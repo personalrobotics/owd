@@ -1,0 +1,12 @@
+<package>
+  <description brief="OpenWAM driver">
+     ROS driver for the Barrett WAM
+  </description>
+  <author>Mike Vande Weghe (vandeweg@cmu.edu)</author>
+  <license>LGPL</license>
+  <depend package="roscpp"/>
+  <depend package="std_msgs"/>
+<export>
+  <cpp cflags="-I${prefix}/srv/cpp -I${prefix}/msg/cpp"/>
+</export>
+</package>

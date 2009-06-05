@@ -1,0 +1,34 @@
+HOW TO CREATE LAPACK AND BLAS LIBRARIES
+
+1. Get gfortran from from package manager or download the binaries from http://gcc.gnu.org/wiki/GFortranBinaries.
+1.5 If you get Binaries, follow these install instructions, this will not interfere with any current compilers on the system:
+
+    (i) Download the linux binary from http://gcc.gnu.org/wiki/GFortranBinaries 32/64bit accroding to requirements.
+    
+    (ii) cd to the directory where you wish to install gfortran; let us say $mypath, which might conveniently be /home or /home/myname or /etc (or even /).
+    
+    (iii) tar -zxvf $path_to_download/gfortran-linux.tar.gz This will create a directory irun, under $mypath that contains gfortran-4.2 and gcc-4.2 plus associated libraries. This will not interfere with any other compiler.
+    
+    (iii) $mypath/irun/bin/gfortran --version will tests that all is well. You should see GNU Fortran 95 (GCC) 4.2.0 20060602 (experimental) Copyright (C) 2006 Free Software Foundation, Inc.
+    
+    GNU Fortran comes with NO WARRANTY, to the extent permitted by law. You may redistribute copies of GNU Fortran under the terms of the GNU General Public License. For more information about these matters, see the file named COPYING
+    
+    (iv) I have to confess that on my solo user system, I use $mypath = "", so that the invocation is /irun/bin/gfortran You might find it cleaner to use /etc
+    
+    (v) You will need to set LD_LIBRARY_FLAG or compile with -static.
+    
+    (vi) Assuming that you are using bash, find your .bash_profile and add the line,
+    
+    export LD_LIBRARY_PATH=$mypath/irun/lib alternatively, invoke bash at the command line and enter this previous line.
+
+2. Download the LAPACK source (BLAS is included) from http://www.netlib.org/lapack/
+
+3. Untar the source to $lapack, enter the $lapack directory.
+
+4. Do cp $lapack/INSTALL/make.inc.gfortran make.inc
+
+5. Type "make blaslib" (unless you somehow already have BLAS installed)
+
+6. Type "make" (this will take a long time)
+
+You should now have two libraries: lapack_LINUX.a and blas_LINUX.a . If you want to link to these files, make sure that libgfortran is also linked-to in your makefile. Note that libgfortran will be in the $mypath/irun/lib directory if you downloaded the binaries.

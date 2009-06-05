@@ -1,0 +1,199 @@
+/*
+  Copyright 2006 Simon Leonard
+
+  This file is part of openwam.
+
+  openman is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License as published by
+  the Free Software Foundation; either version 3 of the License, or (at your
+  option) any later version.
+
+  openman is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#include <semaphore.h>
+#include <list>
+
+#include "CANbus.hh"
+#include "Joint.hh"
+#include "Motor.hh"
+#include "ControlLoop.hh"
+#include "Link.hh"
+#include "Kinematics.hh"
+#include "Dynamics.hh"
+
+#include "PulseTraj.hh"
+#include "SE3Traj.hh"
+#include "SE3CtrlPD.hh"
+#include "JointsTraj.hh"
+#include "JointCtrlPID.hh"
+#include "ParaJointTraj.hh"
+#include "MacJointTraj.hh"
+#include "Sigmoid.hh"
+
+#ifndef __WAM_H__
+#define __WAM_H__
+
+using namespace std;
+
+class WAMstats{
+public:
+  double trajtime;
+  double jsctrltime;
+  int safetycount;
+  double loopread;
+  double loopctrl;
+  double loopsend;
+  double looptime;
+  double slowcount;
+  double slowavg;
+  double slowreadtime;
+  double slowctrltime;
+  double slowsendtime;
+  double dyntime;
+
+  WAMstats() : trajtime(0.0f),
+	       jsctrltime(0.0f),
+	       safetycount(0),
+	       loopread(0.0f),
+	       loopctrl(0.0f),
+	       loopsend(0.0f),
+	       looptime(0.0f),
+	       slowcount(0.0f),
+	       slowavg(0.0f),
+	       slowreadtime(0.0f),
+	       slowctrltime(0.0f),
+	       slowsendtime(0.0f),
+	       dyntime(0.0f)
+  {}
+
+  void rosprint() const;
+  
+};
+
+
+class WAM{
+public:
+  static const double mN1 = 41.782;  //joint ratios
+  static const double mN2 = 27.836;
+  static const double mN3 = 27.836;
+  static const double mN4 = 17.860;
+  static const double mN5 =  9.68163;
+  static const double mN6 =  9.68163;
+  static const double mN7 = 14.962;
+  static const double mn3 =  1.68;
+  static const double mn6 =  1.00;
+
+  static const double M2_MM2 = 1.0/1000000;
+
+
+  pthread_mutex_t mutex;                   // Use to lock the WAM
+  Joint joints[Joint::Jn+1];               // Array of joints
+  Motor motors[Motor::Mn+1];               // Array of motors
+  Link links[Link::Ln+1];                  // Array of links
+  double heldPositions[Joint::Jn+1];       // use if you want to hold some joint pos
+  bool suppress_controller[Joint::Jn+1];    // flag to disable PID control
+  bool check_safety_torques;
+  double pid_torq[Joint::Jn+1];
+ 
+  double A,B,C,D,E,F;                      // WTF?
+  SE3 E0n;                                 // forward kinematics transformation
+
+  SE3Traj     *se3traj;                    // Cartesian trajectory
+  SE3CtrlPD    se3ctrl;                    // basic Cartesian controller
+  //  ParaJointTraj  *jointstraj;                 // joints trajectories
+  Trajectory *jointstraj;
+  PulseTraj   *pulsetraj;                  // trajectory of joint acceleration pulses
+  JointCtrlPID jointsctrl[Joint::Jn+1];    // joint controllers
+
+  bool rec;                                // Are we recording data
+  bool wsdyn;                              // Is the WS dynamics turned on?
+  bool jsdyn;                              // Is the JS dynamics turned on?
+  bool holdpos;                            // Should we hold position?
+  bool exit_on_pendant_press;              // once running, should we exit if the user
+                                           // presses e-stop or shift-idle?
+  double pid_sum;
+  int pid_count;
+  bool safety_hold;
+
+  WAMstats stats;
+  inline void rosprint_stats() { stats.rosprint(); bus->rosprint_stats();}
+
+  int load(const char* fn);
+  int loadctrl(const char* fn);
+   
+  int recv_mpos();
+  int send_mtrq();
+
+  void mpos2jpos();
+  void jpos2mpos();   
+  void jtrq2mtrq();
+
+  R6 WSControl(double dt);
+  void JSControl(double qdd[Joint::Jn+1], double dt);
+  void newJSControl(double q_target[], double q[], double dt, double pid_torq[]); // Mike
+
+  void lock(const char *name=NULL);
+  void unlock(const char *name=NULL);
+
+  CANbus* bus;                             // pointer to the CAN bus
+  ControlLoop ctrl_loop;            // control loop object
+
+  WAM(CANbus* cb);
+   
+  int init();                       // initialise the WAM
+  void dump();                      // print information of the WAM
+
+  void printjpos();                 // print joints positions
+  void printmtrq();                 // print motor torques
+
+  int start();                      // start the control loop
+  void stop();                      // stop the control loop
+  void newcontrol(double dt);          // main control function
+  bool safety_torques_exceeded(double t[]); // check pid torqs against thresholds
+
+  int  set_jpos(double pos[Joint::Jn+1]);   // set the joint positions
+  void get_current_data(double *pos, double *trq, double *nettrq); // get the
+  //       joint positions, torques, and net torques (any pointer can be NULL)
+  void get_jtrq(double trq[Joint::Jn+1]);   // get the joint torques
+  void get_net_jtrq(double trq[Joint::Jn+1]); // get the net joint torques
+
+  int hold_position(double jval[] = NULL, bool grab_lock=true); // call to hold current position.
+                                            // returns position if pointer is supplied.
+  void release_position(bool grab_lock=true
+);          // call to release current position from PID control
+  void set_stiffness(float stiffness); // how "hard" to hold position
+  void move_sigmoid(const SE3& E0ns);
+  void move_sigmoid(const double q[Joint::Jn+1]);
+  void move_trapezoid(const SE3& E0ns);
+  void move_trapezoid(const double q[Joint::Jn+1]);
+
+  int run_trajectory(Trajectory *traj);  // start a trajectory
+  int pause_trajectory();
+  int resume_trajectory();
+  int cancel_trajectory();
+
+  bool& wsdynamics(){return wsdyn;} // use to set the dynamics
+  bool& jsdynamics(){return jsdyn;} // use to set the dynamics
+  
+  bool& record(){return rec;}       // use to set the recording
+  SE3 FK(){  SE3 e0n; lock();   e0n=E0n;   unlock();   return e0n;  }
+
+  friend ostream& operator << (ostream& s, WAM& wam);
+
+  typedef enum {MOTORS_OFF,MOTORS_IDLE,MOTORS_ACTIVE} motor_state_t;
+  motor_state_t motor_state;
+
+  float stiffness;
+
+
+};
+
+#endif
+

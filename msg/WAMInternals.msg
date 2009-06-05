@@ -1,0 +1,9 @@
+float64[] mass
+float64[] inertia
+float64[] gravity_torque
+float64[] dynamic_torque
+float64[] friction_torque
+float64[] error_torque
+float64[] position_error
+float64 trajectory_current_time
+float64 trajectory_end_time

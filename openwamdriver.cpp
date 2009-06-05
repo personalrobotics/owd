@@ -1,0 +1,1870 @@
+/*
+ *  openwamdriver.cpp
+ *  A ROS driver for the Barrett WAM arm.
+ *  Copyright 2009, Mike Vande Weghe, Carnegie Mellon University
+ *
+ */
+
+// #define CALIBRATE_ON_STARTUP
+// to do:
+// test velocity limits
+
+// clear the traj when done
+// decide which value to use for queued trajectories; last point of previous
+// traj or current point.  i guess wait to decide until you're ready to execute.//
+// good scenario:  multiple trajs come in, each one matches previous, ok to
+// chain together, doesn't hurt to add current position right before executing
+// each one.
+//
+// bad scenario: multiple trajs, one is aborted.  don't want to continue with
+// future trajs.  could just clear queue when you abort one.
+
+
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <stdio.h>
+#include <syslog.h>
+#include <sys/time.h>
+#include <sys/timeb.h>
+
+#include <PulseTraj.hh>
+#include <ServoTraj.hh>
+
+#define SAFETY_MODULE 10
+
+extern int MECH,AP,ZERO,IFAULT;
+extern int ADDR, VALUE, MODE;
+extern int dyn_active_link;
+namespace Dynamics {
+extern double g;
+}
+
+extern double fv[8];  // viscous friction from Dynamics.cc
+extern double fs[8];  // static friction from Dynamics.cc
+
+#include <term.h>
+
+#include "openwamdriver.h"
+#include "ParabolicSegment.hh"
+
+
+WamDriver::WamDriver(const char *name) :
+  robotname(name),  cmdnum(0), nJoints(Joint::Jn)
+
+{
+  gravity_comp_value=1.0;
+  min_accel_time=1.0;
+  max_joint_vel.push_back(1.0); // J1
+  max_joint_vel.push_back(1.0); // J2
+  max_joint_vel.push_back(1.0); // J3
+  max_joint_vel.push_back(1.0); // J4
+  max_joint_vel.push_back(2.0); // J5
+  max_joint_vel.push_back(2.0); // J6
+  max_joint_vel.push_back(1.0); // J7
+  
+  for (unsigned int j=0; j<nJoints; ++j) {
+    joint_vel.push_back(max_joint_vel[j]);
+    joint_accel.push_back(joint_vel[j]/min_accel_time);
+  }
+#ifdef FAKE7
+  wamstate.positions.resize(7,0.0f);
+  // not implemented yet: ws.velocities.resize(nJoints,0f);
+  wamstate.torques.resize(7,0.0f);
+#else
+  wamstate.positions.resize(nJoints);
+  // not implemented yet: ws.velocities.resize(nJoints,0f);
+  wamstate.torques.resize(nJoints,0.0f);
+#endif // FAKE7
+
+  // create a dummy previous trajectory
+  owd::TrajInfo ti;
+  ti.id=cmdnum;  // next will be incremented, so it will never match
+#ifdef FAKE7
+  ti.end_position.resize(7,0.0f);
+#else
+  ti.end_position.resize(nJoints,0.0f);
+#endif
+  ti.options = 0;
+  wamstate.prev_trajectory = ti;
+}
+
+bool WamDriver::Init(const char *joint_cal_file)
+{
+  ROS_INFO("Wam driver initializing");
+  ROS_DEBUG("  Gravity comp value = %1.1fg",gravity_comp_value);
+  joint_calibration_file = strdup(joint_cal_file);
+  
+  char speedstr[200], accelstr[200];
+  strcpy(speedstr,""); strcpy(accelstr,"");
+  for (unsigned int j = 0; j < nJoints; ++j) {
+    sprintf(speedstr+strlen(speedstr),"%3.0f ",joint_vel[j] * 180.0/3.141592654);
+    sprintf(accelstr+strlen(accelstr),"%3.0f ",joint_accel[j]*180.0/3.141592654);
+  }
+  
+  ROS_DEBUG("Max motion limits: joint speed (deg/s) = [ %s]",speedstr);
+  ROS_DEBUG("                 joint accel (deg/s/s) = [ %s]",accelstr);
+  
+  if (bus.load() == OW_FAILURE) {
+    ROS_FATAL("Unable to load bus definition file (bus4.dat or bus7.dat)");
+    return false;
+  }
+  if (bus.open() == OW_FAILURE) {
+    ROS_FATAL("Unable to open CANbus device");
+    return false;
+  }
+  
+  bool powerup = false;
+  if (bus.check() == OW_FAILURE) {
+    // Get the WAM into Idle mode
+    ROS_FATAL("  Unable to communicate with the WAM.  Please do the following:");
+    ROS_FATAL("    1. Turn on the WAM");
+    ROS_FATAL("    2. Move it to its home position");
+    ROS_FATAL("    3. Release all e-stops and press Shift-Idle on the pendant");
+    powerup=true;
+    do {
+      usleep(100000); // wait for the user, and try again
+    } while (bus.check() == OW_FAILURE);
+  }
+  
+  long WamWasZeroed = 0;
+  if (bus.get_property(SAFETY_MODULE, ZERO, &WamWasZeroed) == OW_FAILURE) {
+    ROS_FATAL("Unable to query safety puck");
+    return false;
+  }
+  
+  owam = new WAM(&bus);
+  if (owam->init() == OW_FAILURE) {
+    ROS_FATAL("Failed to initialize WAM instance");
+    return false;
+  }
+  
+  
+  // Read our motor offsets from file (if found) and apply them
+  // to the encoder values
+  if (WamWasZeroed) {
+    ROS_DEBUG("Wam was already zeroed from a previous run; motor offsets unchanged.");
+    start_control_loop();
+    Dynamics::g=9.81; // turn on Gravity
+    owam->jsdynamics() = true; // turn on feed-forward dynamics
+    
+    //#define CALIBRATE_ON_STARTUP
+#ifdef CALIBRATE_ON_STARTUP
+    calibrate_joint_angles();
+#endif // CALIBRATE_ON_STARTUP
+    
+  } else {
+    if (!powerup) {
+      // still need to tell the user what to do
+      ROS_FATAL("\007WAM did not retain its encoder values\007.");
+      ROS_FATAL("Please move the WAM to its home position.");
+    }
+    bool good_home;
+    do {
+      set_home_position();
+      start_control_loop();
+      Dynamics::g=0.0; // turn off Gravity
+      owam->jsdynamics() = true; // turn on feed-forward dynamics
+      
+#ifdef CALIBRATE_ON_STARTUP
+      calibrate_joint_angles();
+#endif // CALIBRATE_ON_STARTUP
+      
+      ROS_INFO("Robot will make small movements to verify home position, and");
+      ROS_INFO("then will turn on gravity compensation.");
+      good_home = verify_home_position();
+      if (!good_home) {
+	// wait until Shift-Idle is pressed
+	while (bus.get_puck_state()== 2) {
+	  usleep(50000);
+	}
+	owam->jsdynamics()=false;
+	stop_control_loop();
+      }
+    } while (!good_home);
+    Dynamics::g=9.81; // turn on Gravity
+  }
+  owam->exit_on_pendant_press=true; // from now on, exit if the user hits e-stop or idle
+  
+#ifdef HANDLINK
+  hand_dev.device = NULL;
+  
+  if(cf->ReadDeviceAddr(&hand_dev.addr, section, "requires", PLAYER_POSITION3D_CODE, -1, NULL)) {
+    ROS_WARN("Didn't read hand device address");
+  }
+  
+#endif // HANDLINK
+  return true;
+}
+
+WamDriver::~WamDriver() {
+  owam->jsdynamics() = false;
+  
+#ifdef AUTO_SHUTDOWN // (not quite working)
+  for (int p=1; p<8; p++) {
+    if (bus.set_property(p,MODE,0,false) == OW_FAILURE) {
+      ROS_FATAL("Error changing mode of puck %d",p);
+      throw -1;
+    }
+  }
+  if (bus.set_property(10,MODE,0,false) == OW_FAILURE) {
+    ROS_FATAL("Error changing mode of puck 10");
+    throw -1;
+  }
+#endif  // AUTO_SHUTDOWN
+  
+  owam->stop();
+  ROS_INFO("WAM driver exiting normally");
+}
+
+
+Trajectory *WamDriver::BuildTrajectory(owd::JointTraj &jt) {
+
+  cmdnum++;
+
+  // check to see if we can use a MacJointTraj (currently doesn't
+  //    support segments with zero-radius blends at both ends)
+  bool unblended_segment = false;
+  char debug_str[500];
+  sprintf(debug_str,"trajectory blend radii: %1.2f",jt.blend_radius[0]);
+  unsigned int bad_i=0;
+  for (unsigned int i=0; i<jt.blend_radius.size()-1; ++i) {
+    if (strlen(debug_str) < 490) {
+      sprintf(debug_str+strlen(debug_str)," %1.2f",jt.blend_radius[i+1]);
+    }
+    if (!unblended_segment
+	&& (jt.blend_radius[i] == 0.0) 
+	&& (jt.blend_radius[i+1] == 0.0)) {
+      unblended_segment=true;
+      bad_i=i;
+      // leave out the break for now in order to collect all the radii
+      // in the print message
+      // break;
+    }
+  }
+  
+  TrajType traj;
+  try {
+    traj=ros2owd_traj(jt);
+  } catch (char *error) {
+    ROS_ERROR_NAMED("BuildTrajectory","Could not extract valid trajectory: %s",
+		    error);
+    return NULL;
+  }
+  bool bWaitForStart=(jt.options & jt.opt_WaitForStart);
+  bool bHoldOnStall=(jt.options & jt.opt_HoldOnStall);
+  
+  if (unblended_segment || (jt.blend_radius.size()<3)) {
+    ROS_WARN_NAMED("BuildTrajectory","Unable to use blended trajectory due to zero-radius ends on segment %d",bad_i);
+    ROS_WARN_NAMED("BuildTrajectory",debug_str);
+
+    // need to use a ParaJointTraj (no blends)
+    try {
+      ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,cmdnum);
+      ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
+      ROS_DEBUG_NAMED("BuildTrajectory","Segments=%d, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
+      
+      return paratraj;
+    } catch (const char * error) {
+      ROS_ERROR_NAMED("BuildTrajectory","Error building parabolic traj: %s",
+		      error);
+      return NULL;
+    }
+  } else {
+    // can use a MacJointTraj (blends at points)
+    try {
+      MacJointTraj *mactraj = new MacJointTraj(traj,joint_vel, joint_accel,
+					       bWaitForStart,bHoldOnStall,
+					       cmdnum);
+      ROS_DEBUG_NAMED("BuildTrajectory","MacFarlane blended trajectory built");
+      ROS_DEBUG_NAMED("BuildTrajectory",debug_str);
+      return mactraj;
+    } catch (const char *error) {
+      ROS_ERROR_NAMED("BuildTrajectory","Error building blended traj: %s",
+		      error);
+      return NULL;
+    }
+  }
+}
+
+TrajType WamDriver::ros2owd_traj (owd::JointTraj &jt) {
+  TrajType traj;
+  if (jt.positions.size() != jt.blend_radius.size()) {
+    throw "Bad ROS trajectory: mismatched number of points";
+  }
+  ROS_DEBUG_NAMED("trajectory","Converting trajectory of %d points",jt.positions.size());
+  for (unsigned int i=0; i<jt.positions.size(); ++i) {
+    JointPos jp = jt.positions[i].j;
+    TrajPoint tp(jp,jt.blend_radius[i]);
+    traj.push_back(tp);
+  }
+  return traj;
+}
+
+
+#ifdef MAIN
+////////////////////////////////////////////////////////////////////////////////
+// Main function for device thread
+void WamDriver::Main() 
+{
+    ScreenBuf::log_message("Use space to pause a trajectory, q to quit driver\n");
+
+    int pointcount = 0;
+    char *jvalstr = NULL;
+    size_t jvalsize = 0;
+    static bool pause_status =false;
+
+
+    // The main loop; interact with the device here
+    for(;;) {
+        // test if we are supposed to cancel
+        pthread_testcancel();
+        
+        char cmd;
+        // look to see if user is trying to send a keyboard command.
+        // this only works because we did the right tcsetattr call
+        // above; otherwise we'd have to wait for a <return>.
+        int numvals;
+
+        if (read(fileno(stdin),&cmd,1)) {
+            switch (cmd) {
+            case ' ' :
+                if (pause_status) {
+                    owam->resume_trajectory();
+                    pause_status = false;
+                    ScreenBuf::log_message("Trajectory resumed.");
+                } else {
+                    owam->pause_trajectory();
+                    pause_status = true;
+                    ScreenBuf::log_message("Trajectory paused.");
+                }
+                break;
+            case 27: // ESC char
+                owam->cancel_trajectory();
+                owam->release_position();
+                break;
+            case 'H':
+                owam->hold_position();
+                break;
+            case 'h':
+                owam->release_position();
+                break;
+            case 'q' :
+                this->~WamDriver();
+                exit(0);
+                break;
+            case 'w':
+                write_pulse_data();
+                break;
+            case 'c' :
+            case 'C' :
+                // calibration mode
+                calibrate_joint_angles();
+                break;
+#ifdef USE_BARRETT
+            case 'l' :
+            case 'L' :
+                // read in new laser-derived calibration values
+                printf("Enter a comma-separated list of %d joint adjustments:\n",wam->dof);
+                vect_n *offsets = new_vn(wam->dof);
+
+                // restore terminal settings to cannonical input
+                tcsetattr(fileno(stdin), TCSANOW, &initial_termattr);
+                getline(&jvalstr,&jvalsize,stdin);
+                // re-enable immediate keypress input
+                tcsetattr(fileno(stdin), TCSANOW, &immediate_termattr);
+          
+                ScreenBuf::log_message("\nRead in \"%s\"\n",jvalstr);
+                char *t = jvalstr;
+                numvals = strcount_vn(&t," \n\r"); // validate string and count the number of values
+                if (numvals != wam->dof) {
+                    ScreenBuf::log_message("Expecting %d values but only got %d; aborted.\n",
+                             wam->dof,numvals);
+                    break;
+                }
+                csvto_vn(offsets,jvalstr);
+                ScreenBuf::log_message("Read the following offsets:\n");
+                ScreenBuf::log_message("   %2.8f",offsets->q[0]);
+                for (int i = 1; i < numvals; i++) {
+                    printf(", %2.8f",offsets->q[i]);
+                }
+                printf("\n");
+                setmode_bts(&(wam->Jsc),SCMODE_IDLE);
+                apply_joint_offsets(offsets->q);
+                setmode_bts(&(wam->Jsc),SCMODE_POS);
+                break;
+#endif // USE_BARRETT
+            case 'v' :
+                // override joint velocities, for tuning
+                printf("Enter new joint velocity (deg/sec):\n");
+                
+                // restore terminal settings to cannonical input
+                tcsetattr(fileno(stdin), TCSANOW, &initial_termattr);
+                float new_vel;
+                if ((scanf("%f",&new_vel) == 1) &&
+                    (new_vel > 0) && 
+                    (new_vel < 360.0f)) {
+                    for (int j = 0; j < nJoints; ++j) {
+                        joint_vel[j] = new_vel * 3.141592654/180.0;
+                        joint_accel[j]=joint_vel[j]/min_accel_time;
+                    }
+                    ScreenBuf::log_message("All joints set to velocity of %3.0f deg/s\n",new_vel);
+                } else {
+                    ScreenBuf::log_message("Unable to parse value; velocities unchanged.\n");
+                }
+
+                // re-enable immediate keypress input
+                tcsetattr(fileno(stdin), TCSANOW, &immediate_termattr);
+                break;
+                
+            case 'a' :
+                // override joint accelerations, for tuning
+                printf("Enter new min accel time (secs):\n");
+                
+                // restore terminal settings to cannonical input
+                tcsetattr(fileno(stdin), TCSANOW, &initial_termattr);
+                float new_accel_time;
+                if ((scanf("%f",&new_accel_time) == 1) && 
+                    (new_accel_time > 0) &&
+                    (new_accel_time < 10.0)) {
+                    min_accel_time=new_accel_time;
+                    for (int j = 0; j < nJoints; ++j) {
+                        joint_accel[j] = joint_vel[j]/min_accel_time;
+                    }
+                    ScreenBuf::log_message("Min accel time set to %3.0f sec\n",min_accel_time);
+                } else {
+                    ScreenBuf::log_message("Invalid value; accels unchanged.\n");
+                }
+
+                // re-enable immediate keypress input
+                tcsetattr(fileno(stdin), TCSANOW, &immediate_termattr);
+                break;
+            case 'g' :
+                // gravity-comp tuning mode
+                calibrate_wam_mass_model();
+                // re-enable immediate keypress input
+                tcsetattr(fileno(stdin), TCSANOW, &immediate_termattr);
+                break;
+            default :
+                break;
+            }
+        }
+        static int count = 0;
+        if (++count == 20) {  // no need to print every time
+            ScreenBuf::clear_and_print();
+            count = 0;
+        }
+
+        if (owam->jointstraj) {
+            static char trajmsg[100];
+            switch (owam->jointstraj->state()) {
+            case ParaJointTraj::RUN:
+                sprintf(trajmsg,"Trajectory: running");
+                break;
+            case ParaJointTraj::STOP:
+                sprintf(trajmsg,"Trajectory: stopped");
+                break;
+            case ParaJointTraj::DONE:
+                sprintf(trajmsg,"Trajectory: done");
+                break;
+            case ParaJointTraj::LOG:
+                // no message (logging should be brief anyway)
+                break;
+            }
+            ScreenBuf::traj_msg = trajmsg;
+        } else if (owam->holdpos) {
+            ScreenBuf::traj_msg = "Holding position";
+        } else {
+            ScreenBuf::traj_msg = "free to move";
+        }                
+        _curarmdata.actuators_count = nJoints;
+        static uint8_t old_arm_state = PLAYER_ACTARRAY_ACTSTATE_IDLE;
+        for(int i = 0; i < nJoints; ++i) {
+            _curarmdata.actuators[i].position = jointpos[i+1];
+            _curarmdata.actuators[i].speed = bCommandExec?joint_vel[i]:0.0f;
+	    _curarmdata.actuators[i].current=jointtorqs[i+1];
+            if (i==0) {
+                if (trajectory) {
+                    // processed trajectory ready to execute
+                    _curarmdata.actuators[0].state = PLAYER_ACTARRAY_ACTSTATE_READY;
+                    _curarmdata.trajectory_id = trajectory->id;
+
+                } else if (owam->jointstraj) { // active trajectory
+                    if (owam->jointstraj->state() == ParaJointTraj::STOP) {
+                        // trajectory is paused
+                        if (owam->safety_hold) {
+                            // paused due to torque limits
+                            _curarmdata.actuators[0].state = PLAYER_ACTARRAY_ACTSTATE_STALLED;
+                        } else {
+                            // paused due to client command
+                            _curarmdata.actuators[0].state = PLAYER_ACTARRAY_ACTSTATE_BRAKED;
+                        }
+                    } else { // running
+                        _curarmdata.actuators[0].state = PLAYER_ACTARRAY_ACTSTATE_MOVING;
+                    }
+                    _curarmdata.trajectory_id = owam->jointstraj->id;
+                } else if (listCommands.size() > 0) {
+                    // no active trajectory, but there are more traj/move commands
+                    // pending, so tell the client we're still moving
+                    _curarmdata.actuators[0].state = PLAYER_ACTARRAY_ACTSTATE_MOVING;
+                    _curarmdata.trajectory_id = 0;
+                } else if (owam->holdpos) { // holding position
+                    _curarmdata.actuators[0].state = PLAYER_ACTARRAY_ACTSTATE_BRAKED;
+                    _curarmdata.trajectory_id = 0;
+                } else { // loose
+                    _curarmdata.actuators[0].state = PLAYER_ACTARRAY_ACTSTATE_IDLE;
+                    _curarmdata.trajectory_id = 0;
+                }
+        }
+        Publish(m_actarray_addr, NULL, PLAYER_MSGTYPE_DATA, PLAYER_ACTARRAY_DATA_STATE, &_curarmdata, sizeof (_curarmdata), NULL);
+
+#if defined(TRAJLOG) && defined(USE_BARRETT)
+        // log actual position to file while running trajectories
+        int trajstate = get_trjstate_bts(&wam->Jsc);
+        if (trajstate == BTTRAJ_RUN) {
+            if (! intraj) {
+                // we just started a trajectory
+                intraj = true;
+                pointcount = 0;
+                gettimeofday(&trajstarttime,NULL);
+                sprintf(wamname,"%s_wam.csv",trajname);
+                wamout = fopen(wamname, "w");
+            }
+            if (wamout && (++pointcount == 10)) {
+                pointcount = 0;
+                // each time through the loop, log every 10th pt only if
+                // the file is already open
+                struct timeval trajcurtime;
+                gettimeofday(&trajcurtime,NULL);
+                double deltatime = double(trajcurtime.tv_sec - trajstarttime.tv_sec) + ((double)(trajcurtime.tv_usec - trajstarttime.tv_usec))/1.0e6;
+                // print time
+                fprintf(wamout,"% 2.8f",deltatime);
+                // print joint values
+                for(int i = 0; i < nJoints; ++i) {
+                    fprintf(wamout,", % 2.8f",((vect_n*)wam->Jpos)->q[i]);
+                }
+                // add the joint error (Jref-Jpos)
+                for(int i = 0; i < nJoints; ++i) {
+                    fprintf(wamout,", % 2.8f",((vect_n*)wam->Jref)->q[i]-((vect_n*)wam->Jpos)->q[i]);
+                }
+                fprintf(wamout,"\n");
+            }
+        } else {
+            if (intraj) {
+                // we just finished a trajectory
+                intraj = false;
+                fclose(wamout);
+                // reuse the same file descriptor, even though it's
+                // not the wamout file
+                wamout = fopen(logfilename,"a");
+                if (wamout) {
+                    fprintf(wamout,"Saved executed trajectory to %s\n",wamname);
+                    fclose(wamout);
+                }
+                
+            }
+        }
+        
+#endif // TRAJLOG && USE_BARRETT
+
+        usleep(40000);
+            
+    }
+    // restore terminal settings
+    tcsetattr(fileno(stdin), TCSANOW, &initial_termattr);
+    }
+}
+#endif // MAIN
+
+    
+void WamDriver::save_joint_offset(double jointval, double *offset) {
+
+    // get the nearest parallel/square angle
+    double newval = get_nearest_joint_value(jointval,40.0);
+    ROS_WARN("\nSet joint to %3f degrees (y/n)?",
+           newval*180/3.141592654);
+    while (char c = getchar()) {
+        if (c == 'y') {
+            *offset = jointval - newval;
+            return;
+        } else if (c == 'n') {
+            return;
+        } else {
+            usleep(10000);
+        }
+    }
+    return;
+}
+
+int WamDriver::get_joint_num() {
+    while (char c = getchar()) {
+        if ((c >= '0') && (c <= '9')) {
+            return (int)(c - '0');
+        } else if ((c == 'q') || (c == 3) || (c == 27)) {
+            // allow abort with q, ctrl-c, or ESC
+            return -1;
+        } else {
+            usleep(10000);
+        }
+    }
+    return 0;
+}
+
+double WamDriver::get_nearest_joint_value(double jointval, double tolerance) {
+    double jointval_deg = jointval * 180.0 / 3.141592654;
+    // check for a variety of multiples of 90-deg, from
+    // -270 to 270, to infer the position that the user
+    // intends to set
+    for (int a = -3; a < 4; a++) {
+        double newval = (double)a * 90.0;
+        if (abs((int)(newval - jointval_deg))  < tolerance) {
+            return newval * 3.141592654/180.0;
+        }
+    }
+    // no match found, so return unchanged value
+    return jointval;
+}
+
+void WamDriver::apply_joint_offsets(double *joint_offsets) {
+    ROS_INFO("New offsets recorded for the following joints:");
+    for (unsigned int j = 1; j <= nJoints; ++j) {
+        if (joint_offsets[j] != 0.0f) {
+            ROS_INFO("  %d = %1.8f radians (%3.6f degrees)",j,joint_offsets[j],joint_offsets[j]*180.0/3.141592654);
+        }
+    }
+
+    ROS_WARN("\n  Return the WAM to the initial position.");
+    ROS_WARN("  Press shift-idle on the pendant when ready.");
+    owam->exit_on_pendant_press=false;
+
+    // wait for shift-idle to be pressed
+    while (bus.get_puck_state()== 2) {
+        usleep(50000);
+    }
+    
+    // turn off gravity and idle the controller
+    owam->jsdynamics()=false;
+    // wait 3sec for the arm to physically stabilize
+    sleep(3);
+    // get the current position
+    double jointpos[nJoints+1];
+    owam->get_current_data(jointpos,NULL,NULL);
+
+    stop_control_loop();
+
+    // tweak the joint angles to apply the offsets
+    double new_joint_angles[Joint::Jn+1];
+    // subtract each offset from the current value
+    // that will force the WAM to have to move that joint
+    // physically further in the offset direction to reach the
+    // same value.  thus if someone provides a positive offset,
+    // the arm will be shifted in the positive direction.
+    for (unsigned int j = 1; j <= nJoints; ++j) {
+        new_joint_angles[j]=jointpos[j]-joint_offsets[j];
+    }
+
+    if (owam->set_jpos(new_joint_angles) == OW_FAILURE) {
+        ROS_ERROR("Failed to set new joint angles");
+        throw -1;
+    }
+
+    // record the AP to MECH offsets for each motor
+    FILE *moff_out = fopen(joint_calibration_file,"w");
+    if (moff_out) {
+        fprintf(moff_out,"WAM encoder offset values\n");
+        for (unsigned int puck_id = 1; puck_id <= nJoints; puck_id++) {
+            long mech;
+            long moff = get_puck_offset(puck_id,&mech);
+            fprintf(moff_out,"%d = %ld %ld\n",puck_id,moff,mech);
+        }
+        fclose(moff_out);
+        ROS_DEBUG("New offsets written to \"%s\"",joint_calibration_file);
+    } else {
+        ROS_ERROR("Error writting to offset file \"%s\"",joint_calibration_file);
+    }
+
+    start_control_loop();
+    owam->jsdynamics()=true;
+
+    ROS_DEBUG("New offsets recorded; server ready.");
+}        
+
+int WamDriver::get_puck_offset(int puckid, long *mechout, long *apout) {
+    long p,mech;
+    if (bus.get_property(bus.pucks[puckid].id(), AP, &p) == OW_FAILURE){
+        cerr << "Failed to get AP" << endl;
+        throw -1;
+    }
+    if(bus.set_property(bus.pucks[puckid].id(), ADDR, 0x84D7, false) == OW_FAILURE){
+        cerr << "Failed to set address of MECH" << endl;
+        throw -1;
+    }
+    if(bus.get_property(bus.pucks[puckid].id(), VALUE, &mech) == OW_FAILURE) {
+        cerr << "Failed to get MECH" << endl;
+        throw -1;
+    }
+    ROS_DEBUG("Puck %d  AP=%ld  OFFSET=%ld  MECH=%ld",puckid,p,p-mech,mech);
+    if (mechout) {
+        // return the value of MECH, too
+        *mechout = mech;
+    }
+    if (apout) {
+        // return the value of AP, too
+        *apout = p;
+    }
+    return p-mech;
+}
+
+void WamDriver::calibrate_joint_angles() {
+/*
+ * Calibration procedure:
+ *   0. At initialization, driver reads AP-MECH offsets from file
+ *   1. Idle the controller, leave gravity comp enabled.
+ *   2. Move joints to known positions, and hit a key to save each joint
+ *      error
+ * OR 2. Use laser pointer and record a bunch of matching joint angles,
+ *      then solve for joint error
+ *   3. Move robot to home position, idle robot, and correct joint angles
+ *      based on errors from #2
+ *   4. Record AP-MECH offsets for each joint and save to file for next time
+ *   5. Switch back to position mode if controller was idled (#1)
+ */
+
+    // Set up stdin to work char-by-char instead of line-by-line
+    struct termios previous_termattr;
+    struct termios new_termattr;
+    tcgetattr(fileno(stdin), &previous_termattr);
+    tcgetattr(fileno(stdin), &new_termattr);
+    new_termattr.c_lflag &= ~ICANON;
+    new_termattr.c_cc[VMIN] =0;
+    new_termattr.c_cc[VTIME] = 0;
+    tcsetattr(fileno(stdin), TCSANOW, &new_termattr);
+
+    // cancel any pending trajectories and ignore future ones
+    discard_movements=true;
+    if (owam->jointstraj) {
+        owam->cancel_trajectory();
+    }
+
+    // set idle mode so that joints can be moved
+    owam->release_position();
+
+    // turn off all the controllers, then go to hold position mode
+    for (unsigned int j=1; j<=nJoints; ++j) {
+        owam->suppress_controller[j]=true;
+    }
+    owam->check_safety_torques=false; // hold positions stiffly
+    owam->hold_position();
+
+    ROS_WARN("Robot is in calibration mode.  For each joint,");
+    ROS_WARN("move it to be parallel or square to the previous");
+    ROS_WARN("joint, then press key 1-7 corresponding to the joint");
+    ROS_WARN("number.");
+    ROS_WARN("'H' will hold a joint angle, 'h' will release it.");
+    ROS_WARN("Hit 'd' when done, or 'q' to quit.");
+    double joint_offsets[nJoints+1];
+    for (unsigned int j = 1; j <=nJoints; ++j) {
+        joint_offsets[j] = 0.0f;
+    }
+    bool done = false;
+    bool save = true;
+    char cmd;
+    unsigned int jnum;
+    double jointpos[nJoints+1];
+    while (!done) {
+      owam->get_current_data(jointpos,NULL,NULL); // update the joint positions
+        if (read(fileno(stdin),&cmd,1)) {
+            switch(cmd) {
+            case 'd' :
+            case 'D':
+                done = true;
+                break;
+            case '1' :
+                save_joint_offset(jointpos[1],joint_offsets + 1);
+                break;
+            case '2' :
+                save_joint_offset(jointpos[2],joint_offsets + 2);
+                break;
+            case '3' :
+                save_joint_offset(jointpos[3],joint_offsets + 3);
+                break;
+            case '4' :
+                save_joint_offset(jointpos[4],joint_offsets + 4);
+                break;
+            case '5' :
+                if (nJoints>4) {
+                    save_joint_offset(jointpos[5],joint_offsets + 5);
+                }
+                break;
+            case '6' :
+                if (nJoints>4) {
+                    save_joint_offset(jointpos[6],joint_offsets + 6);
+                }
+                break;
+            case '7' :
+                if (nJoints>4) {
+                    save_joint_offset(jointpos[7],joint_offsets + 7);
+                }
+                break;
+            case 'h' :
+                // hold a joint angle
+                ROS_WARN("\nHold joint number 1-%d: \n",nJoints);
+                jnum = get_joint_num();
+                if ((jnum > 0) && (jnum <= nJoints)) {
+                    // if it's within 2 deg of parallel or square,
+                    // set it to parallel or square
+                    double holdval = get_nearest_joint_value(jointpos[jnum] - joint_offsets[jnum],2);
+                    owam->heldPositions[jnum] = holdval+joint_offsets[jnum];
+                    owam->jointsctrl[jnum].reset();
+                    owam->jointsctrl[jnum].set(holdval+joint_offsets[jnum]);
+                    owam->jointsctrl[jnum].run();
+                    owam->suppress_controller[jnum]=false;
+                }
+                break;
+            case 'u' :
+                // unhold a joint angle
+                ROS_WARN("\nUnhold joint number 1-%d: \n",nJoints);
+                jnum = get_joint_num();
+                if ((jnum > 0) && (jnum <= nJoints)) {
+                    owam->suppress_controller[jnum]=true;
+                }
+                break;
+            case 'q' :
+            case 'Q' :
+                save = false;
+                done = true;
+            }
+        }
+        for (unsigned int j=1; j <= nJoints; j++) {
+	  printf("%d=% 3.2f  ",j,(jointpos[j] - joint_offsets[j]) * 180.0 / 3.141592654);
+        }
+        printf("    \r");
+        usleep(10000);
+    }
+    owam->release_position();
+    owam->check_safety_torques = true;
+    for (unsigned int j=1; j<=nJoints; ++j) {
+        owam->suppress_controller[j]=false;
+    }
+    if (save) {
+        apply_joint_offsets(joint_offsets);
+    }
+
+    // start accepting trajectories again
+    discard_movements=false;
+    // restore terminal settings
+    tcsetattr(fileno(stdin), TCSANOW, &previous_termattr);
+
+}
+
+
+void WamDriver::calibrate_wam_mass_model() {
+#ifdef USE_OPENWAM
+    ROS_WARN("Robot is in mass calibration mode.  Select a link\n");
+    ROS_WARN("using keys 1-7, then press + or - to increase or\n");
+    ROS_WARN("decrease the link mass, or x/X, y/Y, z/Z to decrease/\n");
+    ROS_WARN("increase the COG distance.\n");
+    ROS_WARN("Hit 'd' when done, or 'q' to quit.\n");
+    char cmd;
+    int active_link = 1;
+    bool done=false;
+    double pulsemag = 4.0;
+    int pulsedur = 200;
+    bool pulsepair = true;
+    static double friction_pulse_lowpos[8]= {0.0,-2.1,-1.5,-2.3, -.4,-4.0,-1.1,-2.5};
+    static double friction_pulse_highpos[8]={0.0, 2.1, 1.5, 2.0, 2.6, 0.8, 1.1, 2.5};
+
+    TrajPoint tp(nJoints);
+    TrajType vtraj;
+    while (!done) {
+        if (read(fileno(stdin),&cmd,1)) {
+            // get the current position
+	  //            for (int j1=1; j1<8; j1++) {
+	  //                tp[j1-1]=ScreenBuf::joint_pos[j1];
+	  //            }
+            if ((cmd >= '1') && (cmd <= '0'+nJoints)) {
+                active_link = cmd - '0';
+                dyn_active_link = active_link;
+            } else {
+                switch(cmd) {
+                case 'q' :
+                    ROS_WARN("Exiting calibration mode.\n");
+                    return;
+                case '+':
+                    owam->links[active_link].mass *= 1.05;
+                    break;
+                case '-':
+                    owam->links[active_link].mass /= 1.05;
+                    break;
+                case 'x':
+                    owam->links[active_link].cog.x[0] /= 1.05;
+                    break;
+                case 'X':
+                    owam->links[active_link].cog.x[0] *= 1.05;
+                    break;
+                case 'y':
+                    owam->links[active_link].cog.x[1] /= 1.05;
+                    break;
+                case 'Y':
+                    owam->links[active_link].cog.x[1] *= 1.05;
+                    break;
+                case 'z':
+                    owam->links[active_link].cog.x[2] /= 1.05;
+                    break;
+                case 'Z':
+                    owam->links[active_link].cog.x[2] *= 1.05;
+                    break;
+                case 'D':
+		  //                    if (ScreenBuf::mode == ScreenBuf::ACCEL_PULSE) {
+                        pulsedur += 100;
+			//                    } else if (ScreenBuf::mode == ScreenBuf::FRICTION_CALIB) {
+                        fv[active_link]+=0.1;
+			//                    }
+                    break;
+                case 'd':
+		  //                    if (ScreenBuf::mode == ScreenBuf::ACCEL_PULSE) {
+                        pulsedur -= 100;
+			//                    } else if (ScreenBuf::mode == ScreenBuf::FRICTION_CALIB) {
+                        fv[active_link]-=0.1;
+			//                    }
+                    break;
+                case 'M':
+                    pulsemag += 1.0;
+                    break;
+                case 'm':
+                    pulsemag -= 1.0;
+                    break;
+                case '/':
+                    pulsepair = !pulsepair;
+                    break;
+                case 'H':
+                    owam->hold_position();
+                    break;
+                case 'h':
+                    owam->release_position();
+                    break;
+                case '\n':
+#ifdef PULSE
+		  if (ScreenBuf::mode == ScreenBuf::ACCEL_PULSE) {
+                        //apply an acceleration pulse at the current joint
+                        owam->lock("OWD: calib mass model");
+                        //delete previous pulse if there is one
+                        if(owam->pulsetraj != NULL)
+                            delete owam->pulsetraj;
+                        if (pulsepair) {
+                            owam->pulsetraj = new PulseTraj(pulsemag,pulsedur,pulsedur/2,active_link);
+                        } else {
+                            owam->pulsetraj = new PulseTraj(pulsemag,pulsedur,0,active_link);
+                        }
+                        owam->unlock("OWD: calib mass model");
+		} else if (ScreenBuf::mode == ScreenBuf::FRICTION_CALIB) {
+                        // run a velocity traj on the current joint
+                        joint_accel[active_link-1]=joint_vel[active_link-1]=ScreenBuf::friction_pulse_velocity;
+                        vtraj.clear();
+                        // the first point in the trajectory will have most joint values the
+                        // same as the current position, but the active joint set to the low
+                        // pulse position
+                        tp[active_link-1]=friction_pulse_lowpos[active_link];
+                        vtraj.push_back(TrajPoint(tp));
+                        // the second trajectory point will have the active joint set to the
+                        // high pulse position
+                        tp[active_link-1]=friction_pulse_highpos[active_link];
+                        vtraj.push_back(TrajPoint(tp));
+			//                        ExecuteTrajectory(vtraj,false,false,false,false,0);
+                        // restore the joint velocities
+                        joint_vel[active_link-1]=max_joint_vel[active_link-1];
+                        joint_accel[active_link-1]=joint_vel[active_link-1]/min_accel_time;
+                    } else if (ScreenBuf::mode == ScreenBuf::TRAJ_RECORD) {
+#endif // PULSE
+                        // add current position to point list
+                        vtraj.push_back(TrajPoint(tp));
+#ifdef PULSE
+                    }
+#endif // PULSE
+                    break;
+                case 'w':
+		  //                    if (ScreenBuf::mode == ScreenBuf::ACCEL_PULSE) {
+                        //write pulse trajectory positions to file
+                        write_pulse_data();
+#ifdef DIAG
+			//                    } else if (ScreenBuf::mode == ScreenBuf::TRAJ_RECORD) {
+                        // write list of points to file
+                        char point_fname[100];
+                        sprintf(point_fname,"collected_points_%d",point_filenum++);
+                        log_rave_trajectory(point_fname,vtraj);
+                        vtraj.clear();
+                        ScreenBuf::savedpoints=0;
+                        ROS_WARN("Saved points written to %s",point_fname);
+#endif // DIAG
+			//                    }
+                    break;
+                case 'S':
+                    fs[active_link]+=0.1;
+                    break;
+                case 's':
+                    fs[active_link]-=0.1;
+                    break;
+                case 'V':
+		  //                    ScreenBuf::friction_pulse_velocity+= 0.05f;
+                    break;
+                case 'v':
+		  //                    ScreenBuf::friction_pulse_velocity-= 0.05f;
+                    break;
+                case 'A':
+		  //                    ScreenBuf::mode = ScreenBuf::ACCEL_PULSE;
+                    break;
+                case 'F':
+		  //                    ScreenBuf::mode = ScreenBuf::FRICTION_CALIB;
+                    break;
+                case 'T':
+		  //                    ScreenBuf::mode = ScreenBuf::TRAJ_RECORD;
+                    vtraj.clear();
+                    break;
+                case 'N':
+		  //                    ScreenBuf::mode = ScreenBuf::NONE;
+                    break;
+                }
+            }
+        }
+        usleep(20000);
+    }
+#endif // USE_OPENWAM
+}
+
+
+void WamDriver::write_pulse_data() {
+    if(owam->pulsetraj != NULL && owam->pulsetraj->done && !owam->pulsetraj->record) {
+        fstream filestream;
+        filestream.open("pulsetraj.txt", ios::out);
+        for(unsigned int i = 0; i < owam->pulsetraj->posvals.size(); i++) {
+            for(unsigned int j = 0; j < nJoints;j++){
+                filestream << owam->pulsetraj->posvals[i][j]; 
+                filestream <<  ", ";
+            }
+            for(unsigned int j = 0; j < nJoints;j++) {
+                filestream << owam->pulsetraj->velvals[i][j]; 
+                filestream <<  ", ";
+            }
+            for(unsigned int j = 0; j < nJoints;j++) {
+                filestream << owam->pulsetraj->accelvals[i][j]; 
+                filestream <<  ", ";
+            }
+            for(unsigned int j = 0; j < nJoints;j++) {
+                filestream << owam->pulsetraj->trqvals[i][j]; 
+                if(j != nJoints -1) {
+                    filestream <<  ", ";
+                }
+            }
+            filestream << endl;
+        }
+        filestream.close();
+    }
+    ROS_DEBUG("Pulse data written to pulsetraj.txt");
+}
+
+
+
+
+void WamDriver::set_home_position() {
+
+	ROS_WARN("\007When ready, type HOME<return>\007");
+	char *line=NULL;
+	size_t linelen = 0;
+	getline(&line,&linelen,stdin);
+	while (strncmp(line,"HOME",4)) {
+        ROS_WARN("\007\nYou must type the word HOME and press <return>\007");
+        getline(&line,&linelen,stdin);
+    }
+    free(line);
+    
+    if (FILE *moff_file = fopen(joint_calibration_file,"r")) {
+      ROS_INFO("Applying encoder offsets from file %s",joint_calibration_file);
+        long initial_mech[nJoints+1];
+        for (unsigned int m =1; m <= nJoints; ++m) {
+            puck_offsets[m] = initial_mech[m]=0;
+        }
+        char *jvalstr = NULL;
+        size_t jsize = 0;
+        getline(&jvalstr,&jsize,moff_file); // getline will do the malloc
+        if (strncmp(jvalstr,"WAM encoder offset values",strlen("WAM encoder offset values"))) {
+            ROS_ERROR("Unrecognized format in joint calibration file \"%s\"",joint_calibration_file);
+            goto NOCALIB;
+        } else {
+            int puck_id;
+            long offset, initial;
+            unsigned int puckcount=0;
+            while (fscanf(moff_file,"%d = %ld %ld\n",
+                          &puck_id,&offset,&initial) ==3 ) {
+                puck_offsets[puck_id] = offset;
+                initial_mech[puck_id] = initial;
+                puckcount++;
+            }
+            if (puckcount != nJoints) {
+                ROS_ERROR("Unrecognized format in joint calibration file \"%s\"",joint_calibration_file);
+                goto NOCALIB;
+            }
+            long apvals[bus.npucks+1];
+            for (puck_id = 1; puck_id<=bus.npucks; ++puck_id) {
+                long mech;
+                long old_AP;
+                
+                get_puck_offset(bus.pucks[puck_id].id(),&mech,&old_AP);
+
+#ifdef VERBOSE
+                cout << "Puck " << puck_id << " MECH=" << mech << endl;
+#endif // VERBOSE                
+                // Check to make sure we're mapping the offset to
+                // the nearest half-rev of the motor.  If it looks like
+                // we're more than half a rev away for when we saved
+                // the offset, add or subtract a full revolution.
+                long puckdiff = mech - initial_mech[puck_id];
+                if (puckdiff < -2048) {
+                    apvals[puck_id] = mech + puck_offsets[puck_id] + 4096;
+                } else if (puckdiff > 2048) {
+                    apvals[puck_id] = mech + puck_offsets[puck_id] - 4096;
+                } else {
+                    apvals[puck_id] = mech + puck_offsets[puck_id];
+                }
+                
+                ROS_DEBUG("Changing puck %d from AP=%ld to %ld",puck_id,old_AP,apvals[puck_id]);
+            }
+            ROS_DEBUG("Setting new positions");
+            if (bus.send_AP(apvals) == OW_FAILURE) {
+                ROS_FATAL("Unable to update pucks with calibrated home position");
+                throw -1;
+            }
+            ROS_DEBUG("Positions set");
+        }
+        free(jvalstr);
+        fclose(moff_file);
+    } else {
+    NOCALIB:
+        ROS_WARN("Could not read WAM calibration file \"%s\";",joint_calibration_file);
+        ROS_WARN("using home position values instead.");
+        double wamhome[8] = {9999,  // dummy value in zero position
+                             -2.66, 1.97, -2.80, -0.83, 1.309, 0, 3.02}; // J1-J7
+        
+        if (owam->set_jpos(wamhome) == OW_FAILURE) {
+            ROS_FATAL("Unable to define WAM home position");
+            throw -1;
+        }
+        
+        // record the offsets in case we go into calibration later
+        for (unsigned int i=1; i<=nJoints; ++i) {
+            puck_offsets[i]=get_puck_offset(i);
+        }
+    }
+}
+
+void WamDriver::start_control_loop() {
+    // before starting the control thread, suppress faults and
+    // get the position from the WAM, so that the safety module knows
+    // where it's starting from
+    if(bus.set_property(SAFETY_MODULE, IFAULT, 4, true) == OW_FAILURE){
+        ROS_FATAL("Unable to suppress safety module faults.");
+        throw -1;
+    }
+    double jointpos[nJoints+1];
+    owam->get_current_data(jointpos,NULL,NULL); // update the joint positions
+    // Re-activate the tip velocity-limit checking.
+    if(bus.set_property(SAFETY_MODULE, ZERO, 1, true) == OW_FAILURE){
+        ROS_FATAL("Unable to re-activate safety module.");
+        throw -1;
+    }
+
+    ROS_INFO("Starting control thread");
+
+    if (owam->start() == OW_FAILURE) {
+        ROS_FATAL("Failed to start OpenWAM control thread");
+        throw -1;
+    }
+    // confirm with user
+    ROS_WARN("Verify the following:");
+    ROS_WARN("  1. WAM has %d joints (%s)",nJoints,nJoints==4?"wrist NOT INSTALLED":nJoints==7?"wrist INSTALLED":"WARNING: UNFAMILIAR CONFIG");
+    ROS_WARN("  2. Tool mass is %fkg (%s)",owam->links[nJoints].mass,owam->links[nJoints].mass==1.3?"Barrett Hand with cameras":owam->links[nJoints].mass==0.0?"no tool":"custom tool");
+    
+    ROS_WARN("\nPress Shift-Activate to activate motors and start system.");
+
+#ifdef AUTO_ACTIVATE
+    if (bus.set_property(10,MODE,2,false) == OW_FAILURE) {
+        ROS_FATAL("Error changing mode of puck 10");
+        throw -1;
+    }
+    for (int p=1; p<8; p++) {
+        if (bus.set_property(p,MODE,2,false) == OW_FAILURE) {
+            ROS_FATAL("Error changing mode of puck %d",p);
+            throw -1;
+        }
+    }
+#endif // AUTO_ACTIVATE
+    
+    int retval;
+    // check the mode of puck 1 to detect when active was pressed
+    while (bus.get_puck_state() != 2) {
+      usleep(50000);
+    }
+    
+    if (retval == OW_FAILURE) {
+            ROS_FATAL("Error getting puck mode");
+            throw -1;
+    }
+}
+
+void WamDriver::stop_control_loop() {
+    owam->stop();
+}
+
+bool WamDriver::move_until_stop(int joint, double stop, double limit, double velocity) {
+    double jointpos[nJoints+1];
+    owam->hold_position(jointpos);
+    TrajPoint curpoint(nJoints);
+    curpoint.absolute_time=0;
+    for (size_t i=0; i<curpoint.size(); ++i) {
+        curpoint[i]=jointpos[i+1];
+    }
+    TrajType traj;
+    traj.push_back(curpoint);
+    double curjointpos=curpoint[joint-1];
+    curpoint[joint-1]=limit;
+    traj.push_back(curpoint);
+    std::vector<double> modified_joint_vel(joint_vel);
+    // override the default joint velocity to match what was specified
+    modified_joint_vel[joint-1]=velocity;
+    std::vector<double> modified_joint_accel(joint_accel);
+    // rescale the acceleration to match the new velocity
+    modified_joint_accel[joint-1]=joint_accel[joint-1]*velocity/joint_vel[joint-1];
+    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,true,0);
+    ROS_DEBUG("Moving joint %d from %2.2f to %2.2f",joint,curjointpos,limit);
+    if (owam->run_trajectory(paratraj) == OW_FAILURE) {
+        ROS_ERROR("Error starting joint %d trajectory",joint);
+        return false;
+    }
+
+    // loop until the trajectory finishes or gets stuck
+    owam->lock(); // lock before checking jointstraj
+    while (owam->jointstraj) {
+        if (owam->jointstraj->state() == ParaJointTraj::STOP) {
+            owam->unlock();
+            // joint is stuck, so stop the trajectory
+            ROS_DEBUG("Joint hit torque limit.");
+            owam->cancel_trajectory();
+            owam->lock(); // just so that we can unlock again outside the loop
+            break;
+        }
+        owam->unlock();
+        usleep(50000); // 50ms delay
+        owam->lock(); // lock before rechecking jointstraj
+    }
+    owam->unlock();
+    // check our resting position
+    owam->get_current_data(jointpos,NULL,NULL);
+    ROS_DEBUG("Joint stopped at angle %2.2f",jointpos[joint]);
+    
+    
+    float max_error = 0.12; //norm al error
+    //float max_error = 0.2; //DDB TEMP HACK TO GET J6 TO WORK
+    
+    if ((jointpos[joint] > stop-max_error) && (jointpos[joint] < stop+max_error) ) {
+        // we stopped within .12 radians of the expected position: good!
+        // (the worst-case for being off by one complete motor rev is .15 radians (J1),
+        // so if we're within .12 we're fine.
+        return true;
+    } else {
+        // we stopped somewhere else
+                return false;
+    }
+    return false;
+}
+
+bool WamDriver::move_joint(int joint, double newpos, double velocity) {
+    double jointpos[nJoints+1];
+    owam->hold_position(jointpos);
+    TrajPoint curpoint(nJoints);
+    curpoint.absolute_time=0;
+    for (size_t i=0; i<curpoint.size(); ++i) {
+        curpoint[i]=jointpos[i+1];
+    }
+    TrajType traj;
+    traj.push_back(curpoint);
+    curpoint[joint-1]=newpos;
+    traj.push_back(curpoint);
+    std::vector<double> modified_joint_vel(joint_vel);
+    // override the default joint velocity to match what was specified
+    modified_joint_vel[joint-1]=velocity;
+    std::vector<double> modified_joint_accel(joint_accel);
+    // rescale the acceleration to match the new velocity
+    modified_joint_accel[joint-1]=joint_accel[joint-1]*velocity/joint_vel[joint-1];
+    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,true,0);
+    if (owam->run_trajectory(paratraj) == OW_FAILURE) {
+        ROS_ERROR("Error starting joint %d trajectory",joint);
+        return false;
+    }
+
+    // loop until the trajectory finishes or gets stuck
+    owam->lock(); // lock before checking jointstraj
+    while (owam->jointstraj) {
+        if (owam->jointstraj->state()==ParaJointTraj::STOP) {
+            owam->unlock();
+            // joint got stuck
+            owam->cancel_trajectory();
+            return false;
+        }
+        owam->unlock();
+        usleep(50000); // 50ms delay
+        owam->lock(); // lock before rechecking jointstraj
+    }
+    owam->unlock();
+    // we finished the trajectory ok
+    return true;
+}
+
+bool WamDriver::verify_home_position() {
+    ROS_DEBUG("Checking joints: ");
+    fflush(stdout);
+    if (nJoints==7) {
+        ROS_DEBUG(" 7");
+        // J7 check: make sure we hit the stop around 3.02 when moving to 3.2
+        if (!move_until_stop(7,3.02,3.2,1.0)) {
+	  ROS_ERROR("\nERROR: Joint 7 was not turned to its positive limit.\n");
+	  ROS_ERROR("Please press Shift-Idle to turn off the motors,");
+	  ROS_ERROR("then turn the joint fully CCW as seen from the hand.");
+	  owam->release_position();
+	  return false;
+        }
+        // return to initial
+        move_joint(7,3.02,1.0);
+        
+        // wait for position to stabilize
+
+        sleep(4);
+        ROS_DEBUG(" 6"); fflush(stdout);
+        // J6 check: make sure we hit the stop around 1.57 when moving to 1.75
+        if (!move_until_stop(6,1.57,1.75,1.0)) {
+            ROS_ERROR("\nERROR: Joint 6 was not started in the center of its range.\n");
+            ROS_ERROR("Please press Shift-Idle to turn off the motors,");
+            ROS_ERROR("then adjust the joint.");
+            owam->release_position();
+            return false;
+        }
+        // return to initial
+        move_joint(6,0,1.0);
+    
+	sleep(4);
+        ROS_DEBUG(" 5"); fflush(stdout);
+        // J5 check: make sure we hit the stop around 1.31 when moving to 1.5
+        if (!move_until_stop(5,1.31,1.5,1.0)) {
+            ROS_ERROR("\nERROR: Joint 5 was not turned to its positive limit.\n");
+            ROS_ERROR("Please press Shift-Idle to turn off the motors,");
+            ROS_ERROR("then turn the joint fully CCW as seen from the hand.");
+            owam->release_position();
+            return false;
+        }
+        // return to initial
+        move_joint(5,1.309,1.0);
+    }
+
+    sleep(4);
+    ROS_DEBUG(" 2"); fflush(stdout);
+    // J2 check: make sure we hit the stop around 1.97 when moving to 2.2
+    if (!move_until_stop(2,1.97,2.2,1.0)) {
+        ROS_ERROR("\nERROR: Joint 2 was not turned to its positive limit.\n");
+        ROS_ERROR("Please press Shift-Idle to turn off the motors,");
+        ROS_ERROR("then swing the joint all the way to its positive stop.");
+        owam->release_position();
+        return false;
+    }
+    // move to 1.8 to allow testing of J3
+    move_joint(2,1.8,1.0);
+
+    sleep(4);
+    ROS_DEBUG(" 3"); fflush(stdout);
+    // J3 check: make sure we hit the stop around -2.8 when moving to -3.0
+    if (!move_until_stop(3,-2.8,-3.0,1.0)) {
+        ROS_ERROR("\nERROR: Joint 3 was not turned to its negative limit.\n");
+        ROS_ERROR("Please press Shift-Idle to turn off the motors,");
+        ROS_ERROR("then turn the joint fully CW as seen from the hand.");
+        owam->release_position();
+        return false;
+    }
+    // return to initial
+    move_joint(3,-2.8,1.0);
+
+    // return J2 to initial
+    move_joint(2,1.97,1.0);
+    
+
+    sleep(4);
+    ROS_DEBUG(" 4"); fflush(stdout);
+    // J4 check: make sure we hit the stop around -.83 when moving to -1.05
+    if (!move_until_stop(4,-0.83,-1.05,1.0)) {
+        ROS_ERROR("\nERROR: Joint 4 was not turned to its negative limit.\n");
+        ROS_ERROR("Please press Shift-Idle to turn off the motors,");
+        ROS_ERROR("then bend the joint fully backwards.");
+        owam->release_position();
+        return false;
+    }
+    // return to initial
+    move_joint(4,-.83,1.0);
+
+    sleep(4);
+    ROS_DEBUG(" 1"); fflush(stdout);
+    // J1 check: make sure we hit the stop around -2.66 when moving to -2.85
+    if (!move_until_stop(1,-2.66,-2.85,1.0)) {
+        ROS_ERROR("\nERROR: Joint 1 was not turned to its negative limit.\n");
+        ROS_ERROR("Please press Shift-Idle to turn off the motors,");
+        ROS_ERROR("then turn the joint fully CW as seen from above.");
+        owam->release_position();
+        return false;
+    }
+    // return to initial
+    move_joint(1,-2.66,1.0);
+    owam->release_position();
+    
+    ROS_DEBUG(" done.");
+    return true;
+}
+
+bool WamDriver::Publish(ros::Node &n) {
+  double jointpos[nJoints+1];
+  double jointtorqs[nJoints+1];  // PID error-correction torques,
+  //                                       after removing dynamic torques
+  owam->get_current_data(jointpos,NULL,jointtorqs);
+  for (unsigned int i=0; i<nJoints; ++i) {
+    wamstate.positions[i] = jointpos[i+1];
+    wamstate.torques[i] = jointtorqs[i+1];
+  }
+
+  owam->lock();
+  if (owam->jointstraj) {
+    if (owam->jointstraj->state() == ParaJointTraj::STOP) {
+      if (owam->safety_hold) {
+	wamstate.state=owd::WAMState::state_stalled;
+      } else {
+	wamstate.state=owd::WAMState::state_fixed;
+      }
+    } else {
+      wamstate.state=owd::WAMState::state_moving;
+    }
+  } else if (owam->holdpos) {
+    wamstate.state = owd::WAMState::state_fixed;
+  } else {
+    wamstate.state = owd::WAMState::state_free;
+  }
+  owam->unlock();
+
+  n.publish("wamstate", wamstate);
+  return true;
+}
+
+// Handle requests for DOF information
+bool WamDriver::GetDOF(owd::GetDOF::Request &req,
+		       owd::GetDOF::Response &res) {
+#ifdef FAKE7
+  res.nDOF = 4;
+#else
+  res.nDOF =nJoints;
+#endif // FAKE7
+
+  return true;
+}
+
+bool WamDriver::AddTrajectory(owd::AddTrajectory::Request &req,
+			      owd::AddTrajectory::Response &res) {
+  // check number of points
+  if (req.traj.positions.size() < 2) {
+    ROS_ERROR_NAMED("AddTrajectory","Minimum of 2 traj points required");
+    res.id = 0;
+    return true;
+  }
+
+#ifdef FAKE7
+  if (nJoints !=4) {
+    ROS_ERROR("FAKE7 was defined but openwam was compiled with 7 DOF");
+    ROS_ERROR("Remove -DWRIST from openwam and relink");
+    res.id = 0;
+    return true;
+  }
+    
+  // we're only running a 4DOF wam, so strip the extra DOFS from the
+  // trajectory points
+  for (unsigned int i=0; i<req.traj.positions.size(); ++i) {
+    req.traj.positions[i].j.resize(4);
+  }
+#endif // FAKE7
+
+  // get trajectory start point
+  JointPos firstpoint(req.traj.positions[0].j);
+
+  // figure out where robot will be at start of trajectory
+  JointPos curpoint(nJoints);
+  if (! owam->jointstraj) {
+    // no trajectory running, so get position from WAM
+    double wampos[nJoints+1];
+    owam->get_current_data(wampos,NULL,NULL);
+    curpoint.SetFromArray(nJoints,wampos+1);
+    // make sure first point matches current pos or last queued pos.
+    if (firstpoint != curpoint) {
+      ROS_ERROR_NAMED("AddTrajectory","First traj point doesn't match current position");
+      char firststr[200], curstr[200];
+      strcpy(firststr,""); strcpy(curstr,"");
+      for (unsigned int j=0; j<nJoints; ++j) {
+	sprintf(firststr+strlen(firststr)," %1.4f",firstpoint[j]);
+	sprintf(curstr+strlen(curstr)," %1.4f",curpoint[j]);
+      }
+      ROS_DEBUG_NAMED("AddTrajectory","Current point: %s",curstr);
+      ROS_DEBUG_NAMED("AddTrajectory","First point: %s",firststr);
+      res.id = 0;
+      return true;
+    }
+  } else {
+    // compare against the last queued point
+    if (trajectory_list.size() > 0) {
+      curpoint = trajectory_list.back()->end_position;
+#ifdef FAKE7
+      curpoint.resize(nJoints);  // strip off the fake joints
+#endif
+    } else {
+      owam->lock();
+      if (! owam->jointstraj) {
+	// the trajectory finished while we were monkeying around.
+	// go back and try again.
+	owam->unlock();
+	AddTrajectory(req,res);
+      }
+      curpoint = owam->jointstraj->end_position;
+      owam->unlock();
+    }
+    // make sure first point matches current pos or last queued pos.
+    if (firstpoint != curpoint) {
+      ROS_ERROR_NAMED("AddTrajectory","First traj point doesn't match last queued point");
+      res.id = 0;
+      return true;
+    }
+  }
+    
+  // build trajectory
+  Trajectory *t = BuildTrajectory(req.traj);
+  if (!t) {
+    res.id = 0;
+    return true;
+  }
+  owd::TrajInfo ti;
+  ti.id=t->id;
+  ti.end_position = t->end_position; // copytoarray?
+#ifdef FAKE7
+  ti.end_position.resize(7);
+#endif
+  if (t->WaitForStart) {
+    ti.options = owd::JointTraj::opt_WaitForStart;
+  }
+  if (t->HoldOnStall) {
+    ti.options |= owd::JointTraj::opt_HoldOnStall;
+  }
+  wamstate.trajectory_queue.push_back(ti);
+
+
+  // if there are already running / queued trajectories, just add ours.
+  // note: the order of these conditional checks is important.  only want to
+  // use the owam->jointtraj check if the queue is empty; otherwise you might
+  // enter a race condition with the Update loop (both of you will notice
+  // jointtraj is null, and both will start changing it).  by making sure
+  // the queue is empty first, we know the Update loop will have nothing to do.
+  if ((trajectory_list.size() > 0) || owam->jointstraj) {
+    trajectory_list.push_back(t);
+    return true;
+  }
+
+  // in case we still aren't holding position, start holding now and then
+  // compare the value to the trajectory start
+  if (!owam->holdpos) {
+    JointPos curpoint(nJoints);
+    double wampos[nJoints+1];
+    // hold the current position and get the value
+    owam->set_stiffness(1.0);
+    owam->hold_position(wampos);
+    curpoint.SetFromArray(nJoints,wampos+1);
+    if (firstpoint != curpoint) {
+      ROS_ERROR_NAMED("AddTrajectory","Arm moved while building trajectory; initial point now invalid");
+      delete t;
+      wamstate.trajectory_queue.pop_back();
+      res.id = 0;
+      return true;
+    }
+  }
+  owam->run_trajectory(t);
+  ROS_INFO("Added trajectory #%d",t->id);
+  res.id = t->id;
+  return true;
+}
+
+bool WamDriver::DeleteTrajectory(owd::DeleteTrajectory::Request &req,
+				 owd::DeleteTrajectory::Response &res) {
+#ifdef FAKE7
+  return false;
+#endif
+
+  std::list<Trajectory *>::iterator tl_it;
+  std::vector<owd::TrajInfo>::iterator ws_it;
+  // lock against re-queuing by Update() function
+  boost::mutex::scoped_lock lock(queue_mutex);
+  for (unsigned int x=0; x<req.ids.size(); ++x) {
+    int delete_id = req.ids[x];
+    owam->lock();
+    if (owam->jointstraj && (owam->jointstraj->id == delete_id)) {
+      owam->unlock();
+      owam->cancel_trajectory();
+      wamstate.trajectory_queue.erase(wamstate.trajectory_queue.begin());
+    } else {
+      owam->unlock();
+      for (tl_it = trajectory_list.begin(),
+	     ws_it=wamstate.trajectory_queue.begin();
+	   tl_it != trajectory_list.end(); ++tl_it,++ws_it) {
+	if ((*tl_it)->id == delete_id) {
+	  trajectory_list.erase(tl_it);
+	  wamstate.trajectory_queue.erase(ws_it);
+	}
+      }
+    }
+  }
+  // now look for discontinuities in position
+  owam->lock();
+  JointPos p;
+  tl_it=trajectory_list.begin();
+  ws_it=wamstate.trajectory_queue.begin();
+  if (owam->jointstraj) {
+    p=owam->jointstraj->end_position;
+  } else if (trajectory_list.size() > 0) {
+    p=(*tl_it)->end_position;
+    ++tl_it; ++ws_it;
+  } else {
+    // no more trajectories
+    owam->unlock();
+    ROS_INFO("DeleteTrajectory done; no more trajectories");
+    return true;
+  }
+  owam->unlock();
+  while (tl_it != trajectory_list.end()) {
+    while (p != (*tl_it)->end_position) {
+      // mismatch, so delete
+      trajectory_list.erase(tl_it);
+      wamstate.trajectory_queue.erase(ws_it);
+      ++tl_it; ++ws_it;
+    }
+    if (tl_it != trajectory_list.end()) {
+      p = (*tl_it)->end_position;
+      ++tl_it; ++ws_it;
+    }
+  }
+  ROS_INFO("DeleteTrajectory processed: new queue size %d",
+	   trajectory_list.size());
+  return false;
+}
+
+bool WamDriver::SetStiffness(owd::SetStiffness::Request &req,
+			     owd::SetStiffness::Response &res) {
+  if (req.stiffness > 0.0) {
+    if (!owam->jointstraj) {
+      // if we're not running a trajectory, then hold the current position
+      owam->set_stiffness(req.stiffness);
+      owam->hold_position();
+      ROS_INFO("Position held by SetStiffness command");
+    }
+  } else {
+    // Release position
+    if (!owam->jointstraj) {
+      // if we're not running a trajectory, just go back to idle
+      owam->release_position();
+      owam->set_stiffness(0.0);
+      ROS_INFO("Position released by SetStiffness command");
+    }
+  }
+  return true;
+}
+
+bool WamDriver::PauseTrajectory(owd::PauseTrajectory::Request &req,
+				owd::PauseTrajectory::Response &res) {
+  if (owam->jointstraj) {
+    if (req.pause) {
+      owam->pause_trajectory();
+      ROS_INFO("Trajectory paused");
+    } else {
+      owam->resume_trajectory();
+      ROS_INFO("Trajectory resumed");
+    }
+    return true;
+  } else {
+    ROS_ERROR("PauseTrajectory called while no trajectory was running");
+    return false;
+  }
+}
+
+bool WamDriver::ReplaceTrajectory(owd::ReplaceTrajectory::Request &req,
+				  owd::ReplaceTrajectory::Response &res) {
+  // not implemented yet
+  return false;
+
+
+  /* old code that might help:
+     if (trajectory && trajectory->id == pCurTraj->id) {
+     delete trajectory; // wipe out the current one
+     listCommands.push_front(pCurTraj); // add this to the front
+     ROS_WARN("Added trajectory #%d to the front of the command queue\n",cmdnum);
+     syslog(LOG_ERR,"Added trajectory #%d to the front of the command queue",cmdnum);
+     log_rave_trajectory(trajname,pCurTraj->vtraj);
+     pCurTraj=NULL;
+     return 0;
+     }
+     // check to see if the trajectory replaces a queued one
+     for (std::list<Command *>::iterator it= listCommands.begin();
+     it != listCommands.end(); ++it) {
+     if (((TrajectoryCommand *)(*it))->id == pCurTraj->id) {
+     delete *it; // remove the old one
+     *it = pCurTraj; // repoint to the new one
+     ROS_WARN("Added trajectory #%d to the command queue, replacing previous one\n",cmdnum);
+     syslog(LOG_ERR,"Added trajectory #%d to the command queue, replacing previous one",cmdnum);
+     log_rave_trajectory(trajname,pCurTraj->vtraj);
+     pCurTraj=NULL;
+     return 0;
+  */
+}
+
+ bool WamDriver::SetSpeed(owd::SetSpeed::Request &req,
+			 owd::SetSpeed::Response &res) {
+  if (req.velocities.size() != nJoints) {
+    ROS_ERROR("Received SetSpeed command with wrong array size");
+    return false;
+  }
+  for (unsigned int i=0; i<nJoints; ++i) {
+    if (req.velocities[i] > max_joint_vel[i]) {
+      // limit to max
+      joint_vel[i] = max_joint_vel[i];
+      ROS_WARN("Limited joint %d velocity to max %2.2f",i,joint_vel[i]);
+    } else if (req.velocities[i] < 0.05 * max_joint_vel[i]) {
+      // limit to no less than 5% of max
+      joint_vel[i] = 0.05 * max_joint_vel[i];
+      ROS_WARN("Limited joint %d velocity to min %2.2f",i,joint_vel[i]);
+    } else {
+      joint_vel[i] = req.velocities[i];
+    }
+    joint_accel[i] = joint_vel[i] / req.min_accel_time;
+  }
+  ROS_INFO("Processed SetSpeed command");
+  return true;
+}
+ 
+bool WamDriver::SetExtraMass(owd::SetExtraMass::Request &req,
+			      owd::SetExtraMass::Response &res) {
+  ROS_INFO("Got grabbed data mass, cog, and inertia");
+  
+  owam->lock("OWD processmsg");
+
+  owam->links[Link::Ln].mass = req.m.mass;
+
+  owam->links[Link::Ln].cog.x[0] = req.m.cog_x;
+  owam->links[Link::Ln].cog.x[1] = req.m.cog_y;
+  owam->links[Link::Ln].cog.x[2] = req.m.cog_z;
+  
+  owam->links[Link::Ln].inertia 
+    = Inertia(  req.m.inertia_xx, req.m.inertia_xy, req.m.inertia_xz,
+		req.m.inertia_yy, req.m.inertia_yz, req.m.inertia_zz);
+
+  owam->unlock("OWD processmsg");
+  return true;
+}
+ 
+void WamDriver::Update() {
+  
+  static int statcount = 0;
+  if (++statcount == 20) {
+    owam->rosprint_stats();
+    statcount=0;
+  }
+
+  if (owam->jointstraj) {
+    return; // still running a trajectory
+  }
+  
+  if (wamstate.trajectory_queue.size() > 0) {
+    wamstate.prev_trajectory = wamstate.trajectory_queue.front();
+    wamstate.trajectory_queue.erase(wamstate.trajectory_queue.begin());
+  }
+
+  boost::mutex::scoped_lock lock(queue_mutex);
+  if (trajectory_list.size()==0) {
+    return; // nothing to do
+  }
+  
+  // make sure already holding position
+  if (!owam->holdpos || (owam->stiffness < 1.0)) {
+    ROS_ERROR("WAM not holding position; cannot start trajectory");
+    for (std::list<Trajectory *>::iterator it=trajectory_list.begin();
+	 it != trajectory_list.end(); ++it) {
+      delete *it;
+    }
+    trajectory_list.clear();
+    wamstate.trajectory_queue.clear();
+    return;
+  }
+
+  // check for current position
+  JointPos curpoint(nJoints);
+  double wampos[nJoints+1];
+  // get the held value
+  owam->hold_position(wampos,true);
+  curpoint.SetFromArray(nJoints,wampos+1);
+  JointPos firstpoint(trajectory_list.front()->start_position);
+  if (firstpoint != curpoint) {
+    ROS_ERROR("Arm position doesn't match queued trajectory start");
+    ROS_ERROR("Clearing trajectory queue");
+    for (std::list<Trajectory *>::iterator it=trajectory_list.begin();
+	 it != trajectory_list.end(); ++it) {
+      delete *it;
+    }
+    trajectory_list.clear();
+    return;
+  }
+
+  // load next trajectory
+  owam->run_trajectory(trajectory_list.front());
+  trajectory_list.pop_front();
+}
+
+void WamDriver::wamservo_callback(void *message) {
+  ROS_DEBUG_NAMED("servo","Received servo command:");
+  owd::Servo *servo = (owd::Servo*)message;
+  if (servo->joint.size() != servo->velocity.size()) {
+    ROS_ERROR("Mismatched arrays received in Servo message; ignored");
+    return;
+  }
+  for (unsigned int j=0; j<servo->joint.size(); ++j) {
+    ROS_DEBUG_NAMED("servo","  Servo joint %d velocity %2.2f",
+	      servo->joint[j], servo->velocity[j]);
+  }
+  owam->lock();
+  if (owam->jointstraj) {
+    ServoTraj *straj = dynamic_cast<ServoTraj *>(owam->jointstraj);
+    if (straj) {
+      ROS_DEBUG_NAMED("servo","Updating servo trajectory %d",straj->id);
+      for (unsigned int i=0; i<servo->joint.size(); ++i) {
+	straj->SetVelocity(servo->joint[i],servo->velocity[i]);
+      }
+      owam->unlock();
+      return;
+    } else {
+      owam->unlock();
+      ROS_WARN("Joint Trajectory already running; velocity command ignored");
+      return;
+    }
+  } else {
+    owam->unlock();
+    cmdnum++;
+    ServoTraj *straj = new ServoTraj(nJoints, cmdnum, owam->heldPositions+1);
+    for (unsigned int i=0; i<servo->joint.size(); ++i) {
+      straj->SetVelocity(servo->joint[i],servo->velocity[i]);
+    }
+    owam->run_trajectory(straj);
+    ROS_DEBUG_NAMED("servo","Starting servo trajectory %d",cmdnum);
+    return;
+  }
+} 
