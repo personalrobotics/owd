@@ -1,0 +1,15 @@
+<package>
+	<description brief="ROS messages for Personal Robotics project at Intel/CMU">
+
+		This package ideally includes all the custom ROS messages used inside the Personal Robotics project at Intel/CMU. 
+
+  </description>
+  <author>all@pr-intel</author>
+  <depend package="std_msgs"/>
+  <depend package="robot_msgs"/>
+  <depend package="deprecated_msgs"/>
+  <export>
+    <cpp cflags="-I${prefix}/msg/cpp"/>
+  </export>
+</package>
+
