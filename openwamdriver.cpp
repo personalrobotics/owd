@@ -63,6 +63,7 @@ WamDriver::WamDriver(const char *name) :
   max_joint_vel.push_back(2.0); // J5
   max_joint_vel.push_back(2.0); // J6
   max_joint_vel.push_back(1.0); // J7
+  max_jerk = 10.0 * 3.141592654;
   
   for (unsigned int j=0; j<nJoints; ++j) {
     joint_vel.push_back(max_joint_vel[j]);
@@ -275,6 +276,7 @@ Trajectory *WamDriver::BuildTrajectory(owd::JointTraj &jt) {
     // can use a MacJointTraj (blends at points)
     try {
       MacJointTraj *mactraj = new MacJointTraj(traj,joint_vel, joint_accel,
+					       max_jerk,
 					       bWaitForStart,bHoldOnStall,
 					       cmdnum);
       ROS_DEBUG_NAMED("BuildTrajectory","MacFarlane blended trajectory built");
@@ -1199,16 +1201,11 @@ void WamDriver::start_control_loop() {
     }
 #endif // AUTO_ACTIVATE
     
-    int retval;
     // check the mode of puck 1 to detect when active was pressed
     while (bus.get_puck_state() != 2) {
       usleep(50000);
     }
     
-    if (retval == OW_FAILURE) {
-            ROS_FATAL("Error getting puck mode");
-            throw -1;
-    }
 }
 
 void WamDriver::stop_control_loop() {

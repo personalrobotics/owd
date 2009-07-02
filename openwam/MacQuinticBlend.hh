@@ -57,7 +57,8 @@ public:
 		  MacQuinticSegment *seg2,
 		  double blend_rad,
 		  JointPos max_joint_vel,
-		  JointPos max_joint_accel);
+		  JointPos max_joint_accel,
+		  double max_jerk);
 
   // functions required by the base class
   // blends start and end with the same velocity, so these next two

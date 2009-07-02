@@ -15,6 +15,8 @@ protected:
   // direction is an n-dof unit vector pointing from start to end
   JointPos direction;
 
+  double jmax;  // maximum path jerk
+
   // distance is the straightline jointspace distance from start to end
   double distance;
 
@@ -39,7 +41,8 @@ public:
   MacQuinticSegment( TrajPoint first_p,
                      TrajPoint second_p,
 		     JointPos max_joint_vel,
-		     JointPos max_joint_accel);
+		     JointPos max_joint_accel,
+		     double max_jerk);
 
   // functions required by the base class
   void setStartVelocity(double v);

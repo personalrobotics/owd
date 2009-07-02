@@ -4,13 +4,13 @@
 #include <assert.h>
 #include "MacQuinticSegment.hh"
 
-#define DTMAX MacAccelElement::DTMAX
-
 MacQuinticSegment::MacQuinticSegment( TrajPoint first_p,
 				      TrajPoint second_p,
 				      JointPos max_joint_vel,
-				      JointPos max_joint_accel):
-  MacQuinticElement(first_p,second_p) // sets start_pos, end_pos
+				      JointPos max_joint_accel,
+				      double max_jerk):
+  MacQuinticElement(first_p,second_p), // sets start_pos, end_pos
+  jmax(max_jerk) 
 {
 
   // calculate the distance and unit direction vector
@@ -68,27 +68,28 @@ MacQuinticSegment::MacQuinticSegment( TrajPoint first_p,
 }
 
 // accel_rise_dist: returns how much distance is traversed by a single
-// acceleration rise from zero to amax, starting at velocity v
-// (change can be either positive or negative - distance is the same)
+// acceleration rise from zero to amax, starting at velocity v and 
+// subject to jerk limit jmax
 inline double MacQuinticSegment::accel_rise_dist(double v, double amax) const {
   // distance required for a single accel rise
   // Equation 3.7 / 3.8 of MacFarlane thesis
-  return(fabs(v) * DTMAX + amax*DTMAX*DTMAX*(.25 - 1/PI/PI));
+  double atime = amax/jmax * PI/2;
+  return(fabs(v) * atime + amax*atime*atime*(.25 - 1/PI/PI));
 }
 
 // accel_fall_dist: distance covered by a single accel fall from amax to 0,
 // starting at velocity v
 inline double MacQuinticSegment::accel_fall_dist(double v, double amax) const {
-  return(fabs(v) * DTMAX + amax*DTMAX*DTMAX*(.25 + 1/PI/PI));
+  double atime = amax/jmax * PI/2;
+  return(fabs(v) * atime + amax*atime*atime*(.25 + 1/PI/PI));
 }
 
 inline double MacQuinticSegment::AP_dist(double v, double amax) const {
   // total distance is an acceleration rise starting at velocity v followed
   //  by an acceleration fall starting at v+amax*dtmax/2 (midpoint v).
-  //  return (accel_rise_dist(v,amax) 
-  //	  + accel_fall_dist(fabs(v)+fabs(amax)*DTMAX/2,amax));
+  double atime = amax/jmax * PI/2;
   return (accel_rise_dist(v,amax) 
-	  + accel_fall_dist(v + amax*DTMAX/2, amax));
+	  + accel_fall_dist(v + amax*atime/2, amax));
 }
 
 // AP_max_delta_v: given limited distance, what's the max velocity
@@ -96,16 +97,17 @@ inline double MacQuinticSegment::AP_dist(double v, double amax) const {
 // (pulse can be either positive or negative - delta v is the same)
 inline double MacQuinticSegment::AP_max_delta_v(double v, double amax, double d) {
   d = fabs(d); v=fabs(v); amax=fabs(amax);
+  double atime = amax/jmax * PI/2;
 
   // make sure we can reach max accel and still have room for 
   //   a sustained portion
   if (d <= AP_dist(v,amax)) {
     // there's no room for a sustained portion, so calculate the max pulse
     // we can do
-    if (d <= 2 * v * DTMAX) {
+    if (d <= 2 * v * atime) {
       // at this speed, we don't even have room to change acceleration,
       // so we have to leave the speed the way it is
-      //      printf("AP_max_delta_v # 1: dist of %2.3f required for a pulse, only %2.3f available\n",2*v*DTMAX,d);
+      //      printf("AP_max_delta_v # 1: dist of %2.3f required for a pulse, only %2.3f available\n",2*v*atime,d);
       free(reason);
       reason=strdup("distance limit (too short for any accel)");
       return 0;
@@ -113,17 +115,17 @@ inline double MacQuinticSegment::AP_max_delta_v(double v, double amax, double d)
     // we'll just do an accel pulse to a lower accel value
     // set the equation in AP_dist equal to d and solve for the new amax
     //    printf("Segment accel pulse reduced from a=%2.3f to %2.3f (distance limit)\n",
-    //	   amax,(d-2*v*DTMAX)/DTMAX/DTMAX);
-    amax=(d-2*v*DTMAX)/DTMAX/DTMAX;
+    //	   amax,(d-2*v*atime)/atime/atime);
+    amax=(d-2*v*atime)/atime/atime;
     if (amax<0) {
       throw "AP_max_delta_v: calculated a negative acceleration";
     }
     
     // now use the new (lower) amax to calculate the new delta v
-    //    printf("New max delta_v=%2.3f\n",DTMAX*amax);
+    //    printf("New max delta_v=%2.3f\n",atime*amax);
     free(reason);
     reason=strdup("distance limit w/ lower amax");
-    return DTMAX * amax;
+    return atime * amax;
   }
   // we're rising to amax, holding as long as we can, then falling back to 0
   // first, subtract out the distance consumed by the first rise
@@ -132,9 +134,9 @@ inline double MacQuinticSegment::AP_max_delta_v(double v, double amax, double d)
   // next, calculate the time that the sustain portion can last
   // uses quadratic formula based on calculating remaining distance
   // d=d_sustain + d_fall  (a function of t_sustain^2 and t_sustain)
-  double t_sustain = (-v -1.5*amax*DTMAX
-		+ sqrt(v*v + 3*v*amax*DTMAX + 2.25*amax*amax*DTMAX*DTMAX
-		       -2*amax*(DTMAX*v+amax*DTMAX*DTMAX*(1/PI/PI+.75)-d)))
+  double t_sustain = (-v -1.5*amax*atime
+		+ sqrt(v*v + 3*v*amax*atime + 2.25*amax*amax*atime*atime
+		       -2*amax*(atime*v+amax*atime*atime*(1/PI/PI+.75)-d)))
     /amax;  // updated 10/4/08
   if (t_sustain < 0) {
     throw "ERROR: negative sustain time in this segment";
@@ -142,7 +144,7 @@ inline double MacQuinticSegment::AP_max_delta_v(double v, double amax, double d)
   
   // finally, compute the total velocity change
   // we're still just working with positive velocities (directions can be neg)
-  double delta_v = amax*DTMAX + t_sustain*amax;
+  double delta_v = amax*atime + t_sustain*amax;
   if ((v + delta_v) > max_path_velocity) {
     // should stay below max_path_velocity
     //    printf("AP_max_delta_v condition 3: limiting max delta_v of %2.3f to only %2.3f to stay below %2.3f\n",delta_v,max_path_velocity-v,max_path_velocity);
@@ -249,7 +251,6 @@ void MacQuinticSegment::BuildProfile() {
   }
 
   MacAccelElement *ap;
-  double distance_remaining = distance;
   if (distance == 0) {
     throw "MacQuinticSegment::BuildProfile: distance was zero";
   }
@@ -258,35 +259,290 @@ void MacQuinticSegment::BuildProfile() {
   double cruise_start_time=start_time;
   duration=0;
 
+  double delta_v = end_vel - start_vel;
+  
+  // ============================================================
+  // Test #1: Max Velocity?
+  //
+  // check to see whether we have room to reach max velocity
+  // during this segment
+  // ============================================================
+  MacAccelElement *ap1 = NULL;
+  MacAccelElement *ap2 = NULL;
+  double distance_remaining = distance;
+  if (start_vel < max_path_velocity) {
+    ap1 = new MacAccelPulse(0,
+			    start_vel,
+			    (max_path_velocity-start_vel),
+			    max_path_acceleration,
+			    jmax,
+			    start_time);
+    distance_remaining -= maxrise->distance();
+    cruise_start = maxrise->end_pos();
+    cruise_start_time = maxrise->end_time();
+  }
+  if (end_vel < max_path_velocity) {
+    ap2 = new MacAccelPulse(cruise_start;
+			    max_path_velocity,
+			    (end_vel - max_path_velocity),
+			    -max_path_acceleration,
+			    -jmax,
+			    cruise_start_time);
+    distance_remaining -= maxfall->distance();
+  }
+  if (fabs(distance_remaining) < 0.005) {
+    // in the unlikely even that we matched the distance, we
+    // can wrap things up with what we've already used for testing
+    if (ap1) {
+      duration += ap1->duration();
+      accel_elements.push_back(ap1);
+    }
+    if (ap2) {
+      duration += ap2->duration();
+      accel_elements.push_back(ap2);
+    }
+    if (reverse) {
+      reverse_accel_pulses();
+    }
+    verify_end_conditions();
+    return;
+  }
+
+  if (distance_remaining > 0) {
+    // we have confirmed that we can accel up to max vel and back down,
+    // and still have room left over for a velocity cruise.  finishing up
+    // is just a matter of creating the cruise.
+    if (ap1) {
+      duration += ap1->duration();
+      accel_elements.push_back(ap1);
+    }
+    double cruise_end = cruise_start + distance_remaining;
+    ap1 = new MacZeroAccel(cruise_start,
+			   max_path_velocity,
+			   cruise_end,
+			   cruise_start_time);
+    duration += ap1->duration();
+    accel_elements.push_back(ap1);
+    if (ap2) {
+      // modify ap2 to start at the cruise ending position and time
+      ap2->reset(cruise_end,
+		 max_path_velocity,
+		 -max_path_acceleration,
+		 -jmax,
+		 cruise_start_time + ap1->duration());
+      duration += ap2->duration();
+      accel_elements.push_back(ap2);
+    }
+    if (reverse) {
+      reverse_accel_pulses();
+    }
+    verify_end_conditions();
+    return;
+  }
+
+  // ok, we've established that we can't reach max_velocity.  throw
+  // away our test pulses.
+  if (ap1) {
+    delete ap1;
+    ap1=NULL;
+  }
+  if (ap2) {
+    delete ap2;
+    ap2=NULL;
+  }
+			   
+  // ============================================================
+  // TEST #2: Pure Acceleration
+  //
+  // check to see whether accelerating from start_vel to end_vel
+  // exactly uses up the distance available
+  // ============================================================
+
   // first, construct the accel pulse that satisfies the velocity change
   if (end_vel != start_vel) {
-    ap = new MacAccelPulse(0, start_vel,
+    ap1 = new MacAccelPulse(0,
+			   start_vel,
 			   (end_vel-start_vel),
 			   max_path_acceleration,
+			   jmax,
 			   start_time);
-    cruise_start=ap->distance();
-    cruise_start_time=ap->end_time();
-    distance_remaining -= ap->distance();
+    cruise_start=ap1->distance();
+    cruise_start_time=ap1->end_time();
+    distance_remaining = distance - ap1->distance();
     if (distance_remaining < -0.005) {
-      printf("initial distance was %2.8f, pulse requires %2.8f\n",
-	     distance,ap->distance());
-      printf("distance_remaining is %2.3f\n",distance_remaining);
-      ap->dump();
-      throw "Error: velocity change cannot be met with accel limit in available distance";
-      
+      // something's wrong; we don't even have the available distance
+      // to reach end_vel
+      printf("distance available is %2.8f, pulse requires %2.8f\n",
+	     distance,ap1->distance());
+      ap1->dump();
+      delete ap1;
+      throw "Error: velocity change cannot be met with motion limits in available distance";
     }
-    duration = ap->duration();
-    accel_elements.push_back(ap);
-    if (distance_remaining ==0) {
-      // we exactly met the distance
+    if (distance_remaining < 0.005) {
+      // we used up all the distance just making the velocity change,
+      // so we're done.
+      duration = ap1->duration();
+      accel_elements.push_back(ap1);
       if (reverse) {
 	reverse_accel_pulses();
       }
       condition=1;
       verify_end_conditions();
       return;
-    }
+    }      
   }
+
+  // ============================================================
+  // Peak Velocity Tests
+  //
+  // we've established that there's extra distance available for
+  // a velocity peak, and that peak is less than max_path_velocity.
+  // now we'll go through some checks to solve for the peak velocity.
+  //
+  // since start_vel <= end_vel, we will end up with one of the
+  // following cases (corresponding to the subsequent tests):
+  //    #3: Both accel pulse and decel pulse reach max_accel
+  //    #4: Accel pulse reaches max_accel but decel pulse doesn't
+  //    #5: Neither accel pulse or decel pulse reach max_accel
+  //
+  // ============================================================
+  // TEST #3: Max Deceleration
+  //
+  // see whether there's room to get in an Accel Pulse of amplitude
+  // max_path_acceleration when decelerating from Vpeak to end_vel.
+  // if so, we know that both accel and decel pulses will reach
+  // max_path_acceleration, and it will just be a matter of computing
+  // the appropriate sustain durations for each.
+    
+  double vpeak = end_vel + 
+    max_path_acceleration * max_path_acceleration / jmax
+    * PI / 2;
+  if (ap1) {
+    delete ap1;
+  }
+  ap1 = new MacAccelPulse(0,
+			  start_vel,
+			  (vpeak - start_vel),
+			  max_path_acceleration,
+			  jmax,
+			  start_time);
+  ap2 = new MacAccelPulse(ap1->end_pos(),
+			  vpeak,
+			  end_vel - vpeak,
+			  -max_path_acceleration,
+			  -jmax,
+			  ap1->end_time());
+  distance_remaining = distance - ap1->distance() - ap2->distance();
+  if (fabs(distance_remaining) < 0.005) {
+    // we got lucky; it fits!
+    accel_elements.push_back(ap1);
+    accel_elements.push_back(ap2);
+    duration = ap1->duration() + ap2->duration();
+    if (reverse) {
+      reverse_accel_pulses();
+    }
+    verify_end_conditions();
+    return;
+  } else if (distance_remaining > 0) {
+    // we can make it fit by adding some sustain portions to both
+    // accel and decel pulses.  the integrated area added to each
+    // pulse must be equal in order for the end_velocity to come
+    // out right, which means that the two sustain durations will
+    // be equal (since the amplitude is at max_accel).
+    // also, each sustain portion will use exactly half of
+    // distance_remaining.
+
+    // compute velocity at end of ap1 sustain
+    double ap1_sustain_v = ap1->end_vel() 
+      - max_path_acceleration * max_path_acceleration / jmax * PI / 2;
+
+    // compute length of sustain extension
+    // solve for t using quadratic formula, based on
+    //   d = 1/2 * a * t*t  + v * t  (where d = distance_remaining/2)
+    double extra_sustain_t =
+      (sqrt(ap1_sustain_v * ap1_sustain_v
+	    + max_path_acceleration*distance_remaining)
+       - ap1_sustain_v)
+      / max_path_acceleration;
+    if (extra_sustain_t <0) {
+      // something went wrong
+      delete ap1;
+      delete ap2;
+      throw "Error: bad calculation when extending pulses";
+    }
+    ap1->extend_sustain_time_by(extra_sustain_t);
+    ap2->extend_sustain_time_by(extra_sustain_t);
+    if ((ap1->distance() + ap2->distance()) > distance+0.005) {
+      delete ap1;
+      delete ap2;
+      throw "Error: overall distance doesn't add up after extending pulses";
+    }
+    accel_elements.push_back(ap1);
+    accel_elements.push_back(ap2);
+    duration = ap1->duration() + ap2->duration();
+    if (reverse) {
+      reverse_accel_pulses();
+    }
+    verify_end_conditions();
+    return;
+  }
+  delete ap1;
+  delete ap2;
+
+  // ============================================================
+  // TEST #4: Max acceleration
+  //
+  // If we can reach max acceleration during the first pulse and still
+  // return to end_vel with distance remaining, then we just have to 
+  // add a sustain portion to the accel pulse and scale up the decel
+  // pulse to match.
+  
+  if (end_vel < start_vel) {
+    // no need to check unless the velocities are different; otherwise
+    // it amounts to the same thing we tested in the previous case.
+    // this case is really for the situation where just going from start_vel
+    // to end_vel uses most of the distance, and there's just a little room
+    // to squeeze in a bit more accel and decel.
+    vpeak = start_vel + 
+      max_path_acceleration * max_path_acceleration / jmax
+      * PI / 2;
+    ap1 = new MacAccelPulse(0,
+			    start_vel,
+			    (vpeak - start_vel),
+			    max_path_acceleration,
+			    jmax,
+			    start_time);
+    ap2 = new MacAccelPulse(ap1->end_pos(),
+			    vpeak,
+			    end_vel - vpeak,
+			    -max_path_acceleration,
+			    -jmax,
+			    ap1->end_time());
+    distance_remaining = distance - ap1->distance() - ap2->distance();
+    if (fabs(distance_remaining) < 0.005) {
+      // we're done
+      accel_elements.push_back(ap1);
+      accel_elements.push_back(ap2);
+      duration = ap1->duration() + ap2->duration();
+      if (reverse) {
+	reverse_accel_pulses();
+      }
+      verify_end_conditions();
+      return;
+    } else if (distance_remaining > 0) {
+      // calculate 
+    
+
+
+
+
+
+
+
+
+
+
+
   // make up the remaining distance with a velocity cruise
   ap = new MacZeroAccel(cruise_start,end_vel,
 			cruise_start+distance_remaining,
@@ -324,7 +580,7 @@ void MacQuinticSegment::BuildProfile() {
 				    distance_remaining/2);
     if (delta_v > 0) {
       ap = new MacAccelPulse(0,start_vel,delta_v,
-			     max_path_acceleration, start_time);
+			     max_path_acceleration, jmax, start_time);
       printf("condition 3 actual delta_v = %2.3f, first dist=%2.3f\n",
 	     delta_v,ap->distance());
       
@@ -356,7 +612,7 @@ void MacQuinticSegment::BuildProfile() {
     }
     // now build the final element
     ap = new MacAccelPulse(ap->end_pos(),ap->end_vel(),-delta_v,
-			   -max_path_acceleration, ap->end_time());
+			   -max_path_acceleration, -jmax, ap->end_time());
     
     accel_elements.push_back(ap);
     duration+=ap->duration();
@@ -396,7 +652,8 @@ void MacQuinticSegment::BuildProfile() {
       // we can still increase the accel pulse amplitude
       
       // make sure we don't exceed max_path_velocity when boosting the accel
-      double delta_v = max_path_acceleration * DTMAX;  // a full accel pulse
+      double atime = max_path_acceleration/jmax * PI/2;
+      double delta_v = max_path_acceleration * atime;  // a full accel pulse
       if (start_vel + delta_v > max_path_velocity) {
 	delta_v = max_path_velocity - start_vel;
       }
@@ -404,6 +661,7 @@ void MacQuinticSegment::BuildProfile() {
       ap = new MacAccelPulse(0,start_vel,
 			     delta_v,
 			     max_path_acceleration,
+			     jmax,
 			     start_time);
       
       duration = ap->duration();
@@ -416,7 +674,7 @@ void MacQuinticSegment::BuildProfile() {
       // calculate the theoretical ending pulse needed to bring the
       // velocity back down to end_vel;
       double vel_boost = ap->end_vel() - accel_elements.back()->end_vel();
-      double end_accel = vel_boost /DTMAX;
+      double end_accel = vel_boost /atime;
       double delta_d = AP_dist(end_vel,end_accel); // distance traversed by this ending pulse
       if (ap->distance() + delta_d > distance) {
 	// we don't have enough distance to boost the initial accel amplitude
@@ -424,9 +682,9 @@ void MacQuinticSegment::BuildProfile() {
 	// this equation was derived by solving for two pulses whose
 	//   overall distance equals our dist and whose meeting velocities
  	//   are equal
-	double accel1 = (distance - DTMAX*(start_vel*(3-2/PI/PI) +end_vel*(1+2/PI/PI)))
-	  / (DTMAX*DTMAX*(2-4/PI/PI));
-	double accel2 = (end_vel - start_vel) / DTMAX - accel1;
+	double accel1 = (distance - atime*(start_vel*(3-2/PI/PI) +end_vel*(1+2/PI/PI)))
+	  / (atime*atime*(2-4/PI/PI));
+	double accel2 = (end_vel - start_vel) / atime - accel1;
 	printf("condition 5: ap->dist=%2.3f, delta_d=%2.3f, distance=%2.3f\n",
 	       ap->distance(), delta_d, distance);
 	printf("accel1=%2.3f, accel2=%2.3f\n",accel1, accel2);
@@ -435,14 +693,16 @@ void MacQuinticSegment::BuildProfile() {
 	accel_elements.pop_back();
 	// accel pulse
 	ap = new MacAccelPulse(0,start_vel,
-			       accel1*DTMAX,
-			       accel1, start_time);
+			       accel1*atime,
+			       accel1,
+			       jmax,
+			       start_time);
 	duration = ap->duration();
 	accel_elements.push_back(ap);
 	// decel pulse
 	ap = new MacAccelPulse(ap->end_pos(),ap->end_vel(),
-			       -accel2*DTMAX,
-			       -accel2, ap->end_time());
+			       -accel2*atime,
+			       -accel2, -jmax, ap->end_time());
 	duration += ap->duration();
 	accel_elements.push_back(ap);
 	if (reverse) {
@@ -455,8 +715,8 @@ void MacQuinticSegment::BuildProfile() {
       if (ap->distance() + delta_d == distance) {
 	// we have exactly enough distance
 	ap=new MacAccelPulse(ap->end_pos(),ap->end_vel(),
-			     -end_accel*DTMAX,
-			     -end_accel,ap->end_time());
+			     -end_accel*atime,
+			     -end_accel,-jmax, ap->end_time());
 	duration += ap->duration();
 	accel_elements.push_back(ap);
 	if (reverse) {
@@ -475,10 +735,12 @@ void MacQuinticSegment::BuildProfile() {
 
 
   double end_accel = max_path_acceleration;
-  if (end_vel + end_accel*DTMAX > max_path_velocity) {
+  double atime = max_path_acceleration/jmax * PI/2;
+
+  if (end_vel + end_accel*atime > max_path_velocity) {
     // trying to put a max decel at the end would require the
     // velocity to be exceeded beforehand, so live with less
-    end_accel = (max_path_velocity - end_vel) / DTMAX;
+    end_accel = (max_path_velocity - end_vel) / atime;
   }
   double delta_d = AP_dist(end_vel,end_accel); // bigger distance
   delete accel_elements.back();
@@ -486,8 +748,9 @@ void MacQuinticSegment::BuildProfile() {
   // remake the starting pulse so that it increases velocity to the point
   // that a single decel pulse at the end will get us back to end_vel
   ap = new MacAccelPulse(0,start_vel,
-			 end_vel + end_accel*DTMAX - start_vel,
+			 end_vel + end_accel*atime - start_vel,
 			 max_path_acceleration,
+			 jmax,
 			 start_time);
   
   duration = ap->duration();
@@ -500,16 +763,16 @@ void MacQuinticSegment::BuildProfile() {
     // once again, we solve for a pair of pulses whose total distance
     // matches the segment distance and whose velocities match at the
     // meeting point
-    end_accel = (distance - (start_vel + end_vel)*2*DTMAX
-		 -max_path_acceleration*DTMAX*DTMAX*(1-1/PI/PI)
-		 -(start_vel + 0.5*max_path_acceleration*DTMAX) *
-		 (end_vel - start_vel - max_path_acceleration*DTMAX)/
+    end_accel = (distance - (start_vel + end_vel)*2*atime
+		 -max_path_acceleration*atime*atime*(1-1/PI/PI)
+		 -(start_vel + 0.5*max_path_acceleration*atime) *
+		 (end_vel - start_vel - max_path_acceleration*atime)/
 		 max_path_acceleration)
-      / (DTMAX*DTMAX*(1-1/PI/PI)
-	 + (start_vel + 0.5*max_path_acceleration*DTMAX)*DTMAX/max_path_acceleration);
+      / (atime*atime*(1-1/PI/PI)
+	 + (start_vel + 0.5*max_path_acceleration*atime)*atime/max_path_acceleration);
     // recompute the smaller sustain time for the accel pulse
     double const_accel_time = (end_vel - start_vel
-			       + (end_accel-max_path_acceleration)*DTMAX)
+			       + (end_accel-max_path_acceleration)*atime)
       / max_path_acceleration;
 
     // adjust the accel pulse
@@ -521,6 +784,7 @@ void MacQuinticSegment::BuildProfile() {
     ap = new MacAccelPulse(ap->end_pos(),ap->end_vel(),
 			   end_vel - ap->end_vel(),
 			   -end_accel,
+			   -jmax,
 			   ap->end_time());
     duration += ap->duration();
     accel_elements.push_back(ap);
@@ -538,6 +802,7 @@ void MacQuinticSegment::BuildProfile() {
     ap = new MacAccelPulse(ap->end_pos(), ap->end_vel(),
 			   end_vel - ap->end_vel(),
 			   -end_accel,
+			   -jmax,
 			   ap->end_time());
     duration += ap->duration();
     accel_elements.push_back(ap);
@@ -552,7 +817,7 @@ void MacQuinticSegment::BuildProfile() {
   // make sure we aren't already hitting velocity limit.
   // if we are, there's nothing else we can do, so just add a const
   // section to the middle and wrap it up
-  if (end_vel + end_accel*DTMAX > 0.999* max_path_velocity) {
+  if (end_vel + end_accel*atime > 0.999* max_path_velocity) {
     // build constant section
     double extra_dist = distance - ap->distance() - delta_d;
     ap = new MacZeroAccel(ap->end_pos(),ap->end_vel(),
@@ -564,6 +829,7 @@ void MacQuinticSegment::BuildProfile() {
     ap = new MacAccelPulse(ap->end_pos(),ap->end_vel(),
 			   end_vel - ap->end_vel(),
 			   end_accel,
+			   jmax,
 			   ap->end_time());
     duration += ap->duration();
     accel_elements.push_back(ap);
@@ -590,8 +856,8 @@ void MacQuinticSegment::BuildProfile() {
   if (a1 != - a2) {
     throw "Error: expected both accel pulses to be at max accel";
   }
-  double sustain_v1 = accel_elements.front()->end_vel() - a1 * DTMAX;
-  double sustain_v2 = accel_elements.front()->end_vel() + a2 * DTMAX;
+  double sustain_v1 = accel_elements.front()->end_vel() - a1 * atime;
+  double sustain_v2 = accel_elements.front()->end_vel() + a2 * atime;
 
   // first try to fill the distance
   // calculate the sustain time we want to add on to each pulse
@@ -607,7 +873,7 @@ void MacQuinticSegment::BuildProfile() {
     // build the second pulse
     ap=new MacAccelPulse(ap->end_pos(), ap->end_vel(),
 			 end_vel - ap->end_vel(),
-			 a2, ap->end_time());  // remake the 2nd
+			 a2, jmax, ap->end_time());  // remake the 2nd
     accel_elements.push_back(ap);
     duration += ap->duration();
     if (reverse) {
@@ -638,7 +904,7 @@ void MacQuinticSegment::BuildProfile() {
   // rebuild the final decel pulse
   ap=new MacAccelPulse(ap->end_pos(),ap->end_vel(),
 		       end_vel - ap->end_vel(),
-		       a2, ap->end_time());
+		       a2, jmax, ap->end_time());
   duration += ap->duration();
   accel_elements.push_back(ap);
   
@@ -673,7 +939,7 @@ void MacQuinticSegment::reverse_accel_pulses() {
   double vel(start_vel);
   for (unsigned int i=0; i<accel_elements.size(); ++i) {
     double accel = accel_elements[i]->accel();
-    accel_elements[i]->reset(pos,vel,-accel,t);
+    accel_elements[i]->reset(pos,vel,-accel,-jmax,t);
 
     // save ending values to use for start of next segment
     t=accel_elements[i]->end_time();
