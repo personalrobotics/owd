@@ -13,7 +13,6 @@ MacJointTraj::~MacJointTraj() {
 MacJointTraj::MacJointTraj(TrajType &vtraj, 
 			   const JointPos &mjv, 
 			   const JointPos &mja,
-			   double max_jerk,
 			   bool bWaitForStart,
 			   bool bHoldOnStall,
 			   int trajid) :
@@ -30,7 +29,7 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
 
     //    pthread_mutex_init(&mutex, NULL);
     if (vtraj.size() < 2) {
-        throw "Trajectories must have 2 or more points";
+        throw "Trajectories must have 2 or more points; do a move instead";
     }
 
     DOF = vtraj[0].size();
@@ -50,8 +49,7 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
       // with no blends at either end
       openseg = new MacQuinticSegment(vtraj[0],vtraj[1],
 				      max_joint_vel,
-				      max_joint_accel,
-				      max_jerk);
+				      max_joint_accel);
       openseg->setVelocity(0,0);
 
     } else {
@@ -59,8 +57,7 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
       // initialize the first segment with zero starting velocity
       openseg = new MacQuinticSegment(vtraj[0],vtraj[1],
 				      max_joint_vel,
-				      max_joint_accel,
-				      max_jerk);
+				      max_joint_accel);
       openseg->setVelocity(0,MacQuinticElement::VEL_MAX);
 
     }
@@ -77,16 +74,14 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
 	// the last segment doesn't get a final blend
 	nextseg = new MacQuinticSegment(vtraj[i-1],vtraj[i],
 					max_joint_vel,
-					max_joint_accel,
-					max_jerk);
+					max_joint_accel);
 	// set to come to a stop
 	nextseg->setVelocity(openseg->EndVelocity(),0);
       } else {
 	// all other segments expect blends at both ends (default)
 	nextseg = new MacQuinticSegment(vtraj[i-1],vtraj[i],
 					max_joint_vel,
-					max_joint_accel,
-					max_jerk);
+					max_joint_accel);
 	// set to increasing velocity (if possible)
 	nextseg->setVelocity(openseg->EndVelocity(),
 			     MacQuinticElement::VEL_MAX);
@@ -101,8 +96,7 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
 	MacQuinticBlend *blend = new MacQuinticBlend(openseg, nextseg,
 						     vtraj[i-1].blend_radius,
 						     max_joint_vel,
-						     max_joint_accel,
-						     max_jerk);
+						     max_joint_accel);
 
 	// calculate the max blend velocity, based on previous segment
 	// and dynamic limits

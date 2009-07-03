@@ -31,7 +31,6 @@ public:
     MacJointTraj(TrajType &vtraj, 
 		 const JointPos &max_joint_vel, 
 		 const JointPos &max_joint_accel,
-		 double max_jerk,
 		 bool bWaitForStart,
 		 bool bAutoBrakeOnStall,
 		 int trajid);
