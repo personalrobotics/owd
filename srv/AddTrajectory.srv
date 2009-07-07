@@ -1,0 +1,3 @@
+pr_msgs/JointTraj traj
+---
+uint32 id
