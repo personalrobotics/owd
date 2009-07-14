@@ -4,12 +4,13 @@
 		This package ideally includes all the custom ROS messages and services used inside the Personal Robotics project at Intel/CMU. 
 
   </description>
-  <author>all@pr-intel</author>
+  <author>herb-dev@lists.andrew.cmu.edu</author>
+  <license>LGPL</license>
   <depend package="std_msgs"/>
   <depend package="robot_msgs"/>
   <depend package="deprecated_msgs"/>
   <export>
-		<cpp cflags="-I${prefix}/msg/cpp -I${prefix}/srv/cpp"/>
+	<cpp cflags="-I${prefix}/msg/cpp -I${prefix}/srv/cpp"/>
   </export>
 </package>
 

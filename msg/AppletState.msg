@@ -1,9 +1,9 @@
-pr_msgs/Action [] actions  # the actions that this applet is ready 
+pr_msgs/Action[] actions  # the actions that this applet is ready 
                            #   to perform NOW
 
 uint8 state                # the applet state (one of the values below)
 
-int last_command_id        # the id number of the last command (good or bad)
+int32 last_command_id      # the id number of the last command (good or bad)
 
 string info                # any additional human-readable information
 
