@@ -7,8 +7,10 @@ link_directories (positionInterface)
 include(../detect_cpu.cmake)
 
 if( DEFINED ENV{XENOMAI_PATH} )
+   message(STATUS "Using $ENV{XENOMAI_PATH} for xenomai build")
    include_directories( "$ENV{XENOMAI_PATH}/include" )
 else()
+   message(STATUS "Using /usr/xenomai for xenomai build")
    include_directories(/usr/xenomai/include)
 endif()
 
