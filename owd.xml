@@ -1,12 +1,6 @@
 <?xml version="1.0" ?>
 
 <launch>
-    <machine name="wamarm" address="wamarm" default="false" user="root" ros-ip="wamarm"/>
-    <machine name="segbot" address="segbot" default="true"/>
-    <master auto="start"/>
-
-    <node pkg="owd" type="owd" machine="wamarm" output="screen" respawn="false" cwd="node" name="owd"/>
-
     <param name="owd/positionInterface/speedLimitJ1" value="3.0"/>
     <param name="owd/positionInterface/speedLimitJ2" value="3.0"/>
     <param name="owd/positionInterface/speedLimitJ3" value="3.0"/>

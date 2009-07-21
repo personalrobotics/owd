@@ -1,4 +1,4 @@
-#include <ros/node.h>
+#include <ros/ros.h>
 #include <ros/time.h>
 #include <owd/WAMState.h>
 #include <owd/IndexedJointValues.h>
@@ -8,14 +8,14 @@
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv);
-
   char *robotname;
   if (argc > 1) {
     robotname=strdup(argv[1]);
   } else {
     robotname=strdup("WAM");
   }
+
+  ros::init(argc, argv, robotname, 0);
 
   if(mlockall(MCL_CURRENT | MCL_FUTURE) == -1){
     ROS_FATAL("canbus_handler: mlockall failed: ");
@@ -27,27 +27,31 @@ int main(int argc, char** argv)
 
   // read parameters and set wam options
 
-  ros::Node n(robotname);
-  wam.Init("wam_joint_calibrations");
+  ros::NodeHandle n;
+  std::string calibration_filename;
+  n.param("~calibration_file",calibration_filename,std::string("wam_joint_calibrations"));
+  wam.Init(calibration_filename.c_str());
 
-  n.advertise<owd::WAMState>("wamstate", 10);
+  ros::Publisher wamstate_publisher = 
+    n.advertise<owd::WAMState>("wamstate", 10);
   n.advertiseService("AddTrajectory",&WamDriver::AddTrajectory,&wam);
   n.advertiseService("SetStiffness",&WamDriver::SetStiffness,&wam);
-#ifndef FAKE7
   n.advertiseService("DeleteTrajectory",&WamDriver::DeleteTrajectory,&wam);
   n.advertiseService("PauseTrajectory",&WamDriver::PauseTrajectory,&wam);
   n.advertiseService("ReplaceTrajectory",&WamDriver::ReplaceTrajectory,&wam);
   n.advertiseService("SetSpeed",&WamDriver::SetSpeed,&wam);
   n.advertiseService("SetExtraMass",&WamDriver::SetExtraMass,&wam);
-#endif // FAKE7
   n.advertiseService("GetArmDOF",&WamDriver::GetDOF,&wam);
   n.advertiseService("CalibrateJoints", &WamDriver::CalibrateJoints, &wam);
   owd::Servo servocmd;
-  n.subscribe("wamservo", servocmd, &WamDriver::wamservo_callback,&wam,&servocmd,10);
+  n.subscribe("wamservo", 1, &WamDriver::wamservo_callback,&wam);
 
+#ifdef SEATTLE
+  // NEED TO UPDATE THE SUBSCRIBE TO USE THE NODEHANDLE INTERFACE
   // LLL
   owd::IndexedJointValues jtcmd;
   n.subscribe("wam_joint_targets", jtcmd, &WamDriver::wamjointtargets_callback,&wam,&jtcmd,10);
+#endif //SEATTLE
  
 #ifdef BUILD_FOR_SEA
   owd::WamSetupSeaCtrl tlcmd;
@@ -83,7 +87,7 @@ int main(int argc, char** argv)
   while (n.ok())
   {
     // publish our state info
-    wam.Publish(n);
+    wam.Publish(wamstate_publisher);
 
     // let the driver update
     wam.Update();

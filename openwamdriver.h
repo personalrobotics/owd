@@ -9,7 +9,7 @@
 #include <list>
 #include <vector>
 #include <algorithm>
-#include <ros/node.h>
+#include <ros/ros.h>
 #include <boost/thread/mutex.hpp>
 #include <owd/AddTrajectory.h>
 #include <owd/DeleteTrajectory.h>
@@ -41,7 +41,7 @@ public:
 
     bool Init(const char *joint_calibration_file);
     
-    bool Publish(ros::Node &n);
+    bool Publish(ros::Publisher &p);
 
     void Update();
 
@@ -64,7 +64,7 @@ public:
     bool CalibrateJoints(owd::CalibrateJoints::Request &req,
         owd::CalibrateJoints::Response &res);
 
-    void wamservo_callback(void *message);
+    void wamservo_callback(const boost::shared_ptr<const owd::Servo> &message);
 
     // LLL
     void wamjointtargets_callback(void *message);

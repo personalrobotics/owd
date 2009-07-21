@@ -937,16 +937,11 @@ void WamDriver::start_control_loop() {
     }
 #endif // AUTO_ACTIVATE
     
-    int retval;
     // check the mode of puck 1 to detect when active was pressed
     while (bus.get_puck_state() != 2) {
       usleep(50000);
     }
     
-    if (retval == OW_FAILURE) {
-            ROS_FATAL("Error getting puck mode");
-            throw -1;
-    }
 }
 
 void WamDriver::stop_control_loop() {
@@ -1163,7 +1158,7 @@ bool WamDriver::verify_home_position() {
     return true;
 }
 
-bool WamDriver::Publish(ros::Node &n) {
+bool WamDriver::Publish(ros::Publisher &p) {
   double jointpos[nJoints+1];
   double jointtorqs[nJoints+1];  // PID error-correction torques,
   //                                       after removing dynamic torques
@@ -1191,7 +1186,7 @@ bool WamDriver::Publish(ros::Node &n) {
   }
   owam->unlock();
 
-  n.publish("wamstate", wamstate);
+  p.publish(wamstate);
   return true;
 }
 
@@ -1575,9 +1570,8 @@ void WamDriver::Update() {
   trajectory_list.pop_front();
 }
 
-void WamDriver::wamservo_callback(void *message) {
+void WamDriver::wamservo_callback(const boost::shared_ptr<const owd::Servo> &servo) {
   ROS_DEBUG_NAMED("servo","Received servo command:");
-  owd::Servo *servo = (owd::Servo*)message;
   if (servo->joint.size() != servo->velocity.size()) {
     ROS_ERROR("Mismatched arrays received in Servo message; ignored");
     return;

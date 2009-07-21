@@ -1,0 +1,22 @@
+<?xml version="1.0" ?>
+
+<launch>
+
+  <!-- roscore -->
+  <master auto="start"/>
+
+  <!-- machines -->
+  <machine name="wamarm" address="wamarm" default="false" user="root" ros-ip="wamarm"/>
+  <machine name="segbot" address="segbot" default="true"/>
+
+  <!-- parameters -->
+  <include file="owd.xml"/>
+  <param name="owd/calibration_file" type="string"
+         value="irs_wam_joint_calibrations" />
+
+  <!-- nodes -->
+  <node pkg="owd" type="owd" machine="wamarm" output="screen" respawn="false" cwd="node" name="owd"/>
+
+
+</launch>
+
