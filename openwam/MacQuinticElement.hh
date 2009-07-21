@@ -1,6 +1,7 @@
 #ifndef MACQUINTICELEMENT_H
 #define MACQUINTICELEMENT_H
 
+#include <string.h>
 #include "MacAccelPulse.hh"
 #include "TrajType.hh"
 

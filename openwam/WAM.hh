@@ -16,6 +16,8 @@
   You should have received a copy of the GNU Lesser General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+//LLL
+//#define BUILD_FOR_SEA
 
 #include <semaphore.h>
 #include <list>
@@ -32,10 +34,14 @@
 #include "SE3Traj.hh"
 #include "SE3CtrlPD.hh"
 #include "JointsTraj.hh"
-#include "JointCtrlPID.hh"
 #include "ParaJointTraj.hh"
 #include "MacJointTraj.hh"
 #include "Sigmoid.hh"
+#include "JointCtrlPID.hh"
+
+//LLL
+#include "positionInterface/SmoothArm.h"
+#include "JointCtrlSea.hh"
 
 #ifndef __WAM_H__
 #define __WAM_H__
@@ -59,18 +65,18 @@ public:
   double dyntime;
 
   WAMstats() : trajtime(0.0f),
-	       jsctrltime(0.0f),
-	       safetycount(0),
-	       loopread(0.0f),
-	       loopctrl(0.0f),
-	       loopsend(0.0f),
-	       looptime(0.0f),
-	       slowcount(0.0f),
-	       slowavg(0.0f),
-	       slowreadtime(0.0f),
-	       slowctrltime(0.0f),
-	       slowsendtime(0.0f),
-	       dyntime(0.0f)
+               jsctrltime(0.0f),
+               safetycount(0),
+               loopread(0.0f),
+               loopctrl(0.0f),
+               loopsend(0.0f),
+               looptime(0.0f),
+               slowcount(0.0f),
+               slowavg(0.0f),
+               slowreadtime(0.0f),
+               slowctrltime(0.0f),
+               slowsendtime(0.0f),
+               dyntime(0.0f)
   {}
 
   void rosprint() const;
@@ -87,8 +93,8 @@ public:
   static const double mN5 =  9.68163;
   static const double mN6 =  9.68163;
   static const double mN7 = 14.962;
-  static const double mn3 =  1.68;
-  static const double mn6 =  1.00;
+  static const double mn3 = 1.68;
+  static const double mn6 = 1.00;
 
   static const double M2_MM2 = 1.0/1000000;
 
@@ -97,7 +103,6 @@ public:
   Joint joints[Joint::Jn+1];               // Array of joints
   Motor motors[Motor::Mn+1];               // Array of motors
   Link links[Link::Ln+1];                  // Array of links
-  double heldPositions[Joint::Jn+1];       // use if you want to hold some joint pos
   bool suppress_controller[Joint::Jn+1];    // flag to disable PID control
   bool check_safety_torques;
   double pid_torq[Joint::Jn+1];
@@ -110,7 +115,12 @@ public:
   //  ParaJointTraj  *jointstraj;                 // joints trajectories
   Trajectory *jointstraj;
   PulseTraj   *pulsetraj;                  // trajectory of joint acceleration pulses
+#ifdef BUILD_FOR_SEA
+  JointCtrlSea jointsctrl[Joint::Jn+1];    // joint controllers
+  void loadSeaParams();
+#else
   JointCtrlPID jointsctrl[Joint::Jn+1];    // joint controllers
+#endif
 
   bool rec;                                // Are we recording data
   bool wsdyn;                              // Is the WS dynamics turned on?
@@ -145,6 +155,12 @@ public:
   CANbus* bus;                             // pointer to the CAN bus
   ControlLoop ctrl_loop;            // control loop object
 
+  // LLL a beta version of joint targs
+  //JointTargets jointTargs;
+  // LLL a beta version of position smoother 
+  SmoothArm posSmoother;
+
+
   WAM(CANbus* cb);
    
   int init();                       // initialise the WAM
@@ -158,7 +174,8 @@ public:
   void newcontrol(double dt);          // main control function
   bool safety_torques_exceeded(double t[]); // check pid torqs against thresholds
 
-  int  set_jpos(double pos[Joint::Jn+1]);   // set the joint positions
+  int  set_targ_jpos(double* pos);          // set the target joint positions online 
+  int  set_jpos(double pos[Joint::Jn+1]);   // set the joint positions offline
   void get_current_data(double *pos, double *trq, double *nettrq); // get the
   //       joint positions, torques, and net torques (any pointer can be NULL)
   void get_jtrq(double trq[Joint::Jn+1]);   // get the joint torques

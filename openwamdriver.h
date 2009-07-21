@@ -21,7 +21,15 @@
 #include <owd/WAMState.h>
 #include <owd/WAMInternals.h>
 #include <owd/GetDOF.h>
+#include <owd/CalibrateJoints.h>
 #include <owd/Servo.h>
+
+#ifdef BUILD_FOR_SEA
+  #include <owd/WamRequestSeaCtrlTorqLimit.h>
+  #include <owd/WamRequestSeaCtrlKp.h>
+  #include <owd/WamRequestSeaCtrlKd.h>
+  #include <owd/WamRequestSeaCtrlKi.h>
+#endif
 
 class WamDriver
 {
@@ -38,23 +46,57 @@ public:
     void Update();
 
     bool AddTrajectory(owd::AddTrajectory::Request &req,
-		       owd::AddTrajectory::Response &res);
+                       owd::AddTrajectory::Response &res);
     bool DeleteTrajectory(owd::DeleteTrajectory::Request &req,
-			  owd::DeleteTrajectory::Response &res);
+                          owd::DeleteTrajectory::Response &res);
     bool PauseTrajectory(owd::PauseTrajectory::Request &req,
-			 owd::PauseTrajectory::Response &res);
+                         owd::PauseTrajectory::Response &res);
     bool ReplaceTrajectory(owd::ReplaceTrajectory::Request &req,
-			   owd::ReplaceTrajectory::Response &res);
+                           owd::ReplaceTrajectory::Response &res);
     bool SetExtraMass(owd::SetExtraMass::Request &req,
-		      owd::SetExtraMass::Response &res);
+                      owd::SetExtraMass::Response &res);
     bool SetStiffness(owd::SetStiffness::Request &req,
-		      owd::SetStiffness::Response &res);
+                      owd::SetStiffness::Response &res);
     bool SetSpeed(owd::SetSpeed::Request &req,
-		  owd::SetSpeed::Response &res);
+                  owd::SetSpeed::Response &res);
     bool GetDOF(owd::GetDOF::Request &req,
-		owd::GetDOF::Response &res);
+                owd::GetDOF::Response &res);
+    bool CalibrateJoints(owd::CalibrateJoints::Request &req,
+        owd::CalibrateJoints::Response &res);
 
     void wamservo_callback(void *message);
+
+    // LLL
+    void wamjointtargets_callback(void *message);
+
+#ifdef BUILD_FOR_SEA
+    void resetSeaCtrl();
+
+    void wam_seactrl_settl_callback(void *message);
+    void publishCurrentTorqLimits();
+    bool WamRequestSeaCtrlTorqLimit(owd::WamRequestSeaCtrlTorqLimit::Request &req,
+                                    owd::WamRequestSeaCtrlTorqLimit::Response &res);
+
+    void wam_seactrl_setkp_callback(void *message);
+    void publishCurrentKp();
+    bool WamRequestSeaCtrlKp(owd::WamRequestSeaCtrlKp::Request &req,
+                             owd::WamRequestSeaCtrlKp::Response &res);
+
+    void wam_seactrl_setkd_callback(void *message);
+    void publishCurrentKd();
+    bool WamRequestSeaCtrlKd(owd::WamRequestSeaCtrlKd::Request &req,
+                             owd::WamRequestSeaCtrlKd::Response &res);
+
+    void wam_seactrl_setki_callback(void *message);
+    void publishCurrentKi();
+    bool WamRequestSeaCtrlKi(owd::WamRequestSeaCtrlKi::Request &req,
+                             owd::WamRequestSeaCtrlKi::Response &res);
+
+    void publishAllSeaSettings();
+#endif
+
+
+
 
     std::string robotname;
 

@@ -44,71 +44,66 @@ WAM::WAM(CANbus* cb) :
   jointstraj = NULL;
   pulsetraj = NULL;
 
-  for(int i = Joint::J1; i<=Joint::Jn; i++) {
-      heldPositions[i] = 0;
-      suppress_controller[i]=false;
-  }
-
-
+  
   links[Link::L0]=Link( DH(  0.0000,   0.0000,   0.0000,   0.0000), 0.0000, 
-			R3(  0.0000,   0.0000,   0.0000), 
-			Inertia(0,0,0,0,0,0));
+                        R3(  0.0000,   0.0000,   0.0000), 
+                        Inertia(0,0,0,0,0,0));
 
   links[Link::L1]=Link( DH( -M_PI_2,   0.0000,   0.0000,   0.0000), 8.3936,
- 			R3(  0.3506, 132.6795,   0.6286)*0.001,
-			Inertia(95157.4294,   246.1404,    -95.0183,
-				92032.3524,  -962.6725,  59290.5997, M2_MM2) );
+                         R3(  0.3506, 132.6795,   0.6286)*0.001,
+                        Inertia(95157.4294,   246.1404,    -95.0183,
+                                92032.3524,  -962.6725,  59290.5997, M2_MM2) );
             
   links[Link::L2]=Link( DH(  M_PI_2,   0.0000,   0.0000,   0.0000), 4.8487,
-	 		R3( -0.2230, -21.3924,  13.3754)*0.001, 
-			Inertia(29326.8098,   -43.3994,   -129.2942,
-				20781.5826,  1348.6924,  22807.3271, M2_MM2) );
+                         R3( -0.2230, -21.3924,  13.3754)*0.001, 
+                        Inertia(29326.8098,   -43.3994,   -129.2942,
+                                20781.5826,  1348.6924,  22807.3271, M2_MM2) );
 
   links[Link::L3]=Link( DH( -M_PI_2,   0.0450,   0.5500,   0.0000), 1.7251,
-		 	R3(-38.7565, 217.9078,   0.0252)*0.001, 
-			Inertia(56662.2970, -2321.6892,      8.2125,
-			  	 3158.0509,   -16.6307,  56806.6024, M2_MM2) );
+                         R3(-38.7565, 217.9078,   0.0252)*0.001, 
+                        Inertia(56662.2970, -2321.6892,      8.2125,
+                                   3158.0509,   -16.6307,  56806.6024, M2_MM2) );
 
 #ifdef WRIST
 #warning "COMPILING WRIST"
 
   /* newer numbers from Barrett's Oct 2007 WAM_MassParams_AA-01.pdf */
   links[Link::L4]=Link( DH(  M_PI_2,  -0.0450,   0.0000,   0.0000), 2.40016804,
-			R3(  0.00498512,-0.00022942,0.13271662),
-			Inertia(0.01491672,    0.00001741,  -0.00150604,
-			0.01482922,    -0.00002109,   0.00294463, 1) );
+                        R3(  0.00498512,-0.00022942,0.13271662),
+                        Inertia(0.01491672,    0.00001741,  -0.00150604,
+                        0.01482922,    -0.00002109,   0.00294463, 1) );
 
   /* March 2009, not working so great
   links[Link::L4]=Link( DH(  M_PI_2,  -0.0450,   0.0000,   0.0000), 2.17266212,
-			R3(  0.00553408,0.00006822,0.11927695),
-			Inertia(0.01067491,    0.00004503,  -0.00135557,
-				0.01058659,    -0.00011002,   0.00282036, 1) );  */
+                        R3(  0.00553408,0.00006822,0.11927695),
+                        Inertia(0.01067491,    0.00004503,  -0.00135557,
+                                0.01058659,    -0.00011002,   0.00282036, 1) );  */
   
 
   links[Link::L5]=Link( DH( -M_PI_2,   0.0000,   0.3000,   0.0000), 0.35655692,
-			R3(  0.00005483,0.02886286,0.00148493), 
-			Inertia(  0.00037112,    -0.00000008,     -0.00000003,
-				  0.00019434,    -0.00001613,    0.00038209, 1) );
+                        R3(  0.00005483,0.02886286,0.00148493), 
+                        Inertia(  0.00037112,    -0.00000008,     -0.00000003,
+                                  0.00019434,    -0.00001613,    0.00038209, 1) );
 
   links[Link::L6]=Link( DH(  M_PI_2,   0.0000,   0.0000,   0.0000), 0.40915886,
-			R3( -0.00005923,-0.01686123,0.02419052),
-			Inertia(  0.00054889,     0.00000019,     -0.00000010,
-				  0.00023846,   -0.00004430,    0.00045133, 1) );
+                        R3( -0.00005923,-0.01686123,0.02419052),
+                        Inertia(  0.00054889,     0.00000019,     -0.00000010,
+                                  0.00023846,   -0.00004430,    0.00045133, 1) );
 /*old wrist
   links[Link::L4]=Link( DH(  M_PI_2,  -0.0450,   0.0000,   0.0000), 2.1824,
-			R3(  6.2895,  -0.0010, 111.0633)*0.001,
-			Inertia(10065.3990,    14.6007,  -1392.4965,
-				10000.5377,    29.4814,   2838.9554, M2_MM2) );
+                        R3(  6.2895,  -0.0010, 111.0633)*0.001,
+                        Inertia(10065.3990,    14.6007,  -1392.4965,
+                                10000.5377,    29.4814,   2838.9554, M2_MM2) );
 
   links[Link::L5]=Link( DH( -M_PI_2,   0.0000,   0.3000,   0.0000), 0.4067,
-			R3(  0.0584,  28.3754,   0.1902)*0.001, 
-			Inertia(  321.0141,    -0.0667,     -0.0079,
-				  172.3637,    -2.4724,    350.6782, M2_MM2) );
+                        R3(  0.0584,  28.3754,   0.1902)*0.001, 
+                        Inertia(  321.0141,    -0.0667,     -0.0079,
+                                  172.3637,    -2.4724,    350.6782, M2_MM2) );
 
   links[Link::L6]=Link( DH(  M_PI_2,   0.0000,   0.0000,   0.0000), 0.5278,
-			R3( -0.0311, -14.8635,  25.6326)*0.001,
-			Inertia(  604.1921,     0.0825,     -0.1896,
-				  269.3020,   -62.3326,    507.9036, M2_MM2) );
+                        R3( -0.0311, -14.8635,  25.6326)*0.001,
+                        Inertia(  604.1921,     0.0825,     -0.1896,
+                                  269.3020,   -62.3326,    507.9036, M2_MM2) );
 */
 #else
 
@@ -119,15 +114,15 @@ WAM::WAM(CANbus* cb) :
   // new COG: X=(.01096*1.065 + .045*1.3)/(1.065+1.3) = .0297
   //          Z=(.14054*1.065 + .410*1.3)/(1.065+1.3) = .2887
   links[Link::L4]=Link( DH(  M_PI_2,  -0.0450,   0.0000,   0.0000), 2.36513649,
-			R3(  0.0297,0.00002567,0.2887),
-			Inertia(0.01848577,    0.00000219,  -0.00160868,
-				0.01891658,    -0.00000515,   0.00197517, 1) );
+                        R3(  0.0297,0.00002567,0.2887),
+                        Inertia(0.01848577,    0.00000219,  -0.00160868,
+                                0.01891658,    -0.00000515,   0.00197517, 1) );
 
 #else
   links[Link::L4]=Link( DH(  M_PI_2,  -0.0450,   0.0000,   0.0000), 1.06513649,
-			R3(  0.01095471,0.00002567,0.14053900),
-			Inertia(0.01848577,    0.00000219,  -0.00160868,
-				0.01891658,    -0.00000515,   0.00197517, 1) );
+                        R3(  0.01095471,0.00002567,0.14053900),
+                        Inertia(0.01848577,    0.00000219,  -0.00160868,
+                                0.01891658,    -0.00000515,   0.00197517, 1) );
   /* newer numbers from Barrett's Oct 2007 WAM_MassParams_AA-01.pdf 
        Lxx = 0.01848577        Lxy = 0.00000219      Lxz = ­0.00160868 
        Lyx = 0.00000219        Lyy = 0.01891658      Lyz = 0.00000515 
@@ -151,24 +146,24 @@ WAM::WAM(CANbus* cb) :
 
   //new inertias
   links[Link::L7]=Link( DH(  0.0000,   0.0000,   0.0620,   0.0000), 1.3754270,
-			R3(  0.0000,   0.0000,  45.0000)*0.001,
-			Inertia(   2558.1007,   0.0000,      0.0000,
-				   2558.1007,   0.0000,   1242.1825, M2_MM2) );
+                        R3(  0.0000,   0.0000,  45.0000)*0.001,
+                        Inertia(   2558.1007,   0.0000,      0.0000,
+                                   2558.1007,   0.0000,   1242.1825, M2_MM2) );
  
 
-//			Inertia(   2231.8750,   0.0000,      0.0000,				   2231.8750,   0.0000,   1083.7500, M2_MM2) );
+//                        Inertia(   2231.8750,   0.0000,      0.0000,                                   2231.8750,   0.0000,   1083.7500, M2_MM2) );
   /*
   links[Link::L7]=Link( DH(  0.0000,   0.0000,   0.0620,   0.0000), 1.3000,
-			R3( -30.0000,   0.0000,  45.0000)*0.001,
-			Inertia(   2231.8750,   0.0000,      0.0000,
-				   2231.8750,   0.0000,   1083.7500, M2_MM2) );
+                        R3( -30.0000,   0.0000,  45.0000)*0.001,
+                        Inertia(   2231.8750,   0.0000,      0.0000,
+                                   2231.8750,   0.0000,   1083.7500, M2_MM2) );
   */
 #else
 
   links[Link::L7]=Link( DH(  0.0000,   0.0000,   0.0609,   0.0000), 0.07548270,
-			R3( 0.00014836,0.00007252,-0.00335185),
-			Inertia(   0.00003911,    0.00000019,      0.0000,
-				   0.00003877,     0.00000,     0.00007614, M2_MM2) );
+                        R3( 0.00014836,0.00007252,-0.00335185),
+                        Inertia(   0.00003911,    0.00000019,      0.0000,
+                                   0.00003877,     0.00000,     0.00007614, M2_MM2) );
             /*from wam7hand.conf:
             <0.00003911,0.00000019,0.00000000>,
             <0.00000019,0.00003877,0.00000000>,
@@ -177,9 +172,9 @@ WAM::WAM(CANbus* cb) :
 
 /*old wrist
   links[Link::L7]=Link( DH(  0.0000,   0.0000,   0.0620,   0.0000), 0.0557,
-			R3( -0.0001,  -0.1823,-284.7431)*0.001,
-			Inertia(   21.4102,    -0.0001,      0.0000,
-				   21.6157,     0.0040,     42.1975, M2_MM2) );
+                        R3( -0.0001,  -0.1823,-284.7431)*0.001,
+                        Inertia(   21.4102,    -0.0001,      0.0000,
+                                   21.6157,     0.0040,     42.1975, M2_MM2) );
 */
 
 #endif
@@ -208,6 +203,9 @@ int WAM::init(){
     ROS_FATAL("WAM::init: failed to load config file.");
       return OW_FAILURE;
   }
+#ifdef BUILD_FOR_SEA
+  loadSeaParams();
+#endif
   return OW_SUCCESS;
 }
 
@@ -246,8 +244,188 @@ int WAM::loadctrl(const char* fn){
   }
   for(int j=Joint::J1; j<=Joint::Jn; j++)
     is >> jointsctrl[j];
+
   return OW_SUCCESS;
 }
+
+#ifdef BUILD_FOR_SEA
+void WAM::loadSeaParams(){
+  // retrieve sea from ros param server, if available
+  ros::Node* node = ros::Node::instance();
+
+  assert(Joint::Jn == 7);
+
+  // assume 7 joints
+  assert(Joint::Jn == 7);
+
+  // safe settings (used when there is no torque limit)
+  // j1
+  double kpSafe, kiSafe, kdSafe;
+  node->param(std::string("owd/JointCtrlSea/j1Kp_safe"), kpSafe, 1800.0);
+  node->param(std::string("owd/JointCtrlSea/j1Ki_safe"), kiSafe, 0.0);
+  node->param(std::string("owd/JointCtrlSea/j1Kd_safe"), kdSafe, 10.0);
+  ROS_INFO("j1 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
+  jointsctrl[1].specifySafeSettings(kpSafe, kiSafe, kdSafe);
+  // j2
+  node->param(std::string("owd/JointCtrlSea/j2Kp_safe"), kpSafe, 1800.0);
+  node->param(std::string("owd/JointCtrlSea/j2Ki_safe"), kiSafe, 0.0);
+  node->param(std::string("owd/JointCtrlSea/j2Kd_safe"), kdSafe, 10.0);
+  ROS_INFO("j2 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
+  jointsctrl[2].specifySafeSettings(kpSafe, kiSafe, kdSafe);
+  // j3
+  node->param(std::string("owd/JointCtrlSea/j3Kp_safe"), kpSafe, 2000.0);
+  node->param(std::string("owd/JointCtrlSea/j3Ki_safe"), kiSafe, 0.0);
+  node->param(std::string("owd/JointCtrlSea/j3Kd_safe"), kdSafe, 20.0);
+  ROS_INFO("j3 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
+  jointsctrl[3].specifySafeSettings(kpSafe, kiSafe, kdSafe);
+  // j4
+  node->param(std::string("owd/JointCtrlSea/j4Kp_safe"), kpSafe, 1200.0);
+  node->param(std::string("owd/JointCtrlSea/j4Ki_safe"), kiSafe, 0.0);
+  node->param(std::string("owd/JointCtrlSea/j4Kd_safe"), kdSafe, 10.0);
+  ROS_INFO("j4 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
+  jointsctrl[4].specifySafeSettings(kpSafe, kiSafe, kdSafe);
+  // j5
+  node->param(std::string("owd/JointCtrlSea/j5Kp_safe"), kpSafe, 300.0);
+  node->param(std::string("owd/JointCtrlSea/j5Ki_safe"), kiSafe, 0.0);
+  node->param(std::string("owd/JointCtrlSea/j5Kd_safe"), kdSafe, 5.0);
+  ROS_INFO("j5 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
+  jointsctrl[5].specifySafeSettings(kpSafe, kiSafe, kdSafe);
+  // j6
+  node->param(std::string("owd/JointCtrlSea/j6Kp_safe"), kpSafe, 10.0);
+  node->param(std::string("owd/JointCtrlSea/j6Ki_safe"), kiSafe, 0.0);
+  node->param(std::string("owd/JointCtrlSea/j6Kd_safe"), kdSafe, 1.5);
+  ROS_INFO("j6 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
+  jointsctrl[6].specifySafeSettings(kpSafe, kiSafe, kdSafe);
+  // j7
+  node->param(std::string("owd/JointCtrlSea/j7Kp_safe"), kpSafe, 2.0);
+  node->param(std::string("owd/JointCtrlSea/j7Ki_safe"), kiSafe, 0.0);
+  node->param(std::string("owd/JointCtrlSea/j7Kd_safe"), kdSafe, 0.1);
+  ROS_INFO("j7 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
+  jointsctrl[7].specifySafeSettings(kpSafe, kiSafe, kdSafe);
+
+
+  double torqLimit;
+  // J1
+  node->param(std::string("owd/JointCtrlSea/j1Limit"), torqLimit, 15.0);
+  ROS_INFO("owd/JointCtrlSea/j1Limit %f", torqLimit);
+  jointsctrl[1].setTorqLimit(torqLimit);
+  // J2
+  node->param(std::string("owd/JointCtrlSea/j2Limit"), torqLimit, 15.0);
+  ROS_INFO("owd/JointCtrlSea/j2Limit %f", torqLimit);
+  jointsctrl[2].setTorqLimit(torqLimit);
+  // J3
+  node->param(std::string("owd/JointCtrlSea/j3Limit"), torqLimit, 10.0);
+  ROS_INFO("owd/JointCtrlSea/j3Limit %f", torqLimit);
+  jointsctrl[3].setTorqLimit(torqLimit);
+  // J4
+  node->param(std::string("owd/JointCtrlSea/j4Limit"), torqLimit, 8.0);
+  ROS_INFO("owd/JointCtrlSea/j4Limit %f", torqLimit);
+  jointsctrl[4].setTorqLimit(torqLimit);
+  // J5
+  node->param(std::string("owd/JointCtrlSea/j5Limit"), torqLimit, 3.0);
+  ROS_INFO("owd/JointCtrlSea/j5Limit %f", torqLimit);
+  jointsctrl[5].setTorqLimit(torqLimit);
+  // J6
+  node->param(std::string("owd/JointCtrlSea/j6Limit"), torqLimit, 3.0);
+  ROS_INFO("owd/JointCtrlSea/j6Limit %f", torqLimit);
+  jointsctrl[6].setTorqLimit(torqLimit);
+  // J7
+  node->param(std::string("owd/JointCtrlSea/j7Limit"), torqLimit, 1.0);
+  ROS_INFO("owd/JointCtrlSea/j7Limit %f", torqLimit);
+  jointsctrl[7].setTorqLimit(torqLimit);
+
+  double kp;
+  // J1
+  node->param(std::string("owd/JointCtrlSea/j1Kp"), kp, 1800.0);
+  ROS_INFO("owd/JointCtrlSea/j1Kp %f", kp);
+  jointsctrl[1].setKp(kp);
+  // J2
+  node->param(std::string("owd/JointCtrlSea/j2Kp"), kp, 2000.0);
+  ROS_INFO("owd/JointCtrlSea/j2Kp %f", kp);
+  jointsctrl[2].setKp(kp);
+  // J3
+  node->param(std::string("owd/JointCtrlSea/j3Kp"), kp, 1200.0);
+  ROS_INFO("owd/JointCtrlSea/j3Kp %f", kp);
+  jointsctrl[3].setKp(kp);
+  // J4
+  node->param(std::string("owd/JointCtrlSea/j4Kp"), kp, 300.0);
+  ROS_INFO("owd/JointCtrlSea/j4Kp %f", kp);
+  jointsctrl[4].setKp(kp);
+  // J5
+  node->param(std::string("owd/JointCtrlSea/j5Kp"), kp, 10.0);
+  ROS_INFO("owd/JointCtrlSea/j5Kp %f", kp);
+  jointsctrl[5].setKp(kp);
+  // J6
+  node->param(std::string("owd/JointCtrlSea/j6Kp"), kp, 15.0);
+  ROS_INFO("owd/JointCtrlSea/j6Kp %f", kp);
+  jointsctrl[6].setKp(kp);
+  // J7
+  node->param(std::string("owd/JointCtrlSea/j7Kp"), kp, 2.0);
+  ROS_INFO("owd/JointCtrlSea/j7Kp %f", kp);
+  jointsctrl[7].setKp(kp);
+
+  double kd;
+  // J1
+  node->param(std::string("owd/JointCtrlSea/j1Kd"), kd, 10.0);
+  ROS_INFO("owd/JointCtrlSea/j1Kd %f", kd);
+  jointsctrl[1].setKd(kd);
+  // J2
+  node->param(std::string("owd/JointCtrlSea/j2Kd"), kd, 20.0);
+  ROS_INFO("owd/JointCtrlSea/j2Kd %f", kd);
+  jointsctrl[2].setKd(kd);
+  // J3
+  node->param(std::string("owd/JointCtrlSea/j3Kd"), kd, 10.0);
+  ROS_INFO("owd/JointCtrlSea/j3Kd %f", kd);
+  jointsctrl[3].setKd(kd);
+  // J4
+  node->param(std::string("owd/JointCtrlSea/j4Kd"), kd, 5.0);
+  ROS_INFO("owd/JointCtrlSea/j4Kd %f", kd);
+  jointsctrl[4].setKd(kd);
+  // J5
+  node->param(std::string("owd/JointCtrlSea/j5Kd"), kd, 1.5);
+  ROS_INFO("owd/JointCtrlSea/j5Kd %f", kd);
+  jointsctrl[5].setKd(kd);
+  // J6
+  node->param(std::string("owd/JointCtrlSea/j6Kd"), kd, 0.1);
+  ROS_INFO("owd/JointCtrlSea/j6Kd %f", kd);
+  jointsctrl[6].setKd(kd);
+  // J7
+  node->param(std::string("owd/JointCtrlSea/j7Kd"), kd, 0.1);
+  ROS_INFO("owd/JointCtrlSea/j7Kd %f", kd);
+  jointsctrl[7].setKd(kd);
+
+  double ki;
+  // J1
+  node->param(std::string("owd/JointCtrlSea/j1Ki"), ki, 0.0);
+  ROS_INFO("owd/JointCtrlSea/j1Ki %f", ki);
+  jointsctrl[1].setKi(ki);
+  // J2
+  node->param(std::string("owd/JointCtrlSea/j2Ki"), ki, 0.0);
+  ROS_INFO("owd/JointCtrlSea/j2Ki %f", ki);
+  jointsctrl[2].setKi(ki);
+  // J3
+  node->param(std::string("owd/JointCtrlSea/j3Ki"), ki, 0.0);
+  ROS_INFO("owd/JointCtrlSea/j3Ki %f", ki);
+  jointsctrl[3].setKi(ki);
+  // J4
+  node->param(std::string("owd/JointCtrlSea/j4Ki"), ki, 0.0);
+  ROS_INFO("owd/JointCtrlSea/j4Ki %f", ki);
+  jointsctrl[4].setKi(ki);
+  // J5
+  node->param(std::string("owd/JointCtrlSea/j5Ki"), ki, 0.0);
+  ROS_INFO("owd/JointCtrlSea/j5Ki %f", ki);
+  jointsctrl[5].setKi(ki);
+  // J6
+  node->param(std::string("owd/JointCtrlSea/j6Ki"), ki, 0.0);
+  ROS_INFO("owd/JointCtrlSea/j6Ki %f", ki);
+  jointsctrl[6].setKi(ki);
+  // J7
+  node->param(std::string("owd/JointCtrlSea/j7Ki"), ki, 0.0);
+  ROS_INFO("owd/JointCtrlSea/j7Ki %f", ki);
+  jointsctrl[7].setKi(ki);
+}
+#endif
+
 
 /*
  * Output the information about the WAM
@@ -378,6 +556,7 @@ int WAM::set_jpos(double* pos){
   return OW_SUCCESS;
 }
 
+
 void WAM::get_current_data(double* pos, double *trq, double *nettrq){
     this->lock();
     if (pos) {
@@ -394,7 +573,7 @@ void WAM::get_current_data(double* pos, double *trq, double *nettrq){
       // subtracts out static (gravity) and dynamic (acceleration) torques to
       // leave just what balances ext. forces
       for(int j=Joint::J1; j<=Joint::Jn; j++)
-	nettrq[ joints[j].id() ] = pid_torq[j];
+        nettrq[ joints[j].id() ] = pid_torq[j];
     }
     this->unlock();
 }
@@ -466,8 +645,8 @@ void* control_loop(void* argv){
       
       // GET POSITIONS
       if(wam->bus->read_positions() == OW_FAILURE){
-	ROS_FATAL("control_handler: read_positions failed");
-	return NULL;
+        ROS_FATAL("control_handler: read_positions failed");
+        return NULL;
       }
       
       RTIME bt1 = rt_timer_ticks2ns(rt_timer_read());
@@ -481,8 +660,8 @@ void* control_loop(void* argv){
 
       // SEND TORQUES
       if(wam->bus->send_torques() == OW_FAILURE){
-	ROS_FATAL("control_handler: send_torques failed.");
-	return NULL;
+        ROS_FATAL("control_handler: send_torques failed.");
+        return NULL;
       }
 
       RTIME bt3 = rt_timer_ticks2ns(rt_timer_read());
@@ -492,35 +671,35 @@ void* control_loop(void* argv){
       // only check the state every 200 cycles
       static int stateperiod=0;
       if (++stateperiod == 200) {
-	wam->bus->set_puck_state();
-	stateperiod=0;
+        wam->bus->set_puck_state();
+        stateperiod=0;
       }
 
       // check for slow loops
       if ((t2-t1)>2000000) {
-	slowcount++;
-	slowtime += (t2-t1) * 1e-6;
-	slowreadtime += (bt1-t2) * 1e-6;
-	slowctrltime += (bt2-bt1) * 1e-6;
-	slowsendtime += (bt3-bt2) * 1e-6;
+        slowcount++;
+        slowtime += (t2-t1) * 1e-6;
+        slowreadtime += (bt1-t2) * 1e-6;
+        slowctrltime += (bt2-bt1) * 1e-6;
+        slowsendtime += (bt3-bt2) * 1e-6;
       }
       looptime += (t2-t1) * 1e-6;
 
       // save time stats
       if (++loopcount == 1000) {
-	wam->stats.loopread= readtime/1000.0;
-	wam->stats.loopctrl= controltime/1000.0;
-	wam->stats.loopsend= sendtime/1000.0;
-	wam->stats.looptime= looptime/1000.0;
-	wam->stats.slowcount = slowcount/10.0;
-	wam->stats.slowavg = slowtime/slowcount;
-	wam->stats.slowreadtime = slowreadtime/slowcount;
-	wam->stats.slowctrltime = slowctrltime/slowcount;
-	wam->stats.slowsendtime = slowsendtime/slowcount;
-	readtime=controltime=sendtime=slowtime=0.0f;
-	slowreadtime=slowctrltime=slowsendtime=0.0f;
-	looptime=0.0f;
-	loopcount=slowcount=0;
+        wam->stats.loopread= readtime/1000.0;
+        wam->stats.loopctrl= controltime/1000.0;
+        wam->stats.loopsend= sendtime/1000.0;
+        wam->stats.looptime= looptime/1000.0;
+        wam->stats.slowcount = slowcount/10.0;
+        wam->stats.slowavg = slowtime/slowcount;
+        wam->stats.slowreadtime = slowreadtime/slowcount;
+        wam->stats.slowctrltime = slowctrltime/slowcount;
+        wam->stats.slowsendtime = slowsendtime/slowcount;
+        readtime=controltime=sendtime=slowtime=0.0f;
+        slowreadtime=slowctrltime=slowsendtime=0.0f;
+        looptime=0.0f;
+        loopcount=slowcount=0;
       }
       
       // get ready for next pass
@@ -580,6 +759,8 @@ void WAM::newcontrol(double dt){
     static double trajtime=0.0f;
     static int safety_torque_count=0;
     
+    // TODO LLL: yikes! i'm not sure we want to lock here 
+    // if the non real-time thread locks as well
     this->lock();
 
     double traj_timestep;
@@ -591,8 +772,8 @@ void WAM::newcontrol(double dt){
       traj_timestep = dt;
     }
     
-    if(recv_mpos() == OW_SUCCESS){			// read new motor positions
-        mpos2jpos();						// convert to joint positions
+    if(recv_mpos() == OW_SUCCESS){  // read new motor positions
+        mpos2jpos();    // convert to joint positions
         
         for(int j=Joint::J1; j<=Joint::Jn; j++){
             q_target[j] = q[j] = joints[j].pos();
@@ -601,148 +782,186 @@ void WAM::newcontrol(double dt){
         }
         // is there a joint trajectory running
         if(jointstraj != NULL){
-	  try {
-	    RTIME t3 = rt_timer_ticks2ns(rt_timer_read());	
-	    jointstraj->evaluate(q_target, qd_target, qdd_target, traj_timestep * timestep_factor);
-	    RTIME t4 = rt_timer_ticks2ns(rt_timer_read());	
-	    trajtime += (t4-t3) / 1e6;
-	    for(int j=Joint::J1; j<=Joint::Jn; j++){
-	      qd_target[j] *= timestep_factor;
-	      qdd_target[j] *= timestep_factor * timestep_factor;
-	    }
-	    if(jointstraj->state() == Trajectory::DONE){
-	      // we've gone past the last time in the trajectory,
-	      // so set up to hold at the final position.  we'll let
-	      // the trajectory control values persist for the rest of this
-	      // iteration (to help deccelerate if we're still moving), but
-	      // the next time around we'll start holding at the endpoint
-	      jointstraj->endPosition().cpy(&heldPositions[Joint::J1]);
-	      holdpos = true;  // should have been true already, but just making sure
-	      delete jointstraj;
-	      jointstraj = NULL;
-	      //	      ROS_INFO("Trajectory done");
-	    }
-	    
-	    // ask the controllers to compute the correction torques.
-	    RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
-	    newJSControl(q_target,q,dt,pid_torq);
-	    RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
-	    jscontroltime += (t2-t1) / 1e6;
-	    
-	    if (safety_torques_exceeded(pid_torq)) {
-	      // hold here with zero target velocity and acceleration,
-	      // and wait until the limit condition goes away.
-	      if (jointstraj) { // might have ended and been cleared (above)
-		// March 2009: something to try
-		// just slow down the time, and take a smaller step.
-		// as long as we keep exceeding, keep trying smaller steps.
-		// as we free up, we can start taking bigger steps again.
-		if (timestep_factor > 0.2f) {
-		  timestep_factor /= 2.0f;
-		}
-		safety_torque_count++;
-		
-		// back up the trajectory
-		for (int j=Joint::J1; j<Joint::Jn; ++j) {
-		  q_target[j] = q[j]; // reset current position
-		}
-		jointstraj->evaluate(q_target, qd_target, qdd_target, -traj_timestep * timestep_factor);
-		for(int j=Joint::J1; j<=Joint::Jn; j++){
-		  qd_target[j] *= timestep_factor;
-		  qdd_target[j] *= timestep_factor * timestep_factor;
-		}
-		// re-calc the control torques
-		newJSControl(q_target,q,dt,pid_torq);
-		safety_hold=true; // let the app know that we're hitting something
-		if (jointstraj->HoldOnStall) {
-		  jointstraj->stop();  // still have to stop if the app wants to
-		}
-	      }
-	    } else if (timestep_factor < 1.0f) {
-	      // we're back within the safety thresholds, so start increasing our
-	      // stepsize again
-	      timestep_factor *= 1.1f;
-	      if (timestep_factor > 1.0f) {
-		timestep_factor = 1.0f;
-	      }
-	      if (jointstraj != NULL) {
-		if (!jointstraj->HoldOnStall) {
-		  jointstraj->run();
-		}
-	      }
-	      safety_hold=false;
-	    }
-	  } catch (char *error) {
-	    // most likely a problem evaluating the trajectory, so
-	    // halt it and just hold position
-	    ROS_ERROR("Problem in trajectory; aborting and holding current position");
-	    delete jointstraj;
-	    jointstraj = NULL;
-	    hold_position(NULL,false);
+          //LLL
+          posSmoother.invalidate();
+          try {
+            RTIME t3 = rt_timer_ticks2ns(rt_timer_read());        
+            jointstraj->evaluate(q_target, qd_target, qdd_target, traj_timestep * timestep_factor);
+            RTIME t4 = rt_timer_ticks2ns(rt_timer_read());        
+            trajtime += (t4-t3) / 1e6;
+            for(int j=Joint::J1; j<=Joint::Jn; j++){
+              qd_target[j] *= timestep_factor;
+              qdd_target[j] *= timestep_factor * timestep_factor;
+            }
+            if(jointstraj->state() == Trajectory::DONE){
+              // we've gone past the last time in the trajectory,
+              // so set up to hold at the final position.  we'll let
+              // the trajectory control values persist for the rest of this
+              // iteration (to help deccelerate if we're still moving), but
+              // the next time around we'll start holding at the endpoint
+              double heldPositions[Joint::Jn+1];
+              jointstraj->endPosition().cpy(&heldPositions[Joint::J1]);
+              posSmoother.reset(heldPositions, Joint::Jn+1);   
+              holdpos = true;  // should have been true already, but just making sure
+              delete jointstraj;
+              jointstraj = NULL;
+              //ROS_INFO("Trajectory done");
+            }
+            
+            // ask the controllers to compute the correction torques.
+            RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+            newJSControl(q_target,q,dt,pid_torq);
+            RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
+            jscontroltime += (t2-t1) / 1e6;
+            
+            if (safety_torques_exceeded(pid_torq)) {
+              // hold here with zero target velocity and acceleration,
+              // and wait until the limit condition goes away.
+              if (jointstraj) { // might have ended and been cleared (above)
+                // March 2009: something to try
+                // just slow down the time, and take a smaller step.
+                // as long as we keep exceeding, keep trying smaller steps.
+                // as we free up, we can start taking bigger steps again.
+                if (timestep_factor > 0.2f) {
+                  timestep_factor /= 2.0f;
+                }
+                safety_torque_count++;
+                
+                // back up the trajectory
+                for (int j=Joint::J1; j<Joint::Jn; ++j) {
+                  q_target[j] = q[j]; // reset current position
+                }
+                jointstraj->evaluate(q_target, qd_target, qdd_target, -traj_timestep * timestep_factor);
+                for(int j=Joint::J1; j<=Joint::Jn; j++){
+                  qd_target[j] *= timestep_factor;
+                  qdd_target[j] *= timestep_factor * timestep_factor;
+                }
+                // re-calc the control torques
+                newJSControl(q_target,q,dt,pid_torq);
+                safety_hold=true; // let the app know that we're hitting something
+                if (jointstraj->HoldOnStall) {
+                  jointstraj->stop();  // still have to stop if the app wants to
+                }
+              }
+            } else if (timestep_factor < 1.0f) {
+              // we're back within the safety thresholds, so start increasing our
+              // stepsize again
+              timestep_factor *= 1.1f;
+              if (timestep_factor > 1.0f) {
+                timestep_factor = 1.0f;
+              }
+              if (jointstraj != NULL) {
+                if (!jointstraj->HoldOnStall) {
+                  jointstraj->run();
+                }
+              }
+              safety_hold=false;
+            }
+          } catch (char *error) {
+            // most likely a problem evaluating the trajectory, so
+            // halt it and just hold position
+            ROS_ERROR("Problem in trajectory; aborting and holding current position");
+            delete jointstraj;
+            jointstraj = NULL;
+            hold_position(NULL,false);
 
-	    // now do the same thing that the "if (holdpos)" step does, below
-	    for(int i = Joint::J1; i <= Joint::Jn; i++) {
-	      q_target[i] = heldPositions[i];
-	    }
-	    // ask the controllers to compute the correction torques.
-	    RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
-	    newJSControl(q_target,q,dt,pid_torq);
-	    RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
-	    jscontroltime += (t2-t1) / 1e6;
-	    
-	  }
-	} else if (holdpos) {
-	  for(int i = Joint::J1; i <= Joint::Jn; i++) {
-	    q_target[i] = heldPositions[i];
-	  }
-	  
-	  // ask the controllers to compute the correction torques.
-	  RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
-	  newJSControl(q_target,q,dt,pid_torq);
-	  RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
-	  jscontroltime += (t2-t1) / 1e6;
-	  
-	  if (safety_torques_exceeded(pid_torq)) {
-	    // NEW WAY:
-	    for(int jj = Joint::J1; jj <= Joint::Jn; jj++) {
-	      double jointdiff = joints[jj].pos() - heldPositions[jj];
-	      // inch the target pos 10% towards the current pos
-	      heldPositions[jj] += 0.1f * jointdiff;
-	    }
-	    // OLD WAY:
-	    //    release_position(false);  // release (without locking)
-	    //    hold_position(NULL,false);// and hold new current position
-	  }
+            // now do the same thing that the "if (holdpos)" step does, below
+            double heldPositions[Joint::Jn+1];
+            posSmoother.getSmoothedPVA(heldPositions);
+            for(int i = Joint::J1; i <= Joint::Jn; i++) {
+              q_target[i] = heldPositions[i];
+            }
+            // ask the controllers to compute the correction torques.
+            RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+            newJSControl(q_target,q,dt,pid_torq);
+            RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
+            jscontroltime += (t2-t1) / 1e6;
+            
+          }
+        } else if (holdpos) {
+
+          if ( posSmoother.isValid() == false ) {
+            // reset
+            std::vector<double> startPosVec;
+            // get current joint positions
+            for(int j=0; j<=Joint::Jn; j++) {
+              startPosVec.push_back(joints[j].pos());
+            }
+            posSmoother.reset(startPosVec);
+          }
+
+          double heldPositions[Joint::Jn+1];
+          posSmoother.getSmoothedPVA(heldPositions);
+          //TODO if we want to use jsdyn, I believe we will have to set qd_target and qdd_target
+
+          for(int i = Joint::J1; i <= Joint::Jn; i++) {
+            q_target[i] = heldPositions[i];
+          }
+          
+          // ask the controllers to compute the correction torques.
+          RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+          newJSControl(q_target,q,dt,pid_torq);
+          RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
+          jscontroltime += (t2-t1) / 1e6;
+          
+          #ifndef BUILD_FOR_SEA
+          if (safety_torques_exceeded(pid_torq)) {
+            // NEW WAY:
+            std::vector<double> slipPosVec;
+            // reset the posSmoother at a new
+            // target pos 10% towards the current pos 
+            for(int j=0; j<=Joint::Jn; j++) {
+              slipPosVec.push_back(0.9 * heldPositions[j] + 0.1 * joints[j].pos());
+            }
+            posSmoother.reset(slipPosVec);
+
+            // OLD WAY:
+            //    release_position(false);  // release (without locking)
+            //    hold_position(NULL,false);// and hold new current position
+          }
+          #endif
         } else {
-	  for(int i = Joint::J1; i <= Joint::Jn; i++) {
-	    pid_torq[i]=0.0f;  // zero out the torques otherwise
-	  }
+          //LLL
+          posSmoother.invalidate();
+          for(int i = Joint::J1; i <= Joint::Jn; i++) {
+            pid_torq[i]=0.0f;  // zero out the torques otherwise
+          }
         }
-	if (++trajcount == 1000) {
-	  stats.trajtime = trajtime/1000.0;
-	  stats.jsctrltime=jscontroltime/1000.0;
-	  stats.safetycount=safety_torque_count;
-	  trajcount=safety_torque_count=0;
-	  trajtime=jscontroltime=0.0f;
-	}
-	
+        if (++trajcount == 1000) {
+          stats.trajtime = trajtime/1000.0;
+          stats.jsctrltime=jscontroltime/1000.0;
+          stats.safetycount=safety_torque_count;
+          trajcount=safety_torque_count=0;
+          trajtime=jscontroltime=0.0f;
+        }
+        
      
         // compute the torque required to meet the desired qd and qdd
         if(jsdyn){
-	  RTIME t4 = rt_timer_ticks2ns(rt_timer_read());
-	  JSdynamics(dyn_torq, links, qd_target, qdd_target); 
-	  RTIME t5 = rt_timer_ticks2ns(rt_timer_read());
-	  dyntime += (t5-t4) / 1e6;
-	  if (++dyncount == 1000) {
-	    stats.dyntime = dyntime/1000.0;
-	    dyncount=0; dyntime=0.0f;
-	  }
+          RTIME t4 = rt_timer_ticks2ns(rt_timer_read());
+          JSdynamics(dyn_torq, links, qd_target, qdd_target); 
+          RTIME t5 = rt_timer_ticks2ns(rt_timer_read());
+          dyntime += (t5-t4) / 1e6;
+          if (++dyncount == 1000) {
+            stats.dyntime = dyntime/1000.0;
+            dyncount=0; dyntime=0.0f;
+          }
 
         } else {
             for (int j=Joint::J1; j<=Joint::Jn; j++) {
                 dyn_torq[j]=0.0;  // zero out the torques otherwise
             }
         }
+        /*
+        static int count = 0;
+
+        if(count++ % 100 == 0) {
+            printf("pid_torq: %f %f %f %f %f %f %f\n", pid_torq[1], pid_torq[2], pid_torq[3], pid_torq[4], 
+                pid_torq[5], pid_torq[6], pid_torq[7]);
+            printf("dyn_torq: %f %f %f %f %f %f %f\n", dyn_torq[1], dyn_torq[2], dyn_torq[3], dyn_torq[4], 
+                dyn_torq[5], dyn_torq[6], dyn_torq[7]);
+        }
+        */
         
         // finally, sum the control torq and dynamics torq
         for(int j=Joint::J1; j<=Joint::Jn; j++){
@@ -750,19 +969,19 @@ void WAM::newcontrol(double dt){
             // joints[j].trq(dyn_torq[j]);  // send to the joints w/o PID
         }
         
-        jtrq2mtrq();	 // results in motor::torque
+        jtrq2mtrq();         // results in motor::torque
         
         if(send_mtrq() == OW_FAILURE) {
-	  ROS_ERROR("WAM::control_loop: send_mtrq failed.");
+          ROS_ERROR("WAM::control_loop: send_mtrq failed.");
         }
     } else {
         // We lost communication with the pucks (someone probably hit the e-stop).
         motor_state=MOTORS_OFF;
         if (exit_on_pendant_press) {
-	  ROS_FATAL("WAM::control_loop: lost communication with the WAM; shutting down.");
-	  ROS_FATAL("If you want to restart the controller, make sure power is applied");
-	  ROS_FATAL("and all e-stops are released, then re-run player.");
-	  exit(1);
+          ROS_FATAL("WAM::control_loop: lost communication with the WAM; shutting down.");
+          ROS_FATAL("If you want to restart the controller, make sure power is applied");
+          ROS_FATAL("and all e-stops are released, then re-run player.");
+          exit(1);
         }
     }
     
@@ -771,7 +990,7 @@ void WAM::newcontrol(double dt){
     int puckstate=bus->get_puck_state();
     if (puckstate != 2) {
         motor_state=MOTORS_IDLE;
-	//ROS_DEBUG("Puckstate = %d",puckstate);
+        //ROS_DEBUG("Puckstate = %d",puckstate);
         if (exit_on_pendant_press) {
             // The motors have been idled (someone pressed shift-idle), so go ahead
             // and exit without being told.
@@ -784,9 +1003,9 @@ void WAM::newcontrol(double dt){
             
             ROS_WARN("Detected motor switch to idle; exiting controller.");
             ROS_WARN("If the pendant shows a torque or velocity fault, and the yellow idle");
-	    ROS_WARN("button is still lit, you can clear the fault by pressing shift-idle");
-	    ROS_WARN("again, and encoder values will be preserved.");
-	    ROS_WARN("To restart the controller, just re-run the previous command.");
+            ROS_WARN("button is still lit, you can clear the fault by pressing shift-idle");
+            ROS_WARN("again, and encoder values will be preserved.");
+            ROS_WARN("To restart the controller, just re-run the previous command.");
             exit(0);
         }
     } else {
@@ -799,17 +1018,22 @@ bool WAM::safety_torques_exceeded(double t[]) {
     //    static double safety_torqs[8]={0.0,10.0,10.0,5.0,5.0,2,2,2};
     static double safety_torqs[8]={0.0, 15.0, 15.0, 10.0, 8.0, 3.0, 3.0, 1.0};
     //static double safety_torqs[8]={0.0,50.0,75.0,75.0,60.0,15.0,15.0,15.0};
+    bool bExceeded = false;
     if (!check_safety_torques) {
-        return false;
+        return bExceeded;
     }
     for (int i = 1; i <= Joint::Jn; i++) {
         if (stiffness * fabs(t[i])>safety_torqs[i]) {
-	  //	  ROS_WARN("SAFETY TORQUE EXCEEDED: J%d, %2.2f>%2.2f\n",
-	  //                                   i,fabs(t[i]),safety_torqs[i]);
-	  return true;
+          //          ROS_WARN("SAFETY TORQUE EXCEEDED: J%d, %2.2f>%2.2f\n",
+          //                                   i,fabs(t[i]),safety_torqs[i]);
+          // set s.t. it will not exceed
+          if (stiffness != 0.0) {
+            //t[i] = safety_torqs[i]/stiffness *  t[i]/fabs(t[i]);
+          }
+          bExceeded = true;
         }
     }
-    return false;
+    return bExceeded;
 }
 
 
@@ -915,9 +1139,14 @@ int WAM::cancel_trajectory() {
     }
     this->lock("cancel_traj");
     jointstraj->stop();
-    for (int i = Joint::J1; i<=Joint::Jn; i++) {
-        heldPositions[i]=joints[i].pos();
+
+    double heldPositions[Joint::Jn+1];
+    for(int i = Joint::J1; i<=Joint::Jn; i++) {
+      heldPositions[i] = joints[i].pos();
+      suppress_controller[i]=false;
     }
+    posSmoother.reset(heldPositions, Joint::Jn+1);   
+     
     holdpos = true;  // should have been true already, but just making sure
     delete jointstraj;
     jointstraj = NULL;
@@ -937,8 +1166,8 @@ int WAM::cancel_trajectory() {
 
 void WAM::move_sigmoid(const SE3& E02){
   se3traj = new SE3Traj( FK(), E02, 
-			 new Sigmoid(Sigmoid::VMAX), 
-			 new Sigmoid(Sigmoid::WMAX) );
+                         new Sigmoid(Sigmoid::VMAX), 
+                         new Sigmoid(Sigmoid::WMAX) );
   se3traj->run();
   se3ctrl.reset();
   se3ctrl.set(FK());
@@ -974,8 +1203,11 @@ int WAM::hold_position(double jval[],bool grab_lock)
    // if grab_lock is false, it assumes the mutex has already been acquired
    
 {
+    double heldPositions[Joint::Jn+1];
+
     if (holdpos) { // we're already holding
         if (jval != NULL) {  // but we still need to return the position if requested
+            posSmoother.getSmoothedPVA(heldPositions);
             for (int i = Joint::J1; i<=Joint::Jn; i++) {
                 jval[i]=heldPositions[i];
             }
@@ -996,7 +1228,7 @@ int WAM::hold_position(double jval[],bool grab_lock)
         return OW_FAILURE;
     }
 
-    holdpos = true;
+    //holdpos = true;
 
     if(jointstraj != NULL)
     {
@@ -1013,6 +1245,9 @@ int WAM::hold_position(double jval[],bool grab_lock)
             jval[i]=heldPositions[i];
         }
     }
+    posSmoother.reset(heldPositions, Joint::Jn+1);   
+
+    holdpos = true;
 
     if (grab_lock) {
         this->unlock("hold pos");
@@ -1032,9 +1267,11 @@ void WAM::release_position(bool grab_lock)
         for(int i = Joint::J1; i <= Joint::Jn; i++)
         {
             jointsctrl[i].stop();
-            heldPositions[i] = 0;
         }
         holdpos = false;
+        // LLL
+        posSmoother.invalidate();
+        // LLL
         if (grab_lock) {
             this->unlock("release pos");
         }
@@ -1044,8 +1281,8 @@ void WAM::release_position(bool grab_lock)
 /*
 void WAM::moveTrapezoid(const SE3& E02){
   se3traj = new SE3Traj( FK(), E02, 
-			 new Trapezoid(Trapezoid::VMAX), 
-			 new Trapezoid(Trapezoid::WMAX) );
+                         new Trapezoid(Trapezoid::VMAX), 
+                         new Trapezoid(Trapezoid::WMAX) );
   se3traj->run();
   se3ctrl.reset();
   se3ctrl.set(FK());
@@ -1055,7 +1292,7 @@ void WAM::moveTrapezoid(const double* q2[Joint::Jn+1]){
   for(int j=Joint::J1; j<=Joint::Jn; j++){
     if(mask & JointTraj::MASK[j]){
       jointtraj[j] = new JointTraj(joints[j].pos(), q2[j], 
-				   new Trapezoid(0.1) );
+                                   new Trapezoid(0.1) );
       jointtraj[j]->run();
       jointctrl[j].reset();
       jointctrl[j].set(joints[j].pos());
@@ -1099,23 +1336,23 @@ void WAM::unlock(const char *name) {
 
 void WAMstats::rosprint() const {
   ROS_DEBUG_NAMED("times",
-		  "Loop: %2.2fms (read %2.1fms, control %2.1fms, send %2.1fms)",
-		  looptime,
-		  loopread,
-		  loopctrl,
-		  loopsend);
+                  "Loop: %2.2fms (read %2.1fms, control %2.1fms, send %2.1fms)",
+                  looptime,
+                  loopread,
+                  loopctrl,
+                  loopsend);
   if (slowcount > 0) {
     ROS_WARN_NAMED("times","Slow cycles %2.1f%% of the time (avg=%2.1fms)",
-		   slowcount, slowavg);
+                   slowcount, slowavg);
     ROS_WARN_NAMED("times",
-		   "  Slow breakdown: read %2.1fms, ctrl %2.1fms, send %2.1fms",
-		   slowreadtime,
-		   slowctrltime,
-		   slowsendtime);
+                   "  Slow breakdown: read %2.1fms, ctrl %2.1fms, send %2.1fms",
+                   slowreadtime,
+                   slowctrltime,
+                   slowsendtime);
   }
   ROS_DEBUG_NAMED("times",
-		  "trajectory eval %2.2fms, jscontrol %2.2fms, safetycount=%d",
-		  trajtime,jsctrltime,safetycount);
+                  "trajectory eval %2.2fms, jscontrol %2.2fms, safetycount=%d",
+                  trajtime,jsctrltime,safetycount);
   ROS_DEBUG_NAMED("times","newcontrol dynamics time: %2.2fms",
-		  dyntime);
+                  dyntime);
 }

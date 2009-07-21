@@ -31,17 +31,8 @@ class SE3{
 private:
   double H[4][4];
 
-  void setR3(const R3& t){
-    H[0][3] = t[R3::X];
-    H[1][3] = t[R3::Y];
-    H[2][3] = t[R3::Z];
-  }
-
-  void setSO3(const SO3& R){
-    H[0][0]=R[SO3::R11];   H[0][1]=R[SO3::R12];   H[0][2]=R[SO3::R13];
-    H[1][0]=R[SO3::R21];   H[1][1]=R[SO3::R22];   H[1][2]=R[SO3::R23];
-    H[2][0]=R[SO3::R31];   H[2][1]=R[SO3::R32];   H[2][2]=R[SO3::R33];
-  }
+  void setR3(const R3& t);
+  void setSO3(const SO3& R);
 
 public:
 
@@ -58,9 +49,9 @@ public:
   static const int NZ =  8; static const int OZ =  9; static const int AZ = 10;
 
   SE3(){eye();}
-  SE3(const SO3& R, const R3& t){  eye();  setSO3(      R );  setR3(t);}
-  SE3(const so3& R, const R3& t){  eye();  setSO3( (SO3)R );  setR3(t);}
-  SE3(const ZYX& R, const R3& t){  eye();  setSO3( (SO3)R );  setR3(t);}
+  SE3(const SO3 R, const R3 t){  eye();  setSO3(      R );  setR3(t);}
+  SE3(const so3 R, const R3 t){  eye();  setSO3( (SO3)R );  setR3(t);}
+  SE3(const ZYX R, const R3 t){  eye();  setSO3( (SO3)R );  setR3(t);}
 
   operator       double* ()        {return &H[0][0];}
   operator const double* () const  {return &H[0][0];}

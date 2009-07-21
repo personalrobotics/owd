@@ -1,6 +1,7 @@
 #include "screenbuf.hh"
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 
 extern double fv[NUMDOF+1];
 extern double fs[NUMDOF+1];

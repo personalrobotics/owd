@@ -18,6 +18,18 @@
 */
 #include "SE3.hh"
 
+void SE3::setR3(const R3& t){
+    H[0][3] = t[R3::X];
+    H[1][3] = t[R3::Y];
+    H[2][3] = t[R3::Z];
+}
+
+void SE3::setSO3(const SO3& R){
+    H[0][0]=R[SO3::R11];   H[0][1]=R[SO3::R12];   H[0][2]=R[SO3::R13];
+    H[1][0]=R[SO3::R21];   H[1][1]=R[SO3::R22];   H[1][2]=R[SO3::R23];
+    H[2][0]=R[SO3::R31];   H[2][1]=R[SO3::R32];   H[2][2]=R[SO3::R33];
+}
+
 SE3::operator so3() const{
   double theta = acos( (H[0][0]+H[1][1]+H[2][2] - 1.0)/2);
 

@@ -17,6 +17,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "SO3.hh"
+#include <assert.h>
 
 so3::operator SO3() const{
   double ct, st, vt, w1, w2, w3;
@@ -30,8 +31,27 @@ so3::operator SO3() const{
 }
 
 
+SO3::SO3(){
+    this->eye();
+}
+
+SO3::SO3(const R3 rx, const R3 ry, const R3 rz){
+    this->R[0][0] = rx[0];  this->R[0][1] = ry[0];  this->R[0][2] = rz[0];
+    this->R[1][0] = rx[1];  this->R[1][1] = ry[1];  this->R[1][2] = rz[1];
+    this->R[2][0] = rx[2];  this->R[2][1] = ry[2];  this->R[2][2] = rz[2];
+    
+    for(int i=0; i<3; i++)
+        for(int j=0; j<3; j++)
+            assert(this->R[i][j] <= 1.0 && this->R[i][j] >= -1.0);
+}
+
+void SO3::eye(){
+    bzero(&R[0][0], 3*3*sizeof(double)); 
+    R[0][0] = R[1][1] = R[2][2] = 1.0;
+}
+
 SO3::operator so3() const{
-  double theta = acos( (R[0][0]+R[1][1]+R[2][2] - 1.0)/2);
+  double theta = acos( (this->R[0][0]+this->R[1][1]+this->R[2][2] - 1.0)/2);
 
   if(so3::EPSILON < fabs(theta)){
     return so3(R3( (R[2][1]-R[1][2])/(2.0*sin(theta)),
@@ -39,6 +59,18 @@ SO3::operator so3() const{
 		   (R[1][0]-R[0][1])/(2.0*sin(theta)) ), theta);
   }
   else return so3(R3(), theta); 
+}
+
+R3 operator * (const SO3& R,  const R3& p) {
+    return R3( R.R[0][0]*p[0] + R.R[0][1]*p[1] + R.R[0][2]*p[2],
+	       R.R[1][0]*p[0] + R.R[1][1]*p[1] + R.R[1][2]*p[2],
+	       R.R[2][0]*p[0] + R.R[2][1]*p[1] + R.R[2][2]*p[2]);
+}
+  
+SO3 operator ! (const SO3& R){
+    return SO3( R3(R.R[0][0], R.R[0][1], R.R[0][2]),
+		R3(R.R[1][0], R.R[1][1], R.R[1][2]),
+		R3(R.R[2][0], R.R[2][1], R.R[2][2]) );
 }
 
 SO3 operator * (const SO3& r1, const SO3& r2){

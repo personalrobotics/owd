@@ -19,7 +19,7 @@
 #include <iostream>
 #include <iomanip>
 #include <math.h>
-
+#include <string.h>
 #include "R3.hh"
 
 #ifndef __SO3_HH__
@@ -66,12 +66,9 @@ public:
   static const int R21 = 3; static const int R22 = 4; static const int R23 = 5;
   static const int R31 = 6; static const int R32 = 7; static const int R33 = 8;
 
-  SO3(){eye();}
-  SO3(const R3& rx, const R3& ry, const R3& rz){
-    R[0][0] = rx[0];  R[0][1] = ry[0];  R[0][2] = rz[0];
-    R[1][0] = rx[1];  R[1][1] = ry[1];  R[1][2] = rz[1];
-    R[2][0] = rx[2];  R[2][1] = ry[2];  R[2][2] = rz[2];
-  }
+  SO3();
+
+  SO3(const R3 rx, const R3 ry, const R3 rz);
   
   operator       double* ()        {return &R[0][0];}
   operator const double* () const  {return &R[0][0];}
@@ -81,25 +78,11 @@ public:
   operator so3() const;  // convert to so3
   
   friend SO3 operator * (const SO3& R1, const SO3& R2);
-  
-  friend R3  operator * (const SO3& R,  const R3& p) {
-    return R3( R.R[0][0]*p[0] + R.R[0][1]*p[1] + R.R[0][2]*p[2],
-	       R.R[1][0]*p[0] + R.R[1][1]*p[1] + R.R[1][2]*p[2],
-	       R.R[2][0]*p[0] + R.R[2][1]*p[1] + R.R[2][2]*p[2]);
-   }
-  
-  friend SO3 operator ! (const SO3& R){
-    return SO3( R3(R.R[0][0], R.R[0][1], R.R[0][2]),
-		R3(R.R[1][0], R.R[1][1], R.R[1][2]),
-		R3(R.R[2][0], R.R[2][1], R.R[2][2]) );
-  }
-  
+  friend R3  operator * (const SO3& R,  const R3& p);
+  friend SO3 operator ! (const SO3& R);
   friend ostream& operator <<  (ostream& s, const SO3& r);
-  
-  void eye(){
-    bzero(&R[0][0], 3*3*sizeof(double)); 
-    R[0][0] = R[1][1] = R[2][2] = 1.0;
-  }
+ 
+  void eye();
 };
 
 #endif

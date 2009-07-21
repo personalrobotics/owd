@@ -83,7 +83,7 @@ int CANbus::open(){
   
 	if (!handle)
 	{
-		ROS_ERROR("CANbus::open(): CAN_Open(): cannot open device";
+		ROS_ERROR("CANbus::open(): CAN_Open(): cannot open device");
 			  //		pthread_mutex_unlock(&busmutex);
 		return OW_FAILURE;
 	}
@@ -855,14 +855,14 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
   }
 
   long voltlevel;
-
+#ifdef SET_VOLTAGE_LIMITS
   // set appropriate high-voltage levels for battery operation
   if (get_property(SAFETY_MODULE,VOLTH1,&voltlevel) == OW_FAILURE) {
       ROS_ERROR("CANbus::limits failed to get previous high voltage warning level.");
       return OW_FAILURE;
   }
-  ROS_DEBUG_NAMED("canlimits","VOLTH1 was %d, changing to 89",voltlevel);
-  if (set_property(SAFETY_MODULE,VOLTH1,89,true) == OW_FAILURE) {
+  ROS_DEBUG_NAMED("canlimits","VOLTH1 was %d, changing to 54",voltlevel);
+  if (set_property(SAFETY_MODULE,VOLTH1,54,true) == OW_FAILURE) {
       ROS_ERROR("CANbus::limits: set_prop failed");
   }
 
@@ -870,10 +870,11 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
       ROS_ERROR("CANbus::limits failed to get previous high voltage warning level.");
       return OW_FAILURE;
   }
-  ROS_DEBUG_NAMED("canlimits","VOLTH1 was %d, changing to 92",voltlevel);
-  if (set_property(SAFETY_MODULE,VOLTH2,89,true) == OW_FAILURE) {
+  ROS_DEBUG_NAMED("canlimits","VOLTH1 was %d, changing to 57",voltlevel);
+  if (set_property(SAFETY_MODULE,VOLTH2,57,true) == OW_FAILURE) {
       ROS_ERROR("CANbus::limits: set_prop failed");
   }
+#endif
 
 
 

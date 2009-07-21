@@ -1,5 +1,6 @@
 #include "MacJointTraj.hh"
 #include <syslog.h>
+#include <string.h>
 #include "MacQuinticBlend.hh"
 
 

@@ -18,6 +18,7 @@
 */
 #include <iostream>
 #include <iomanip>
+#include <string.h>
 
 #include "R3.hh"
 

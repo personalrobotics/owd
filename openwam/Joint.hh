@@ -77,7 +77,8 @@ public:
 
   void trq(double T) {  
     lock();  
-    t = T; // clip( T, Joint::MIN_TRQ[id()], Joint::MAX_TRQ[id()] );  
+    t = T; // clip( T, Joint::MIN_TRQ[id()], Joint::MAX_TRQ[id()] ); 
+    //t = 0.0;
     unlock();
   }
   void pos(double Q) {  

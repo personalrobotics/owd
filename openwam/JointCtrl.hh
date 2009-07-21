@@ -17,10 +17,15 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <iostream>
+#include <iomanip>
+
 #include "Controller.hh"
 
 #ifndef __JOINTCTRL_HH__
 #define __JOINTCTRL_HH__
+
+using namespace std;
 
 /*
  * This is just an interface

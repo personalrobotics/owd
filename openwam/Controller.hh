@@ -22,6 +22,7 @@
  * This is really just very basic interface that provides a state and a mutex
  * This class is used to derive SE3 controllers and joint controllers
  */
+#include <pthread.h>
 
 #ifndef __CONTROLLER_HH__
 #define __CONTROLLER_HH__
@@ -30,6 +31,8 @@ class Controller{
 
 private:
   pthread_mutex_t mutex;
+
+protected:
   int s;
 
 public:
@@ -44,6 +47,7 @@ public:
   virtual ~Controller(){}
   void lock()  {pthread_mutex_lock  (&mutex);}
   void unlock(){pthread_mutex_unlock(&mutex);}
+  int trylock(){ return pthread_mutex_trylock(&mutex); }
 
   void run(){   lock();  s = Controller::RUN;   unlock();  }
   void stop(){  lock();  s = Controller::STOP;  unlock();  }
