@@ -1612,7 +1612,7 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> 
 
 
 //LLL
-void WamDriver::wamjointtargets_callback(void *message) {
+void WamDriver::wamjointtargets_callback(const boost::shared_ptr<const pr_msgs::IndexedJointValues> &jt) {
 
   if (owam->holdpos == false) {
     ROS_WARN("ignoring wam_joint_targets message while in non-holding mode\n");
@@ -1620,7 +1620,6 @@ void WamDriver::wamjointtargets_callback(void *message) {
   }
 
   //ROS_INFO("Received JointTargets command:");
-  pr_msgs::IndexedJointValues * jt = (pr_msgs::IndexedJointValues*)message;
 
   if (jt->jointIndices.size() != jt->values.size()) {
     ROS_ERROR("Mismatched arrays received in wamjointtargets_callback; ignored");

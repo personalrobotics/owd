@@ -43,15 +43,12 @@ int main(int argc, char** argv)
   n.advertiseService("SetExtraMass",&WamDriver::SetExtraMass,&wam);
   n.advertiseService("GetArmDOF",&WamDriver::GetDOF,&wam);
   n.advertiseService("CalibrateJoints", &WamDriver::CalibrateJoints, &wam);
-  pr_msgs::Servo servocmd;
   n.subscribe("wamservo", 1, &WamDriver::wamservo_callback,&wam);
 
-#ifdef SEATTLE
   // NEED TO UPDATE THE SUBSCRIBE TO USE THE NODEHANDLE INTERFACE
   // LLL
   pr_msgs::IndexedJointValues jtcmd;
-  n.subscribe("wam_joint_targets", jtcmd, &WamDriver::wamjointtargets_callback,&wam,&jtcmd,10);
-#endif //SEATTLE
+  n.subscribe("wam_joint_targets", 10, &WamDriver::wamjointtargets_callback,&wam);
  
 #ifdef BUILD_FOR_SEA
   pr_msgs::WamSetupSeaCtrl tlcmd;
