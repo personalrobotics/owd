@@ -6,6 +6,7 @@
   <license>LGPL</license>
   <depend package="roscpp"/>
   <depend package="std_msgs"/>
+  <depend package="pr_msgs"/>
 <export>
   <cpp cflags="-I${prefix}/srv/cpp -I${prefix}/msg/cpp"/>
 </export>

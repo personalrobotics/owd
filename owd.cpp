@@ -1,8 +1,8 @@
 #include <ros/ros.h>
 #include <ros/time.h>
-#include <owd/WAMState.h>
-#include <owd/IndexedJointValues.h>
-#include <owd/WamSetupSeaCtrl.h>
+#include <pr_msgs/WAMState.h>
+#include <pr_msgs/IndexedJointValues.h>
+#include <pr_msgs/WamSetupSeaCtrl.h>
 #include "openwamdriver.h"
 #include <sys/mman.h>
 
@@ -33,7 +33,7 @@ int main(int argc, char** argv)
   wam.Init(calibration_filename.c_str());
 
   ros::Publisher wamstate_publisher = 
-    n.advertise<owd::WAMState>("wamstate", 10);
+    n.advertise<pr_msgs::WAMState>("wamstate", 10);
   n.advertiseService("AddTrajectory",&WamDriver::AddTrajectory,&wam);
   n.advertiseService("SetStiffness",&WamDriver::SetStiffness,&wam);
   n.advertiseService("DeleteTrajectory",&WamDriver::DeleteTrajectory,&wam);
@@ -43,35 +43,35 @@ int main(int argc, char** argv)
   n.advertiseService("SetExtraMass",&WamDriver::SetExtraMass,&wam);
   n.advertiseService("GetArmDOF",&WamDriver::GetDOF,&wam);
   n.advertiseService("CalibrateJoints", &WamDriver::CalibrateJoints, &wam);
-  owd::Servo servocmd;
+  pr_msgs::Servo servocmd;
   n.subscribe("wamservo", 1, &WamDriver::wamservo_callback,&wam);
 
 #ifdef SEATTLE
   // NEED TO UPDATE THE SUBSCRIBE TO USE THE NODEHANDLE INTERFACE
   // LLL
-  owd::IndexedJointValues jtcmd;
+  pr_msgs::IndexedJointValues jtcmd;
   n.subscribe("wam_joint_targets", jtcmd, &WamDriver::wamjointtargets_callback,&wam,&jtcmd,10);
 #endif //SEATTLE
  
 #ifdef BUILD_FOR_SEA
-  owd::WamSetupSeaCtrl tlcmd;
+  pr_msgs::WamSetupSeaCtrl tlcmd;
   n.subscribe("wam_seactrl_settl", tlcmd, &WamDriver::wam_seactrl_settl_callback, &wam, &tlcmd, 10); 
-  n.advertise<owd::IndexedJointValues>("wam_seactrl_curtl", 10);
+  n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curtl", 10);
   n.advertiseService("WamRequestSeaCtrlTorqLimit",&WamDriver::WamRequestSeaCtrlTorqLimit,&wam);
 
-  owd::WamSetupSeaCtrl kpcmd;
+  pr_msgs::WamSetupSeaCtrl kpcmd;
   n.subscribe("wam_seactrl_setkp", kpcmd, &WamDriver::wam_seactrl_setkp_callback, &wam, &kpcmd, 10); 
-  n.advertise<owd::IndexedJointValues>("wam_seactrl_curkp", 10);
+  n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curkp", 10);
   n.advertiseService("WamRequestSeaCtrlKp",&WamDriver::WamRequestSeaCtrlKp,&wam);
 
-  owd::WamSetupSeaCtrl kdcmd;
+  pr_msgs::WamSetupSeaCtrl kdcmd;
   n.subscribe("wam_seactrl_setkd", kdcmd, &WamDriver::wam_seactrl_setkd_callback, &wam, &kdcmd, 10); 
-  n.advertise<owd::IndexedJointValues>("wam_seactrl_curkd", 10);
+  n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curkd", 10);
   n.advertiseService("WamRequestSeaCtrlKd",&WamDriver::WamRequestSeaCtrlKd,&wam);
 
-  owd::WamSetupSeaCtrl kicmd;
+  pr_msgs::WamSetupSeaCtrl kicmd;
   n.subscribe("wam_seactrl_setki", kicmd, &WamDriver::wam_seactrl_setki_callback, &wam, &kicmd, 10); 
-  n.advertise<owd::IndexedJointValues>("wam_seactrl_curki", 10);
+  n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curki", 10);
   n.advertiseService("WamRequestSeaCtrlKi",&WamDriver::WamRequestSeaCtrlKi,&wam);
 
   usleep(100000);

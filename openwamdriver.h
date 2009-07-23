@@ -11,24 +11,24 @@
 #include <algorithm>
 #include <ros/ros.h>
 #include <boost/thread/mutex.hpp>
-#include <owd/AddTrajectory.h>
-#include <owd/DeleteTrajectory.h>
-#include <owd/PauseTrajectory.h>
-#include <owd/ReplaceTrajectory.h>
-#include <owd/SetExtraMass.h>
-#include <owd/SetStiffness.h>
-#include <owd/SetSpeed.h>
-#include <owd/WAMState.h>
+#include <pr_msgs/AddTrajectory.h>
+#include <pr_msgs/DeleteTrajectory.h>
+#include <pr_msgs/PauseTrajectory.h>
+#include <pr_msgs/ReplaceTrajectory.h>
+#include <pr_msgs/SetExtraMass.h>
+#include <pr_msgs/SetStiffness.h>
+#include <pr_msgs/SetSpeed.h>
+#include <pr_msgs/WAMState.h>
+#include <pr_msgs/GetDOF.h>
+#include <pr_msgs/Servo.h>
 #include <owd/WAMInternals.h>
-#include <owd/GetDOF.h>
 #include <owd/CalibrateJoints.h>
-#include <owd/Servo.h>
 
 #ifdef BUILD_FOR_SEA
-  #include <owd/WamRequestSeaCtrlTorqLimit.h>
-  #include <owd/WamRequestSeaCtrlKp.h>
-  #include <owd/WamRequestSeaCtrlKd.h>
-  #include <owd/WamRequestSeaCtrlKi.h>
+  #include <pr_msgs/WamRequestSeaCtrlTorqLimit.h>
+  #include <pr_msgs/WamRequestSeaCtrlKp.h>
+  #include <pr_msgs/WamRequestSeaCtrlKd.h>
+  #include <pr_msgs/WamRequestSeaCtrlKi.h>
 #endif
 
 class WamDriver
@@ -45,26 +45,26 @@ public:
 
     void Update();
 
-    bool AddTrajectory(owd::AddTrajectory::Request &req,
-                       owd::AddTrajectory::Response &res);
-    bool DeleteTrajectory(owd::DeleteTrajectory::Request &req,
-                          owd::DeleteTrajectory::Response &res);
-    bool PauseTrajectory(owd::PauseTrajectory::Request &req,
-                         owd::PauseTrajectory::Response &res);
-    bool ReplaceTrajectory(owd::ReplaceTrajectory::Request &req,
-                           owd::ReplaceTrajectory::Response &res);
-    bool SetExtraMass(owd::SetExtraMass::Request &req,
-                      owd::SetExtraMass::Response &res);
-    bool SetStiffness(owd::SetStiffness::Request &req,
-                      owd::SetStiffness::Response &res);
-    bool SetSpeed(owd::SetSpeed::Request &req,
-                  owd::SetSpeed::Response &res);
-    bool GetDOF(owd::GetDOF::Request &req,
-                owd::GetDOF::Response &res);
+    bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
+                       pr_msgs::AddTrajectory::Response &res);
+    bool DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
+                          pr_msgs::DeleteTrajectory::Response &res);
+    bool PauseTrajectory(pr_msgs::PauseTrajectory::Request &req,
+                         pr_msgs::PauseTrajectory::Response &res);
+    bool ReplaceTrajectory(pr_msgs::ReplaceTrajectory::Request &req,
+                           pr_msgs::ReplaceTrajectory::Response &res);
+    bool SetExtraMass(pr_msgs::SetExtraMass::Request &req,
+                      pr_msgs::SetExtraMass::Response &res);
+    bool SetStiffness(pr_msgs::SetStiffness::Request &req,
+                      pr_msgs::SetStiffness::Response &res);
+    bool SetSpeed(pr_msgs::SetSpeed::Request &req,
+                  pr_msgs::SetSpeed::Response &res);
+    bool GetDOF(pr_msgs::GetDOF::Request &req,
+                pr_msgs::GetDOF::Response &res);
     bool CalibrateJoints(owd::CalibrateJoints::Request &req,
-        owd::CalibrateJoints::Response &res);
+			 owd::CalibrateJoints::Response &res);
 
-    void wamservo_callback(const boost::shared_ptr<const owd::Servo> &message);
+    void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &message);
 
     // LLL
     void wamjointtargets_callback(void *message);
@@ -74,23 +74,23 @@ public:
 
     void wam_seactrl_settl_callback(void *message);
     void publishCurrentTorqLimits();
-    bool WamRequestSeaCtrlTorqLimit(owd::WamRequestSeaCtrlTorqLimit::Request &req,
-                                    owd::WamRequestSeaCtrlTorqLimit::Response &res);
+    bool WamRequestSeaCtrlTorqLimit(pr_msgs::WamRequestSeaCtrlTorqLimit::Request &req,
+                                    pr_msgs::WamRequestSeaCtrlTorqLimit::Response &res);
 
     void wam_seactrl_setkp_callback(void *message);
     void publishCurrentKp();
-    bool WamRequestSeaCtrlKp(owd::WamRequestSeaCtrlKp::Request &req,
-                             owd::WamRequestSeaCtrlKp::Response &res);
+    bool WamRequestSeaCtrlKp(pr_msgs::WamRequestSeaCtrlKp::Request &req,
+                             pr_msgs::WamRequestSeaCtrlKp::Response &res);
 
     void wam_seactrl_setkd_callback(void *message);
     void publishCurrentKd();
-    bool WamRequestSeaCtrlKd(owd::WamRequestSeaCtrlKd::Request &req,
-                             owd::WamRequestSeaCtrlKd::Response &res);
+    bool WamRequestSeaCtrlKd(pr_msgs::WamRequestSeaCtrlKd::Request &req,
+                             pr_msgs::WamRequestSeaCtrlKd::Response &res);
 
     void wam_seactrl_setki_callback(void *message);
     void publishCurrentKi();
-    bool WamRequestSeaCtrlKi(owd::WamRequestSeaCtrlKi::Request &req,
-                             owd::WamRequestSeaCtrlKi::Response &res);
+    bool WamRequestSeaCtrlKi(pr_msgs::WamRequestSeaCtrlKi::Request &req,
+                             pr_msgs::WamRequestSeaCtrlKi::Response &res);
 
     void publishAllSeaSettings();
 #endif
@@ -101,9 +101,9 @@ public:
     std::string robotname;
 
 private:
-    Trajectory *BuildTrajectory(owd::JointTraj &jt);
-    owd::WAMState wamstate;
-    owd::Servo servocmd;
+    Trajectory *BuildTrajectory(pr_msgs::JointTraj &jt);
+    pr_msgs::WAMState wamstate;
+    pr_msgs::Servo servocmd;
     double gravity_comp_value;
     vector<double> max_joint_vel;
     double min_accel_time;
@@ -147,7 +147,7 @@ private:
     int get_joint_num();
     double get_nearest_joint_value(double jointval, double tolerance);
     void apply_joint_offsets(double *joint_offsets);
-    TrajType ros2owd_traj (owd::JointTraj &jt);
+    TrajType ros2owd_traj (pr_msgs::JointTraj &jt);
 
     CANbus bus;
     WAM *owam;

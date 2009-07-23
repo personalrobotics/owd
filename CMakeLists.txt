@@ -39,6 +39,5 @@ elseif(VENDOR_ID STREQUAL "CentaurHauls")
     add_definitions("-march=c3-2")
 endif()
 
-# rospack_add_executable(cantest cantest.cc)
 
 

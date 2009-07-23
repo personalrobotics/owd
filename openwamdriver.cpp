@@ -33,8 +33,8 @@
 #include <ServoTraj.hh>
 
 // LLL
-#include <owd/IndexedJointValues.h>
-#include <owd/WamSetupSeaCtrl.h>
+#include <pr_msgs/IndexedJointValues.h>
+#include <pr_msgs/WamSetupSeaCtrl.h>
 #include <positionInterface/SmoothArm.h>
 
 #define SAFETY_MODULE 10
@@ -84,7 +84,7 @@ WamDriver::WamDriver(const char *name) :
 #endif // FAKE7
 
   // create a dummy previous trajectory
-  owd::TrajInfo ti;
+  pr_msgs::TrajInfo ti;
   ti.id=cmdnum;  // next will be incremented, so it will never match
 #ifdef FAKE7
   ti.end_position.resize(7,0.0f);
@@ -225,7 +225,7 @@ WamDriver::~WamDriver() {
 }
 
 
-Trajectory *WamDriver::BuildTrajectory(owd::JointTraj &jt) {
+Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
 
   cmdnum++;
 
@@ -294,7 +294,7 @@ Trajectory *WamDriver::BuildTrajectory(owd::JointTraj &jt) {
   }
 }
 
-TrajType WamDriver::ros2owd_traj (owd::JointTraj &jt) {
+TrajType WamDriver::ros2owd_traj (pr_msgs::JointTraj &jt) {
   TrajType traj;
   if (jt.positions.size() != jt.blend_radius.size()) {
     throw "Bad ROS trajectory: mismatched number of points";
@@ -1172,17 +1172,17 @@ bool WamDriver::Publish(ros::Publisher &p) {
   if (owam->jointstraj) {
     if (owam->jointstraj->state() == ParaJointTraj::STOP) {
       if (owam->safety_hold) {
-        wamstate.state=owd::WAMState::state_stalled;
+        wamstate.state=pr_msgs::WAMState::state_stalled;
       } else {
-        wamstate.state=owd::WAMState::state_fixed;
+        wamstate.state=pr_msgs::WAMState::state_fixed;
       }
     } else {
-      wamstate.state=owd::WAMState::state_moving;
+      wamstate.state=pr_msgs::WAMState::state_moving;
     }
   } else if (owam->holdpos) {
-    wamstate.state = owd::WAMState::state_fixed;
+    wamstate.state = pr_msgs::WAMState::state_fixed;
   } else {
-    wamstate.state = owd::WAMState::state_free;
+    wamstate.state = pr_msgs::WAMState::state_free;
   }
   owam->unlock();
 
@@ -1191,8 +1191,8 @@ bool WamDriver::Publish(ros::Publisher &p) {
 }
 
 // Handle requests for DOF information
-bool WamDriver::GetDOF(owd::GetDOF::Request &req,
-                       owd::GetDOF::Response &res) {
+bool WamDriver::GetDOF(pr_msgs::GetDOF::Request &req,
+                       pr_msgs::GetDOF::Response &res) {
 #ifdef FAKE7
   res.nDOF = 4;
 #else
@@ -1208,8 +1208,8 @@ bool WamDriver::CalibrateJoints(owd::CalibrateJoints::Request &req,
     return true;
 }
 
-bool WamDriver::AddTrajectory(owd::AddTrajectory::Request &req,
-                              owd::AddTrajectory::Response &res) {
+bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
+                              pr_msgs::AddTrajectory::Response &res) {
   // check number of points
   if (req.traj.positions.size() < 2) {
     ROS_ERROR_NAMED("AddTrajectory","Minimum of 2 traj points required");
@@ -1288,17 +1288,17 @@ bool WamDriver::AddTrajectory(owd::AddTrajectory::Request &req,
     res.id = 0;
     return true;
   }
-  owd::TrajInfo ti;
+  pr_msgs::TrajInfo ti;
   ti.id=t->id;
   ti.end_position = t->end_position; // copytoarray?
 #ifdef FAKE7
   ti.end_position.resize(7);
 #endif
   if (t->WaitForStart) {
-    ti.options = owd::JointTraj::opt_WaitForStart;
+    ti.options = pr_msgs::JointTraj::opt_WaitForStart;
   }
   if (t->HoldOnStall) {
-    ti.options |= owd::JointTraj::opt_HoldOnStall;
+    ti.options |= pr_msgs::JointTraj::opt_HoldOnStall;
   }
   wamstate.trajectory_queue.push_back(ti);
 
@@ -1337,14 +1337,14 @@ bool WamDriver::AddTrajectory(owd::AddTrajectory::Request &req,
   return true;
 }
 
-bool WamDriver::DeleteTrajectory(owd::DeleteTrajectory::Request &req,
-                                 owd::DeleteTrajectory::Response &res) {
+bool WamDriver::DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
+                                 pr_msgs::DeleteTrajectory::Response &res) {
 #ifdef FAKE7
   return false;
 #endif
 
   std::list<Trajectory *>::iterator tl_it;
-  std::vector<owd::TrajInfo>::iterator ws_it;
+  std::vector<pr_msgs::TrajInfo>::iterator ws_it;
   // lock against re-queuing by Update() function
   boost::mutex::scoped_lock lock(queue_mutex);
   for (unsigned int x=0; x<req.ids.size(); ++x) {
@@ -1400,8 +1400,8 @@ bool WamDriver::DeleteTrajectory(owd::DeleteTrajectory::Request &req,
   return false;
 }
 
-bool WamDriver::SetStiffness(owd::SetStiffness::Request &req,
-                             owd::SetStiffness::Response &res) {
+bool WamDriver::SetStiffness(pr_msgs::SetStiffness::Request &req,
+                             pr_msgs::SetStiffness::Response &res) {
 
   if (req.stiffness > 0.0) {
     if (!owam->jointstraj) {
@@ -1422,8 +1422,8 @@ bool WamDriver::SetStiffness(owd::SetStiffness::Request &req,
   return true;
 }
 
-bool WamDriver::PauseTrajectory(owd::PauseTrajectory::Request &req,
-                                owd::PauseTrajectory::Response &res) {
+bool WamDriver::PauseTrajectory(pr_msgs::PauseTrajectory::Request &req,
+                                pr_msgs::PauseTrajectory::Response &res) {
   if (owam->jointstraj) {
     if (req.pause) {
       owam->pause_trajectory();
@@ -1439,8 +1439,8 @@ bool WamDriver::PauseTrajectory(owd::PauseTrajectory::Request &req,
   }
 }
 
-bool WamDriver::ReplaceTrajectory(owd::ReplaceTrajectory::Request &req,
-                                  owd::ReplaceTrajectory::Response &res) {
+bool WamDriver::ReplaceTrajectory(pr_msgs::ReplaceTrajectory::Request &req,
+                                  pr_msgs::ReplaceTrajectory::Response &res) {
   // not implemented yet
   return false;
 
@@ -1469,8 +1469,8 @@ bool WamDriver::ReplaceTrajectory(owd::ReplaceTrajectory::Request &req,
   */
 }
 
- bool WamDriver::SetSpeed(owd::SetSpeed::Request &req,
-                         owd::SetSpeed::Response &res) {
+ bool WamDriver::SetSpeed(pr_msgs::SetSpeed::Request &req,
+                         pr_msgs::SetSpeed::Response &res) {
   if (req.velocities.size() != nJoints) {
     ROS_ERROR("Received SetSpeed command with wrong array size");
     return false;
@@ -1493,8 +1493,8 @@ bool WamDriver::ReplaceTrajectory(owd::ReplaceTrajectory::Request &req,
   return true;
 }
  
-bool WamDriver::SetExtraMass(owd::SetExtraMass::Request &req,
-                              owd::SetExtraMass::Response &res) {
+bool WamDriver::SetExtraMass(pr_msgs::SetExtraMass::Request &req,
+                              pr_msgs::SetExtraMass::Response &res) {
   ROS_INFO("Got grabbed data mass, cog, and inertia");
   
   owam->lock("OWD processmsg");
@@ -1570,7 +1570,7 @@ void WamDriver::Update() {
   trajectory_list.pop_front();
 }
 
-void WamDriver::wamservo_callback(const boost::shared_ptr<const owd::Servo> &servo) {
+void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &servo) {
   ROS_DEBUG_NAMED("servo","Received servo command:");
   if (servo->joint.size() != servo->velocity.size()) {
     ROS_ERROR("Mismatched arrays received in Servo message; ignored");
@@ -1620,7 +1620,7 @@ void WamDriver::wamjointtargets_callback(void *message) {
   }
 
   //ROS_INFO("Received JointTargets command:");
-  owd::IndexedJointValues * jt = (owd::IndexedJointValues*)message;
+  pr_msgs::IndexedJointValues * jt = (pr_msgs::IndexedJointValues*)message;
 
   if (jt->jointIndices.size() != jt->values.size()) {
     ROS_ERROR("Mismatched arrays received in wamjointtargets_callback; ignored");
@@ -1642,7 +1642,7 @@ void WamDriver::resetSeaCtrl() {
 void WamDriver::wam_seactrl_settl_callback(void *message) {
 
   ROS_INFO("Received set torq limit command:");
-  owd::WamSetupSeaCtrl * tl = (owd::WamSetupSeaCtrl*)message;
+  pr_msgs::WamSetupSeaCtrl * tl = (pr_msgs::WamSetupSeaCtrl*)message;
 
   if (tl->jointIndices.size() != tl->values.size()) {
     ROS_ERROR("Mismatched arrays received in wam_seactrl_settl_callback; ignored");
@@ -1669,7 +1669,7 @@ void WamDriver::wam_seactrl_settl_callback(void *message) {
 void WamDriver::publishCurrentTorqLimits() {
   // build the curtl message
   ROS_INFO("publishCurrentTorqLimits");
-  owd::IndexedJointValues curtl;
+  pr_msgs::IndexedJointValues curtl;
   for (int j=Joint::J1; j<=Joint::Jn; j++) {
     curtl.jointIndices.push_back(j);
     curtl.values.push_back( owam->jointsctrl[j].getTorqLimit() );
@@ -1680,8 +1680,8 @@ void WamDriver::publishCurrentTorqLimits() {
   return;
 }
 
-bool WamDriver::WamRequestSeaCtrlTorqLimit(owd::WamRequestSeaCtrlTorqLimit::Request &req,
-                                           owd::WamRequestSeaCtrlTorqLimit::Response &res) {
+bool WamDriver::WamRequestSeaCtrlTorqLimit(pr_msgs::WamRequestSeaCtrlTorqLimit::Request &req,
+                                           pr_msgs::WamRequestSeaCtrlTorqLimit::Response &res) {
   ROS_INFO("WamRequestSeaCtrlTorqLimit\n");
   publishCurrentTorqLimits();
   return true;
@@ -1691,7 +1691,7 @@ bool WamDriver::WamRequestSeaCtrlTorqLimit(owd::WamRequestSeaCtrlTorqLimit::Requ
 void WamDriver::wam_seactrl_setkp_callback(void *message) {
 
   ROS_INFO("Received set kp command:");
-  owd::WamSetupSeaCtrl * kp = (owd::WamSetupSeaCtrl*)message;
+  pr_msgs::WamSetupSeaCtrl * kp = (pr_msgs::WamSetupSeaCtrl*)message;
 
   if (kp->jointIndices.size() != kp->values.size()) {
     ROS_ERROR("Mismatched arrays received in wam_seactrl_setkp_callback; ignored");
@@ -1716,7 +1716,7 @@ void WamDriver::wam_seactrl_setkp_callback(void *message) {
 void WamDriver::publishCurrentKp() {
   ROS_INFO("publishCurrentKp");
   // build the curkp message
-  owd::IndexedJointValues curkp;
+  pr_msgs::IndexedJointValues curkp;
   for (int j=Joint::J1; j<=Joint::Jn; j++) {
     curkp.jointIndices.push_back(j);
     curkp.values.push_back( owam->jointsctrl[j].getKp() );
@@ -1727,8 +1727,8 @@ void WamDriver::publishCurrentKp() {
   return;
 }
 
-bool WamDriver::WamRequestSeaCtrlKp(owd::WamRequestSeaCtrlKp::Request &req,
-                                    owd::WamRequestSeaCtrlKp::Response &res) {
+bool WamDriver::WamRequestSeaCtrlKp(pr_msgs::WamRequestSeaCtrlKp::Request &req,
+                                    pr_msgs::WamRequestSeaCtrlKp::Response &res) {
   ROS_INFO("WamrequestSeaCtrlKp");
   publishCurrentKp();
   return true;
@@ -1737,7 +1737,7 @@ bool WamDriver::WamRequestSeaCtrlKp(owd::WamRequestSeaCtrlKp::Request &req,
 void WamDriver::wam_seactrl_setkd_callback(void *message) {
 
   ROS_INFO("Received set kd command:");
-  owd::WamSetupSeaCtrl * kd = (owd::WamSetupSeaCtrl*)message;
+  pr_msgs::WamSetupSeaCtrl * kd = (pr_msgs::WamSetupSeaCtrl*)message;
 
   if (kd->jointIndices.size() != kd->values.size()) {
     ROS_ERROR("Mismatched arrays received in wam_seactrl_setkd_callback; ignored");
@@ -1762,7 +1762,7 @@ void WamDriver::wam_seactrl_setkd_callback(void *message) {
 void WamDriver::publishCurrentKd() {
   ROS_INFO("publishCurrentKd");
   // build the curkd message
-  owd::IndexedJointValues curkd;
+  pr_msgs::IndexedJointValues curkd;
   for (int j=Joint::J1; j<=Joint::Jn; j++) {
     curkd.jointIndices.push_back(j);
     curkd.values.push_back( owam->jointsctrl[j].getKd() );
@@ -1773,8 +1773,8 @@ void WamDriver::publishCurrentKd() {
   return;
 }
 
-bool WamDriver::WamRequestSeaCtrlKd(owd::WamRequestSeaCtrlKd::Request &req,
-                                    owd::WamRequestSeaCtrlKd::Response &res) {
+bool WamDriver::WamRequestSeaCtrlKd(pr_msgs::WamRequestSeaCtrlKd::Request &req,
+                                    pr_msgs::WamRequestSeaCtrlKd::Response &res) {
   ROS_INFO("WamrequestSeaCtrlKd");
   publishCurrentKd();
   return true;
@@ -1784,7 +1784,7 @@ bool WamDriver::WamRequestSeaCtrlKd(owd::WamRequestSeaCtrlKd::Request &req,
 void WamDriver::wam_seactrl_setki_callback(void *message) {
 
   ROS_INFO("Received set ki command:");
-  owd::WamSetupSeaCtrl * ki = (owd::WamSetupSeaCtrl*)message;
+  pr_msgs::WamSetupSeaCtrl * ki = (pr_msgs::WamSetupSeaCtrl*)message;
 
   if (ki->jointIndices.size() != ki->values.size()) {
     ROS_ERROR("Mismatched arrays received in wam_seactrl_setki_callback; ignored");
@@ -1809,7 +1809,7 @@ void WamDriver::wam_seactrl_setki_callback(void *message) {
 void WamDriver::publishCurrentKi() {
   ROS_INFO("publishCurrentKi");
   // build the curki message
-  owd::IndexedJointValues curki;
+  pr_msgs::IndexedJointValues curki;
   for (int j=Joint::J1; j<=Joint::Jn; j++) {
     curki.jointIndices.push_back(j);
     curki.values.push_back( owam->jointsctrl[j].getKi() );
@@ -1820,8 +1820,8 @@ void WamDriver::publishCurrentKi() {
   return;
 }
 
-bool WamDriver::WamRequestSeaCtrlKi(owd::WamRequestSeaCtrlKi::Request &req,
-                                    owd::WamRequestSeaCtrlKi::Response &res) {
+bool WamDriver::WamRequestSeaCtrlKi(pr_msgs::WamRequestSeaCtrlKi::Request &req,
+                                    pr_msgs::WamRequestSeaCtrlKi::Response &res) {
   ROS_INFO("WamrequestSeaCtrlKi");
   publishCurrentKi();
   return true;
