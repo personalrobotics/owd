@@ -1638,10 +1638,9 @@ void WamDriver::resetSeaCtrl() {
   owam->posSmoother.setReset();
 }
 
-void WamDriver::wam_seactrl_settl_callback(void *message) {
+void WamDriver::wam_seactrl_settl_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &tl) {
 
   ROS_INFO("Received set torq limit command:");
-  pr_msgs::WamSetupSeaCtrl * tl = (pr_msgs::WamSetupSeaCtrl*)message;
 
   if (tl->jointIndices.size() != tl->values.size()) {
     ROS_ERROR("Mismatched arrays received in wam_seactrl_settl_callback; ignored");
@@ -1687,10 +1686,9 @@ bool WamDriver::WamRequestSeaCtrlTorqLimit(pr_msgs::WamRequestSeaCtrlTorqLimit::
 }
 
 
-void WamDriver::wam_seactrl_setkp_callback(void *message) {
+void WamDriver::wam_seactrl_setkp_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &kp) {
 
   ROS_INFO("Received set kp command:");
-  pr_msgs::WamSetupSeaCtrl * kp = (pr_msgs::WamSetupSeaCtrl*)message;
 
   if (kp->jointIndices.size() != kp->values.size()) {
     ROS_ERROR("Mismatched arrays received in wam_seactrl_setkp_callback; ignored");
@@ -1733,10 +1731,9 @@ bool WamDriver::WamRequestSeaCtrlKp(pr_msgs::WamRequestSeaCtrlKp::Request &req,
   return true;
 } 
 
-void WamDriver::wam_seactrl_setkd_callback(void *message) {
+void WamDriver::wam_seactrl_setkd_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &kd) {
 
   ROS_INFO("Received set kd command:");
-  pr_msgs::WamSetupSeaCtrl * kd = (pr_msgs::WamSetupSeaCtrl*)message;
 
   if (kd->jointIndices.size() != kd->values.size()) {
     ROS_ERROR("Mismatched arrays received in wam_seactrl_setkd_callback; ignored");
@@ -1780,10 +1777,9 @@ bool WamDriver::WamRequestSeaCtrlKd(pr_msgs::WamRequestSeaCtrlKd::Request &req,
 } 
 
 
-void WamDriver::wam_seactrl_setki_callback(void *message) {
+void WamDriver::wam_seactrl_setki_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &ki) {
 
   ROS_INFO("Received set ki command:");
-  pr_msgs::WamSetupSeaCtrl * ki = (pr_msgs::WamSetupSeaCtrl*)message;
 
   if (ki->jointIndices.size() != ki->values.size()) {
     ROS_ERROR("Mismatched arrays received in wam_seactrl_setki_callback; ignored");

@@ -10,6 +10,7 @@
 #include <vector>
 #include <algorithm>
 #include <ros/ros.h>
+#include <ros/node.h>
 #include <boost/thread/mutex.hpp>
 #include <pr_msgs/AddTrajectory.h>
 #include <pr_msgs/DeleteTrajectory.h>
@@ -72,22 +73,23 @@ public:
 #ifdef BUILD_FOR_SEA
     void resetSeaCtrl();
 
-    void wam_seactrl_settl_callback(void *message);
+    void wam_seactrl_settl_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &message);
+
     void publishCurrentTorqLimits();
     bool WamRequestSeaCtrlTorqLimit(pr_msgs::WamRequestSeaCtrlTorqLimit::Request &req,
                                     pr_msgs::WamRequestSeaCtrlTorqLimit::Response &res);
 
-    void wam_seactrl_setkp_callback(void *message);
+    void wam_seactrl_setkp_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &message);
     void publishCurrentKp();
     bool WamRequestSeaCtrlKp(pr_msgs::WamRequestSeaCtrlKp::Request &req,
                              pr_msgs::WamRequestSeaCtrlKp::Response &res);
 
-    void wam_seactrl_setkd_callback(void *message);
+    void wam_seactrl_setkd_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &message);
     void publishCurrentKd();
     bool WamRequestSeaCtrlKd(pr_msgs::WamRequestSeaCtrlKd::Request &req,
                              pr_msgs::WamRequestSeaCtrlKd::Response &res);
 
-    void wam_seactrl_setki_callback(void *message);
+    void wam_seactrl_setki_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &message);
     void publishCurrentKi();
     bool WamRequestSeaCtrlKi(pr_msgs::WamRequestSeaCtrlKi::Request &req,
                              pr_msgs::WamRequestSeaCtrlKi::Response &res);

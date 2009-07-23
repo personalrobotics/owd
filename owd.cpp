@@ -45,29 +45,27 @@ int main(int argc, char** argv)
   n.advertiseService("CalibrateJoints", &WamDriver::CalibrateJoints, &wam);
   n.subscribe("wamservo", 1, &WamDriver::wamservo_callback,&wam);
 
-  // NEED TO UPDATE THE SUBSCRIBE TO USE THE NODEHANDLE INTERFACE
   // LLL
   pr_msgs::IndexedJointValues jtcmd;
   n.subscribe("wam_joint_targets", 10, &WamDriver::wamjointtargets_callback,&wam);
  
 #ifdef BUILD_FOR_SEA
-  pr_msgs::WamSetupSeaCtrl tlcmd;
-  n.subscribe("wam_seactrl_settl", tlcmd, &WamDriver::wam_seactrl_settl_callback, &wam, &tlcmd, 10); 
+  n.subscribe("wam_seactrl_settl", 10, &WamDriver::wam_seactrl_settl_callback, &wam);
   n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curtl", 10);
   n.advertiseService("WamRequestSeaCtrlTorqLimit",&WamDriver::WamRequestSeaCtrlTorqLimit,&wam);
 
   pr_msgs::WamSetupSeaCtrl kpcmd;
-  n.subscribe("wam_seactrl_setkp", kpcmd, &WamDriver::wam_seactrl_setkp_callback, &wam, &kpcmd, 10); 
+  n.subscribe("wam_seactrl_setkp", 10, &WamDriver::wam_seactrl_setkp_callback, &wam); 
   n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curkp", 10);
   n.advertiseService("WamRequestSeaCtrlKp",&WamDriver::WamRequestSeaCtrlKp,&wam);
 
   pr_msgs::WamSetupSeaCtrl kdcmd;
-  n.subscribe("wam_seactrl_setkd", kdcmd, &WamDriver::wam_seactrl_setkd_callback, &wam, &kdcmd, 10); 
+  n.subscribe("wam_seactrl_setkd", 10, &WamDriver::wam_seactrl_setkd_callback, &wam); 
   n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curkd", 10);
   n.advertiseService("WamRequestSeaCtrlKd",&WamDriver::WamRequestSeaCtrlKd,&wam);
 
   pr_msgs::WamSetupSeaCtrl kicmd;
-  n.subscribe("wam_seactrl_setki", kicmd, &WamDriver::wam_seactrl_setki_callback, &wam, &kicmd, 10); 
+  n.subscribe("wam_seactrl_setki", 10, &WamDriver::wam_seactrl_setki_callback, &wam); 
   n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curki", 10);
   n.advertiseService("WamRequestSeaCtrlKi",&WamDriver::WamRequestSeaCtrlKi,&wam);
 
