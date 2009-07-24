@@ -42,7 +42,7 @@ public:
 
     bool Init(const char *joint_calibration_file);
     
-    bool Publish(ros::Publisher &p);
+    bool Publish();
 
     void Update();
 
@@ -64,6 +64,8 @@ public:
                 pr_msgs::GetDOF::Response &res);
     bool CalibrateJoints(owd::CalibrateJoints::Request &req,
 			 owd::CalibrateJoints::Response &res);
+
+    void AdvertiseAndSubscribe(ros::NodeHandle &n);
 
     void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &message);
 
@@ -155,6 +157,45 @@ private:
     WAM *owam;
     boost::mutex queue_mutex;
     boost::mutex wscb_mutex;
+
+    ros::Publisher
+      pub_wamstate;
+
+    ros::Subscriber
+      sub_wamservo,
+      sub_wam_joint_targets;
+
+    ros::ServiceServer 
+      ss_AddTrajectory,
+      ss_SetStiffness,
+      ss_DeleteTrajectory, 
+      ss_PauseTrajectory,
+      ss_ReplaceTrajectory,
+      ss_SetSpeed,
+      ss_SetExtraMass,
+      ss_GetArmDOF,
+      ss_CalibrateJoints;
+ 
+#ifdef BUILD_FOR_SEA
+    ros::Publisher
+      pub_wam_seactrl_curtl,
+      pub_wam_seactrl_curkp,
+      pub_wam_seactrl_curkd,
+      pub_wam_seactrl_curki;
+
+    ros::Subscriber 
+      sub_wam_seactrl_settl,
+      sub_wam_seactrl_setkp,
+      sub_wam_seactrl_setkd,
+      sub_wam_seactrl_setki;
+
+    ros::ServiceServer
+      ss_WamRequestSeaCtrlTorqLimit,
+      ss_WamRequestSeaCtrlKp,
+      ss_WamRequestSeaCtrlKd,
+      ss_WamRequestSeaCtrlKi;
+
+#endif // BUILD_FOR_SEA
 
     friend class PositionCommand;
     friend class TrajectoryCommand;

@@ -204,6 +204,66 @@ bool WamDriver::Init(const char *joint_cal_file)
   return true;
 }
 
+void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
+  pub_wamstate = 
+    n.advertise<pr_msgs::WAMState>("wamstate", 10);
+  ss_AddTrajectory = 
+    n.advertiseService("AddTrajectory",&WamDriver::AddTrajectory,this);
+  ss_SetStiffness =
+    n.advertiseService("SetStiffness",&WamDriver::SetStiffness,this);
+  ss_DeleteTrajectory = 
+    n.advertiseService("DeleteTrajectory",&WamDriver::DeleteTrajectory,this);
+  ss_PauseTrajectory = 
+    n.advertiseService("PauseTrajectory",&WamDriver::PauseTrajectory,this);
+  ss_ReplaceTrajectory =
+    n.advertiseService("ReplaceTrajectory",&WamDriver::ReplaceTrajectory,this);
+  ss_SetSpeed =
+    n.advertiseService("SetSpeed",&WamDriver::SetSpeed,this);
+  ss_SetExtraMass =
+    n.advertiseService("SetExtraMass",&WamDriver::SetExtraMass,this);
+  ss_GetArmDOF =
+    n.advertiseService("GetArmDOF",&WamDriver::GetDOF,this);
+  ss_CalibrateJoints =
+    n.advertiseService("CalibrateJoints", &WamDriver::CalibrateJoints, this);
+  sub_wamservo =
+    n.subscribe("wamservo", 1, &WamDriver::wamservo_callback,this);
+
+  // LLL
+  sub_wam_joint_targets = 
+    n.subscribe("wam_joint_targets", 10, &WamDriver::wamjointtargets_callback,this);
+ 
+#ifdef BUILD_FOR_SEA
+  sub_wam_seactrl_settl =
+    n.subscribe("wam_seactrl_settl", 10, &WamDriver::wam_seactrl_settl_callback, this);
+  pub_wam_seactrl_curtl = 
+    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curtl", 10);
+  ss_WamRequestSeaCtrlTorqLimit =
+    n.advertiseService("WamRequestSeaCtrlTorqLimit",&WamDriver::WamRequestSeaCtrlTorqLimit,this);
+
+  sub_wam_seactrl_setkp =
+    n.subscribe("wam_seactrl_setkp", 10, &WamDriver::wam_seactrl_setkp_callback, this); 
+  pub_wam_seactrl_curkp =
+    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curkp", 10);
+  ss_WamRequestSeaCtrlKp =
+    n.advertiseService("WamRequestSeaCtrlKp",&WamDriver::WamRequestSeaCtrlKp,this);
+
+  sub_wam_seactrl_setkd =
+    n.subscribe("wam_seactrl_setkd", 10, &WamDriver::wam_seactrl_setkd_callback, this); 
+  pub_wam_seactrl_curkd =
+    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curkd", 10);
+  ss_WamRequestSeaCtrlKd =
+    n.advertiseService("WamRequestSeaCtrlKd",&WamDriver::WamRequestSeaCtrlKd,this);
+
+  sub_wam_seactrl_setki =
+    n.subscribe("wam_seactrl_setki", 10, &WamDriver::wam_seactrl_setki_callback, this); 
+  pub_wam_seactrl_curki =
+    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curki", 10);
+  ss_WamRequestSeaCtrlKi =
+    n.advertiseService("WamRequestSeaCtrlKi",&WamDriver::WamRequestSeaCtrlKi,this);
+#endif // BUILD_FOR_SEA
+}
+
+
 WamDriver::~WamDriver() {
   owam->jsdynamics() = false;
   
@@ -1158,7 +1218,7 @@ bool WamDriver::verify_home_position() {
     return true;
 }
 
-bool WamDriver::Publish(ros::Publisher &p) {
+bool WamDriver::Publish() {
   double jointpos[nJoints+1];
   double jointtorqs[nJoints+1];  // PID error-correction torques,
   //                                       after removing dynamic torques
@@ -1186,7 +1246,7 @@ bool WamDriver::Publish(ros::Publisher &p) {
   }
   owam->unlock();
 
-  p.publish(wamstate);
+  pub_wamstate.publish(wamstate);
   return true;
 }
 
@@ -1672,8 +1732,7 @@ void WamDriver::publishCurrentTorqLimits() {
     curtl.jointIndices.push_back(j);
     curtl.values.push_back( owam->jointsctrl[j].getTorqLimit() );
   }
-  ros::Node* pNode = ros::Node::instance();
-  pNode->publish("wam_seactrl_curtl", curtl);
+  pub_wam_seactrl_curtl.publish(curtl);
 
   return;
 }
@@ -1718,8 +1777,7 @@ void WamDriver::publishCurrentKp() {
     curkp.jointIndices.push_back(j);
     curkp.values.push_back( owam->jointsctrl[j].getKp() );
   }
-  ros::Node* pNode = ros::Node::instance();
-  pNode->publish("wam_seactrl_curkp", curkp);
+  pub_wam_seactrl_curkp.publish(curkp);
 
   return;
 }
@@ -1763,8 +1821,7 @@ void WamDriver::publishCurrentKd() {
     curkd.jointIndices.push_back(j);
     curkd.values.push_back( owam->jointsctrl[j].getKd() );
   }
-  ros::Node* pNode = ros::Node::instance();
-  pNode->publish("wam_seactrl_curkd", curkd);
+  pub_wam_seactrl_curkd.publish(curkd);
 
   return;
 }
@@ -1809,8 +1866,7 @@ void WamDriver::publishCurrentKi() {
     curki.jointIndices.push_back(j);
     curki.values.push_back( owam->jointsctrl[j].getKi() );
   }
-  ros::Node* pNode = ros::Node::instance();
-  pNode->publish("wam_seactrl_curki", curki);
+  wam_seactrl_curki.publish(curki);
 
   return;
 }
