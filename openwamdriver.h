@@ -41,6 +41,8 @@ public:
     ~WamDriver();
 
     bool Init(const char *joint_calibration_file);
+
+    void Pump(const ros::TimerEvent& e);
     
     bool Publish();
 

@@ -1572,7 +1572,17 @@ bool WamDriver::SetExtraMass(pr_msgs::SetExtraMass::Request &req,
   owam->unlock("OWD processmsg");
   return true;
 }
- 
+
+void WamDriver::Pump(const ros::TimerEvent& e) {
+    // Perform periodic tasks
+
+    // publish our state info
+    this->Publish();
+
+    // let the driver update
+    this->Update();
+}
+
 void WamDriver::Update() {
   
   static int statcount = 0;
@@ -1866,7 +1876,7 @@ void WamDriver::publishCurrentKi() {
     curki.jointIndices.push_back(j);
     curki.values.push_back( owam->jointsctrl[j].getKi() );
   }
-  wam_seactrl_curki.publish(curki);
+  pub_wam_seactrl_curki.publish(curki);
 
   return;
 }

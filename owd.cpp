@@ -39,22 +39,8 @@ int main(int argc, char** argv)
   wam.publishAllSeaSettings();
 #endif // BUILD_FOR_SEA
 
-  //
-  // Create a ros::Duration that will let us sleep for a specified period of time (in seconds)
-  //
-  ros::Duration sleep_duration(0.1);
+  ros::Timer wam_timer = n.createTimer(ros::Duration(0.1), &WamDriver::Pump, &wam);
+  ros::MultiThreadedSpinner s(3);
+  ros::spin(s);
 
-  while (n.ok())
-  {
-    // publish our state info
-    wam.Publish();
-
-    // let the driver update
-    wam.Update();
-    
-    //
-    // Sleep for the duration we specified above
-    //
-    sleep_duration.sleep();
-  }
 }
