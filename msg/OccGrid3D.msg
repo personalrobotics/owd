@@ -10,7 +10,7 @@ uint32 num_y_voxels
 uint32 num_z_voxels
 
 # exact center of map (always an odd number of voxels in each dimension)
-robot_msgs/Point32 origin
+geometry_msgs/Point32 origin
 
 # the map data. 0-100, representing probability: ceil(100*p_occupied-0.5)
 # index =  kk * num_y_voxels * num_x_voxels + jj * num_x_voxels + ii
