@@ -178,6 +178,11 @@ WAM::WAM(CANbus* cb) :
 */
 
 #endif
+
+  for (unsigned int i=0; i<7; ++i) {
+    safetytorquecount[i]=safetytorquesum[i]=0;
+  }
+    
 }
 
 /*
@@ -931,6 +936,11 @@ void WAM::newcontrol(double dt){
           stats.trajtime = trajtime/1000.0;
           stats.jsctrltime=jscontroltime/1000.0;
           stats.safetycount=safety_torque_count;
+	  for (unsigned int i=0; i<7; ++i) {
+	    stats.hitorquecount[i]=safetytorquecount[i];
+	    stats.hitorqueavg[i]=safetytorquesum[i] / safetytorquecount[i];
+	    safetytorquesum[i]=safetytorquecount[i]=0;
+	  }
           trajcount=safety_torque_count=0;
           trajtime=jscontroltime=0.0f;
         }
@@ -1031,6 +1041,8 @@ bool WAM::safety_torques_exceeded(double t[]) {
             //t[i] = safety_torqs[i]/stiffness *  t[i]/fabs(t[i]);
           }
           bExceeded = true;
+	  safetytorquecount[i-1]++;
+	  safetytorquesum[i-1] += t[i];
         }
     }
     return bExceeded;
@@ -1353,6 +1365,18 @@ void WAMstats::rosprint() const {
   ROS_DEBUG_NAMED("times",
                   "trajectory eval %2.2fms, jscontrol %2.2fms, safetycount=%d",
                   trajtime,jsctrltime,safetycount);
+  if (safetycount > 0) {
+    ROS_DEBUG_NAMED("times",
+		    "Safety torque exception counts and averages:\n");
+    for (unsigned int i=0; i<7; ++i) {
+      if (hitorquecount[i]>0) {
+	ROS_DEBUG_NAMED("times",
+			"J%d: %4d %2.2f", i+1, hitorquecount[i],
+			hitorqueavg);
+      }
+    }
+  }
+
   ROS_DEBUG_NAMED("times","newcontrol dynamics time: %2.2fms",
                   dyntime);
 }

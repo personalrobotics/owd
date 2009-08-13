@@ -1462,11 +1462,15 @@ bool WamDriver::DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
 
 bool WamDriver::SetStiffness(pr_msgs::SetStiffness::Request &req,
                              pr_msgs::SetStiffness::Response &res) {
-
+  
   if (req.stiffness > 0.0) {
     if (!owam->jointstraj) {
       // if we're not running a trajectory, then hold the current position
-      owam->set_stiffness(req.stiffness);
+      if (req.stiffness > 1.0) {
+	owam->set_stiffness(1.0);
+      } else {
+	owam->set_stiffness(req.stiffness);
+      }
       owam->hold_position();
       ROS_INFO("Position held by SetStiffness command");
     }

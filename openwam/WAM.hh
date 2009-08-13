@@ -63,6 +63,8 @@ public:
   double slowctrltime;
   double slowsendtime;
   double dyntime;
+  int hitorquecount[7];
+  double hitorqueavg[7];
 
   WAMstats() : trajtime(0.0f),
                jsctrltime(0.0f),
@@ -77,7 +79,12 @@ public:
                slowctrltime(0.0f),
                slowsendtime(0.0f),
                dyntime(0.0f)
-  {}
+  {
+    for (unsigned int i=0; i<7; ++i) {
+      hitorquecount[i]=0;
+      hitorqueavg[i]=0;
+    }
+  }
 
   void rosprint() const;
   
@@ -115,6 +122,10 @@ public:
   //  ParaJointTraj  *jointstraj;                 // joints trajectories
   Trajectory *jointstraj;
   PulseTraj   *pulsetraj;                  // trajectory of joint acceleration pulses
+  int safetytorquecount[7];
+  double safetytorquesum[7];
+
+
 #ifdef BUILD_FOR_SEA
   JointCtrlSea jointsctrl[Joint::Jn+1];    // joint controllers
   void loadSeaParams();
