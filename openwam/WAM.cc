@@ -34,7 +34,7 @@ WAM::WAM(CANbus* cb) :
     check_safety_torques(true),rec(false),wsdyn(false),jsdyn(false),
     holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
     pid_count(0),safety_hold(false),motor_state(MOTORS_OFF),
-    stiffness(1.0)
+    stiffness(1.0), recorder(50000)
 {
 
   pthread_mutex_init(&mutex, NULL);
@@ -831,11 +831,23 @@ void WAM::newcontrol(double dt){
                   timestep_factor /= 2.0f;
                 }
                 safety_torque_count++;
-                
+		std::vector<double> data;
+		data.push_back(t1); // record the current time
+		data.push_back(timestep_factor);  // time factor
+		data.push_back(jointstraj->curtime());  // traj time
+
                 // back up the trajectory
-                for (int j=Joint::J1; j<Joint::Jn; ++j) {
+                for (int j=Joint::J1; j<=Joint::Jn; ++j) {
+		  data.push_back(q_target[j]);  // record target position
+		  data.push_back(q[j]);         // record actual position
+		  data.push_back(pid_torq[j]);  // record the bad torques
                   q_target[j] = q[j]; // reset current position
+		                      // (the traj->evaluate() function
+		                      // expects the current position in
+		                      // q_target)
                 }
+
+		// go backwards in time by a small step
                 jointstraj->evaluate(q_target, qd_target, qdd_target, -traj_timestep * timestep_factor);
                 for(int j=Joint::J1; j<=Joint::Jn; j++){
                   qd_target[j] *= timestep_factor;
@@ -847,6 +859,7 @@ void WAM::newcontrol(double dt){
                 if (jointstraj->HoldOnStall) {
                   jointstraj->stop();  // still have to stop if the app wants to
                 }
+		recorder.add(data);
               }
             } else if (timestep_factor < 1.0f) {
               // we're back within the safety thresholds, so start increasing our
@@ -1346,7 +1359,7 @@ void WAM::unlock(const char *name) {
     pthread_mutex_unlock(&mutex);
 }
 
-void WAMstats::rosprint() const {
+void WAMstats::rosprint(int recorder_count) const {
   ROS_DEBUG_NAMED("times",
                   "Loop: %2.2fms (read %2.1fms, control %2.1fms, send %2.1fms)",
                   looptime,
@@ -1363,8 +1376,8 @@ void WAMstats::rosprint() const {
                    slowsendtime);
   }
   ROS_DEBUG_NAMED("times",
-                  "trajectory eval %2.2fms, jscontrol %2.2fms, safetycount=%d",
-                  trajtime,jsctrltime,safetycount);
+                  "trajectory eval %2.2fms, jscontrol %2.2fms, safetycount=%d, recordercount=%d",
+                  trajtime,jsctrltime,safetycount,recorder_count);
   if (safetycount > 0) {
     ROS_DEBUG_NAMED("times",
 		    "Safety torque exception counts and averages:\n");
@@ -1372,11 +1385,17 @@ void WAMstats::rosprint() const {
       if (hitorquecount[i]>0) {
 	ROS_DEBUG_NAMED("times",
 			"J%d: %4d %2.2f", i+1, hitorquecount[i],
-			hitorqueavg);
+			hitorqueavg[i]);
       }
     }
   }
 
   ROS_DEBUG_NAMED("times","newcontrol dynamics time: %2.2fms",
                   dyntime);
+}
+
+WAM::~WAM() {
+  if (recorder.count > 0) {
+    recorder.dump("wamstats_final.csv");
+  }
 }

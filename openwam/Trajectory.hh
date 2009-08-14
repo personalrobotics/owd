@@ -72,6 +72,8 @@ public:
   
   virtual void reset(double t) {time=t;}
 
+  inline virtual const double curtime() const {return time;}
+
   friend class WamDriver;
 };
 

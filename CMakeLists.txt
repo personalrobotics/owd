@@ -26,6 +26,9 @@ rospack_add_executable(owd owd.cpp openwamdriver.cpp)
 target_link_libraries(owd openwam openmath lapack blas ntcan native gfortran)
 add_definitions("-ggdb3 -DWRIST -DBH8")
 
+rospack_add_executable(owd_test test.cpp)
+add_definitions("-ggdb3")
+
 include(detect_cpu.cmake)
 
 if( DEFINED ENV{OWD_MARCH_FLAGS} )

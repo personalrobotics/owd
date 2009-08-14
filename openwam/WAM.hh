@@ -42,6 +42,7 @@
 //LLL
 #include "positionInterface/SmoothArm.h"
 #include "JointCtrlSea.hh"
+#include "DataRecorder.hh"
 
 #ifndef __WAM_H__
 #define __WAM_H__
@@ -86,7 +87,7 @@ public:
     }
   }
 
-  void rosprint() const;
+  void rosprint(int rc) const;
   
 };
 
@@ -144,7 +145,7 @@ public:
   bool safety_hold;
 
   WAMstats stats;
-  inline void rosprint_stats() { stats.rosprint(); bus->rosprint_stats();}
+  inline void rosprint_stats() { stats.rosprint(recorder.count); bus->rosprint_stats();}
 
   int load(const char* fn);
   int loadctrl(const char* fn);
@@ -173,7 +174,8 @@ public:
 
 
   WAM(CANbus* cb);
-   
+  ~WAM();
+ 
   int init();                       // initialise the WAM
   void dump();                      // print information of the WAM
 
@@ -219,7 +221,7 @@ public:
   motor_state_t motor_state;
 
   float stiffness;
-
+  DataRecorder recorder;
 
 };
 
