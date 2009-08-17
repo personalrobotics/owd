@@ -785,6 +785,8 @@ void WAM::newcontrol(double dt){
             links[j].theta(q[j]);
             qd_target[j] = qdd_target[j] = 0.0; // zero out
         }
+	std::vector<double> data;
+	bool data_recorded=false;
         // is there a joint trajectory running
         if(jointstraj != NULL){
           //LLL
@@ -819,6 +821,20 @@ void WAM::newcontrol(double dt){
             RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
             jscontroltime += (t2-t1) / 1e6;
             
+	    data_recorded=true;
+	    data.push_back(t1); // record the current time
+	    data.push_back(timestep_factor);  // time factor
+	    if (jointstraj) {
+	      data.push_back(jointstraj->curtime());  // traj time
+	    } else {
+	      data.push_back(0);
+	    }
+	    for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+		  data.push_back(q_target[j]);  // record target position
+		  data.push_back(q[j]);         // record actual position
+		  data.push_back(pid_torq[j]);  // record the pid torques
+	    }
+
             if (safety_torques_exceeded(pid_torq)) {
               // hold here with zero target velocity and acceleration,
               // and wait until the limit condition goes away.
@@ -831,16 +847,9 @@ void WAM::newcontrol(double dt){
                   timestep_factor /= 2.0f;
                 }
                 safety_torque_count++;
-		std::vector<double> data;
-		data.push_back(t1); // record the current time
-		data.push_back(timestep_factor);  // time factor
-		data.push_back(jointstraj->curtime());  // traj time
 
                 // back up the trajectory
                 for (int j=Joint::J1; j<=Joint::Jn; ++j) {
-		  data.push_back(q_target[j]);  // record target position
-		  data.push_back(q[j]);         // record actual position
-		  data.push_back(pid_torq[j]);  // record the bad torques
                   q_target[j] = q[j]; // reset current position
 		                      // (the traj->evaluate() function
 		                      // expects the current position in
@@ -859,7 +868,6 @@ void WAM::newcontrol(double dt){
                 if (jointstraj->HoldOnStall) {
                   jointstraj->stop();  // still have to stop if the app wants to
                 }
-		recorder.add(data);
               }
             } else if (timestep_factor < 1.0f) {
               // we're back within the safety thresholds, so start increasing our
@@ -975,6 +983,12 @@ void WAM::newcontrol(double dt){
                 dyn_torq[j]=0.0;  // zero out the torques otherwise
             }
         }
+	if (data_recorded) {
+	  for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+	    data.push_back(dyn_torq[j]);
+	  }
+	  recorder.add(data);
+	}
         /*
         static int count = 0;
 
@@ -1396,6 +1410,6 @@ void WAMstats::rosprint(int recorder_count) const {
 
 WAM::~WAM() {
   if (recorder.count > 0) {
-    recorder.dump("wamstats_final.csv");
+    recorder.dump("/tmp/wamstats_final.csv");
   }
 }

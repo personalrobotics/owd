@@ -37,7 +37,7 @@ public:
   Inertia inertia;
 
 
-  static const int L0 = 0;         // link 1 index
+  static const int L0 = 0;         // link 0 index
   static const int L1 = 1;         // link 1 index
   static const int L2 = 2;         // link 2 index
   static const int L3 = 3;         // link 3 index
