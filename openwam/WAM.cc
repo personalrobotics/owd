@@ -1069,7 +1069,7 @@ bool WAM::safety_torques_exceeded(double t[]) {
           }
           bExceeded = true;
 	  safetytorquecount[i-1]++;
-	  safetytorquesum[i-1] += t[i];
+	  safetytorquesum[i-1] += fabs(t[i]);
         }
     }
     return bExceeded;
