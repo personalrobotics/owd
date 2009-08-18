@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 2.4.6)
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
-rospack(owd)
-genmsg()
-gensrv()
+rosbuild_init()
+rosbuild_genmsg()
+rosbuild_gensrv()
 
 set (CMAKE_VERBOSE_MAKEFILE on)
 add_subdirectory(openwam)
@@ -22,11 +22,11 @@ endif()
 link_directories (../lapack ../esdcan-pci200/lib32)
 include_directories (openwam openmath esdcan-pci200/lib32)
 
-rospack_add_executable(owd owd.cpp openwamdriver.cpp)
+rosbuild_add_executable(owd owd.cpp openwamdriver.cpp)
 target_link_libraries(owd openwam openmath lapack blas ntcan native gfortran)
 add_definitions("-ggdb3 -DWRIST -DBH8")
 
-rospack_add_executable(owd_test test.cpp)
+rosbuild_add_executable(owd_test test.cpp)
 add_definitions("-ggdb3")
 
 include(detect_cpu.cmake)
