@@ -843,8 +843,10 @@ void WAM::newcontrol(double dt){
                 // just slow down the time, and take a smaller step.
                 // as long as we keep exceeding, keep trying smaller steps.
                 // as we free up, we can start taking bigger steps again.
-                if (timestep_factor > 0.2f) {
-                  timestep_factor /= 2.0f;
+                if (timestep_factor > 0.05f) {
+                  timestep_factor *= 0.97; // at 3% decrease per control loop
+		                           // it will take 100ms to reach
+		                           // 5% real-time.
                 }
                 safety_torque_count++;
 

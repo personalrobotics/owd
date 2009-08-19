@@ -2,11 +2,15 @@
 
 use IO::Handle;
 
+$GP[0] = "GNUPLOT0";
 $GP[1] = "GNUPLOT1";
+open($GP[0] , "| gnuplot -geometry 600x280");
 open($GP[1] , "| gnuplot -geometry 600x280");
 # set autoflush
+$GP[0]->autoflush(1);
 $GP[1]->autoflush(1);
 # use lines for plots
+print {$GP[0]} "set style data lines\n";
 print {$GP[1]} "set style data lines\n";
 print {$GP[1]} "set y2tics\n";
 
@@ -58,7 +62,15 @@ while (<>) {
 #for ($col=3; $col<21; ++$col) {
 #  print {$GP[1]} "replot $f using 1:$col\n";
 #}
+	print {$GP[0]} "set title \"Target Values\"\n";
 
+	print {$GP[0]} "plot $f using 1:4 title \"J1\"\n";
+	print {$GP[0]} "replot $f using 1:7 title \"J2\"\n";
+	print {$GP[0]} "replot $f using 1:10 title \"J3\"\n";
+	print {$GP[0]} "replot $f using 1:13 title \"J4\"\n";
+	print {$GP[0]} "replot $f using 1:16 title \"J5\"\n";
+	print {$GP[0]} "replot $f using 1:19 title \"J6\"\n";
+	print {$GP[0]} "replot $f using 1:22 title \"J7\"\n";
 
     } else {
 	print "$f not found";
