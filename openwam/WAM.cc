@@ -849,32 +849,15 @@ void WAM::newcontrol(double dt){
 		                           // 5% real-time.
                 }
                 safety_torque_count++;
-
-                // back up the trajectory
-                for (int j=Joint::J1; j<=Joint::Jn; ++j) {
-                  q_target[j] = q[j]; // reset current position
-		                      // (the traj->evaluate() function
-		                      // expects the current position in
-		                      // q_target)
-                }
-
-		// go backwards in time by a small step
-                jointstraj->evaluate(q_target, qd_target, qdd_target, -traj_timestep * timestep_factor);
-                for(int j=Joint::J1; j<=Joint::Jn; j++){
-                  qd_target[j] *= timestep_factor;
-                  qdd_target[j] *= timestep_factor * timestep_factor;
-                }
-                // re-calc the control torques
-                newJSControl(q_target,q,dt,pid_torq);
                 safety_hold=true; // let the app know that we're hitting something
                 if (jointstraj->HoldOnStall) {
                   jointstraj->stop();  // still have to stop if the app wants to
                 }
               }
             } else if (timestep_factor < 1.0f) {
-              // we're back within the safety thresholds, so start increasing our
-              // stepsize again
-              timestep_factor *= 1.1f;
+              // we're back within the safety thresholds, so start 
+	      // increasing our stepsize again
+              timestep_factor *= 1.03f;
               if (timestep_factor > 1.0f) {
                 timestep_factor = 1.0f;
               }
