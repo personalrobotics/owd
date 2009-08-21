@@ -24,6 +24,7 @@
 #include <pr_msgs/Servo.h>
 #include <owd/WAMInternals.h>
 #include <owd/CalibrateJoints.h>
+#include <tf/transform_broadcaster.h>
 
 #ifdef BUILD_FOR_SEA
   #include <pr_msgs/WamRequestSeaCtrlTorqLimit.h>
@@ -177,6 +178,8 @@ private:
       ss_SetExtraMass,
       ss_GetArmDOF,
       ss_CalibrateJoints;
+
+    tf::TransformBroadcaster tf_broadcaster;
  
 #ifdef BUILD_FOR_SEA
     ros::Publisher

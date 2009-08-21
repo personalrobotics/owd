@@ -261,6 +261,7 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
   ss_WamRequestSeaCtrlKi =
     n.advertiseService("WamRequestSeaCtrlKi",&WamDriver::WamRequestSeaCtrlKi,this);
 #endif // BUILD_FOR_SEA
+
 }
 
 
@@ -1226,6 +1227,15 @@ bool WamDriver::Publish() {
   for (unsigned int i=0; i<nJoints; ++i) {
     wamstate.positions[i] = jointpos[i+1];
     wamstate.torques[i] = jointtorqs[i+1];
+    // publish as transforms, too
+    char jref[50], jname[50];
+    snprintf(jref,50,"wam%d",i);
+    snprintf(jname,50,"wam%d",i+1);
+    if (i==0) { // just wam0->wam1 for now
+      btTransform wam_tf(btQuaternion(jointpos[i+1],0,0),btVector3(0,0,0));
+      tf::Stamped<tf::Transform> wam_stf(wam_tf,ros::Time::now(),jname,jref);
+      tf_broadcaster.sendTransform(wam_stf);
+    }
   }
 
   owam->lock();
