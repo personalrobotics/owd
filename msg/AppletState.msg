@@ -12,4 +12,5 @@ string info                # any additional human-readable information
 uint8 state_idle=0
 uint8 state_busy=1
 uint8 state_error=2
+uint8 state_dying=3
 
