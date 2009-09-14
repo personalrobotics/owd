@@ -427,8 +427,8 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
         }
     }
 
-    ROS_WARN("\n  Return the WAM to the initial position.");
-    ROS_WARN("  Press shift-idle on the pendant when ready.");
+    ROS_ERROR("\n  Return the WAM to the initial position.");
+    ROS_ERROR("  Press shift-idle on the pendant when ready.");
     owam->exit_on_pendant_press=false;
 
     // wait for shift-idle to be pressed
@@ -550,12 +550,12 @@ void WamDriver::calibrate_joint_angles() {
     owam->check_safety_torques=false; // hold positions stiffly
     owam->hold_position();
 
-    ROS_WARN("Robot is in calibration mode.  For each joint,");
-    ROS_WARN("move it to be parallel or square to the previous");
-    ROS_WARN("joint, then press key 1-7 corresponding to the joint");
-    ROS_WARN("number.");
-    ROS_WARN("'H' will hold a joint angle, 'h' will release it.");
-    ROS_WARN("Hit 'd' when done, or 'q' to quit.");
+    ROS_ERROR("Robot is in calibration mode.  For each joint,");
+    ROS_ERROR("move it to be parallel or square to the previous");
+    ROS_ERROR("joint, then press key 1-7 corresponding to the joint");
+    ROS_ERROR("number.");
+    ROS_ERROR("'H' will hold a joint angle, 'h' will release it.");
+    ROS_ERROR("Hit 'd' when done, or 'q' to quit.");
     double joint_offsets[nJoints+1];
     for (unsigned int j = 1; j <=nJoints; ++j) {
         joint_offsets[j] = 0.0f;
@@ -602,7 +602,7 @@ void WamDriver::calibrate_joint_angles() {
                 break;
             case 'h' :
                 // hold a joint angle
-                ROS_WARN("\nHold joint number 1-%d: holdpos: %d\n",nJoints, owam->holdpos);
+                ROS_ERROR("\nHold joint number 1-%d: holdpos: %d\n",nJoints, owam->holdpos);
                 jnum = get_joint_num();
                 if ((jnum > 0) && (jnum <= nJoints)) {
 
@@ -623,7 +623,7 @@ void WamDriver::calibrate_joint_angles() {
                 break;
             case 'u' :
                 // unhold a joint angle
-                ROS_WARN("\nUnhold joint number 1-%d: holdpos: %d\n",nJoints, owam->holdpos);
+                ROS_ERROR("\nUnhold joint number 1-%d: holdpos: %d\n",nJoints, owam->holdpos);
                 jnum = get_joint_num();
                 if ((jnum > 0) && (jnum <= nJoints)) {
                     owam->suppress_controller[jnum]=true;
@@ -660,11 +660,11 @@ void WamDriver::calibrate_joint_angles() {
 
 void WamDriver::calibrate_wam_mass_model() {
 #ifdef USE_OPENWAM
-    ROS_WARN("Robot is in mass calibration mode.  Select a link\n");
-    ROS_WARN("using keys 1-7, then press + or - to increase or\n");
-    ROS_WARN("decrease the link mass, or x/X, y/Y, z/Z to decrease/\n");
-    ROS_WARN("increase the COG distance.\n");
-    ROS_WARN("Hit 'd' when done, or 'q' to quit.\n");
+    ROS_ERROR("Robot is in mass calibration mode.  Select a link\n");
+    ROS_ERROR("using keys 1-7, then press + or - to increase or\n");
+    ROS_ERROR("decrease the link mass, or x/X, y/Y, z/Z to decrease/\n");
+    ROS_ERROR("increase the COG distance.\n");
+    ROS_ERROR("Hit 'd' when done, or 'q' to quit.\n");
     char cmd;
     int active_link = 1;
     bool done=false;
@@ -688,7 +688,7 @@ void WamDriver::calibrate_wam_mass_model() {
             } else {
                 switch(cmd) {
                 case 'q' :
-                    ROS_WARN("Exiting calibration mode.\n");
+                    ROS_ERROR("Exiting calibration mode.\n");
                     return;
                 case '+':
                     owam->links[active_link].mass *= 1.05;
@@ -794,7 +794,7 @@ void WamDriver::calibrate_wam_mass_model() {
                         log_rave_trajectory(point_fname,vtraj);
                         vtraj.clear();
                         ScreenBuf::savedpoints=0;
-                        ROS_WARN("Saved points written to %s",point_fname);
+                        ROS_ERROR("Saved points written to %s",point_fname);
 #endif // DIAG
                         //                    }
                     break;
@@ -867,12 +867,12 @@ void WamDriver::write_pulse_data() {
 
 void WamDriver::set_home_position() {
 
-        ROS_WARN("\007When ready, type HOME<return>\007");
+        ROS_ERROR("\007When ready, type HOME<return>\007");
         char *line=NULL;
         size_t linelen = 0;
         getline(&line,&linelen,stdin);
         while (strncmp(line,"HOME",4)) {
-        ROS_WARN("\007\nYou must type the word HOME and press <return>\007");
+        ROS_ERROR("\007\nYou must type the word HOME and press <return>\007");
         getline(&line,&linelen,stdin);
     }
     free(line);
@@ -939,8 +939,8 @@ void WamDriver::set_home_position() {
         fclose(moff_file);
     } else {
     NOCALIB:
-        ROS_WARN("Could not read WAM calibration file \"%s\";",joint_calibration_file);
-        ROS_WARN("using home position values instead.");
+        ROS_ERROR("Could not read WAM calibration file \"%s\";",joint_calibration_file);
+        ROS_ERROR("using home position values instead.");
         double wamhome[8] = {9999,  // dummy value in zero position
                              -2.66, 1.97, -2.80, -0.83, 1.309, 0, 3.02}; // J1-J7
         
@@ -979,11 +979,11 @@ void WamDriver::start_control_loop() {
         throw -1;
     }
     // confirm with user
-    ROS_WARN("Verify the following:");
-    ROS_WARN("  1. WAM has %d joints (%s)",nJoints,nJoints==4?"wrist NOT INSTALLED":nJoints==7?"wrist INSTALLED":"WARNING: UNFAMILIAR CONFIG");
-    ROS_WARN("  2. Tool mass is %fkg (%s)",owam->links[nJoints].mass,owam->links[nJoints].mass==1.3?"Barrett Hand with cameras":owam->links[nJoints].mass==0.0?"no tool":"custom tool");
+    ROS_ERROR("Verify the following:");
+    ROS_ERROR("  1. WAM has %d joints (%s)",nJoints,nJoints==4?"wrist NOT INSTALLED":nJoints==7?"wrist INSTALLED":"WARNING: UNFAMILIAR CONFIG");
+    ROS_ERROR("  2. Tool mass is %fkg (%s)",owam->links[nJoints].mass,owam->links[nJoints].mass==1.3?"Barrett Hand with cameras":owam->links[nJoints].mass==0.0?"no tool":"custom tool");
     
-    ROS_WARN("\nPress Shift-Activate to activate motors and start system.");
+    ROS_ERROR("\nPress Shift-Activate to activate motors and start system.");
 
 #ifdef AUTO_ACTIVATE
     if (bus.set_property(10,MODE,2,false) == OW_FAILURE) {
@@ -1543,7 +1543,25 @@ bool WamDriver::ReplaceTrajectory(pr_msgs::ReplaceTrajectory::Request &req,
   */
 }
 
- bool WamDriver::SetSpeed(pr_msgs::SetSpeed::Request &req,
+bool WamDriver::CancelAllTrajectories(
+     pr_msgs::CancelAllTrajectories::Request &req,
+     pr_msgs::CancelAllTrajectories::Response &res) {
+  while (trajectory_list.size() > 0) {
+    // remove each one from the list first, then delete it.
+    // that way we won't screw up other threads
+    std::list<Trajectory *>::iterator it=trajectory_list.begin();
+    trajectory_list.pop_front();
+    delete *it;
+  }
+  if (owam->jointstraj) {
+    owam->cancel_trajectory();
+  }
+  wamstate.trajectory_queue.clear();
+  return true;
+}
+
+
+bool WamDriver::SetSpeed(pr_msgs::SetSpeed::Request &req,
                          pr_msgs::SetSpeed::Response &res) {
   if (req.velocities.size() != nJoints) {
     ROS_ERROR("Received SetSpeed command with wrong array size");
@@ -1656,6 +1674,7 @@ void WamDriver::Update() {
       delete *it;
     }
     trajectory_list.clear();
+    wamstate.trajectory_queue.clear();
     return;
   }
 

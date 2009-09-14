@@ -1178,15 +1178,6 @@ int WAM::cancel_trajectory() {
     return OW_SUCCESS;
 }
 
-/*
- * Move methods. They don't do much except to allocate trajectories and
- * their respective profiles.
- * Whatever you do. Make sure you don't leave any these allocated objects
- * within reach of the user and let the control loop handle deleting them. 
- * The trajectories will be deleted when they're done, and the destructors will
- * handle deleting the profiles.
- * It's safer this way...trust me...I know...
- */
 
 void WAM::move_sigmoid(const SE3& E02){
   se3traj = new SE3Traj( FK(), E02, 

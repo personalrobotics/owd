@@ -14,6 +14,7 @@
 #include <boost/thread/mutex.hpp>
 #include <pr_msgs/AddTrajectory.h>
 #include <pr_msgs/DeleteTrajectory.h>
+#include <pr_msgs/CancelAllTrajectories.h>
 #include <pr_msgs/PauseTrajectory.h>
 #include <pr_msgs/ReplaceTrajectory.h>
 #include <pr_msgs/SetExtraMass.h>
@@ -53,6 +54,8 @@ public:
                        pr_msgs::AddTrajectory::Response &res);
     bool DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
                           pr_msgs::DeleteTrajectory::Response &res);
+    bool CancelAllTrajectories(pr_msgs::CancelAllTrajectories::Request &req,
+                          pr_msgs::CancelAllTrajectories::Response &res);
     bool PauseTrajectory(pr_msgs::PauseTrajectory::Request &req,
                          pr_msgs::PauseTrajectory::Response &res);
     bool ReplaceTrajectory(pr_msgs::ReplaceTrajectory::Request &req,
@@ -172,6 +175,7 @@ private:
       ss_AddTrajectory,
       ss_SetStiffness,
       ss_DeleteTrajectory, 
+      ss_CancelAllTrajectories,
       ss_PauseTrajectory,
       ss_ReplaceTrajectory,
       ss_SetSpeed,
