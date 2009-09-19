@@ -714,9 +714,36 @@ int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
       *value |= 0xFFC00000; // Sign-extend 
       
     *property = AP;
+
+#ifdef JOINT_ENCODERS
+      jointPosition[*nodeid] = 0;
+      jointPosition[*nodeid] |= ( (long)messageData[3] << 16) & 0x003F0000;
+      jointPosition[*nodeid] |= ( (long)messageData[4] << 8 ) & 0x0000FF00;
+      jointPosition[*nodeid] |= ( (long)messageData[5] ) & 0x000000FF;
+      
+      if (jointPosition[*nodeid] & 0x00200000) /* If negative */
+         jointPosition[*nodeid] |= 0xFFC00000; /* Sign-extend */
+#endif // JOINT_ENCODERS
+
     break;
 
   case 2:  // Data is normal, SET 
+
+     /***************************************
+      ***   UPDATED CODE FROM BARRETT     ***
+      *** Need to switch to this as       ***
+      *** soon as I have time for testing ***
+      *** Mike Vande Weghe 9/19/2009      ***
+      ***************************************
+
+      *property = messageData[0] & 0x7F;
+      *value = messageData[len-1] & 0x80 ? -1L : 0;
+      for (i = len-1; i >= 2; i--)
+         *value = *value << 8 | messageData[i];
+      break;
+
+      ***  End updateded code (replaces entire case) ***/
+
     *property = msg[0] & 0x7F;
 
     //
