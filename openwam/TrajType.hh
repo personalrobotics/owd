@@ -18,8 +18,14 @@ public:
 
   inline bool operator!=(const JointPos &rhs) const {
     for (unsigned int i = 0; i < this->size(); ++i) {
-      if (fabs(this->operator[](i) - rhs[i]) > 0.01f ) {
-	return true;
+      if (i==6) { // special test for J7
+	if (fabs(this->operator[](i) - rhs[i]) > 0.015f ) {
+	  return true;
+	}
+      } else {
+	if (fabs(this->operator[](i) - rhs[i]) > 0.01f ) {
+	  return true;
+	}
       }
     }
     return false;
