@@ -1321,8 +1321,8 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
         sprintf(firststr+strlen(firststr)," %1.4f",firstpoint[j]);
         sprintf(curstr+strlen(curstr)," %1.4f",curpoint[j]);
       }
-      ROS_DEBUG_NAMED("AddTrajectory","Current point: %s",curstr);
-      ROS_DEBUG_NAMED("AddTrajectory","First point: %s",firststr);
+      ROS_ERROR_NAMED("AddTrajectory","Current point: %s",curstr);
+      ROS_ERROR_NAMED("AddTrajectory","First point: %s",firststr);
       res.id = 0;
       return true;
     }
