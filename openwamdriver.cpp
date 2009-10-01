@@ -96,13 +96,14 @@ WamDriver::WamDriver(const char *name) :
 
   // Construct the base transforms, based on the dimensions
   // from the WAM manual.
+  static double PI=3.141592654;
   wam_tf_base[0] = btTransform::getIdentity();
-  wam_tf_base[1] = btTransform(btQuaternion(0,0,-PI));
-  wam_tf_base[2] = btTransform(btQuaternion(0,0, PI));
-  wam_tf_base[3] = btTransform(btQuaternion(0,0,-PI),btVector3(0.045,0,0.55));
-  wam_tf_base[4] = btTransform(btQuaternion(0,0, PI));
-  wam_tf_base[5] = btTransform(btQuaternion(0,0,-PI),btVector3(-0.45,0,0.30));
-  wam_tf_base[6] = btTransform(btQuaternion(0,0, PI));
+  wam_tf_base[1] = btTransform(btQuaternion(0,0,-PI/2.0));
+  wam_tf_base[2] = btTransform(btQuaternion(0,0, PI/2.0));
+  wam_tf_base[3] = btTransform(btQuaternion(0,0,-PI/2.0),btVector3(0.045,0,0.55));
+  wam_tf_base[4] = btTransform(btQuaternion(0,0, PI/2.0));
+  wam_tf_base[5] = btTransform(btQuaternion(0,0,-PI/2.0),btVector3(-0.045,0,0.30));
+  wam_tf_base[6] = btTransform(btQuaternion(0,0, PI/2.0));
 }
 
 bool WamDriver::Init(const char *joint_cal_file)
