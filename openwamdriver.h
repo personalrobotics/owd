@@ -184,6 +184,7 @@ private:
       ss_CalibrateJoints;
 
     tf::TransformBroadcaster tf_broadcaster;
+    btTransform wam_tf_base[7];
  
 #ifdef BUILD_FOR_SEA
     ros::Publisher

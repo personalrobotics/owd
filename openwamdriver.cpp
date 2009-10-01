@@ -93,6 +93,16 @@ WamDriver::WamDriver(const char *name) :
 #endif
   ti.options = 0;
   wamstate.prev_trajectory = ti;
+
+  // Construct the base transforms, based on the dimensions
+  // from the WAM manual.
+  wam_tf_base[0] = btTransform::getIdentity();
+  wam_tf_base[1] = btTransform(btQuaternion(0,0,-PI));
+  wam_tf_base[2] = btTransform(btQuaternion(0,0, PI));
+  wam_tf_base[3] = btTransform(btQuaternion(0,0,-PI),btVector3(0.045,0,0.55));
+  wam_tf_base[4] = btTransform(btQuaternion(0,0, PI));
+  wam_tf_base[5] = btTransform(btQuaternion(0,0,-PI),btVector3(-0.45,0,0.30));
+  wam_tf_base[6] = btTransform(btQuaternion(0,0, PI));
 }
 
 bool WamDriver::Init(const char *joint_cal_file)
@@ -1224,6 +1234,10 @@ bool WamDriver::Publish() {
   double jointtorqs[nJoints+1];  // PID error-correction torques,
   //                                       after removing dynamic torques
   owam->get_current_data(jointpos,NULL,jointtorqs);
+
+  // more efficient for most users:
+  // btTransform wam_tf = btTransform::getIdentity();
+
   for (unsigned int i=0; i<nJoints; ++i) {
     wamstate.positions[i] = jointpos[i+1];
     wamstate.torques[i] = jointtorqs[i+1];
@@ -1231,11 +1245,13 @@ bool WamDriver::Publish() {
     char jref[50], jname[50];
     snprintf(jref,50,"wam%d",i);
     snprintf(jname,50,"wam%d",i+1);
-    if (i==0) { // just wam0->wam1 for now
-      btTransform wam_tf(btQuaternion(jointpos[i+1],0,0),btVector3(0,0,0));
-      tf::Stamped<tf::Transform> wam_stf(wam_tf,ros::Time::now(),jname,jref);
-      tf_broadcaster.sendTransform(wam_stf);
-    }
+    btTransform wam_tf = wam_tf_base[i] *
+      btTransform(btQuaternion(jointpos[i+1],0,0));
+    // instead:
+    // wam_tf *= wam_tf_base[i] * btTransform(btQuaternion(jointpos[i+1],0,0));
+    // jref="wam0";
+    tf::Stamped<tf::Transform> wam_stf(wam_tf,ros::Time::now(),jname,jref);
+    tf_broadcaster.sendTransform(wam_stf);
   }
 
   owam->lock();
