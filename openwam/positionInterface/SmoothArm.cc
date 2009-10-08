@@ -82,7 +82,9 @@ void SmoothArm::getSmoothedPVA( std::vector<double>* pSmoothPosVec,
 
   // this could be dangerous if we are not in a valid state
   // TODO do something besides just crash (what?) 
-  assert(state == VALID);
+  if (state != VALID) {
+    throw "No previously held position";
+  }
 
   processPendingCoarseTarg();
 

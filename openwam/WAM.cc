@@ -874,11 +874,16 @@ void WAM::newcontrol(double dt){
             ROS_ERROR("Problem in trajectory; aborting and holding current position");
             delete jointstraj;
             jointstraj = NULL;
-            hold_position(NULL,false);
+            double heldPositions[Joint::Jn+1];
+            hold_position(heldPositions,false);
 
             // now do the same thing that the "if (holdpos)" step does, below
-            double heldPositions[Joint::Jn+1];
-            posSmoother.getSmoothedPVA(heldPositions);
+	    try {
+	      posSmoother.getSmoothedPVA(heldPositions);
+	    } catch (char *errstr) {
+	      // state was invalid; ignore and use the one held (above)
+	    }
+	      
             for(int i = Joint::J1; i <= Joint::Jn; i++) {
               q_target[i] = heldPositions[i];
             }
@@ -902,7 +907,12 @@ void WAM::newcontrol(double dt){
           }
 
           double heldPositions[Joint::Jn+1];
-          posSmoother.getSmoothedPVA(heldPositions);
+	  try {
+	    posSmoother.getSmoothedPVA(heldPositions);
+	  } catch (char *errstr) {
+	    // state was invalid; issue a hold of our own
+	    hold_position(heldPositions, false);
+	  }
           //TODO if we want to use jsdyn, I believe we will have to set qd_target and qdd_target
 
           for(int i = Joint::J1; i <= Joint::Jn; i++) {
@@ -1222,7 +1232,12 @@ int WAM::hold_position(double jval[],bool grab_lock)
 
     if (holdpos) { // we're already holding
         if (jval != NULL) {  // but we still need to return the position if requested
-            posSmoother.getSmoothedPVA(heldPositions);
+	    try {
+	      posSmoother.getSmoothedPVA(heldPositions);
+	    } catch (char *errstr) {
+	      // state was invalid; issue a fresh hold_position
+	      hold_position(heldPositions,false);
+	    }
             for (int i = Joint::J1; i<=Joint::Jn; i++) {
                 jval[i]=heldPositions[i];
             }
