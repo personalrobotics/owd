@@ -101,8 +101,8 @@ WamDriver::WamDriver(const char *name) :
   wam_tf_base[1] = btTransform(btQuaternion(0,0,-PI/2.0));
   wam_tf_base[2] = btTransform(btQuaternion(0,0, PI/2.0));
   wam_tf_base[3] = btTransform(btQuaternion(0,0,-PI/2.0),btVector3(0.045,0,0.55));
-  wam_tf_base[4] = btTransform(btQuaternion(0,0, PI/2.0));
-  wam_tf_base[5] = btTransform(btQuaternion(0,0,-PI/2.0),btVector3(-0.045,0,0.30));
+  wam_tf_base[4] = btTransform(btQuaternion(0,0, PI/2.0),btVector3(-0.045,0,0));
+  wam_tf_base[5] = btTransform(btQuaternion(0,0,-PI/2.0),btVector3(0,0,0.30));
   wam_tf_base[6] = btTransform(btQuaternion(0,0, PI/2.0));
 }
 
