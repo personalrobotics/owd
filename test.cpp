@@ -1,5 +1,4 @@
 #include <ros/ros.h>
-#include <ros/node.h>
 #include <ros/time.h>
 #include <pr_msgs/WAMState.h>
 #include <pr_msgs/SetStiffness.h>

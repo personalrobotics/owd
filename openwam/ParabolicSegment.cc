@@ -1,6 +1,6 @@
 #include "ParabolicSegment.hh"
 #include <math.h>
-#include <ros/node.h>
+#include <ros/ros.h>
 
 ParabolicSegment::ParabolicSegment(int start_i,
                                    double start_t,

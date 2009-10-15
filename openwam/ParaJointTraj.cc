@@ -1,5 +1,5 @@
 #include "ParaJointTraj.hh"
-#include <ros/node.h>
+#include <ros/ros.h>
 
 
 

@@ -18,7 +18,7 @@
 */
 
 #include "WAM.hh"
-#include <ros/node.h>
+#include <ros/ros.h>
 #include <native/task.h>
 #include <native/timer.h>
 

@@ -2,7 +2,7 @@
 
 #include "CANbus.hh"
 #include "CANdefs.hh"
-#include <ros/node.h>
+#include <ros/ros.h>
 #include <native/task.h>
 
 #define PUCK_IDLE 0 

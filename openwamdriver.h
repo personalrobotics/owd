@@ -10,7 +10,6 @@
 #include <vector>
 #include <algorithm>
 #include <ros/ros.h>
-#include <ros/node.h>
 #include <boost/thread/mutex.hpp>
 #include <pr_msgs/AddTrajectory.h>
 #include <pr_msgs/DeleteTrajectory.h>

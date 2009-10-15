@@ -20,7 +20,7 @@
 #include "ControlLoop.hh"
 #include <native/task.h>
 #include <native/timer.h>
-#include <ros/node.h>
+#include <ros/ros.h>
 
 static void* control_handler(void* argv){
   RT_TASK task;

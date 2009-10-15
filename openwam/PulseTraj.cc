@@ -1,5 +1,5 @@
 #include "PulseTraj.hh"
-#include <ros/node.h>
+#include <ros/ros.h>
 
 PulseTraj::PulseTraj(double pulse_accel_in, int pulse_duration_ticks_in, int pulse_switch_ticks_in, int pulse_joint_i_in)
 {

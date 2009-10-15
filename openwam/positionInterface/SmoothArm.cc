@@ -4,7 +4,7 @@
 #include <string>
 #include <stdio.h>
 #include <sys/time.h>
-#include <ros/node.h>
+#include <ros/ros.h>
 #include <unistd.h>
 
 SmoothArm::SmoothArm() {
@@ -387,43 +387,43 @@ void SmoothArm::setupSpeedLimits(){
   double speedLimit;
 
   // retrieve speed limits from ros param server, if available
-  ros::Node* node = ros::Node::instance();
+  ros::NodeHandle node;
 
   // unused J0
   jointSpeedLimitVec.push_back(0.0);
 
   // J1
-  node->param(std::string("owd/positionInterface/speedLimitJ1"), speedLimit, 2.0);
+  node.param(std::string("owd/positionInterface/speedLimitJ1"), speedLimit, 2.0);
   ROS_INFO("positionInterface/speedLimitJ1 %f", speedLimit);
   jointSpeedLimitVec.push_back(speedLimit); 
 
   // J2
-  node->param(std::string("owd/positionInterface/speedLimitJ2"), speedLimit, 3.0);
+  node.param(std::string("owd/positionInterface/speedLimitJ2"), speedLimit, 3.0);
   ROS_INFO("positionInterface/speedLimitJ2 %f", speedLimit);
   jointSpeedLimitVec.push_back(speedLimit); 
 
   // J3
-  node->param(std::string("owd/positionInterface/speedLimitJ3"), speedLimit, 3.0);
+  node.param(std::string("owd/positionInterface/speedLimitJ3"), speedLimit, 3.0);
   ROS_INFO("positionInterface/speedLimitJ3 %f", speedLimit);
   jointSpeedLimitVec.push_back(speedLimit); 
 
   // J4
-  node->param(std::string("owd/positionInterface/speedLimitJ4"), speedLimit, 3.0);
+  node.param(std::string("owd/positionInterface/speedLimitJ4"), speedLimit, 3.0);
   ROS_INFO("positionInterface/speedLimitJ4 %f", speedLimit);
   jointSpeedLimitVec.push_back(speedLimit); 
 
   // J5
-  node->param(std::string("owd/positionInterface/speedLimitJ5"), speedLimit, 5.0);
+  node.param(std::string("owd/positionInterface/speedLimitJ5"), speedLimit, 5.0);
   ROS_INFO("positionInterface/speedLimitJ5 %f", speedLimit);
   jointSpeedLimitVec.push_back(speedLimit); 
 
   // J6
-  node->param(std::string("owd/positionInterface/speedLimitJ6"), speedLimit, 5.0);
+  node.param(std::string("owd/positionInterface/speedLimitJ6"), speedLimit, 5.0);
   ROS_INFO("positionInterface/speedLimitJ6 %f", speedLimit);
   jointSpeedLimitVec.push_back(speedLimit); 
 
   // J7
-  node->param(std::string("owd/positionInterface/speedLimitJ7"), speedLimit, 5.0);
+  node.param(std::string("owd/positionInterface/speedLimitJ7"), speedLimit, 5.0);
   ROS_INFO("positionInterface/speedLimitJ7 %f", speedLimit);
   jointSpeedLimitVec.push_back(speedLimit); 
 }
