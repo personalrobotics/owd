@@ -1020,7 +1020,7 @@ void WamDriver::stop_control_loop() {
     owam->stop();
 }
 
-bool WamDriver::move_until_stop(int joint, double stop, double limit, double velocity) {
+bool WamDriver::move_until_stop(int joint, double stop, double limit, double velocity, double &original_joint_pos) {
     double jointpos[nJoints+1];
     owam->hold_position(jointpos);
     TrajPoint curpoint(nJoints);
@@ -1030,7 +1030,7 @@ bool WamDriver::move_until_stop(int joint, double stop, double limit, double vel
     }
     TrajType traj;
     traj.push_back(curpoint);
-    double curjointpos=curpoint[joint-1];
+    original_joint_pos=curpoint[joint-1];
     curpoint[joint-1]=limit;
     traj.push_back(curpoint);
     std::vector<double> modified_joint_vel(joint_vel);
@@ -1040,9 +1040,12 @@ bool WamDriver::move_until_stop(int joint, double stop, double limit, double vel
     // rescale the acceleration to match the new velocity
     modified_joint_accel[joint-1]=joint_accel[joint-1]*velocity/joint_vel[joint-1];
     ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,true,0);
-    ROS_DEBUG("Moving joint %d from %2.2f to %2.2f",joint,curjointpos,limit);
+    ROS_DEBUG_NAMED("calibration",
+		    "Moving joint %d from %2.2f to %2.2f",
+		    joint,original_joint_pos,limit);
     if (owam->run_trajectory(paratraj) == OW_FAILURE) {
-        ROS_ERROR("Error starting joint %d trajectory",joint);
+      ROS_ERROR_NAMED("calibration",
+		      "Error starting joint %d trajectory",joint);
         return false;
     }
 
@@ -1052,7 +1055,7 @@ bool WamDriver::move_until_stop(int joint, double stop, double limit, double vel
         if (owam->jointstraj->state() == ParaJointTraj::STOP) {
             owam->unlock();
             // joint is stuck, so stop the trajectory
-            ROS_DEBUG("Joint hit torque limit.");
+            ROS_DEBUG_NAMED("calibration","Joint hit torque limit.");
             owam->cancel_trajectory();
             owam->lock(); // just so that we can unlock again outside the loop
             break;
@@ -1064,20 +1067,19 @@ bool WamDriver::move_until_stop(int joint, double stop, double limit, double vel
     owam->unlock();
     // check our resting position
     owam->get_current_data(jointpos,NULL,NULL);
-    ROS_DEBUG("Joint stopped at angle %2.2f",jointpos[joint]);
-    
+    ROS_DEBUG_NAMED("calibration",
+		    "Joint stopped at angle %2.2f",jointpos[joint]);
     
     float max_error = 0.12; //norm al error
-    //float max_error = 0.2; //DDB TEMP HACK TO GET J6 TO WORK
     
     if ((jointpos[joint] > stop-max_error) && (jointpos[joint] < stop+max_error) ) {
-        // we stopped within .12 radians of the expected position: good!
-        // (the worst-case for being off by one complete motor rev is .15 radians (J1),
-        // so if we're within .12 we're fine.
-        return true;
+      // we stopped within .12 radians of the expected position: good!
+      // (the worst-case for being off by one complete motor rev is 
+      // .15 radians (J1), so if we're within .12 we're fine.
+      return true;
     } else {
-        // we stopped somewhere else
-                return false;
+      // we stopped somewhere else
+      return false;
     }
     return false;
 }
@@ -1100,9 +1102,10 @@ bool WamDriver::move_joint(int joint, double newpos, double velocity) {
     std::vector<double> modified_joint_accel(joint_accel);
     // rescale the acceleration to match the new velocity
     modified_joint_accel[joint-1]=joint_accel[joint-1]*velocity/joint_vel[joint-1];
-    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,true,0);
+    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,false,0);
     if (owam->run_trajectory(paratraj) == OW_FAILURE) {
-        ROS_ERROR("Error starting joint %d trajectory",joint);
+      ROS_ERROR_NAMED("calibration",
+		      "Error starting joint %d trajectory",joint);
         return false;
     }
 
@@ -1125,109 +1128,103 @@ bool WamDriver::move_joint(int joint, double newpos, double velocity) {
 }
 
 bool WamDriver::verify_home_position() {
-    ROS_DEBUG("Checking joints: ");
-    fflush(stdout);
-    if (nJoints==7) {
-        ROS_DEBUG(" 7");
-        // J7 check: make sure we hit the stop around 3.02 when moving to 3.2
-        if (!move_until_stop(7,3.02,3.2,1.0)) {
-          ROS_ERROR("\nERROR: Joint 7 was not turned to its positive limit.\n");
-          ROS_ERROR("Please press Shift-Idle to turn off the motors,");
-          ROS_ERROR("then turn the joint fully CCW as seen from the hand.");
-          owam->release_position();
-          return false;
-        }
-        // return to initial
-        move_joint(7,3.02,1.0);
-        
-        // wait for position to stabilize
-
-        sleep(4);
-        ROS_DEBUG(" 6"); fflush(stdout);
-        // J6 check: make sure we hit the stop around 1.57 when moving to 1.75
-        if (!move_until_stop(6,1.57,1.75,1.0)) {
-            ROS_ERROR("\nERROR: Joint 6 was not started in the center of its range.\n");
-            ROS_ERROR("Please press Shift-Idle to turn off the motors,");
-            ROS_ERROR("then adjust the joint.");
-            owam->release_position();
-            return false;
-        }
-        // return to initial
-        move_joint(6,0,1.0);
+  ROS_INFO_NAMED("calibration","Checking joints: ");
+  fflush(stdout);
+  double orig_jpos;
+  if (nJoints==7) {
+    ROS_INFO_NAMED("calibration"," 7");
+    // J7 check: make sure we hit the stop around 3.02 when moving to 3.2
+    if (!move_until_stop(7,3.02,3.2,1.0,orig_jpos)) {
+      ROS_ERROR_NAMED("calibration","\nERROR: Joint 7 was not turned to its positive limit.\n");
+      ROS_ERROR_NAMED("calibration","Please press Shift-Idle to turn off the motors,");
+      ROS_ERROR_NAMED("calibration","then turn the joint fully CCW as seen from the hand.");
+      owam->release_position();
+      return false;
+    }
+    // return to initial
+    move_joint(7,orig_jpos,1.0);
     
-        sleep(4);
-        ROS_DEBUG(" 5"); fflush(stdout);
-        // J5 check: make sure we hit the stop around 1.31 when moving to 1.5
-        if (!move_until_stop(5,1.31,1.5,1.0)) {
-            ROS_ERROR("\nERROR: Joint 5 was not turned to its positive limit.\n");
-            ROS_ERROR("Please press Shift-Idle to turn off the motors,");
-            ROS_ERROR("then turn the joint fully CCW as seen from the hand.");
-            owam->release_position();
-            return false;
-        }
-        // return to initial
-        move_joint(5,1.309,1.0);
-    }
-
-    sleep(4);
-    ROS_DEBUG(" 2"); fflush(stdout);
-    // J2 check: make sure we hit the stop around 1.97 when moving to 2.2
-    if (!move_until_stop(2,1.97,2.2,1.0)) {
-        ROS_ERROR("\nERROR: Joint 2 was not turned to its positive limit.\n");
-        ROS_ERROR("Please press Shift-Idle to turn off the motors,");
-        ROS_ERROR("then swing the joint all the way to its positive stop.");
-        owam->release_position();
-        return false;
-    }
-    // move to 1.8 to allow testing of J3
-    move_joint(2,1.8,1.0);
-
-    sleep(4);
-    ROS_DEBUG(" 3"); fflush(stdout);
-    // J3 check: make sure we hit the stop around -2.8 when moving to -3.0
-    if (!move_until_stop(3,-2.8,-3.0,1.0)) {
-        ROS_ERROR("\nERROR: Joint 3 was not turned to its negative limit.\n");
-        ROS_ERROR("Please press Shift-Idle to turn off the motors,");
-        ROS_ERROR("then turn the joint fully CW as seen from the hand.");
-        owam->release_position();
-        return false;
+    ROS_INFO_NAMED("calibration"," 6"); fflush(stdout);
+    // J6 check: make sure we hit the stop around 1.57 when moving to 1.75
+    if (!move_until_stop(6,1.57,1.75,1.0,orig_jpos)) {
+      ROS_ERROR_NAMED("calibration","\nERROR: Joint 6 was not started in the center of its range.\n");
+      ROS_ERROR_NAMED("calibration","Please press Shift-Idle to turn off the motors,");
+      ROS_ERROR_NAMED("calibration","then adjust the joint.");
+      owam->release_position();
+      return false;
     }
     // return to initial
-    move_joint(3,-2.8,1.0);
-
-    // return J2 to initial
-    move_joint(2,1.97,1.0);
+    move_joint(6,orig_jpos,1.0);
     
-
-    sleep(4);
-    ROS_DEBUG(" 4"); fflush(stdout);
-    // J4 check: make sure we hit the stop around -.83 when moving to -1.05
-    if (!move_until_stop(4,-0.83,-1.05,1.0)) {
-        ROS_ERROR("\nERROR: Joint 4 was not turned to its negative limit.\n");
-        ROS_ERROR("Please press Shift-Idle to turn off the motors,");
-        ROS_ERROR("then bend the joint fully backwards.");
-        owam->release_position();
-        return false;
+    ROS_INFO_NAMED("calibration"," 5"); fflush(stdout);
+    // J5 check: make sure we hit the stop around 1.31 when moving to 1.5
+    if (!move_until_stop(5,1.31,1.5,1.0,orig_jpos)) {
+      ROS_ERROR_NAMED("calibration","\nERROR: Joint 5 was not turned to its positive limit.\n");
+      ROS_ERROR_NAMED("calibration","Please press Shift-Idle to turn off the motors,");
+      ROS_ERROR_NAMED("calibration","then turn the joint fully CCW as seen from the hand.");
+      owam->release_position();
+      return false;
     }
     // return to initial
-    move_joint(4,-.83,1.0);
+    move_joint(5,orig_jpos,1.0);
+  }
 
-    sleep(4);
-    ROS_DEBUG(" 1"); fflush(stdout);
-    // J1 check: make sure we hit the stop around -2.66 when moving to -2.85
-    if (!move_until_stop(1,-2.66,-2.85,1.0)) {
-        ROS_ERROR("\nERROR: Joint 1 was not turned to its negative limit.\n");
-        ROS_ERROR("Please press Shift-Idle to turn off the motors,");
-        ROS_ERROR("then turn the joint fully CW as seen from above.");
-        owam->release_position();
-        return false;
-    }
-    // return to initial
-    move_joint(1,-2.66,1.0);
+  ROS_INFO_NAMED("calibration"," 2"); fflush(stdout);
+  double orig_j2pos;
+  // J2 check: make sure we hit the stop around 1.97 when moving to 2.2
+  if (!move_until_stop(2,1.97,2.2,1.0,orig_j2pos)) {
+    ROS_ERROR_NAMED("calibration","\nERROR: Joint 2 was not turned to its positive limit.\n");
+    ROS_ERROR_NAMED("calibration","Please press Shift-Idle to turn off the motors,");
+    ROS_ERROR_NAMED("calibration","then swing the joint all the way to its positive stop.");
     owam->release_position();
+    return false;
+  }
+  // move to 1.9 to allow testing of J3
+  ROS_INFO_NAMED("calibration","Moving J2 to 1.8 to allow space for J3");
+  move_joint(2,1.9,1.0);
+  
+  ROS_INFO_NAMED("calibration"," 3"); fflush(stdout);
+  // J3 check: make sure we hit the stop around -2.8 when moving to -3.0
+  if (!move_until_stop(3,-2.8,-3.0,1.0,orig_jpos)) {
+    ROS_ERROR_NAMED("calibration","\nERROR: Joint 3 was not turned to its negative limit.\n");
+    ROS_ERROR_NAMED("calibration","Please press Shift-Idle to turn off the motors,");
+    ROS_ERROR_NAMED("calibration","then turn the joint fully CW as seen from the hand.");
+    owam->release_position();
+    return false;
+    }
+  // return to initial
+  move_joint(3,orig_jpos,1.0);
+
+  // return J2 to initial
+  move_joint(2,orig_j2pos,1.0);
     
-    ROS_DEBUG(" done.");
-    return true;
+  ROS_INFO_NAMED("calibration"," 4"); fflush(stdout);
+  // J4 check: make sure we hit the stop around -.83 when moving to -1.05
+  if (!move_until_stop(4,-0.83,-1.05,1.0,orig_jpos)) {
+    ROS_ERROR_NAMED("calibration","\nERROR: Joint 4 was not turned to its negative limit.\n");
+    ROS_ERROR_NAMED("calibration","Please press Shift-Idle to turn off the motors,");
+    ROS_ERROR_NAMED("calibration","then bend the joint fully backwards.");
+    owam->release_position();
+    return false;
+  }
+  // return to initial
+  move_joint(4,orig_jpos,1.0);
+
+  ROS_INFO_NAMED("calibration"," 1"); fflush(stdout);
+  // J1 check: make sure we hit the stop around -2.66 when moving to -2.85
+  if (!move_until_stop(1,-2.66,-2.85,1.0,orig_jpos)) {
+    ROS_ERROR_NAMED("calibration","\nERROR: Joint 1 was not turned to its negative limit.\n");
+    ROS_ERROR_NAMED("calibration","Please press Shift-Idle to turn off the motors,");
+    ROS_ERROR_NAMED("calibration","then turn the joint fully CW as seen from above.");
+    owam->release_position();
+    return false;
+  }
+  // return to initial
+  move_joint(1,orig_jpos,1.0);
+  owam->release_position();
+  
+  ROS_INFO_NAMED("calibration"," done.");
+  return true;
 }
 
 bool WamDriver::Publish() {

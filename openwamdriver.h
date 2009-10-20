@@ -149,7 +149,8 @@ private:
     void stop_control_loop();
     bool verify_home_position();
     bool move_joint(int joint, double newpos, double velocity);
-    bool move_until_stop(int joint, double stop, double limit, double velocity);
+    bool move_until_stop(int joint, double stop, double limit, double velocity,
+			 double &orig_joint_pos);
 
     int get_puck_offset(int puckid,long *mech = NULL,long *apout = NULL);
     void save_joint_offset(double jointval, double *offset);

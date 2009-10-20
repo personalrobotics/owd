@@ -1,7 +1,10 @@
 #include "DataRecorder.hh"
 
 DataRecorder::DataRecorder(int records) : recsize(0),count(0) {
-  bufsize=20*sizeof(double)*records;
+  // just take an initial guess at number of fields (32) in order
+  // to size the initial buffer.  During the add() we'll make sure
+  // we don't go past the end.
+  bufsize=32*sizeof(double)*records;
   data=(double *)malloc(bufsize);
   if (!data) {
     throw "out of memory";
@@ -18,7 +21,7 @@ void DataRecorder::add(const std::vector<double> &v) {
   if (v.size() != recsize) {
     throw "mismatched data sizes";
   }
-  if ((count+1)*recsize < bufsize) {
+  if ((count+1)*recsize*sizeof(double) < bufsize) {
     memcpy(data+count*recsize,&v[0],recsize*sizeof(double));
     ++count;
   }
