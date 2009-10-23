@@ -1180,8 +1180,8 @@ bool WamDriver::verify_home_position() {
     return false;
   }
   // move to 1.9 to allow testing of J3
-  ROS_INFO_NAMED("calibration","Moving J2 to 1.8 to allow space for J3");
-  move_joint(2,1.9,1.0);
+  ROS_INFO_NAMED("calibration","Moving J2 to 1.94 to allow space for J3");
+  move_joint(2,1.94,1.0);
   
   ROS_INFO_NAMED("calibration"," 3"); fflush(stdout);
   // J3 check: make sure we hit the stop around -2.8 when moving to -3.0
