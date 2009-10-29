@@ -256,7 +256,7 @@ protected:
   double vel;
 
 public:
-  MacZeroAccel(double start_pos, double start_vel, double end_pos, double start_time) {
+  MacZeroAccel(double start_pos, double start_vel, double end_pos, double start_time) : a(0),j(0) {
     start_p = start_pos;
     start_v = start_vel;
     dist = end_pos - start_pos;
@@ -266,7 +266,6 @@ public:
       throw "MacZeroAccel: velocity sign does not match sign of end-start";
     }
     start_t = start_time;
-    a=0;
     dur = dist/start_v;
   }
   
