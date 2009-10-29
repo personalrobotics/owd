@@ -256,7 +256,7 @@ protected:
   double vel;
 
 public:
-  MacZeroAccel(double start_pos, double start_vel, double end_pos, double start_time) : a(0),j(0) {
+  MacZeroAccel(double start_pos, double start_vel, double end_pos, double start_time) {
     start_p = start_pos;
     start_v = start_vel;
     dist = end_pos - start_pos;
@@ -267,6 +267,7 @@ public:
     }
     start_t = start_time;
     dur = dist/start_v;
+    a=j=0;
   }
   
   inline double end_vel() const {
