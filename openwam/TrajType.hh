@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <math.h>
-#include <stdio.h>
 
 // a vector of joint angles defines a single Wam position
 class JointPos : public std::vector<double> {
@@ -18,14 +17,8 @@ public:
 
   inline bool operator!=(const JointPos &rhs) const {
     for (unsigned int i = 0; i < this->size(); ++i) {
-      if (i==6) { // special test for J7
-	if (fabs(this->operator[](i) - rhs[i]) > 0.015f ) {
-	  return true;
-	}
-      } else {
-	if (fabs(this->operator[](i) - rhs[i]) > 0.01f ) {
-	  return true;
-	}
+      if (fabs(this->operator[](i) - rhs[i]) > 0.01f ) {
+	return true;
       }
     }
     return false;
@@ -131,8 +124,8 @@ class TrajPoint : public JointPos {
  public:
   TrajPoint():blend_radius(0.0) {}
   TrajPoint(int size) : JointPos(size), blend_radius(0.0) {}
-  TrajPoint(JointPos &jp) : JointPos(jp) , blend_radius(0.0) {}
-  TrajPoint(JointPos &jp, double br) : JointPos(jp) , blend_radius(br) {}
+  TrajPoint(const JointPos &jp) : JointPos(jp) , blend_radius(0.0) {}
+  TrajPoint(const JointPos &jp, const double br) : JointPos(jp) , blend_radius(br) {}
   ~TrajPoint() {}
   bool operator!=(const TrajPoint &rhs);
   TrajPoint& operator=(const TrajPoint &rhs);

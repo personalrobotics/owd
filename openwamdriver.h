@@ -116,6 +116,7 @@ private:
     double gravity_comp_value;
     vector<double> max_joint_vel;
     double min_accel_time;
+    double max_jerk;
     vector<double> joint_vel, joint_accel;
     //    static const float lowerjointlimit_deg[] 
     //          = {-150,-113,-157, -50,-275,-90,-172};

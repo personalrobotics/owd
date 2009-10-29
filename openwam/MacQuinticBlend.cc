@@ -8,7 +8,8 @@ MacQuinticBlend::MacQuinticBlend(MacQuinticSegment *seg1,
 				 MacQuinticSegment *seg2,
 				 double blend_rad,
 				 JointPos max_joint_v,
-				 JointPos max_joint_a) 
+				 JointPos max_joint_a,
+				 double max_jerk) 
   : MacQuinticElement(seg1->end_pos,seg2->start_pos),
     start_direction(seg1->direction),
     end_direction(seg2->direction),
@@ -56,10 +57,9 @@ MacQuinticBlend::MacQuinticBlend(MacQuinticSegment *seg1,
   }
   */
   double cos_theta=(start_direction*end_direction)/(-pow(blend_radius,2));
-  double max_path_jerk = PI*max_path_acceleration / (2*MacAccelElement::DTMAX);
   JointPos dir_diff = end_direction - start_direction;
   double theta=acos(cos_theta);
-  double jerk_limited_s=pow(2*max_path_jerk*pow(blend_radius,2)
+  double jerk_limited_s=pow(2*max_jerk*pow(blend_radius,2)
 				   /(15*cos(theta/2)),1/3);
   double jerk_limited_velocity=max_path_velocity / (2 *blend_radius)
     * jerk_limited_s;

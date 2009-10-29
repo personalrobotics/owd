@@ -7,6 +7,7 @@
 #define TRAJ_TOLERANCE 0.003f
 
 #include "MacQuinticElement.hh"
+#include "MacAccelPulse.hh"
 
 class MacQuinticSegment:public MacQuinticElement {
   friend class MacQuinticBlend;
@@ -14,6 +15,8 @@ class MacQuinticSegment:public MacQuinticElement {
 protected:
   // direction is an n-dof unit vector pointing from start to end
   JointPos direction;
+
+  double jmax;  // maximum path jerk
 
   // distance is the straightline jointspace distance from start to end
   double distance;
@@ -24,22 +27,25 @@ protected:
   // keep track of which "if" condition we used to build the segment
   int condition;
 
-  double accel_rise_dist(double v, double amax) const;
-  double accel_fall_dist(double v, double amax) const;
-  double AP_dist(double v, double amax) const;
-  double AP_max_delta_v(double v, double amax, double d);  // change back to const after removing "reason" assignments
+
   double current_path_vel, current_path_accel;
   void enforceSpeedLimits();
   void reverse_accel_pulses();
   void verify_end_conditions();
-
+  bool search_for_decel_pulse(double dist,
+			      MacAccelElement *ae1,
+			      MacAccelElement *ae2);
+  MacAccelElement *check_for_cruise(double distance,
+				    MacAccelElement *ae1,
+				    MacAccelElement *ae2);
   std::vector<MacAccelElement *> accel_elements;
 
 public:
   MacQuinticSegment( TrajPoint first_p,
                      TrajPoint second_p,
 		     JointPos max_joint_vel,
-		     JointPos max_joint_accel);
+		     JointPos max_joint_accel,
+		     double max_jerk);
 
   // functions required by the base class
   void setStartVelocity(double v);
@@ -57,6 +63,15 @@ public:
   // extra functions specific to a segment
   void setVelocity(double v1, double v2);  // both start and end at once
   JointPos Direction() const;
+
+  static double accel_rise_dist(double v, double amax, double jmax);
+  static double accel_fall_dist(double v, double amax, double jmax);
+  static double AP_dist(double v, double amax, double jmax);
+  static double AP_max_delta_v(double d, double v,
+			       double vmax, double amax, double jmax);
+  static double cubic_solve(double A, double B, double C);
+  static double safe_pow(double val, double exp);
+  static double safe_sqrt(double val);
 
   void dump();
 };
