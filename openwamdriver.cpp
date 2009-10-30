@@ -304,6 +304,16 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
 
   cmdnum++;
 
+  // check to see if we should use a MacJointTraj based on whether
+  // any of the corners have non-zero blend radii
+  bool blended_traj = false;
+  for (unsigned int i=1; i<jt.blend_radius.size()-1; ++i) {
+    if (jt.blend_radius[i] > 0.0) {
+      blended_traj=true;
+      break;
+    }
+  }
+  
   TrajType traj;
   try {
     traj=ros2owd_traj(jt);
@@ -315,8 +325,9 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
   bool bWaitForStart=(jt.options & jt.opt_WaitForStart);
   bool bHoldOnStall=(jt.options & jt.opt_HoldOnStall);
   
-#ifdef OLD_TRAJ
-    // need to use a ParaJointTraj (no blends)
+  if (!blended_traj) {
+    ROS_WARN_NAMED("BuildTrajectory","No blends found; using ParaJointTraj");
+
     try {
       ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,cmdnum);
       ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
@@ -328,8 +339,8 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
                       error);
       return NULL;
     }
-#endif // OLD_TRAJ
-    // can use a MacJointTraj (blends at points)
+  } else {
+    // use a MacJointTraj (blends at points)
     try {
       MacJointTraj *mactraj = new MacJointTraj(traj,joint_vel, joint_accel,
 					       max_jerk,
@@ -342,6 +353,7 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
                       error);
       return NULL;
     }
+  }
 }
 
 TrajType WamDriver::ros2owd_traj (pr_msgs::JointTraj &jt) {
