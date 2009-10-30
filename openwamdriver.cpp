@@ -1236,8 +1236,8 @@ bool WamDriver::Publish() {
     // instead:
     // wam_tf *= wam_tf_base[i] * btTransform(btQuaternion(jointpos[i+1],0,0));
     // jref="wam0";
-    tf::Stamped<tf::Transform> wam_stf(wam_tf,ros::Time::now(),jname,jref);
-    tf_broadcaster.sendTransform(wam_stf);
+    tf_broadcaster.sendTransform(tf::StampedTransform(wam_tf,ros::Time::now(),jref,jname));
+
   }
 
   owam->lock();
