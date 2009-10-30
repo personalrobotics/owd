@@ -1,3 +1,4 @@
+uint8 link
 float64 mass
 float64 cog_x
 float64 cog_y
