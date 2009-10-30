@@ -219,6 +219,8 @@ bool WamDriver::Init(const char *joint_cal_file)
 void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
   pub_wamstate = 
     n.advertise<pr_msgs::WAMState>("wamstate", 10);
+  pub_waminternals = 
+    n.advertise<pr_msgs::WAMInternals>("waminternals", 10);
   ss_AddTrajectory = 
     n.advertiseService("AddTrajectory",&WamDriver::AddTrajectory,this);
   ss_SetStiffness =
@@ -231,14 +233,14 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("ReplaceTrajectory",&WamDriver::ReplaceTrajectory,this);
   ss_SetSpeed =
     n.advertiseService("SetSpeed",&WamDriver::SetSpeed,this);
-  ss_SetExtraMass =
-    n.advertiseService("SetExtraMass",&WamDriver::SetExtraMass,this);
   ss_GetArmDOF =
     n.advertiseService("GetArmDOF",&WamDriver::GetDOF,this);
   ss_CalibrateJoints =
     n.advertiseService("CalibrateJoints", &WamDriver::CalibrateJoints, this);
   sub_wamservo =
     n.subscribe("wamservo", 1, &WamDriver::wamservo_callback,this);
+  sub_MassProperties =
+    n.subscribe("wam_mass", 1, &WamDriver::MassProperties_callback,this);
 
   // LLL
   sub_wam_joint_targets = 
@@ -302,27 +304,6 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
 
   cmdnum++;
 
-  // check to see if we can use a MacJointTraj (currently doesn't
-  //    support segments with zero-radius blends at both ends)
-  bool unblended_segment = false;
-  char debug_str[500];
-  sprintf(debug_str,"trajectory blend radii: %1.2f",jt.blend_radius[0]);
-  unsigned int bad_i=0;
-  for (unsigned int i=0; i<jt.blend_radius.size()-1; ++i) {
-    if (strlen(debug_str) < 490) {
-      sprintf(debug_str+strlen(debug_str)," %1.2f",jt.blend_radius[i+1]);
-    }
-    if (!unblended_segment
-        && (jt.blend_radius[i] == 0.0) 
-        && (jt.blend_radius[i+1] == 0.0)) {
-      unblended_segment=true;
-      bad_i=i;
-      // leave out the break for now in order to collect all the radii
-      // in the print message
-      // break;
-    }
-  }
-  
   TrajType traj;
   try {
     traj=ros2owd_traj(jt);
@@ -334,10 +315,7 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
   bool bWaitForStart=(jt.options & jt.opt_WaitForStart);
   bool bHoldOnStall=(jt.options & jt.opt_HoldOnStall);
   
-  if (unblended_segment || (jt.blend_radius.size()<3)) {
-    ROS_WARN_NAMED("BuildTrajectory","Unable to use blended trajectory due to zero-radius ends on segment %d",bad_i);
-    ROS_WARN_NAMED("BuildTrajectory",debug_str);
-
+#ifdef OLD_TRAJ
     // need to use a ParaJointTraj (no blends)
     try {
       ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,cmdnum);
@@ -350,7 +328,7 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
                       error);
       return NULL;
     }
-  } else {
+#endif // OLD_TRAJ
     // can use a MacJointTraj (blends at points)
     try {
       MacJointTraj *mactraj = new MacJointTraj(traj,joint_vel, joint_accel,
@@ -358,14 +336,12 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
 					       bWaitForStart,bHoldOnStall,
 					       cmdnum);
       ROS_DEBUG_NAMED("BuildTrajectory","MacFarlane blended trajectory built");
-      ROS_DEBUG_NAMED("BuildTrajectory",debug_str);
       return mactraj;
     } catch (const char *error) {
       ROS_ERROR_NAMED("BuildTrajectory","Error building blended traj: %s",
                       error);
       return NULL;
     }
-  }
 }
 
 TrajType WamDriver::ros2owd_traj (pr_msgs::JointTraj &jt) {
@@ -1231,16 +1207,26 @@ bool WamDriver::verify_home_position() {
 
 bool WamDriver::Publish() {
   double jointpos[nJoints+1];
+  double totaltorqs[nJoints+1]; // total actual torq
   double jointtorqs[nJoints+1];  // PID error-correction torques,
   //                                       after removing dynamic torques
-  owam->get_current_data(jointpos,NULL,jointtorqs);
+  double simtorqs[nJoints+1];  // Torques calculated from simulated links
+                               // (used for experiental mass properties)
+
+  pr_msgs::WAMInternals waminternals;
+  owam->get_current_data(jointpos,totaltorqs,jointtorqs,simtorqs);
 
   // more efficient for most users:
   // btTransform wam_tf = btTransform::getIdentity();
 
   for (unsigned int i=0; i<nJoints; ++i) {
-    wamstate.positions[i] = jointpos[i+1];
+    wamstate.positions[i] = waminternals.positions[i] = jointpos[i+1];
     wamstate.torques[i] = jointtorqs[i+1];
+    waminternals.total_torque[i] 
+      = waminternals.dynamic_torque[i]
+      = totaltorqs[i+1];
+    waminternals.dynamic_torque[i] -= jointtorqs[i+1];
+    waminternals.sim_torque[i] = simtorqs[i+1];
     // publish as transforms, too
     char jref[50], jname[50];
     snprintf(jref,50,"wam%d",i);
@@ -1273,6 +1259,7 @@ bool WamDriver::Publish() {
   owam->unlock();
 
   pub_wamstate.publish(wamstate);
+  pub_waminternals.publish(waminternals);
   return true;
 }
 
@@ -1601,24 +1588,24 @@ bool WamDriver::SetSpeed(pr_msgs::SetSpeed::Request &req,
   return true;
 }
  
-bool WamDriver::SetExtraMass(pr_msgs::SetExtraMass::Request &req,
-                              pr_msgs::SetExtraMass::Response &res) {
-  ROS_INFO("Got grabbed data mass, cog, and inertia");
+void WamDriver::MassProperties_callback(const boost::shared_ptr<const pr_msgs::MassProperties> &mass) {
+  if ((mass->link < Link::L1) || (mass->link > Link::Ln)) {
+    ROS_ERROR_NAMED("mass","Received MassProperties message with link out of range");
+    return;
+  }
+  owam->lock("OWD MassProperties cb");
+  owam->sim_links[mass->link].mass = mass->mass;
+
+  owam->links[mass->link].cog.x[0] = mass->cog_x;
+  owam->links[mass->link].cog.x[1] = mass->cog_y;
+  owam->links[mass->link].cog.x[2] = mass->cog_z;
   
-  owam->lock("OWD processmsg");
+  owam->links[mass->link].inertia 
+    = Inertia(  mass->inertia_xx, mass->inertia_xy, mass->inertia_xz,
+                mass->inertia_yy, mass->inertia_yz, mass->inertia_zz);
 
-  owam->links[Link::Ln].mass = req.m.mass;
-
-  owam->links[Link::Ln].cog.x[0] = req.m.cog_x;
-  owam->links[Link::Ln].cog.x[1] = req.m.cog_y;
-  owam->links[Link::Ln].cog.x[2] = req.m.cog_z;
-  
-  owam->links[Link::Ln].inertia 
-    = Inertia(  req.m.inertia_xx, req.m.inertia_xy, req.m.inertia_xz,
-                req.m.inertia_yy, req.m.inertia_yz, req.m.inertia_zz);
-
-  owam->unlock("OWD processmsg");
-  return true;
+  owam->unlock("OWD MassProperties cb");
+  return;
 }
 
 void WamDriver::Pump(const ros::TimerEvent& e) {

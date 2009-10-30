@@ -16,13 +16,13 @@
 #include <pr_msgs/CancelAllTrajectories.h>
 #include <pr_msgs/PauseTrajectory.h>
 #include <pr_msgs/ReplaceTrajectory.h>
-#include <pr_msgs/SetExtraMass.h>
+#include <pr_msgs/MassProperties.h>
 #include <pr_msgs/SetStiffness.h>
 #include <pr_msgs/SetSpeed.h>
 #include <pr_msgs/WAMState.h>
+#include <pr_msgs/WAMInternals.h>
 #include <pr_msgs/GetDOF.h>
 #include <pr_msgs/Servo.h>
-#include <owd/WAMInternals.h>
 #include <owd/CalibrateJoints.h>
 #include <tf/transform_broadcaster.h>
 
@@ -59,8 +59,6 @@ public:
                          pr_msgs::PauseTrajectory::Response &res);
     bool ReplaceTrajectory(pr_msgs::ReplaceTrajectory::Request &req,
                            pr_msgs::ReplaceTrajectory::Response &res);
-    bool SetExtraMass(pr_msgs::SetExtraMass::Request &req,
-                      pr_msgs::SetExtraMass::Response &res);
     bool SetStiffness(pr_msgs::SetStiffness::Request &req,
                       pr_msgs::SetStiffness::Response &res);
     bool SetSpeed(pr_msgs::SetSpeed::Request &req,
@@ -73,6 +71,7 @@ public:
     void AdvertiseAndSubscribe(ros::NodeHandle &n);
 
     void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &message);
+    void MassProperties_callback(const boost::shared_ptr<const pr_msgs::MassProperties> &message);
 
     // LLL
     void wamjointtargets_callback(const boost::shared_ptr<const pr_msgs::IndexedJointValues> &message);
@@ -166,11 +165,13 @@ private:
     boost::mutex wscb_mutex;
 
     ros::Publisher
-      pub_wamstate;
+      pub_wamstate,
+      pub_waminternals;
 
     ros::Subscriber
       sub_wamservo,
-      sub_wam_joint_targets;
+      sub_wam_joint_targets,
+      sub_MassProperties;
 
     ros::ServiceServer 
       ss_AddTrajectory,
@@ -180,7 +181,6 @@ private:
       ss_PauseTrajectory,
       ss_ReplaceTrajectory,
       ss_SetSpeed,
-      ss_SetExtraMass,
       ss_GetArmDOF,
       ss_CalibrateJoints;
 

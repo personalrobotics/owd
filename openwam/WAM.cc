@@ -179,6 +179,10 @@ WAM::WAM(CANbus* cb) :
 
 #endif
 
+  for (unsigned int i=Link::L1; i<=Link::Ln; ++i) {
+    sim_links[i] = links[i];
+  }
+
   for (unsigned int i=0; i<7; ++i) {
     safetytorquecount[i]=safetytorquesum[i]=0;
   }
@@ -456,6 +460,10 @@ void WAM::dump(){
 int WAM::recv_mpos(){
   double mpos[NUM_NODES+1]; // large enough for the all possible pucks
 
+  if (!bus) { // allow running without CANbus for simulation
+    return OW_SUCCESS;
+  }
+
   // fetch positions from the bus
   if(bus->read_positions(mpos) == OW_FAILURE){
     ROS_ERROR("WAM::recv_mpos: read_positions failed." );
@@ -474,6 +482,10 @@ int WAM::recv_mpos(){
  */
 int WAM::send_mtrq(){
   long mtrq[NUM_NODES+1];
+
+  if (!bus) { // allow running without CANbus for simulation
+    return OW_SUCCESS;
+  }
 
   for(int m=Motor::M1; m<=Motor::Mn; m++)
     mtrq[ motors[m].id() ] = (long) (motors[m].trq() * motors[m].IPNm());
@@ -534,6 +546,10 @@ void WAM::jtrq2mtrq(){
 int WAM::set_jpos(double* pos){
   double mpos[NUM_NODES+1];
 
+  if (!bus) { // allow running without CANbus for simulation
+    return OW_SUCCESS;
+  }
+
   // block the control loop from messing with the motors and joints
   this->lock("set_jpos");
 
@@ -562,7 +578,7 @@ int WAM::set_jpos(double* pos){
 }
 
 
-void WAM::get_current_data(double* pos, double *trq, double *nettrq){
+void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *simtrq){
     this->lock();
     if (pos) {
       // joint positions
@@ -579,6 +595,13 @@ void WAM::get_current_data(double* pos, double *trq, double *nettrq){
       // leave just what balances ext. forces
       for(int j=Joint::J1; j<=Joint::Jn; j++)
         nettrq[ joints[j].id() ] = pid_torq[j];
+    }
+
+    if (simtrq) {
+      // torques computed by the simulated links (with experimental
+      // mass properties)
+      for(int j=Joint::J1; j<=Joint::Jn; j++)
+        simtrq[ joints[j].id() ] = sim_torq[j];
     }
     this->unlock();
 }
@@ -783,6 +806,7 @@ void WAM::newcontrol(double dt){
         for(int j=Joint::J1; j<=Joint::Jn; j++){
             q_target[j] = q[j] = joints[j].pos();
             links[j].theta(q[j]);
+            sim_links[j].theta(q[j]);
             qd_target[j] = qdd_target[j] = 0.0; // zero out
         }
 	std::vector<double> data;
@@ -963,6 +987,13 @@ void WAM::newcontrol(double dt){
         
      
         // compute the torque required to meet the desired qd and qdd
+	// always calculate simulated dynamics (we'll overwrite dyn_torq later)
+	JSdynamics(sim_torq, sim_links, qd_target, qdd_target); 
+	if (data_recorded) {
+	  for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+	    data.push_back(dyn_torq[j]);
+	  }
+	}
         if(jsdyn){
           RTIME t4 = rt_timer_ticks2ns(rt_timer_read());
           JSdynamics(dyn_torq, links, qd_target, qdd_target); 
@@ -984,21 +1015,11 @@ void WAM::newcontrol(double dt){
 	  }
 	  recorder.add(data);
 	}
-        /*
-        static int count = 0;
 
-        if(count++ % 100 == 0) {
-            printf("pid_torq: %f %f %f %f %f %f %f\n", pid_torq[1], pid_torq[2], pid_torq[3], pid_torq[4], 
-                pid_torq[5], pid_torq[6], pid_torq[7]);
-            printf("dyn_torq: %f %f %f %f %f %f %f\n", dyn_torq[1], dyn_torq[2], dyn_torq[3], dyn_torq[4], 
-                dyn_torq[5], dyn_torq[6], dyn_torq[7]);
-        }
-        */
         
         // finally, sum the control torq and dynamics torq
         for(int j=Joint::J1; j<=Joint::Jn; j++){
             joints[j].trq(stiffness*pid_torq[j] + dyn_torq[j]);  // send to the joints
-            // joints[j].trq(dyn_torq[j]);  // send to the joints w/o PID
         }
         
         jtrq2mtrq();         // results in motor::torque
@@ -1019,31 +1040,32 @@ void WAM::newcontrol(double dt){
     
     this->unlock();
     long response;
-    int puckstate=bus->get_puck_state();
-    if (puckstate != 2) {
+    if (bus) { // skip if running in simulation
+      int puckstate=bus->get_puck_state();
+      if (puckstate != 2) {
         motor_state=MOTORS_IDLE;
         //ROS_DEBUG("Puckstate = %d",puckstate);
         if (exit_on_pendant_press) {
-            // The motors have been idled (someone pressed shift-idle), so go ahead
-            // and exit without being told.
-            // first, though, send a zero-torque packet to extinguish
-            // the torque warning light
-            for(int m=Motor::M1; m<=Motor::Mn; m++) {
-                motors[m].trq(0.0);
-            }
-            send_mtrq();
+	  // The motors have been idled (someone pressed shift-idle), so go ahead
+	  // and exit without being told.
+	  // first, though, send a zero-torque packet to extinguish
+	  // the torque warning light
+	  for(int m=Motor::M1; m<=Motor::Mn; m++) {
+	    motors[m].trq(0.0);
+	  }
+	  send_mtrq();
             
-            ROS_WARN("Detected motor switch to idle; exiting controller.");
-            ROS_WARN("If the pendant shows a torque or velocity fault, and the yellow idle");
-            ROS_WARN("button is still lit, you can clear the fault by pressing shift-idle");
-            ROS_WARN("again, and encoder values will be preserved.");
-            ROS_WARN("To restart the controller, just re-run the previous command.");
-            exit(0);
+	  ROS_WARN("Detected motor switch to idle; exiting controller.");
+	  ROS_WARN("If the pendant shows a torque or velocity fault, and the yellow idle");
+	  ROS_WARN("button is still lit, you can clear the fault by pressing shift-idle");
+	  ROS_WARN("again, and encoder values will be preserved.");
+	  ROS_WARN("To restart the controller, just re-run the previous command.");
+	  exit(0);
         }
-    } else {
+      } else {
         motor_state=MOTORS_ACTIVE;
-    }        
-    
+      }        
+    }    
 }
 
 bool WAM::safety_torques_exceeded(double t[]) {

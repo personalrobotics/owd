@@ -111,9 +111,11 @@ public:
   Joint joints[Joint::Jn+1];               // Array of joints
   Motor motors[Motor::Mn+1];               // Array of motors
   Link links[Link::Ln+1];                  // Array of links
+  Link sim_links[Link::Ln+1];                  // Array of links (simulated)
   bool suppress_controller[Joint::Jn+1];    // flag to disable PID control
   bool check_safety_torques;
   double pid_torq[Joint::Jn+1];
+  double sim_torq[Joint::Jn+1];
  
   double A,B,C,D,E,F;                      // WTF?
   SE3 E0n;                                 // forward kinematics transformation
@@ -189,8 +191,10 @@ public:
 
   int  set_targ_jpos(double* pos);          // set the target joint positions online 
   int  set_jpos(double pos[Joint::Jn+1]);   // set the joint positions offline
-  void get_current_data(double *pos, double *trq, double *nettrq); // get the
-  //       joint positions, torques, and net torques (any pointer can be NULL)
+  void get_current_data(double *pos, double *trq, 
+			double *nettrq, double *sim_torq=NULL);
+                  // get the joint positions, torques, net torques, and
+                  // simulated torques (any pointer can be NULL)
   void get_jtrq(double trq[Joint::Jn+1]);   // get the joint torques
   void get_net_jtrq(double trq[Joint::Jn+1]); // get the net joint torques
 
