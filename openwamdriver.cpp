@@ -31,6 +31,7 @@
 
 #include <PulseTraj.hh>
 #include <ServoTraj.hh>
+#include <StepTraj.hh>
 
 // LLL
 #include <pr_msgs/IndexedJointValues.h>
@@ -238,6 +239,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.subscribe("wamservo", 1, &WamDriver::wamservo_callback,this);
   sub_MassProperties =
     n.subscribe("wam_mass", 1, &WamDriver::MassProperties_callback,this);
+  ss_StepJoint =
+    n.advertiseService("StepJoint", &WamDriver::StepJoint, this);
 
   // LLL
   sub_wam_joint_targets = 
@@ -1734,6 +1737,16 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> 
   }
 } 
 
+bool WamDriver::StepJoint(owd::StepJoint::Request &req,
+			  owd::StepJoint::Response &res) {
+  cmdnum++;
+  double heldPositions[Joint::Jn+1];
+  owam->posSmoother.getSmoothedPVA(heldPositions);
+  StepTraj *straj = new StepTraj(cmdnum, nJoints, req.joint, heldPositions+1, req.radians);
+  owam->run_trajectory(straj);
+  ROS_DEBUG_NAMED("servo","Starting servo trajectory %d",cmdnum);
+  return true;
+}
 
 //LLL
 void WamDriver::wamjointtargets_callback(const boost::shared_ptr<const pr_msgs::IndexedJointValues> &jt) {

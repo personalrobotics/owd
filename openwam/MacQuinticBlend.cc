@@ -2,6 +2,8 @@
 #include <math.h>
 #include <stdio.h>
 
+// #define VERBOSE 1
+
 #define PI MacAccelElement::PI
 
 MacQuinticBlend::MacQuinticBlend(MacQuinticSegment *seg1,
@@ -38,10 +40,12 @@ MacQuinticBlend::MacQuinticBlend(MacQuinticSegment *seg1,
     reason=strdup("peak acceleration limit");
   }
 
-  printf("max velocity set: seg1=%2.3f, seg2=%2.3f, min=%2.3f\n",
-	 seg1->max_path_velocity,
-	 seg2->max_path_velocity,
-	 max_path_velocity);
+  if (VERBOSE) {
+    printf("max velocity set: seg1=%2.3f, seg2=%2.3f, min=%2.3f\n",
+	   seg1->max_path_velocity,
+	   seg2->max_path_velocity,
+	   max_path_velocity);
+  }
 
   /*    double accel_limited_s=sqrt(0.8*max_path_acceleration*blend_radius
 				     / sqrt((1+cos_theta)/2.0));
@@ -65,8 +69,10 @@ MacQuinticBlend::MacQuinticBlend(MacQuinticSegment *seg1,
     * jerk_limited_s;
 
   if (max_path_velocity > jerk_limited_velocity) {
-    printf("WARNING: reduced max velocity from %2.3f to %2.3f due to jerk limits\n",
-	   max_path_velocity, jerk_limited_velocity);
+    if (VERBOSE) {
+      printf("WARNING: reduced max velocity from %2.3f to %2.3f due to jerk limits\n",
+	     max_path_velocity, jerk_limited_velocity);
+    }
     max_path_velocity = jerk_limited_velocity;
     free(reason);
     reason=strdup("path jerk limit");
@@ -81,7 +87,9 @@ MacQuinticBlend::MacQuinticBlend(MacQuinticSegment *seg1,
     reason=strdup("path jerk limit");
   }
   */
-  printf("final max path vel=%2.3f (%s)\n",max_path_velocity,reason);
+  if (VERBOSE) {
+    printf("final max path vel=%2.3f (%s)\n",max_path_velocity,reason);
+  }
 }
 
 void MacQuinticBlend::setStartVelocity(double v) {
@@ -92,8 +100,10 @@ void MacQuinticBlend::setStartVelocity(double v) {
   velocity = (v > max_path_velocity) ?
     max_path_velocity : v;
 
-  printf("velocity set: requested %2.3f, max %2.3f, result %2.3f\n",
-	 v,max_path_velocity,velocity);
+  if (VERBOSE) {
+    printf("velocity set: requested %2.3f, max %2.3f, result %2.3f\n",
+	   v,max_path_velocity,velocity);
+  }
   // first, determine the max path velocity that doesn't exceed any
   // of the individual joint velocities.  The joint velocities will hit
   // their max values at the beginning and end of the blend, so we only
@@ -151,8 +161,10 @@ void MacQuinticBlend::setStartVelocity(double v) {
 	    velocity,velocity/sqrt(max_accel_ratio),limiting_joint);
     velocity /= sqrt(max_accel_ratio); // accel is proportional to v^2
   }
-  printf("velocity set: requested %2.3f, max %2.3f, result %2.3f\n",
-	 v,max_path_velocity,velocity);
+  if (VERBOSE) {
+    printf("velocity set: requested %2.3f, max %2.3f, result %2.3f\n",
+	   v,max_path_velocity,velocity);
+  }
 }
 
 void MacQuinticBlend::setEndVelocity(double v) {

@@ -5,7 +5,7 @@
 #include <math.h>
 #include <stdio.h>
 
-#define VERBOSE 1
+// #define VERBOSE 1
 
 class MacAccelElement {
 protected:
@@ -69,11 +69,15 @@ protected:
     if (delta_v > (fabs(a)*atime + epsilon)) {
       // we need a sustain portion
       sustain_t = (delta_v - fabs(a)*atime) / fabs(a);
-      printf("   MacAccelPulse: adding a sustain of t= %2.3f to achieve delta_v\n",sustain_t);
+      if (VERBOSE) {
+	printf("   MacAccelPulse: adding a sustain of t= %2.3f to achieve delta_v\n",sustain_t);
+      }
       double actual_delta_v = fabs(a) * (atime + sustain_t);
       if (fabs(actual_delta_v - delta_v) > epsilon) {
-	printf("desired delta_v=%2.3f, actual delta_v=%2.3f\n",delta_v,
-	       actual_delta_v);
+	if (VERBOSE) {
+	  printf("desired delta_v=%2.3f, actual delta_v=%2.3f\n",delta_v,
+		 actual_delta_v);
+	}
 	throw"MacAccelPulse still has wrong delta_v after adding sustain";
       }
     } else if (delta_v < (fabs(a)*atime - epsilon)) {
@@ -86,13 +90,17 @@ protected:
 	a = -sqrt(- delta_v * j * 2.0 / PI);
       }
       atime = a/j * PI/2;
-      printf("   MacAccelPulse: reducing accel from %2.3f to %2.3f to achieve requested delta_v\n",
-	     old_a,a);
+      if (VERBOSE) {
+	printf("   MacAccelPulse: reducing accel from %2.3f to %2.3f to achieve requested delta_v\n",
+	       old_a,a);
+      }
       sustain_t=0;
       double actual_delta_v = fabs(a) * atime;
       if (fabs(actual_delta_v - delta_v) > epsilon) {
-	printf("desired delta_v=%2.3f, actual delta_v=%2.3f\n",delta_v,
-	       actual_delta_v);
+	if (VERBOSE) {
+	  printf("desired delta_v=%2.3f, actual delta_v=%2.3f\n",delta_v,
+		 actual_delta_v);
+	}
 	throw"MacAccelPulse still has wrong delta_v after reducing accel";
       }
     } else {
@@ -262,7 +270,9 @@ public:
     dist = end_pos - start_pos;
     if (((dist < -epsilon) && (start_v >= 0)) ||
 	((dist > epsilon) && (start_v <= 0))) {
-      printf("dist was %2.3f, start_v was %2.3f\n",dist,start_v);
+      if (VERBOSE) {
+	printf("dist was %2.3f, start_v was %2.3f\n",dist,start_v);
+      }
       throw "MacZeroAccel: velocity sign does not match sign of end-start";
     }
     start_t = start_time;

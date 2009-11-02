@@ -5,7 +5,7 @@
 #include <assert.h>
 #include "MacQuinticSegment.hh"
 
-#define VERBOSE 1
+// #define VERBOSE 1
 
 MacQuinticSegment::MacQuinticSegment( TrajPoint first_p,
 				      TrajPoint second_p,
@@ -119,7 +119,9 @@ double MacQuinticSegment::AP_max_delta_v(double d, double v, double vmax, double
     try {
       amax = cubic_solve(A,B,C);
     } catch (char *err) {
-      printf("Could not get a cubic solution for A=%2.4f, B=%2.4f, C=%2.4f\n  %s\n",A,B,C,err);
+      if (VERBOSE) {
+	printf("Could not get a cubic solution for A=%2.4f, B=%2.4f, C=%2.4f\n  %s\n",A,B,C,err);
+      }
       throw;
     }
     if (VERBOSE) {
@@ -414,7 +416,9 @@ void MacQuinticSegment::BuildProfile() {
     delete ap2;
     ap2=NULL;
   }
-  printf("<< Test 1 failed: cannot reach max_velocity in available space\n");
+  if (VERBOSE) {
+    printf("<< Test 1 failed: cannot reach max_velocity in available space\n");
+  }
 			   
   // ============================================================
   // TEST #2: Pure Acceleration
@@ -444,9 +448,11 @@ void MacQuinticSegment::BuildProfile() {
     if (distance_remaining < -MacAccelPulse::epsilon) {
       // something's wrong; we don't even have the available distance
       // to reach end_vel
-      printf("distance available is %2.8f, pulse requires %2.8f\n",
-	     distance_remaining,ap1->distance());
-      ap1->dump();
+      if (VERBOSE) {
+	printf("distance available is %2.8f, pulse requires %2.8f\n",
+	       distance_remaining,ap1->distance());
+	ap1->dump();
+      }
       delete ap1;
       throw "Error: velocity change cannot be met with motion limits in available distance";
     }
@@ -842,7 +848,9 @@ bool MacQuinticSegment::search_for_decel_pulse(double distance,
       if ((new_dist_remaining > dist_remaining) ||
 	  (new_dist_remaining<0)) {
 	// we overshot, so repeat with a smaller jump factor
-	printf("  WARNING: overshot target; reducing jump factor from %2.0f%% to %2.0f%%\n", jump_factor*100.0, jump_factor*50.0);
+	if (VERBOSE) {
+	  printf("  WARNING: overshot target; reducing jump factor from %2.0f%% to %2.0f%%\n", jump_factor*100.0, jump_factor*50.0);
+	}
 	jump_factor /= 2.0;
 	// don't update dist_remaining or decel; just try again
 	decel += a_increment;   // put it back the way it was
@@ -852,7 +860,9 @@ bool MacQuinticSegment::search_for_decel_pulse(double distance,
       if ((new_dist_remaining < dist_remaining) ||
 	  (new_dist_remaining > fabs(dist_remaining))) {
 	// we overshot, so repeat with a smaller jump factor
-	printf("Warning: overshot target; reducing jump factor from %2.0f%% to %2.0f%%\n", jump_factor*100.0, jump_factor*50.0);
+	if (VERBOSE) {
+	  printf("Warning: overshot target; reducing jump factor from %2.0f%% to %2.0f%%\n", jump_factor*100.0, jump_factor*50.0);
+	}
 	jump_factor /= 2.0;
 	// don't update dist_remaining or decel; just try again
 	decel += a_increment;   // put it back the way it was
@@ -952,8 +962,10 @@ void MacQuinticSegment::evaluate(double *y, double *yd, double *ydd, double t) {
   if (i == accel_elements.size()) {
     if (t > accel_elements.back()->end_time() + 0.001) {
       // if we're way beyond the end, throw an error
-      printf("time of t=%2.8f exceeds last element ending time of %2.8f\n",
-	     t, accel_elements.back()->end_time());
+      if (VERBOSE) {
+	printf("time of t=%2.8f exceeds last element ending time of %2.8f\n",
+	       t, accel_elements.back()->end_time());
+      }
       throw "MacQuinticSegment: accel elements don't match overall time";
     } else {
       // but if we're only a little beyond, ignore it
@@ -1013,8 +1025,10 @@ double MacQuinticSegment::safe_pow(double val, double exp) {
   errno=0;
   double result= pow(val,exp);
   if (errno == EDOM) {
-    printf("WARNING: tried to call pow with value %2.4f, exponent %2.4f\n",
-	   val,exp);
+    if (VERBOSE) {
+      printf("WARNING: tried to call pow with value %2.4f, exponent %2.4f\n",
+	     val,exp);
+    }
     throw "pow generated EDOM";
   }
   return result;
@@ -1028,8 +1042,10 @@ double MacQuinticSegment::safe_sqrt(double val) {
       // only slightly negative; just return zero
       return 0;
     }
-    printf("WARNING: tried to call sqrt with negative value %2.4f\n",
-	   val);
+    if (VERBOSE) {
+      printf("WARNING: tried to call sqrt with negative value %2.4f\n",
+	     val);
+    }
     throw "sqrt generated EDOM";
   }
   return result;
@@ -1039,17 +1055,18 @@ double MacQuinticSegment::safe_sqrt(double val) {
 double MacQuinticSegment::cubic_solve(double A, double B, double C) {
   double Q=(safe_pow(A,2)-3.0*B)/9.0;
   double R=(2.0*safe_pow(A,3) - 9.0*A*B +27.0*C) / 54.0;
-  printf("A=%2.4f B=%2.4f C=%2.4f Q=%2.4f R=%2.4f\n",A,B,C,Q,R);
-  printf("pow(Q,3)=%2.4f\n",safe_pow(Q,3));
+  if (VERBOSE) {
+    printf("A=%2.4f B=%2.4f C=%2.4f Q=%2.4f R=%2.4f\n",A,B,C,Q,R);
+    printf("pow(Q,3)=%2.4f\n",safe_pow(Q,3));
+  }
   //  if (safe_pow(R,2) < safe_pow(Q,3) + 1.0e-6) {
   if (safe_pow(R,2) < safe_pow(Q,3)) {
-    printf("Using case 1\n");
+    if (VERBOSE) {
+      printf("Using case 1\n");
+    }
     double theta=acos(R / safe_sqrt(safe_pow(Q,3)));
-    printf("sqrt 1\n");
     double root1 = -2.0 * safe_sqrt(Q) * cos(theta/3.0) - A/3.0;
-    printf("sqrt 2\n");
     double root2 = -2.0 * safe_sqrt(Q) * cos((theta+2.0*PI)/3.0) - A/3.0;
-    printf("sqrt 3\n");
     double root3 = -2.0 * safe_sqrt(Q) * cos((theta-2.0*PI)/3.0) - A/3.0;
     if (root1 > 0) {
       return root1;
@@ -1058,11 +1075,15 @@ double MacQuinticSegment::cubic_solve(double A, double B, double C) {
     } else if (root3 > 0) {
       return root3;
     } else {
-      printf("found roots %2.4f, %2.4f, and %2.4f\n",root1,root2,root3);
+      if (VERBOSE) {
+	printf("found roots %2.4f, %2.4f, and %2.4f\n",root1,root2,root3);
+      }
       throw "could not find a positive root";
     } 
   } else {
-    printf("Using case 2\n");
+    if (VERBOSE) {
+      printf("Using case 2\n");
+    }
     double AA = safe_pow(fabs(R) + safe_sqrt(safe_pow(R,2) - safe_pow(Q,3)), 1.0/3.0);
     double BB;
     if (R>0.0) {
@@ -1079,7 +1100,9 @@ double MacQuinticSegment::cubic_solve(double A, double B, double C) {
     if (root1>0) {
       return root1;
     } else {
-      printf("found real root %2.4f\n",root1);
+      if (VERBOSE) {
+	printf("found real root %2.4f\n",root1);
+      }
       throw "could not find a positive root";
     }
   } 

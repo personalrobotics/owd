@@ -1,6 +1,5 @@
 #include <iostream>
 #include <math.h>
-// #include "TrajType.hh"
 #include "Trajectory.hh"
 #include <vector>
 

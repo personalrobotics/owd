@@ -2,6 +2,7 @@
 #include <syslog.h>
 #include "MacQuinticBlend.hh"
 
+// #define VERBOSE 1
 
 MacJointTraj::~MacJointTraj() {
   for (unsigned int i=0; i<macpieces.size(); ++i) {
@@ -44,7 +45,9 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
     vtraj[0].blend_radius = 0;
     vtraj.back().blend_radius = 0;
 
-    printf("======== Segment 1 ===============\n");
+    if (VERBOSE) {
+      printf("======== Segment 1 ===============\n");
+    }
     if (numpoints == 2) {
       // if there are only 2 points, we'll just make a single segment
       // with no blends at either end
@@ -70,7 +73,9 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
 
     for (int i = 2; i < numpoints; ++i) {        
 
-      printf("======== Segment %d ==============\n",i);
+      if (VERBOSE) {
+	printf("======== Segment %d ==============\n",i);
+      }
       // make the next segment
       MacQuinticSegment *nextseg;
       if (i==numpoints-1) {
@@ -96,7 +101,9 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
       macpieces.push_back(openseg);
 
       if (vtraj[i-1].blend_radius > 0) {
-	printf("======== Blend %d:%d ======================\n",i-1,i);
+	if (VERBOSE) {
+	  printf("======== Blend %d:%d ======================\n",i-1,i);
+	}
 	// make the blend between the current and next
 	MacQuinticBlend *blend = new MacQuinticBlend(openseg, nextseg,
 						     vtraj[i-1].blend_radius,
@@ -110,18 +117,26 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
 	
 	// propogate the blend velocity to the two matching segment ends
 	// (this may reduce the ending velocity of the openseg)
-	printf("======== Blend seg %d ======================\n",i-1);
+	if (VERBOSE) {
+	  printf("======== Blend seg %d ======================\n",i-1);
+	}
 	openseg->setEndVelocity(blend->StartVelocity());
-	printf("======== Blend seg %d ======================\n",i);
+	if (VERBOSE) {
+	  printf("======== Blend seg %d ======================\n",i);
+	}
 	nextseg->setStartVelocity(blend->EndVelocity());
       
 	// add the blend to the trajectory
 	macpieces.push_back(blend);
       } else {
 	// must come to a stop before abruptly changing direction
-	printf("======== Blend seg %d ======================\n",i-1);
+	if (VERBOSE) {
+	  printf("======== Blend seg %d ======================\n",i-1);
+	}
 	openseg->setEndVelocity(0);
-	printf("======== Blend seg %d ======================\n",i);
+	if (VERBOSE) {
+	  printf("======== Blend seg %d ======================\n",i);
+	}
 	nextseg->setStartVelocity(0);
       }
 
@@ -141,10 +156,14 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
     // to care if we're looking at a segment or a blend.
 
     for (unsigned int i = macpieces.size() -1; i>0; --i) {
-      printf("==== Backwards pass, piece %d ====\n",i);
+      if (VERBOSE) {
+	printf("==== Backwards pass, piece %d ====\n",i);
+      }
       if (macpieces[i-1]->EndVelocity() > macpieces[i]->StartVelocity()) {
-	printf("WARNING: reducing speed of macpiece %d from %2.3f to %2.3f\n",
-	       i-1,macpieces[i-1]->EndVelocity(),macpieces[i]->StartVelocity());
+	if (VERBOSE) {
+	  printf("WARNING: reducing speed of macpiece %d from %2.3f to %2.3f\n",
+		 i-1,macpieces[i-1]->EndVelocity(),macpieces[i]->StartVelocity());
+	}
 	macpieces[i-1]->setEndVelocity(macpieces[i]->StartVelocity());
       }
       if (macpieces[i-1]->EndVelocity() < macpieces[i]->StartVelocity()) {
@@ -156,7 +175,9 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
 
     // finally, calculate all the curve coefficients
     for (unsigned int i=0; i<macpieces.size(); ++i) {
-      printf("==== BuildProfile, piece %d ====\n",i);
+      if (VERBOSE) {
+	printf("==== BuildProfile, piece %d ====\n",i);
+      }
       macpieces[i]->BuildProfile();
       if (i<macpieces.size()-1) {
 	// propogate the time forward to the next element
