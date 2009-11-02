@@ -5,7 +5,7 @@
 #include <assert.h>
 #include "MacQuinticSegment.hh"
 
-// #define VERBOSE 1
+#define VERBOSE 0
 
 MacQuinticSegment::MacQuinticSegment( TrajPoint first_p,
 				      TrajPoint second_p,

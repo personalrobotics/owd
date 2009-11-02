@@ -2,7 +2,7 @@
 #include <syslog.h>
 #include "MacQuinticBlend.hh"
 
-// #define VERBOSE 1
+#define VERBOSE 0
 
 MacJointTraj::~MacJointTraj() {
   for (unsigned int i=0; i<macpieces.size(); ++i) {

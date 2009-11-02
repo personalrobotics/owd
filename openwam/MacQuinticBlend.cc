@@ -2,7 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 
-// #define VERBOSE 1
+#define VERBOSE 0
 
 #define PI MacAccelElement::PI
 
