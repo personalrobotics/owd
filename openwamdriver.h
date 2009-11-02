@@ -111,6 +111,7 @@ public:
 private:
     Trajectory *BuildTrajectory(pr_msgs::JointTraj &jt);
     pr_msgs::WAMState wamstate;
+    pr_msgs::WAMInternals waminternals;
     pr_msgs::Servo servocmd;
     double gravity_comp_value;
     vector<double> max_joint_vel;

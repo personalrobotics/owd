@@ -476,7 +476,7 @@ int CANbus::send_torques(){
                                     Puck::MIN_TRQ[puck->id()], 
                                     Puck::MAX_TRQ[puck->id()] );
 		  if (DEBUGCOUNT==0) {
-		    ROS_DEBUG("torques","Puck %d Torque %d",puck->id(),torques[p]);
+		    ROS_DEBUG_NAMED("torques","Puck %d Torque %d",puck->id(),torques[p]);
 		  }
               }
               else{

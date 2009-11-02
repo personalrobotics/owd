@@ -76,12 +76,18 @@ WamDriver::WamDriver(const char *name) :
   }
 #ifdef FAKE7
   wamstate.positions.resize(7,0.0f);
-  // not implemented yet: ws.velocities.resize(nJoints,0f);
   wamstate.torques.resize(7,0.0f);
+  waminternals.positions.resize(7,0.0f);
+  waminternals.total_torque.resize(7,0.0f);
+  waminternals.dynamic_torque.resize(7,0.0f);
+  waminternals.sim_torque.resize(7,0.0f);
 #else
   wamstate.positions.resize(nJoints);
-  // not implemented yet: ws.velocities.resize(nJoints,0f);
   wamstate.torques.resize(nJoints,0.0f);
+  waminternals.positions.resize(nJoints,0.0f);
+  waminternals.total_torque.resize(nJoints,0.0f);
+  waminternals.dynamic_torque.resize(nJoints,0.0f);
+  waminternals.sim_torque.resize(nJoints,0.0f);
 #endif // FAKE7
 
   // create a dummy previous trajectory
@@ -204,15 +210,6 @@ bool WamDriver::Init(const char *joint_cal_file)
   }
   owam->exit_on_pendant_press=true; // from now on, exit if the user hits e-stop or idle
   
-#ifdef HANDLINK
-  hand_dev.device = NULL;
-  
-  if(cf->ReadDeviceAddr(&hand_dev.addr, section, "requires", PLAYER_POSITION3D_CODE, -1, NULL)) {
-    ROS_WARN("Didn't read hand device address");
-  }
-
-  
-#endif // HANDLINK
   return true;
 }
 
@@ -1225,7 +1222,6 @@ bool WamDriver::Publish() {
   double simtorqs[nJoints+1];  // Torques calculated from simulated links
                                // (used for experiental mass properties)
 
-  pr_msgs::WAMInternals waminternals;
   owam->get_current_data(jointpos,totaltorqs,jointtorqs,simtorqs);
 
   // more efficient for most users:

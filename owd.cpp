@@ -39,8 +39,11 @@ int main(int argc, char** argv)
   wam.publishAllSeaSettings();
 #endif // BUILD_FOR_SEA
 
+  ROS_DEBUG("Creating timer and spinner threads");
   ros::Timer wam_timer = n.createTimer(ros::Duration(0.1), &WamDriver::Pump, &wam);
   ros::MultiThreadedSpinner s(3);
+  ROS_DEBUG("Spinning");
   ros::spin(s);
+  ROS_DEBUG("Done spinning; exiting");
 
 }
