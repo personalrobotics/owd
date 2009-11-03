@@ -82,6 +82,8 @@ WamDriver::WamDriver(const char *name) :
   waminternals.total_torque.resize(7,0.0f);
   waminternals.dynamic_torque.resize(7,0.0f);
   waminternals.sim_torque.resize(7,0.0f);
+  pr_msgs::PIDgains empty_gains;
+  waminternals.gains.resize(7);
 #else
   wamstate.positions.resize(nJoints);
   wamstate.torques.resize(nJoints,0.0f);
@@ -89,6 +91,8 @@ WamDriver::WamDriver(const char *name) :
   waminternals.total_torque.resize(nJoints,0.0f);
   waminternals.dynamic_torque.resize(nJoints,0.0f);
   waminternals.sim_torque.resize(nJoints,0.0f);
+  pr_msgs::PIDgains empty_gains;
+  waminternals.gains.resize(nJoints,empty_gains);
 #endif // FAKE7
 
   // create a dummy previous trajectory
@@ -241,6 +245,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.subscribe("wam_mass", 1, &WamDriver::MassProperties_callback,this);
   ss_StepJoint =
     n.advertiseService("StepJoint", &WamDriver::StepJoint, this);
+  ss_SetGains =
+    n.advertiseService("SetGains", &WamDriver::SetGains, this);
 
   // LLL
   sub_wam_joint_targets = 
@@ -1226,6 +1232,7 @@ bool WamDriver::Publish() {
                                // (used for experiental mass properties)
 
   owam->get_current_data(jointpos,totaltorqs,jointtorqs,simtorqs);
+  owam->get_gains(waminternals.gains);
 
   // more efficient for most users:
   // btTransform wam_tf = btTransform::getIdentity();
@@ -1746,6 +1753,11 @@ bool WamDriver::StepJoint(owd::StepJoint::Request &req,
   owam->run_trajectory(straj);
   ROS_DEBUG_NAMED("servo","Starting servo trajectory %d",cmdnum);
   return true;
+}
+
+bool WamDriver::SetGains(owd::SetGains::Request &req,
+			 owd::SetGains::Response &res) {
+  return owam->set_gains(req.joint,req.gains);
 }
 
 //LLL

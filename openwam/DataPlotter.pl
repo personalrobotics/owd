@@ -33,6 +33,7 @@ while (<>) {
 	$linenum = $linenum+1;
     }
     $f = sprintf("wamstats%04d.csv",$linenum);
+    system("scp wam:/tmp/$f .");
     print "Plotting $f\n";
     
     if (-e $f) {
@@ -40,9 +41,9 @@ while (<>) {
 	print {$GP[1]} "set title $f\n";
 #print {$GP[1]} "plot $f using 2\n"; # timestep_factor
 #print {$GP[1]} "replot $f using 3\n"; #traj_time
-	print {$GP[1]} "plot $f using 4 title \"J1 targ\"\n";
-	print {$GP[1]} "replot $f using 5 title \"J1 act\"\n";
-	print {$GP[1]} "replot $f using 6 axes x1y2 title \"J1 PID\"\n";
+#	print {$GP[1]} "plot $f using 4 title \"J1 targ\"\n";
+#	print {$GP[1]} "replot $f using 5 title \"J1 act\"\n";
+#	print {$GP[1]} "replot $f using 6 axes x1y2 title \"J1 PID\"\n";
 #	print {$GP[1]} "replot $f using 7 title \"J2 targ\"\n";
 #	print {$GP[1]} "replot $f using 8 title \"J2 act\"\n";
 #	print {$GP[1]} "replot $f using 9 axes x1y2 title \"J2 PID\"\n";
@@ -55,13 +56,25 @@ while (<>) {
 #print {$GP[1]} "replot $f using 17\n"; # J5 actual
 #print {$GP[1]} "replot $f using 19\n"; # J6 target
 #print {$GP[1]} "replot $f using 20\n"; # J6 actual
-#print {$GP[1]} "replot $f using 22\n"; # J7 target
-#print {$GP[1]} "replot $f using 23\n"; # J7 actual
-	print {$GP[1]} "replot $f using 25 axes x1y2 title \"J1 dyn\"\n";
+print {$GP[1]} "plot $f using 22 title \"J7 targ\"\n";
+print {$GP[1]} "replot $f using 23 title \"J7 act\"\n";
+print {$GP[1]} "replot $f using 24 axes x1y2 title \"J7 PID\"\n";
+#	print {$GP[1]} "replot $f using 25 axes x1y2 title \"J1 dyn\"\n";
 #	print {$GP[1]} "replot $f using 26 axes x1y2 title \"J2 dyn\"\n";
 #for ($col=3; $col<21; ++$col) {
 #  print {$GP[1]} "replot $f using $col\n";
 #}
+
+#	print {$GP[0]} "set title \"Actual Values\"\n";
+#
+#	print {$GP[0]} "plot $f using 5 title \"J1\"\n";
+#	print {$GP[0]} "replot $f using 8 title \"J2\"\n";
+#	print {$GP[0]} "replot $f using 11 title \"J3\"\n";
+#	print {$GP[0]} "replot $f using 14 title \"J4\"\n";
+#	print {$GP[0]} "replot $f using 17 title \"J5\"\n";
+#	print {$GP[0]} "replot $f using 20 title \"J6\"\n";
+#	print {$GP[0]} "replot $f using 23 title \"J7\"\n";
+
 	print {$GP[0]} "set title \"Target Values\"\n";
 
 	print {$GP[0]} "plot $f using 4 title \"J1\"\n";

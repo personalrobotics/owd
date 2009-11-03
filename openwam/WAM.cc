@@ -257,6 +257,23 @@ int WAM::loadctrl(const char* fn){
   return OW_SUCCESS;
 }
 
+bool WAM::set_gains(unsigned int joint,
+		    pr_msgs::PIDgains &gains) {
+  if ((joint < Joint::J1) || (joint >> Joint::Jn)) {
+    return false;
+  }
+  jointsctrl[joint].set_gains(gains.kp,gains.kd,gains.ki);
+  return true;
+}
+
+bool WAM::get_gains(std::vector<pr_msgs::PIDgains > &gains) {
+  gains.resize(Joint::Jn);
+  for (unsigned int j=1; j<=Joint::Jn; ++j) {
+    jointsctrl[j].get_gains(gains[j-1].kp, gains[j-1].kd, gains[j-1].ki);
+  }
+  return true;
+}
+
 #ifdef BUILD_FOR_SEA
 void WAM::loadSeaParams(){
   // retrieve sea from ros param server, if available

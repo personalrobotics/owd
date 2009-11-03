@@ -75,6 +75,19 @@ public:
       << "Ki: "  << setw(4) << Ki ;
     return s;
   }
+
+  inline void set_gains(double kp, double kd, double ki) {
+    Kp=kp;
+    Kd=kd;
+    Ki=ki;
+  }
+
+  inline void get_gains(double &kp, double &kd, double &ki) const {
+    kp=Kp;
+    kd=Kd;
+    ki=Ki;
+  }
+
 };
 
 #endif

@@ -25,6 +25,7 @@
 #include <pr_msgs/Servo.h>
 #include <owd/CalibrateJoints.h>
 #include <owd/StepJoint.h>
+#include <owd/SetGains.h>
 #include <tf/transform_broadcaster.h>
 
 #ifdef BUILD_FOR_SEA
@@ -69,7 +70,9 @@ public:
     bool CalibrateJoints(owd::CalibrateJoints::Request &req,
 			 owd::CalibrateJoints::Response &res);
     bool StepJoint(owd::StepJoint::Request &req,
-			      owd::StepJoint::Response &res);
+		   owd::StepJoint::Response &res);
+    bool SetGains(owd::SetGains::Request &req,
+		  owd::SetGains::Response &res);
 
     void AdvertiseAndSubscribe(ros::NodeHandle &n);
 
@@ -187,7 +190,8 @@ private:
       ss_SetSpeed,
       ss_GetArmDOF,
       ss_CalibrateJoints,
-      ss_StepJoint;
+      ss_StepJoint,
+      ss_SetGains;
 
     tf::TransformBroadcaster tf_broadcaster;
     btTransform wam_tf_base[7];

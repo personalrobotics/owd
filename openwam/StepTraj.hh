@@ -9,8 +9,6 @@
 class StepTraj : public Trajectory {
 private:
   int nDOF;
-  JointPos start_position;
-  JointPos step_position;
 
 public:
 
