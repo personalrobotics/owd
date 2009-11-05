@@ -1510,13 +1510,17 @@ bool WamDriver::SetStiffness(pr_msgs::SetStiffness::Request &req,
       ROS_INFO("Position held by SetStiffness command");
     }
   } else {
-    // Release position
-    if (!owam->jointstraj) {
-      // if we're not running a trajectory, just go back to idle
-      owam->release_position();
-      owam->set_stiffness(0.0);
-      ROS_INFO("Position released by SetStiffness command");
+    if (owam->jointstraj) {
+      pr_msgs::CancelAllTrajectories::Request cancel_req;
+      pr_msgs::CancelAllTrajectories::Response cancel_res;
+      CancelAllTrajectories(cancel_req,cancel_res);
     }
+
+    // Release position
+    
+    owam->release_position();
+    owam->set_stiffness(0.0);
+    ROS_INFO("Position released by SetStiffness command");
   }
   return true;
 }
