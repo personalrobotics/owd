@@ -33,10 +33,11 @@
 #include <ServoTraj.hh>
 #include <StepTraj.hh>
 
-// LLL
+#ifdef BUILD_FOR_SEA
 #include <pr_msgs/IndexedJointValues.h>
 #include <pr_msgs/WamSetupSeaCtrl.h>
 #include <positionInterface/SmoothArm.h>
+#endif // BUILD_FOR_SEA
 
 #define SAFETY_MODULE 10
 
@@ -248,11 +249,10 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
   ss_SetGains =
     n.advertiseService("SetGains", &WamDriver::SetGains, this);
 
-  // LLL
+#ifdef BUILD_FOR_SEA
   sub_wam_joint_targets = 
     n.subscribe("wam_joint_targets", 10, &WamDriver::wamjointtargets_callback,this);
  
-#ifdef BUILD_FOR_SEA
   sub_wam_seactrl_settl =
     n.subscribe("wam_seactrl_settl", 10, &WamDriver::wam_seactrl_settl_callback, this);
   pub_wam_seactrl_curtl = 
@@ -614,15 +614,19 @@ void WamDriver::calibrate_joint_angles() {
                 if ((jnum > 0) && (jnum <= nJoints)) {
 
                     // get current held positions
-                    double heldPositions[Joint::Jn+1];
-                    owam->posSmoother.getSmoothedPVA(heldPositions);
+#ifdef BUILD_FOR_SEA
+                    owam->posSmoother.getSmoothedPVA(owam->heldPositions);
+#endif // BUILD_FOR_SEA
 
                     // if it's within 2 deg of parallel or square,
                     // set it to parallel or square
                     double holdval = get_nearest_joint_value(jointpos[jnum] - joint_offsets[jnum],2);
+		    owam->heldPositions[jnum] = holdval+joint_offsets[jnum];
                     owam->jointsctrl[jnum].reset();
-                    heldPositions[jnum] = holdval+joint_offsets[jnum];
-                    owam->posSmoother.reset(heldPositions, Joint::Jn+1);   
+#ifdef BUILD_FOR_SEA
+                    owam->heldPositions[jnum] = holdval+joint_offsets[jnum];
+                    owam->posSmoother.reset(owam->heldPositions, Joint::Jn+1);   
+#endif // BUILD_FOR_SEA
                     owam->jointsctrl[jnum].set(holdval+joint_offsets[jnum]);
                     owam->jointsctrl[jnum].run();
                     owam->suppress_controller[jnum]=false;
@@ -1614,11 +1618,11 @@ void WamDriver::MassProperties_callback(const boost::shared_ptr<const pr_msgs::M
   owam->lock("OWD MassProperties cb");
   owam->sim_links[mass->link].mass = mass->mass;
 
-  owam->links[mass->link].cog.x[0] = mass->cog_x;
-  owam->links[mass->link].cog.x[1] = mass->cog_y;
-  owam->links[mass->link].cog.x[2] = mass->cog_z;
+  owam->sim_links[mass->link].cog.x[0] = mass->cog_x;
+  owam->sim_links[mass->link].cog.x[1] = mass->cog_y;
+  owam->sim_links[mass->link].cog.x[2] = mass->cog_z;
   
-  owam->links[mass->link].inertia 
+  owam->sim_links[mass->link].inertia 
     = Inertia(  mass->inertia_xx, mass->inertia_xy, mass->inertia_xz,
                 mass->inertia_yy, mass->inertia_yz, mass->inertia_zz);
 
@@ -1732,9 +1736,10 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> 
   } else {
     owam->unlock();
     cmdnum++;
-    double heldPositions[Joint::Jn+1];
-    owam->posSmoother.getSmoothedPVA(heldPositions);
-    ServoTraj *straj = new ServoTraj(nJoints, cmdnum, heldPositions+1);
+#ifdef BUILD_FOR_SEA
+    owam->posSmoother.getSmoothedPVA(owam->heldPositions);
+#endif // BUILD_FOR_SEA
+    ServoTraj *straj = new ServoTraj(nJoints, cmdnum, owam->heldPositions+1);
     for (unsigned int i=0; i<servo->joint.size(); ++i) {
       straj->SetVelocity(servo->joint[i],servo->velocity[i]);
     }
@@ -1747,9 +1752,10 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> 
 bool WamDriver::StepJoint(owd::StepJoint::Request &req,
 			  owd::StepJoint::Response &res) {
   cmdnum++;
-  double heldPositions[Joint::Jn+1];
-  owam->posSmoother.getSmoothedPVA(heldPositions);
-  StepTraj *straj = new StepTraj(cmdnum, nJoints, req.joint, heldPositions+1, req.radians);
+#ifdef BUILD_FOR_SEA
+  owam->posSmoother.getSmoothedPVA(owam->heldPositions);
+#endif // BUILD_FOR_SEA
+  StepTraj *straj = new StepTraj(cmdnum, nJoints, req.joint, owam->heldPositions+1, req.radians);
   owam->run_trajectory(straj);
   ROS_DEBUG_NAMED("servo","Starting servo trajectory %d",cmdnum);
   return true;
@@ -1760,7 +1766,7 @@ bool WamDriver::SetGains(owd::SetGains::Request &req,
   return owam->set_gains(req.joint,req.gains);
 }
 
-//LLL
+#ifdef BUILD_FOR_SEA
 void WamDriver::wamjointtargets_callback(const boost::shared_ptr<const pr_msgs::IndexedJointValues> &jt) {
 
   if (owam->holdpos == false) {
@@ -1777,10 +1783,8 @@ void WamDriver::wamjointtargets_callback(const boost::shared_ptr<const pr_msgs::
   
   owam->posSmoother.setCoarseTarg(jt->jointIndices, jt->values);
   return;
-} 
+}
 
-
-#ifdef BUILD_FOR_SEA
 void WamDriver::resetSeaCtrl() {
   ROS_INFO("Reset SeaCtrl");
 

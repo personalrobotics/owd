@@ -41,8 +41,12 @@
 #include <pr_msgs/PIDgains.h>
 
 //LLL
+
+#ifdef BUILD_FOR_SEA
 #include "positionInterface/SmoothArm.h"
 #include "JointCtrlSea.hh"
+#endif // BUILD_FOR_SEA
+
 #include "DataRecorder.hh"
 
 #ifndef __WAM_H__
@@ -61,6 +65,7 @@ public:
   double looptime;
   double slowcount;
   double slowavg;
+  double slowmax;
   double slowreadtime;
   double slowctrltime;
   double slowsendtime;
@@ -77,6 +82,7 @@ public:
                looptime(0.0f),
                slowcount(0.0f),
                slowavg(0.0f),
+	       slowmax(0.0f),
                slowreadtime(0.0f),
                slowctrltime(0.0f),
                slowsendtime(0.0f),
@@ -113,6 +119,7 @@ public:
   Motor motors[Motor::Mn+1];               // Array of motors
   Link links[Link::Ln+1];                  // Array of links
   Link sim_links[Link::Ln+1];                  // Array of links (simulated)
+  double heldPositions[Joint::Jn+1];
   bool suppress_controller[Joint::Jn+1];    // flag to disable PID control
   bool check_safety_torques;
   double pid_torq[Joint::Jn+1];
@@ -173,8 +180,9 @@ public:
   // LLL a beta version of joint targs
   //JointTargets jointTargs;
   // LLL a beta version of position smoother 
+#ifdef BUILD_FOR_SEA
   SmoothArm posSmoother;
-
+#endif // BUILD_FOR_SEA
 
   WAM(CANbus* cb);
   ~WAM();

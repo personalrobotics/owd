@@ -79,10 +79,9 @@ public:
     void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &message);
     void MassProperties_callback(const boost::shared_ptr<const pr_msgs::MassProperties> &message);
 
-    // LLL
+#ifdef BUILD_FOR_SEA
     void wamjointtargets_callback(const boost::shared_ptr<const pr_msgs::IndexedJointValues> &message);
 
-#ifdef BUILD_FOR_SEA
     void resetSeaCtrl();
 
     void wam_seactrl_settl_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &message);

@@ -43,6 +43,10 @@ WAM::WAM(CANbus* cb) :
   se3traj = NULL;
   jointstraj = NULL;
   pulsetraj = NULL;
+  for(int i = Joint::J1; i<=Joint::Jn; i++) {
+    heldPositions[i] = 0;
+    suppress_controller[i]=false;
+  }
 
   
   links[Link::L0]=Link( DH(  0.0000,   0.0000,   0.0000,   0.0000), 0.0000, 
@@ -674,6 +678,7 @@ void* control_loop(void* argv){
   double controltime=0.0f;
   double sendtime=0.0f;
   double slowtime=0.0f;
+  double slowmax=0.0f;
   double slowreadtime=0.0f;
   double slowctrltime=0.0f;
   double slowsendtime=0.0f;
@@ -724,6 +729,9 @@ void* control_loop(void* argv){
       if ((t2-t1)>2000000) {
         slowcount++;
         slowtime += (t2-t1) * 1e-6;
+	if (slowtime > slowmax) {
+	  slowmax=slowtime;
+	}
         slowreadtime += (bt1-t2) * 1e-6;
         slowctrltime += (bt2-bt1) * 1e-6;
         slowsendtime += (bt3-bt2) * 1e-6;
@@ -741,8 +749,10 @@ void* control_loop(void* argv){
         wam->stats.slowreadtime = slowreadtime/slowcount;
         wam->stats.slowctrltime = slowctrltime/slowcount;
         wam->stats.slowsendtime = slowsendtime/slowcount;
+	wam->stats.slowmax = slowmax;
         readtime=controltime=sendtime=slowtime=0.0f;
         slowreadtime=slowctrltime=slowsendtime=0.0f;
+	slowmax=0.0f;
         looptime=0.0f;
         loopcount=slowcount=0;
       }
@@ -804,8 +814,6 @@ void WAM::newcontrol(double dt){
     static double trajtime=0.0f;
     static int safety_torque_count=0;
     
-    // TODO LLL: yikes! i'm not sure we want to lock here 
-    // if the non real-time thread locks as well
     this->lock();
 
     double traj_timestep;
@@ -830,8 +838,9 @@ void WAM::newcontrol(double dt){
 	bool data_recorded=false;
         // is there a joint trajectory running
         if(jointstraj != NULL){
-          //LLL
+#ifdef BUILD_FOR_SEA
           posSmoother.invalidate();
+#endif // BUILD_FOR_SEA
           try {
             RTIME t3 = rt_timer_ticks2ns(rt_timer_read());        
             jointstraj->evaluate(q_target, qd_target, qdd_target, traj_timestep * timestep_factor);
@@ -847,9 +856,10 @@ void WAM::newcontrol(double dt){
               // the trajectory control values persist for the rest of this
               // iteration (to help deccelerate if we're still moving), but
               // the next time around we'll start holding at the endpoint
-              double heldPositions[Joint::Jn+1];
               jointstraj->endPosition().cpy(&heldPositions[Joint::J1]);
+#ifdef BUILD_FOR_SEA	      
               posSmoother.reset(heldPositions, Joint::Jn+1);   
+#endif
               holdpos = true;  // should have been true already, but just making sure
               delete jointstraj;
               jointstraj = NULL;
@@ -918,12 +928,14 @@ void WAM::newcontrol(double dt){
             double heldPositions[Joint::Jn+1];
             hold_position(heldPositions,false);
 
+#ifdef BUILD_FOR_SEA
             // now do the same thing that the "if (holdpos)" step does, below
 	    try {
 	      posSmoother.getSmoothedPVA(heldPositions);
 	    } catch (char *errstr) {
 	      // state was invalid; ignore and use the one held (above)
 	    }
+#endif // BUILD_FOR_SEA
 	      
             for(int i = Joint::J1; i <= Joint::Jn; i++) {
               q_target[i] = heldPositions[i];
@@ -937,6 +949,7 @@ void WAM::newcontrol(double dt){
           }
         } else if (holdpos) {
 
+#ifdef BUILD_FOR_SEA
           if ( posSmoother.isValid() == false ) {
             // reset
             std::vector<double> startPosVec;
@@ -947,14 +960,13 @@ void WAM::newcontrol(double dt){
             posSmoother.reset(startPosVec);
           }
 
-          double heldPositions[Joint::Jn+1];
 	  try {
 	    posSmoother.getSmoothedPVA(heldPositions);
 	  } catch (char *errstr) {
-	    // state was invalid; issue a hold of our own
-	    hold_position(heldPositions, false);
+	    // state was invalid
 	  }
           //TODO if we want to use jsdyn, I believe we will have to set qd_target and qdd_target
+#endif // BUILD_FOR_SEA
 
           for(int i = Joint::J1; i <= Joint::Jn; i++) {
             q_target[i] = heldPositions[i];
@@ -966,9 +978,10 @@ void WAM::newcontrol(double dt){
           RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
           jscontroltime += (t2-t1) / 1e6;
           
-          #ifndef BUILD_FOR_SEA
           if (safety_torques_exceeded(pid_torq)) {
             // NEW WAY:
+
+#ifdef BUILD_FOR_SEA
             std::vector<double> slipPosVec;
             // reset the posSmoother at a new
             // target pos 10% towards the current pos 
@@ -976,15 +989,19 @@ void WAM::newcontrol(double dt){
               slipPosVec.push_back(0.9 * heldPositions[j] + 0.1 * joints[j].pos());
             }
             posSmoother.reset(slipPosVec);
-
-            // OLD WAY:
-            //    release_position(false);  // release (without locking)
-            //    hold_position(NULL,false);// and hold new current position
+#else // BUILD_FOR_SEA
+	    for(int jj = Joint::J1; jj <= Joint::Jn; jj++) {
+	      double jointdiff = joints[jj].pos() - heldPositions[jj];
+	      // inch the target pos 10% towards the current pos
+	      heldPositions[jj] += 0.1f * jointdiff;
+	    }
+#endif // BUILD_FOR_SEA
           }
-          #endif
+
         } else {
-          //LLL
+#ifdef BUILD_FOR_SEA
           posSmoother.invalidate();
+#endif // BUILD_FOR_SEA
           for(int i = Joint::J1; i <= Joint::Jn; i++) {
             pid_torq[i]=0.0f;  // zero out the torques otherwise
           }
@@ -1213,13 +1230,12 @@ int WAM::cancel_trajectory() {
     this->lock("cancel_traj");
     jointstraj->stop();
 
-    double heldPositions[Joint::Jn+1];
     for(int i = Joint::J1; i<=Joint::Jn; i++) {
       heldPositions[i] = joints[i].pos();
-      suppress_controller[i]=false;
     }
+#ifdef BUILD_FOR_SEA
     posSmoother.reset(heldPositions, Joint::Jn+1);   
-     
+#endif // BUILD_FOR_SEA     
     holdpos = true;  // should have been true already, but just making sure
     delete jointstraj;
     jointstraj = NULL;
@@ -1267,16 +1283,15 @@ int WAM::hold_position(double jval[],bool grab_lock)
    // if grab_lock is false, it assumes the mutex has already been acquired
    
 {
-    double heldPositions[Joint::Jn+1];
-
     if (holdpos) { // we're already holding
         if (jval != NULL) {  // but we still need to return the position if requested
+#ifdef BUILD_FOR_SEA
 	    try {
 	      posSmoother.getSmoothedPVA(heldPositions);
 	    } catch (char *errstr) {
-	      // state was invalid; issue a fresh hold_position
-	      hold_position(heldPositions,false);
+	      // state was invalid
 	    }
+#endif // BUILD_FOR_SEA
             for (int i = Joint::J1; i<=Joint::Jn; i++) {
                 jval[i]=heldPositions[i];
             }
@@ -1297,8 +1312,6 @@ int WAM::hold_position(double jval[],bool grab_lock)
         return OW_FAILURE;
     }
 
-    //holdpos = true;
-
     if(jointstraj != NULL)
     {
         jointstraj->stop();
@@ -1314,8 +1327,9 @@ int WAM::hold_position(double jval[],bool grab_lock)
             jval[i]=heldPositions[i];
         }
     }
+#ifdef BUILD_FOR_SEA
     posSmoother.reset(heldPositions, Joint::Jn+1);   
-
+#endif // BUILD_FOR_SEA
     holdpos = true;
 
     if (grab_lock) {
@@ -1338,39 +1352,17 @@ void WAM::release_position(bool grab_lock)
             jointsctrl[i].stop();
         }
         holdpos = false;
-        // LLL
+
+#ifdef BUILD_FOR_SEA
         posSmoother.invalidate();
-        // LLL
+#endif // BUILD_FOR_SEA
+
         if (grab_lock) {
             this->unlock("release pos");
         }
     }
 }
 
-/*
-void WAM::moveTrapezoid(const SE3& E02){
-  se3traj = new SE3Traj( FK(), E02, 
-                         new Trapezoid(Trapezoid::VMAX), 
-                         new Trapezoid(Trapezoid::WMAX) );
-  se3traj->run();
-  se3ctrl.reset();
-  se3ctrl.set(FK());
-  se3ctrl.run();
-}5A
-void WAM::moveTrapezoid(const double* q2[Joint::Jn+1]){
-  for(int j=Joint::J1; j<=Joint::Jn; j++){
-    if(mask & JointTraj::MASK[j]){
-      jointtraj[j] = new JointTraj(joints[j].pos(), q2[j], 
-                                   new Trapezoid(0.1) );
-      jointtraj[j]->run();
-      jointctrl[j].reset();
-      jointctrl[j].set(joints[j].pos());
-      jointctrl[j].run();
-    }
-    else jointtraj[j] = NULL;
-  }
-}
-*/
 
 void WAM::printjpos(){
   for(int j=Joint::J1; j<=Joint::Jn; j++)
@@ -1411,8 +1403,8 @@ void WAMstats::rosprint(int recorder_count) const {
                   loopctrl,
                   loopsend);
   if (slowcount > 0) {
-    ROS_WARN_NAMED("times","Slow cycles %2.1f%% of the time (avg=%2.1fms)",
-                   slowcount, slowavg);
+    ROS_WARN_NAMED("times","Slow cycles %2.1f%% of the time (avg=%2.1fms, max=%2.1fms)",
+                   slowcount, slowavg, slowmax);
     ROS_WARN_NAMED("times",
                    "  Slow breakdown: read %2.1fms, ctrl %2.1fms, send %2.1fms",
                    slowreadtime,
