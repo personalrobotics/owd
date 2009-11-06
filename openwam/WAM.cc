@@ -1104,7 +1104,7 @@ void WAM::newcontrol(double dt){
 
 bool WAM::safety_torques_exceeded(double t[]) {
     //    static double safety_torqs[8]={0.0,10.0,10.0,5.0,5.0,2,2,2};
-    static double safety_torqs[8]={0.0, 15.0, 15.0, 10.0, 8.0, 3.0, 3.0, 1.0};
+    static double safety_torqs[8]={0.0, 15.0, 30.0, 10.0, 15.0, 3.0, 3.0, 3.0};
     //static double safety_torqs[8]={0.0,50.0,75.0,75.0,60.0,15.0,15.0,15.0};
     bool bExceeded = false;
     if (!check_safety_torques) {

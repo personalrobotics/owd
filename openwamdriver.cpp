@@ -1344,7 +1344,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
 	   (owam->holdpos && (firstpoint == heldpoint)))) {
       ROS_ERROR_NAMED("AddTrajectory","First traj point doesn't match current position");
       char firststr[200], curstr[200], heldstr[200];
-      strcpy(firststr,""); strcpy(curstr,"");
+      strcpy(firststr,""); strcpy(curstr,""); strcpy(heldstr,"");
       for (unsigned int j=0; j<nJoints; ++j) {
         sprintf(firststr+strlen(firststr)," %1.4f",firstpoint[j]);
         sprintf(curstr+strlen(curstr)," %1.4f",curpoint[j]);

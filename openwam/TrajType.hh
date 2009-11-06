@@ -24,6 +24,9 @@ public:
     return false;
   }
 
+  inline bool operator==(const JointPos &rhs) const {
+    return ! operator!=(rhs);
+  }
 
   // add two vectors
   inline JointPos operator+(const JointPos &rhs) const {
