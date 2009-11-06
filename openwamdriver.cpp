@@ -1331,22 +1331,27 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   JointPos firstpoint(req.traj.positions[0].j);
 
   // figure out where robot will be at start of trajectory
-  JointPos curpoint(nJoints);
+  JointPos curpoint(nJoints), heldpoint(nJoints);
   if (! owam->jointstraj) {
     // no trajectory running, so get position from WAM
     double wampos[nJoints+1];
     owam->get_current_data(wampos,NULL,NULL);
     curpoint.SetFromArray(nJoints,wampos+1);
-    // make sure first point matches current pos or last queued pos.
-    if (firstpoint != curpoint) {
+    heldpoint.SetFromArray(nJoints,owam->heldPositions+1);
+    // make sure first point matches current pos or currently held position
+    // (could be slightly different if arm can't reach target pos)
+    if (! ((firstpoint == curpoint) ||
+	   (owam->holdpos && (firstpoint == heldpoint)))) {
       ROS_ERROR_NAMED("AddTrajectory","First traj point doesn't match current position");
-      char firststr[200], curstr[200];
+      char firststr[200], curstr[200], heldstr[200];
       strcpy(firststr,""); strcpy(curstr,"");
       for (unsigned int j=0; j<nJoints; ++j) {
         sprintf(firststr+strlen(firststr)," %1.4f",firstpoint[j]);
         sprintf(curstr+strlen(curstr)," %1.4f",curpoint[j]);
+        sprintf(heldstr+strlen(heldstr)," %1.4f",heldpoint[j]);
       }
       ROS_ERROR_NAMED("AddTrajectory","Current point: %s",curstr);
+      ROS_ERROR_NAMED("AddTrajectory","Held point: %s",heldstr);
       ROS_ERROR_NAMED("AddTrajectory","First point: %s",firststr);
       res.id = 0;
       return true;
