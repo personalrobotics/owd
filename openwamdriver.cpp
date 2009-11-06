@@ -1309,7 +1309,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   if (req.traj.positions.size() < 2) {
     ROS_ERROR_NAMED("AddTrajectory","Minimum of 2 traj points required");
     res.id = 0;
-    return true;
+    return false;
   }
 
 #ifdef FAKE7
@@ -1317,7 +1317,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
     ROS_ERROR("FAKE7 was defined but openwam was compiled with 7 DOF");
     ROS_ERROR("Remove -DWRIST from openwam and relink");
     res.id = 0;
-    return true;
+    return false;
   }
     
   // we're only running a 4DOF wam, so strip the extra DOFS from the
@@ -1354,7 +1354,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
       ROS_ERROR_NAMED("AddTrajectory","Held point: %s",heldstr);
       ROS_ERROR_NAMED("AddTrajectory","First point: %s",firststr);
       res.id = 0;
-      return true;
+      return false;
     }
   } else {
     // compare against the last queued point
@@ -1378,7 +1378,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
     if (firstpoint != curpoint) {
       ROS_ERROR_NAMED("AddTrajectory","First traj point doesn't match last queued point");
       res.id = 0;
-      return true;
+      return false;
     }
   }
     
@@ -1386,7 +1386,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   Trajectory *t = BuildTrajectory(req.traj);
   if (!t) {
     res.id = 0;
-    return true;
+    return false;
   }
   pr_msgs::TrajInfo ti;
   ti.id=t->id;
@@ -1428,7 +1428,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
       delete t;
       wamstate.trajectory_queue.pop_back();
       res.id = 0;
-      return true;
+      return false;
     }
   }
   owam->run_trajectory(t);
