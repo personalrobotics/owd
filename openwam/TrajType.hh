@@ -24,9 +24,20 @@ public:
     return false;
   }
 
+  inline bool closeto(const JointPos &rhs) const {
+    for (unsigned int i = 0; i < this->size(); ++i) {
+      if (fabs(this->operator[](i) - rhs[i]) > 0.05f ) {
+	return false;
+      }
+    }
+    return true;
+  }
+
   inline bool operator==(const JointPos &rhs) const {
     return ! operator!=(rhs);
   }
+
+  
 
   // add two vectors
   inline JointPos operator+(const JointPos &rhs) const {
