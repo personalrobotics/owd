@@ -427,10 +427,6 @@ void WSdynamics(double trq[Link::Ln+1],
 
     JacobianDB(J, links);
     
-    for(int i = 0; i < 6; i++)
-        for(int j = 0; j < 7; j++)
-	  //            ScreenBuf::jacobian[i][j] = J[j][i];
-
     //J'*F
     dgemv_(&TRANST, &NEQS,  &NJOINTS, &ALPHA,
 	   &J[0][0],        &LDJ,
