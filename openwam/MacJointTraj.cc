@@ -20,11 +20,11 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
 			   int trajid) :
   max_joint_vel(mjv), max_joint_accel(mja)
 {
+  // initialize the base class members
   id = trajid;
   WaitForStart=bWaitForStart;
   HoldOnStall=bHoldOnStall;
-  runstate=STOP;
-  time=0.0;
+
   // unlike previous trajectory code, this package assumes that
   // extraneous co-linear points have already been removed, so that
   // every remaining point is a bend or inflection.
@@ -248,14 +248,6 @@ void MacJointTraj::run() {
     }
     runstate=RUN;
     return;
-}
-
-void MacJointTraj::stop() {
-    runstate = STOP;
-}
-
-int MacJointTraj::state() {
-    return runstate;
 }
 
 void MacJointTraj::log(char *trajname) {

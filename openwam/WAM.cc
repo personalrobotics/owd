@@ -829,10 +829,10 @@ void WAM::newcontrol(double dt){
         mpos2jpos();    // convert to joint positions
         
         for(int j=Joint::J1; j<=Joint::Jn; j++){
-            q_target[j] = q[j] = joints[j].pos();
-            links[j].theta(q[j]);
-            sim_links[j].theta(q[j]);
-            qd_target[j] = qdd_target[j] = 0.0; // zero out
+	  q_target[j] = q[j] = joints[j].pos(); // set q_target for traj->eval
+	  links[j].theta(q[j]);
+	  sim_links[j].theta(q[j]);
+	  qd_target[j] = qdd_target[j] = 0.0; // zero out
         }
 	std::vector<double> data;
 	bool data_recorded=false;
@@ -872,6 +872,11 @@ void WAM::newcontrol(double dt){
             RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
             jscontroltime += (t2-t1) / 1e6;
             
+	    // inform the trajectory of how much torque it's causing
+	    if (jointstraj) { // make sure it wasn't deleted, above
+	      jointstraj->update_torques(pid_torq);
+	    }
+
 	    data_recorded=true;
 	    data.push_back(t1); // record the current time
 	    data.push_back(timestep_factor);  // time factor

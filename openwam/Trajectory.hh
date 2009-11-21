@@ -74,6 +74,8 @@ public:
 
   inline virtual const double curtime() const {return time;}
 
+  virtual void update_torques(double t[]) {}
+
   friend class WamDriver;
 };
 

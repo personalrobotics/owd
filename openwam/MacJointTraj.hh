@@ -37,13 +37,9 @@ public:
 		 int trajid);
     virtual ~MacJointTraj();
     
-    void lock(){pthread_mutex_lock(&mutex);}
-    void unlock(){pthread_mutex_unlock(&mutex);}
     void log(char *prefix);
     
     void run();
-    void stop();
-    int  state();
     void evaluate(double y[], double yd[], double ydd[], double dt);
     void get_path_values(double *path_vel, double *path_accel) const;
     void get_limits(double *max_path_vel, double *max_path_accel) const;
