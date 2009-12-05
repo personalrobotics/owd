@@ -27,9 +27,9 @@ int main(int argc, char** argv)
 
   // read parameters and set wam options
 
-  ros::NodeHandle n("~");
+  ros::NodeHandle n;
   std::string calibration_filename;
-  n.param("calibration_file",calibration_filename,std::string("wam_joint_calibrations"));
+  n.param("owd/calibration_file",calibration_filename,std::string("wam_joint_calibrations"));
   wam.Init(calibration_filename.c_str());
 
   wam.AdvertiseAndSubscribe(n);
