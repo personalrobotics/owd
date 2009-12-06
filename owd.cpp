@@ -8,22 +8,14 @@
 
 int main(int argc, char** argv)
 {
-  char *robotname;
-  if (argc > 1) {
-    robotname=strdup(argv[1]);
-  } else {
-    robotname=strdup("WAM");
-  }
-
-  ros::init(argc, argv, robotname, 0);
+  ros::init(argc, argv, std::string("owd"));
 
   if(mlockall(MCL_CURRENT | MCL_FUTURE) == -1){
     ROS_FATAL("canbus_handler: mlockall failed: ");
     return NULL;
   }
 
-  ROS_DEBUG("Creating robot %s",robotname);
-  WamDriver wam(robotname);
+  WamDriver wam("owd");
 
   // read parameters and set wam options
 
