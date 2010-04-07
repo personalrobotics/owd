@@ -1365,6 +1365,16 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
     // it was close enough)
     if (firstpoint != curpoint) {
       req.traj.positions[0].j = curpoint;
+      firstpoint=curpoint;
+
+      // must make sure that the blend radius of the next point
+      // isn't too big (the new first point might be closer to the
+      // second point than the original)
+      JointPos first_segment(JointPos(req.traj.positions[1].j) - firstpoint);
+      double segment_length=first_segment.length();
+      if (req.traj.blend_radius[1] > 0.5*segment_length) {
+	req.traj.blend_radius[1]=0.5*segment_length;
+      }
     }
   } else {
     // compare against the last queued point

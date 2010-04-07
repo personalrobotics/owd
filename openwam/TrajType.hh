@@ -26,8 +26,12 @@ public:
 
   inline bool closeto(const JointPos &rhs) const {
     for (unsigned int i = 0; i < this->size(); ++i) {
-      if (fabs(this->operator[](i) - rhs[i]) > 0.05f ) {
-	return false;
+      if ((i<3) && (fabs(this->operator[](i) - rhs[i]) > 0.1f)) {
+	return false;  // J1-J3
+      } else if ((i==3) && (fabs(this->operator[](i) - rhs[i]) > 0.2f)) {
+        return false; // J4
+      } else if ((i>3) && (fabs(this->operator[](i) - rhs[i]) > 0.4f )) {
+        return false; // J5-7
       }
     }
     return true;
