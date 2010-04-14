@@ -230,6 +230,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("SetStiffness",&WamDriver::SetStiffness,this);
   ss_DeleteTrajectory = 
     n.advertiseService("DeleteTrajectory",&WamDriver::DeleteTrajectory,this);
+  ss_CancelAllTrajectories = 
+    n.advertiseService("CancelAllTrajectories",&WamDriver::CancelAllTrajectories,this);
   ss_PauseTrajectory = 
     n.advertiseService("PauseTrajectory",&WamDriver::PauseTrajectory,this);
   ss_ReplaceTrajectory =
