@@ -21,13 +21,16 @@ endif()
 
 link_directories (../lapack ../esdcan-pci200/lib32)
 include_directories (openwam openmath esdcan-pci200/lib32)
+add_definitions("-ggdb3 -DWRIST -DBH8")
 
 rosbuild_add_executable(owd owd.cpp openwamdriver.cpp)
 target_link_libraries(owd openwam openmath lapack blas ntcan native gfortran)
-add_definitions("-ggdb3 -DWRIST -DBH8")
+
+rosbuild_add_executable(owdsim owd.cpp openwamdriver.cpp)
+target_link_libraries(owdsim openwamsim openmath lapack blas gfortran)
+rosbuild_add_compile_flags(owdsim "-DOWDSIM")
 
 rosbuild_add_executable(owd_test test.cpp)
-add_definitions("-ggdb3")
 
 include(detect_cpu.cmake)
 

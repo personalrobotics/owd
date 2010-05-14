@@ -8,7 +8,7 @@
 #define PUCK_IDLE 0 
 
 CANbus::CANbus() : puck_state(-1),trq(NULL),pos(NULL),
-		   pucks(NULL),npucks(0) {
+		   pucks(NULL),npucks(0),simulation(false) {
   //  pthread_mutex_init(&busmutex, NULL);
   pthread_mutex_init(&trqmutex, NULL);
   pthread_mutex_init(&posmutex, NULL);

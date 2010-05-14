@@ -171,7 +171,7 @@ public:
   void JSControl(double qdd[Joint::Jn+1], double dt);
   void newJSControl(double q_target[], double q[], double dt, double pid_torq[]); // Mike
 
-  void lock(const char *name=NULL);
+  void lock(const char *name="unspecified");
   void unlock(const char *name=NULL);
 
   CANbus* bus;                             // pointer to the CAN bus

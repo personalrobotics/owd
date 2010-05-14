@@ -6,7 +6,9 @@
 #include <math.h>            // M_PI
 #include <iomanip>
 
+#ifndef OWDSIM
 #include <ntcan.h>
+#endif
 
 #include <native/task.h>
 #include <native/timer.h>
@@ -55,16 +57,19 @@ private:
 
 public:
   int id;
-  NTCAN_HANDLE handle;
-  
   Group groups[NUM_GROUPS+1];
   long* trq;
   double* pos;
   Puck *pucks;
   int npucks;
+  bool simulation;
 
   pthread_mutex_t trqmutex;
   pthread_mutex_t posmutex;
+
+#ifndef OWDSIM
+  NTCAN_HANDLE handle;
+#endif
 
   int load();
   int open();

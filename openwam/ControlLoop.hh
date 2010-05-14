@@ -34,6 +34,12 @@ using namespace std;
 
 enum CONTROLLOOP_STATE{CONTROLLOOP_STOP, CONTROLLOOP_RUN};
 
+#ifdef OWDSIM
+typedef unsigned long long RTIME; // usually defined in xenomai types.h
+#else
+#include <native/types.h>
+#endif
+
 class ControlLoop{
 private:
   pthread_t ctrlthread;
@@ -57,6 +63,8 @@ public:
   int stop();
   int state();
   void wait();
+  static RTIME get_time_ns();
+
 };
 
 #endif

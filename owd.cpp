@@ -10,10 +10,12 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, std::string("owd"));
 
+#ifndef OWDSIM
   if(mlockall(MCL_CURRENT | MCL_FUTURE) == -1){
     ROS_FATAL("canbus_handler: mlockall failed: ");
     return NULL;
   }
+#endif
 
   WamDriver wam("owd");
 

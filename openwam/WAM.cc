@@ -193,13 +193,6 @@ WAM::WAM(CANbus* cb) :
     
 }
 
-/*
- * ok. the arguement for the pid*.dat files goes as follow.
- * J7 has quite a bit of friction for its weight. Thus, for small torques
- * it doesn't move at all.
- * HOWEVER! This doesn't solve the problem when moving in WS control...
- * (See the lil' hack in the control loop for this)
- */
 int WAM::init(){
 #ifdef WRIST
 
@@ -481,7 +474,7 @@ void WAM::dump(){
 int WAM::recv_mpos(){
   double mpos[NUM_NODES+1]; // large enough for the all possible pucks
 
-  if (!bus) { // allow running without CANbus for simulation
+  if (bus->simulation) { // allow running without CANbus for simulation
     return OW_SUCCESS;
   }
 
@@ -504,12 +497,12 @@ int WAM::recv_mpos(){
 int WAM::send_mtrq(){
   long mtrq[NUM_NODES+1];
 
-  if (!bus) { // allow running without CANbus for simulation
-    return OW_SUCCESS;
-  }
-
   for(int m=Motor::M1; m<=Motor::Mn; m++)
     mtrq[ motors[m].id() ] = (long) (motors[m].trq() * motors[m].IPNm());
+
+  if (bus->simulation) { // allow running without CANbus for simulation
+    return OW_SUCCESS;
+  }
 
   if(bus->send_torques(mtrq) == OW_FAILURE){
     ROS_ERROR("WAM::send_mtrq: send_torques failed." );
@@ -535,12 +528,12 @@ void WAM::mpos2jpos(){
 // convert joints positions to motors positions
 void WAM::jpos2mpos(){
   motors[1].pos( -joints[1].pos()*mN1 );
-  motors[2].pos(  joints[2].pos()*mN2 - joints[3].pos()*mN3/mn3 );
-  motors[3].pos( -joints[2].pos()*mN2 - joints[3].pos()*mN3/mn3 );
+  motors[2].pos(  joints[2].pos()*mN2 - joints[3].pos()*mN2/mn3 );
+  motors[3].pos( -joints[2].pos()*mN3 - joints[3].pos()*mN3/mn3 );
   motors[4].pos( -joints[4].pos()*mN4 );
 #ifdef WRIST
-  motors[5].pos(  joints[5].pos()*mN5 - joints[6].pos()*mN6/mn6 );
-  motors[6].pos(  joints[5].pos()*mN5 + joints[6].pos()*mN6/mn6 );
+  motors[5].pos(  joints[5].pos()*mN5 - joints[6].pos()*mN5/mn6 );
+  motors[6].pos(  joints[5].pos()*mN6 + joints[6].pos()*mN6/mn6 );
   motors[7].pos( -joints[7].pos()*mN7 );
 #endif
 }
@@ -566,10 +559,6 @@ void WAM::jtrq2mtrq(){
  */
 int WAM::set_jpos(double* pos){
   double mpos[NUM_NODES+1];
-
-  if (!bus) { // allow running without CANbus for simulation
-    return OW_SUCCESS;
-  }
 
   // block the control loop from messing with the motors and joints
   this->lock("set_jpos");
@@ -600,7 +589,7 @@ int WAM::set_jpos(double* pos){
 
 
 void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *simtrq){
-    this->lock();
+    this->lock("get_current_data");
     if (pos) {
       // joint positions
       for(int j=Joint::J1; j<=Joint::Jn; j++)
@@ -686,12 +675,12 @@ void* control_loop(void* argv){
   unsigned int loopcount = 0;
   unsigned int slowcount=0;
 
-  t1 = rt_timer_ticks2ns(rt_timer_read());  // first-time initialization
+  t1 = ControlLoop::get_time_ns();  // first-time initialization
 
   // Main control loop
   while(ctrl_loop->state() == CONTROLLOOP_RUN){
       ctrl_loop->wait();         // wait for the next control iteration;
-      t2 = rt_timer_ticks2ns(rt_timer_read()); // record the time
+      t2 = ControlLoop::get_time_ns(); // record the time
       
       // GET POSITIONS
       if(wam->bus->read_positions() == OW_FAILURE){
@@ -699,13 +688,13 @@ void* control_loop(void* argv){
         return NULL;
       }
       
-      RTIME bt1 = rt_timer_ticks2ns(rt_timer_read());
+      RTIME bt1 = ControlLoop::get_time_ns();
       readtime += (bt1-t2 ) * 1e-6;
       
       // CONTROL LOOP
       wam->newcontrol( ((double)(t2-t1)) * 1e-9); // ns to s
 
-      RTIME bt2 = rt_timer_ticks2ns(rt_timer_read());
+      RTIME bt2 = ControlLoop::get_time_ns();
       controltime += (bt2-bt1) * 1e-6; // ns to ms
 
       // SEND TORQUES
@@ -714,7 +703,7 @@ void* control_loop(void* argv){
         return NULL;
       }
 
-      RTIME bt3 = rt_timer_ticks2ns(rt_timer_read());
+      RTIME bt3 = ControlLoop::get_time_ns();
       sendtime += (bt3-bt2) * 1e-6;
 
       // MOTOR STATE
@@ -726,17 +715,18 @@ void* control_loop(void* argv){
       }
 
       // check for slow loops
-      if ((t2-t1)>2000000) {
+      double thistime = (t2-t1)* 1e-6;  // milliseconds
+      if (thistime > 2.0) {
         slowcount++;
-        slowtime += (t2-t1) * 1e-6;
-	if (slowtime > slowmax) {
-	  slowmax=slowtime;
+        slowtime += thistime;
+	if (thistime > slowmax) {
+	  slowmax=thistime;
 	}
         slowreadtime += (bt1-t2) * 1e-6;
         slowctrltime += (bt2-bt1) * 1e-6;
         slowsendtime += (bt3-bt2) * 1e-6;
       }
-      looptime += (t2-t1) * 1e-6;
+      looptime += thistime;
 
       // save time stats
       if (++loopcount == 1000) {
@@ -783,8 +773,6 @@ void* control_loop(void* argv){
 /*
  * This is the function called at each control loop
  * All the control stuff should happen in here.
- * The beef of this function runs in about 57usec on my computer (not counting
- * the calls to recv_mpos and send_mtrq)
  */
 
 // Mike's control loop outline:
@@ -814,7 +802,7 @@ void WAM::newcontrol(double dt){
     static double trajtime=0.0f;
     static int safety_torque_count=0;
     
-    this->lock();
+    this->lock("newcontrol");
 
     double traj_timestep;
     static double timestep_factor = 1.0f;
@@ -842,9 +830,9 @@ void WAM::newcontrol(double dt){
           posSmoother.invalidate();
 #endif // BUILD_FOR_SEA
           try {
-            RTIME t3 = rt_timer_ticks2ns(rt_timer_read());        
+            RTIME t3 = ControlLoop::get_time_ns();        
             jointstraj->evaluate(q_target, qd_target, qdd_target, traj_timestep * timestep_factor);
-            RTIME t4 = rt_timer_ticks2ns(rt_timer_read());        
+            RTIME t4 = ControlLoop::get_time_ns();        
             trajtime += (t4-t3) / 1e6;
             for(int j=Joint::J1; j<=Joint::Jn; j++){
               qd_target[j] *= timestep_factor;
@@ -867,9 +855,9 @@ void WAM::newcontrol(double dt){
             }
             
             // ask the controllers to compute the correction torques.
-            RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+            RTIME t1 = ControlLoop::get_time_ns();
             newJSControl(q_target,q,dt,pid_torq);
-            RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
+            RTIME t2 = ControlLoop::get_time_ns();
             jscontroltime += (t2-t1) / 1e6;
             
 	    // inform the trajectory of how much torque it's causing
@@ -946,9 +934,9 @@ void WAM::newcontrol(double dt){
               q_target[i] = heldPositions[i];
             }
             // ask the controllers to compute the correction torques.
-            RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+            RTIME t1 = ControlLoop::get_time_ns();
             newJSControl(q_target,q,dt,pid_torq);
-            RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
+            RTIME t2 = ControlLoop::get_time_ns();
             jscontroltime += (t2-t1) / 1e6;
             
           }
@@ -978,9 +966,9 @@ void WAM::newcontrol(double dt){
           }
           
           // ask the controllers to compute the correction torques.
-          RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+          RTIME t1 = ControlLoop::get_time_ns();
           newJSControl(q_target,q,dt,pid_torq);
-          RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
+          RTIME t2 = ControlLoop::get_time_ns();
           jscontroltime += (t2-t1) / 1e6;
           
           if (safety_torques_exceeded(pid_torq)) {
@@ -1034,9 +1022,9 @@ void WAM::newcontrol(double dt){
 	  }
 	}
         if(jsdyn){
-          RTIME t4 = rt_timer_ticks2ns(rt_timer_read());
+          RTIME t4 = ControlLoop::get_time_ns();
           JSdynamics(dyn_torq, links, qd_target, qdd_target); 
-          RTIME t5 = rt_timer_ticks2ns(rt_timer_read());
+          RTIME t5 = ControlLoop::get_time_ns();
           dyntime += (t5-t4) / 1e6;
           if (++dyncount == 1000) {
             stats.dyntime = dyntime/1000.0;
@@ -1066,20 +1054,28 @@ void WAM::newcontrol(double dt){
         if(send_mtrq() == OW_FAILURE) {
           ROS_ERROR("WAM::control_loop: send_mtrq failed.");
         }
+	if (bus->simulation) {
+	  // If we're running in simulation mode, then set the joint positions
+	  // as if they instantly moved to where we wanted.
+	  this->unlock();
+	  set_jpos(q_target);
+	  this->lock("newcontrol2");
+	}
+
     } else {
         // We lost communication with the pucks (someone probably hit the e-stop).
         motor_state=MOTORS_OFF;
         if (exit_on_pendant_press) {
           ROS_FATAL("WAM::control_loop: lost communication with the WAM; shutting down.");
           ROS_FATAL("If you want to restart the controller, make sure power is applied");
-          ROS_FATAL("and all e-stops are released, then re-run player.");
+          ROS_FATAL("and all e-stops are released, then re-run.");
           exit(1);
         }
     }
     
     this->unlock();
     long response;
-    if (bus) { // skip if running in simulation
+    if (!bus->simulation) { // skip if running in simulation
       int puckstate=bus->get_puck_state();
       if (puckstate != 2) {
         motor_state=MOTORS_IDLE;
@@ -1277,7 +1273,7 @@ void WAM::move_sigmoid(const double q2[Joint::Jn+1]){
 
 
 void WAM::set_stiffness(float s) {
-  this->lock();
+  this->lock("set_stiffness");
   stiffness = s;
   this->unlock();
 }
@@ -1379,9 +1375,12 @@ void WAM::printmtrq(){
 }
 
 void WAM::lock(const char *name) {
-    pthread_mutex_lock(&mutex);
-    static char msg[200];
+  static char last_locked_by[100];
+  pthread_mutex_lock(&mutex);
+  strncpy(last_locked_by,name,100);
+  last_locked_by[99]=0; // just in case it was more than 99 chars long
     if (name) {
+      static char msg[200];
       //      sprintf(msg,"OPENWAM locked by %s",name);
       //      syslog(LOG_ERR,msg);
         //    } else {

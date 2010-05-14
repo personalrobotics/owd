@@ -18,60 +18,17 @@
 */
 
 #include "ControlLoop.hh"
-#include <native/task.h>
-#include <native/timer.h>
 #include <ros/ros.h>
+#include <sys/time.h>
+#include <time.h>
+
 
 static void* control_handler(void* argv){
-  RT_TASK task;
-  RTIME samper, now;
   ControlLoop* ctrl_loop;
 
   ctrl_loop = (ControlLoop*)argv;
 
-  //RTAI:  rt_allow_nonroot_hrt();
-
-  int retvalue = rt_task_create(&task, "CANBUS", 0, 99, T_CPU(1));
-  if(retvalue){
-    ROS_FATAL("control_handler: rt_task_create failed");
-    return NULL;
-  }
-  if(mlockall(MCL_CURRENT | MCL_FUTURE) == -1){
-    ROS_FATAL("control_handler: mlockall failed");
-    ROS_ERROR_COND(
-		   rt_task_delete(&task), "Problem deleting RT task");
-    return NULL;
-  }
-
-#ifdef NOT_NECESSARY // causes an error
-    retvalue = rt_task_set_mode(0, T_PRIMARY, NULL);
-  if (retvalue) {
-    ROS_FATAL("Unable to run task in Primary mode: return=%d",retvalue);
-    ROS_ERROR_COND(
-		   rt_task_delete(&task),"Problem deleting RT task");
-    return NULL;
-  }
-#endif   
-  // 
-  retvalue = rt_timer_set_mode(TM_ONESHOT);
-  ROS_ERROR_COND(retvalue,"Unable to set timer in oneshot mode");
-
-  samper = rt_timer_ns2ticks( (RTIME)(ControlLoop::PERIOD*1000000000.0) );
-
-  // start_rt_timer(samper);
-  //  now = rt_timer_read();
-
-  if(rt_task_set_periodic(&task, TM_NOW, samper) != 0){
-    ROS_FATAL("control_handler: rt_task_make_periodic failed.");
-    ROS_ERROR_COND(
-		   rt_task_delete(&task),"Problem deleting RT task");
-    return NULL;
-  }
-
   ctrl_loop->ctrl_fnc( ctrl_loop->ctrl_argv );
-
-  ROS_ERROR_COND(
-		 rt_task_delete(&task),"Problem deleting RT task");
 
   return argv;
 }
@@ -119,8 +76,12 @@ int ControlLoop::state(){
   return s;
 }
 
-void ControlLoop::wait(){rt_task_wait_period(NULL);}
+void ControlLoop::wait() {
+  usleep(1700);
+}
 
 RTIME ControlLoop::get_time_ns() {
-  return rt_timer_ticks2ns(rt_timer_read());
+  timeval t;
+  gettimeofday(&t, NULL);
+  return t.tv_sec * 1e9 + t.tv_usec * 1e3;
 }

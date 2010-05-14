@@ -1107,3 +1107,5 @@ double MacQuinticSegment::cubic_solve(double A, double B, double C) {
     }
   } 
 }
+
+const double MacAccelElement::epsilon;

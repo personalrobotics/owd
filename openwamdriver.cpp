@@ -41,6 +41,12 @@
 
 #define SAFETY_MODULE 10
 
+#ifdef BT_USE_DOUBLE_PRECISION
+#warning DOUBLE PRECISION
+#else
+#warning NOT DOUBLE PRECISION
+#endif
+
 extern int MECH,AP,ZERO,IFAULT;
 extern int ADDR, VALUE, MODE;
 extern int dyn_active_link;
@@ -172,7 +178,22 @@ bool WamDriver::Init(const char *joint_cal_file)
   
   // Read our motor offsets from file (if found) and apply them
   // to the encoder values
-  if (WamWasZeroed) {
+  if (bus.simulation) {
+    // start the simulated wam with all joints set to zero
+    double wamhome[8] = {9999,  // dummy value in zero position
+			 0, 0, 0, 0, 0, 0, 0}; // J1-J7
+    // ROS_DEBUG("Starting at configuration [0,0,0,0,0,0,0]");
+    
+    if (owam->set_jpos(wamhome) == OW_FAILURE) {
+      ROS_FATAL("Unable to define WAM home position");
+      throw -1;
+    }
+
+    start_control_loop();
+    Dynamics::g=9.81; // turn on Gravity
+    owam->jsdynamics() = true; // turn on feed-forward dynamics
+
+  } else if (WamWasZeroed) {
     ROS_DEBUG("Wam was already zeroed from a previous run; motor offsets unchanged.");
     start_control_loop();
     Dynamics::g=9.81; // turn on Gravity
@@ -532,6 +553,10 @@ void WamDriver::calibrate_joint_angles() {
  *   4. Record AP-MECH offsets for each joint and save to file for next time
  *   5. Switch back to position mode if controller was idled (#1)
  */
+
+  if (bus.simulation) {
+    return;
+  }
 
     // Set up stdin to work char-by-char instead of line-by-line
     struct termios previous_termattr;
@@ -1255,12 +1280,15 @@ bool WamDriver::Publish() {
     char jref[50], jname[50];
     snprintf(jref,50,"wam%d",i);
     snprintf(jname,50,"wam%d",i+1);
+    std::string jrefstring(jref);
+    std::string jnamestring(jname);
     btTransform wam_tf = wam_tf_base[i] *
       btTransform(btQuaternion(jointpos[i+1],0,0));
     // instead:
     // wam_tf *= wam_tf_base[i] * btTransform(btQuaternion(jointpos[i+1],0,0));
     // jref="wam0";
-    tf_broadcaster.sendTransform(tf::StampedTransform(wam_tf,ros::Time::now(),jref,jname));
+    tf::StampedTransform st(wam_tf,ros::Time::now(),jrefstring,jnamestring);
+    tf_broadcaster.sendTransform(st);
 
   }
 
