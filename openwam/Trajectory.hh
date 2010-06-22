@@ -32,7 +32,7 @@ protected:
   pthread_mutex_t mutex;
   JointPos start_position, end_position;
   int runstate;
-  double time, total_time;
+  double time;
 public:
   
   static const int STOP = 0;

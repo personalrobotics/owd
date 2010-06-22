@@ -31,7 +31,9 @@ static void* control_handler(void* argv){
 
   //RTAI:  rt_allow_nonroot_hrt();
 
-  int retvalue = rt_task_create(&task, "CANBUS", 0, 99, T_CPU(1));
+  char taskname[20];
+  snprintf(taskname,20,"OWDTASK%02d",ctrl_loop->task_number);
+  int retvalue = rt_task_create(&task, taskname, 0, 99, T_CPU(1));
   if(retvalue){
     ROS_FATAL("control_handler: rt_task_create failed");
     return NULL;
@@ -76,9 +78,10 @@ static void* control_handler(void* argv){
   return argv;
 }
 
-ControlLoop::ControlLoop(){
+ControlLoop::ControlLoop(int tasknum) : task_number(tasknum) {
   pthread_mutex_init(&mutex, NULL);
 }
+
 
 int ControlLoop::start(void* (*fnc)(void*), void* argv){
 

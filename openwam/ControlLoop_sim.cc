@@ -33,7 +33,7 @@ static void* control_handler(void* argv){
   return argv;
 }
 
-ControlLoop::ControlLoop(){
+ControlLoop::ControlLoop(int tasknum) : task_number(tasknum){
   pthread_mutex_init(&mutex, NULL);
 }
 

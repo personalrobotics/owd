@@ -17,13 +17,17 @@ int main(int argc, char** argv)
   }
 #endif
 
-  WamDriver wam("owd");
 
   // read parameters and set wam options
 
-  ros::NodeHandle n;
+  ros::NodeHandle n("~");
   std::string calibration_filename;
-  n.param("owd/calibration_file",calibration_filename,std::string("wam_joint_calibrations"));
+  int canbus_number;
+  n.param("calibration_file",calibration_filename,std::string("wam_joint_calibrations"));
+  n.param("canbus_number",canbus_number,0);
+  ROS_DEBUG("Using CANbus number %d",canbus_number);
+
+  WamDriver wam(canbus_number);
   wam.Init(calibration_filename.c_str());
 
   wam.AdvertiseAndSubscribe(n);

@@ -28,7 +28,7 @@
 using namespace std;
 
 class Motor{
-private:
+public:
   pthread_mutex_t mutex;
   
   int ID;
@@ -36,6 +36,7 @@ private:
   double t;
   double puckI_per_Nm;       // Newton Meters -> puck torque units
   
+private:
   void lock(){pthread_mutex_lock(&mutex);};
   void unlock(){pthread_mutex_unlock(&mutex);};
 
@@ -74,17 +75,6 @@ private:
     unlock();
   }
   void pos(double Q){ lock();  q = Q;  unlock(); }
-  
-  friend istream& operator >> (istream& s, Motor& motor){
-    s >> motor.ID >> motor.puckI_per_Nm;
-    return s;
-  }
-
-  friend ostream& operator << (ostream& s, Motor& motor){
-    s << "id#: "  << setw(1) << motor.ID << "; " 
-      << "I/Nm: " << setw(6) << motor.puckI_per_Nm;
-    return s;
-  }
 }; 
 
 #endif

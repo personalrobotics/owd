@@ -8,6 +8,8 @@
 
 #ifndef OWDSIM
 #include <ntcan.h>
+#else
+#include <stdint.h>
 #endif
 
 #include <native/task.h>
@@ -102,7 +104,7 @@ public:
   }
 
 
-  CANbus();
+  CANbus(int bus_id, int num_pucks);
   ~CANbus(){
     if(pucks!=NULL) delete pucks; 
     if(trq!=NULL) delete trq; 

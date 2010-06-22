@@ -29,22 +29,17 @@ using namespace std;
 
 class Joint{
 private:
+  void lock(){pthread_mutex_lock(&mutex);}
+  void unlock(){pthread_mutex_unlock(&mutex);}
+
+
+public:
   pthread_mutex_t mutex;
 
   int    ID;
   double q;       // position
   double t;       // Nm or puck torque units
   
-  int zorder;
-  double zoffset;
-  double park;
-  double stop_trq;
-  
-  void lock(){pthread_mutex_lock(&mutex);}
-  void unlock(){pthread_mutex_unlock(&mutex);}
-
-public:
-
   static const int J1 = 1;
   static const int J2 = 2;
   static const int J3 = 3;
@@ -87,19 +82,6 @@ public:
     //cerr << "Joint::pos: WARNING J" << id() << " has reached its limit.\n";
   }
 
-  friend istream& operator >> (istream& s, Joint& j){
-    s >> j.ID >> j.zorder >> j.zoffset >> j.stop_trq >> j.park;
-    return s;
-  }
-
-  friend ostream& operator << (ostream& s, Joint& j){
-    s << "id#: "      << setw(1) << j.ID       << "; "
-      << "0 order: "  << setw(1) << j.zorder   << "; "
-      << "0 offset: " << setw(5) << j.zoffset  << "; "
-      << "stop trq: " << setw(2) << j.stop_trq << "; "
-      << "park: "     << setw(5) << j.park     << "; ";
-   return s;
-  }
 };
 
 #endif

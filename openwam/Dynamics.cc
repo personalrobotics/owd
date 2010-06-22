@@ -38,6 +38,7 @@ namespace Dynamics {
    double g = 9.81;
 }
 static R3 z0(0,0,1);
+static R3 up(1,0,0);  // arms turned upright on Herb 2.0
 int dyn_active_link=7;
 /*
  * Recursive Newton-Euler method (Luh, Walker, Paul)
@@ -50,7 +51,7 @@ void RNE(double tau[Link::Ln+1],
   R3 w, wd, v, vd, vdhat;
   R3 n, f, N[Link::Ln+1], F[Link::Ln+1];
 
-  vd = Dynamics::g*z0;
+  vd = Dynamics::g*up;
 
   for(int i=Link::L1; i<=Link::Ln; i++){
 
@@ -115,7 +116,7 @@ void CCG(double ccg[Link::Ln+1], Link links[Link::Ln+1],double qd[Link::Ln+1]){
     R3 N[Link::Ln+1]; //torques applied to links (forward recursing)
     R3 F[Link::Ln+1]; //forces applied to links (forward recursing)
   
-  vd = Dynamics::g*z0; //acceleration from gravity
+  vd = Dynamics::g*up; //acceleration from gravity
 
   //forward recursive computation for kinematic variables
   for(int i=Link::L1; i<=Link::Ln; i++){

@@ -125,12 +125,10 @@ public:
   double pid_torq[Joint::Jn+1];
   double sim_torq[Joint::Jn+1];
  
-  double A,B,C,D,E,F;                      // WTF?
   SE3 E0n;                                 // forward kinematics transformation
 
   SE3Traj     *se3traj;                    // Cartesian trajectory
   SE3CtrlPD    se3ctrl;                    // basic Cartesian controller
-  //  ParaJointTraj  *jointstraj;                 // joints trajectories
   Trajectory *jointstraj;
   PulseTraj   *pulsetraj;                  // trajectory of joint acceleration pulses
   int safetytorquecount[7];
@@ -157,9 +155,6 @@ public:
   WAMstats stats;
   inline void rosprint_stats() { stats.rosprint(recorder.count); bus->rosprint_stats();}
 
-  int load(const char* fn);
-  int loadctrl(const char* fn);
-   
   int recv_mpos();
   int send_mtrq();
 

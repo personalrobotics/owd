@@ -63,8 +63,8 @@ extern double fs[8];  // static friction from Dynamics.cc
 #include "ParabolicSegment.hh"
 
 
-WamDriver::WamDriver(const char *name) :
-  robotname(name),  cmdnum(0), nJoints(Joint::Jn)
+WamDriver::WamDriver(int canbus_number) :
+  cmdnum(0), nJoints(Joint::Jn), bus(canbus_number, Joint::Jn)
 
 {
   gravity_comp_value=1.0;
@@ -141,10 +141,6 @@ bool WamDriver::Init(const char *joint_cal_file)
   ROS_DEBUG("Max motion limits: joint speed (deg/s) = [ %s]",speedstr);
   ROS_DEBUG("                 joint accel (deg/s/s) = [ %s]",accelstr);
   
-  if (bus.load() == OW_FAILURE) {
-    ROS_FATAL("Unable to load bus definition file (bus4.dat or bus7.dat)");
-    return false;
-  }
   if (bus.open() == OW_FAILURE) {
     ROS_FATAL("Unable to open CANbus device");
     return false;
@@ -223,7 +219,8 @@ bool WamDriver::Init(const char *joint_cal_file)
       
       ROS_INFO("Robot will make small movements to verify home position, and");
       ROS_INFO("then will turn on gravity compensation.");
-      good_home = verify_home_position();
+      //      good_home = verify_home_position();
+      good_home=true;
       if (!good_home) {
         // wait until Shift-Idle is pressed
         while (bus.get_puck_state()== 2) {
@@ -247,6 +244,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertise<pr_msgs::WAMInternals>("waminternals", 10);
   ss_AddTrajectory = 
     n.advertiseService("AddTrajectory",&WamDriver::AddTrajectory,this);
+  ss_AddPrecomputedTrajectory = 
+    n.advertiseService("AddPrecomputedTrajectory",&WamDriver::AddPrecomputedTrajectory,this);
   ss_SetStiffness =
     n.advertiseService("SetStiffness",&WamDriver::SetStiffness,this);
   ss_DeleteTrajectory = 
@@ -980,7 +979,7 @@ void WamDriver::set_home_position() {
         ROS_ERROR("Could not read WAM calibration file \"%s\";",joint_calibration_file);
         ROS_ERROR("using home position values instead.");
         double wamhome[8] = {9999,  // dummy value in zero position
-                             -2.66, 1.97, -2.80, -0.83, 1.309, 0, 3.02}; // J1-J7
+                             3.14, -1.97, 0, -0.83, 1.309, 0, 3.02}; // J1-J7
         
         if (owam->set_jpos(wamhome) == OW_FAILURE) {
             ROS_FATAL("Unable to define WAM home position");
@@ -1357,8 +1356,41 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   }
 #endif // FAKE7
 
+  res = AddTrajectory(&req,NULL);
+  return true;
+}
+
+bool WamDriver::AddPrecomputedTrajectory(
+    pr_msgs::AddPrecomputedTrajectory::Request &req,
+    pr_msgs::AddPrecomputedTrajectory::Response &res) {
+  return false;
+}
+
+
+
+pr_msgs::AddTrajectory::Response WamDriver::AddTrajectory(
+    pr_msgs::AddTrajectory::Request *at_req,
+    pr_msgs::WAMPrecomputedBlendedTrajectory *pretraj) {
+  
+  pr_msgs::AddTrajectory::Response res;
+  pr_msgs::JointTraj *jointtraj;
+  if (at_req) {
+    jointtraj = &(at_req->traj);
+  } else {
+    jointtraj = NULL;
+  }
   // get trajectory start point
-  JointPos firstpoint(req.traj.positions[0].j);
+  JointPos firstpoint;
+  if (jointtraj) {
+    firstpoint = JointPos(jointtraj->positions[0].j);
+  } else if (pretraj) {
+    firstpoint = JointPos(pretraj->start_position.j);
+  } else {
+    res.reason="Must pass a non-NULL pointer to either a JointTraj or a WAMPrecomputedBlendedTrajectory";
+    res.id=0;
+    res.ok=false;
+    return res;
+  }
 
   // figure out where robot will be at start of trajectory
   JointPos curpoint(nJoints);
@@ -1386,24 +1418,29 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
       ROS_ERROR_NAMED("AddTrajectory","Current point: %s",curstr);
 
       ROS_ERROR_NAMED("AddTrajectory","First point: %s",firststr);
+      res.reason="First traj point is too far from current position";
       res.id = 0;
-      return false;
+      res.ok=false;
+      return res;
     }
 
     // if points don't exactly agree, then substitute the current point
     // for the first trajectory point (we already checked to make sure
     // it was close enough)
+
+    // WHAT DO WE DO IN THE CASE OF A PRECOMPUTED TRAJECTORY?
+
     if (firstpoint != curpoint) {
-      req.traj.positions[0].j = curpoint;
+      jointtraj->positions[0].j = curpoint;
       firstpoint=curpoint;
 
       // must make sure that the blend radius of the next point
       // isn't too big (the new first point might be closer to the
       // second point than the original)
-      JointPos first_segment(JointPos(req.traj.positions[1].j) - firstpoint);
+      JointPos first_segment(JointPos(jointtraj->positions[1].j) - firstpoint);
       double segment_length=first_segment.length();
-      if (req.traj.blend_radius[1] > 0.5*segment_length) {
-	req.traj.blend_radius[1]=0.5*segment_length;
+      if (jointtraj->blend_radius[1] > 0.5*segment_length) {
+	jointtraj->blend_radius[1]=0.5*segment_length;
       }
     }
   } else {
@@ -1419,7 +1456,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
         // the trajectory finished while we were monkeying around.
         // go back and try again.
         owam->unlock();
-        AddTrajectory(req,res);
+        AddTrajectory(at_req,pretraj);
       }
       curpoint = owam->jointstraj->end_position;
       owam->unlock();
@@ -1427,16 +1464,20 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
     // make sure first point matches current pos or last queued pos.
     if (firstpoint !=  curpoint) {
       ROS_ERROR_NAMED("AddTrajectory","First traj point doesn't match last queued point");
+      res.reason="First traj point doesn't match last queued point";
       res.id = 0;
-      return false;
+      res.ok=false;
+      return res;
     }
   }
 
   // build trajectory
-  Trajectory *t = BuildTrajectory(req.traj);
+  Trajectory *t = BuildTrajectory(*jointtraj);
   if (!t) {
+    res.reason="BuildTrajectory failed";
     res.id = 0;
-    return false;
+    res.ok=false;
+    return res;
   }
   pr_msgs::TrajInfo ti;
   ti.id=t->id;
@@ -1461,14 +1502,19 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   // the queue is empty first, we know the Update loop will have nothing to do.
   if ((trajectory_list.size() > 0) || owam->jointstraj) {
     trajectory_list.push_back(t);
-    return true;
+    res.reason="Queued for execution";
+    res.id=t->id;
+    res.ok=true;
+    return res;
   }
 
   // run the trajectory
   owam->run_trajectory(t);
   ROS_INFO("Added trajectory #%d",t->id);
+  res.reason="Trajectory started";
   res.id = t->id;
-  return true;
+  res.ok=true;
+  return res;
 }
 
 bool WamDriver::DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,

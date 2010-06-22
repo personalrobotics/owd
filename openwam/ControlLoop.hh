@@ -50,14 +50,14 @@ public:
   //static const double PERIOD = 0.01;
   //static const double PERIOD = 0.002;
   static const double PERIOD = 0.002;
-
+  int task_number; // must be unique on the machine
   void* (*ctrl_fnc)(void*);
   void* ctrl_argv;
 
   void lock(){pthread_mutex_lock(&mutex);}
   void unlock(){pthread_mutex_unlock(&mutex);}
 
-  ControlLoop();
+  ControlLoop(int tasknum);
   
   int start(void* ctrl_fnc(void*), void* argv);
   int stop();

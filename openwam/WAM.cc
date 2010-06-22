@@ -33,8 +33,8 @@ extern int MODE;  // puck parameter
 WAM::WAM(CANbus* cb) :
     check_safety_torques(true),rec(false),wsdyn(false),jsdyn(false),
     holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
-    pid_count(0),safety_hold(false),motor_state(MOTORS_OFF),
-    stiffness(1.0), recorder(50000)
+    pid_count(0),safety_hold(false),bus(cb),ctrl_loop(cb->id),
+    motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000)
 {
 
   pthread_mutex_init(&mutex, NULL);
@@ -194,63 +194,44 @@ WAM::WAM(CANbus* cb) :
 }
 
 int WAM::init(){
-#ifdef WRIST
-
-#ifdef BH8 // WRIST + HAND
-  if(load("wam7.dat") == OW_FAILURE || loadctrl("pid7bh8.dat") == OW_FAILURE)
-#else // WRIST BUT NO HAND
-  if(load("wam7.dat") == OW_FAILURE || loadctrl("pid7.dat") == OW_FAILURE)
-#endif
-
-#else // NO WRIST
-  if(load("wam4.dat") == OW_FAILURE || loadctrl("pid4.dat") == OW_FAILURE)
-#endif
-  {
-    ROS_FATAL("WAM::init: failed to load config file.");
-      return OW_FAILURE;
+  for(int j=Joint::J1; j<=Joint::Jn; j++) {
+    joints[j].ID = j;
   }
+  
+  motors[1].ID=1; motors[1].puckI_per_Nm = 2472;
+  motors[2].ID=2; motors[2].puckI_per_Nm = 2472;
+  motors[3].ID=3; motors[3].puckI_per_Nm = 2472;
+  motors[4].ID=4; motors[4].puckI_per_Nm = 2472;
+  if (Motor::Mn > 4) {
+    motors[5].ID=5; motors[5].puckI_per_Nm = 6105;
+    motors[6].ID=6; motors[6].puckI_per_Nm = 6105;
+    motors[7].ID=7; motors[7].puckI_per_Nm = 21400;
+  }
+  if (Motor::Mn > 7) {
+    motors[8].ID=8; motors[8].puckI_per_Nm = 500;
+    motors[9].ID=9; motors[9].puckI_per_Nm = 500;
+    motors[10].ID=10; motors[10].puckI_per_Nm = 500;
+    motors[11].ID=11; motors[11].puckI_per_Nm = 500;
+  }    
+
+  //                      Kp    Kd    Ki
+  jointsctrl[1].set_gains( 900, 10.0, 2.5);
+  jointsctrl[2].set_gains(2500, 20.0, 5.0);
+  jointsctrl[3].set_gains( 600, 10.0, 2.5);
+  jointsctrl[4].set_gains( 500,  2.5, 0.5);
+  if (Joint::Jn > 4) {
+  //                        Kp    Kd    Ki
+    jointsctrl[5].set_gains(  40,  0.5, 0.5);
+    jointsctrl[6].set_gains(  40,  0.5, 0.5);
+    jointsctrl[7].set_gains(  16,  0.2, 0.1);
+  }
+  if (Joint::Jn > 7) {
+    // set 280 Hand gains here
+  }
+
 #ifdef BUILD_FOR_SEA
   loadSeaParams();
 #endif
-  return OW_SUCCESS;
-}
-
-// load the WAM file and all the joints and motor stuff...
-int WAM::load(const char* fn){
-
-  ifstream is;
-  is.open(fn);
-  if(is.fail()){
-    ROS_FATAL("WAM::load: couldn't open file %s",fn);
-    return OW_FAILURE;
-  }
-  is >> A >> B >> C >> D;
-  
-  for(int j=Joint::J1; j<=Joint::Jn; j++) {
-    is >> joints[j];
-  }
-  
-  for(int m=Motor::M1; m<=Motor::Mn; m++) {
-    is >> motors[m];
-  }
-  
-  is.close();
-  
-  return OW_SUCCESS;
-}
-
-
-int WAM::loadctrl(const char* fn){
-  ifstream is;
-  
-  is.open(fn);
-  if(!is){
-    ROS_FATAL("WAM::load: couln't open file %s",fn);
-    return OW_FAILURE;
-  }
-  for(int j=Joint::J1; j<=Joint::Jn; j++)
-    is >> jointsctrl[j];
-
   return OW_SUCCESS;
 }
 

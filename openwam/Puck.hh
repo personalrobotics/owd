@@ -36,17 +36,13 @@ enum{STATUS_OFFLINE = -1,
 };
 
 class Puck{
- private:
-   int IoffsetB;         // Offset to calibrate zero for current sensors
-   int IoffsetC;         // Offset to calibrate zero for current sensors
-
+ public:
    int ID;
    int group_id;
    int group_order; 
    int motor_id;   
    int cpr;             // Encoder counts per revolution
 
- public:
 
   static const int MIN_TRQ[];
   static const int MAX_TRQ[];
@@ -59,24 +55,11 @@ class Puck{
   int motor(){return motor_id;}
   int CPR(){return cpr;}
   
-  friend istream& operator >> (istream& s, Puck& p){
-    s >> p.ID
-      >> p.motor_id
-      >> p.group_id
-      >> p.group_order
-      >> p.IoffsetB
-      >> p.IoffsetC
-      >> p.cpr;
-    return s;
-  }
-
   friend ostream& operator << (ostream& s, Puck& p){
     s << "Puck (id#): "     << p.id()     << "; "
       << "Motor#: "         << p.motor()  << "; "
       << "Group (id#): "    << p.group()  << "; "
       << "Group (order#): " << p.order()  << "; "
-      << "IoffsetB: "       << p.IoffsetB << "; "
-      << "IoffsetC: "       << p.IoffsetC << "; "
       << "Counts/Rev: "     << p.cpr;
     return s;
   }

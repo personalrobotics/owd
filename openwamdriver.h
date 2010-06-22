@@ -12,6 +12,7 @@
 #include <ros/ros.h>
 #include <boost/thread/mutex.hpp>
 #include <pr_msgs/AddTrajectory.h>
+#include <pr_msgs/AddPrecomputedTrajectory.h>
 #include <pr_msgs/DeleteTrajectory.h>
 #include <pr_msgs/CancelAllTrajectories.h>
 #include <pr_msgs/PauseTrajectory.h>
@@ -39,7 +40,7 @@ class WamDriver
 {
 public:
     
-    WamDriver(const char *robotname);
+  WamDriver(int canbus_number);
 
     ~WamDriver();
 
@@ -53,6 +54,8 @@ public:
 
     bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
                        pr_msgs::AddTrajectory::Response &res);
+    bool AddPrecomputedTrajectory(pr_msgs::AddPrecomputedTrajectory::Request &req,
+                       pr_msgs::AddPrecomputedTrajectory::Response &res);
     bool DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
                           pr_msgs::DeleteTrajectory::Response &res);
     bool CancelAllTrajectories(pr_msgs::CancelAllTrajectories::Request &req,
@@ -75,6 +78,10 @@ public:
 		  owd::SetGains::Response &res);
 
     void AdvertiseAndSubscribe(ros::NodeHandle &n);
+
+    pr_msgs::AddTrajectory::Response AddTrajectory(
+	   pr_msgs::AddTrajectory::Request *,
+	   pr_msgs::WAMPrecomputedBlendedTrajectory *pretraj);
 
     void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &message);
     void MassProperties_callback(const boost::shared_ptr<const pr_msgs::MassProperties> &message);
@@ -108,10 +115,6 @@ public:
     void publishAllSeaSettings();
 #endif
 
-
-
-
-    std::string robotname;
 
 private:
     Trajectory *BuildTrajectory(pr_msgs::JointTraj &jt);
@@ -181,6 +184,7 @@ private:
 
     ros::ServiceServer 
       ss_AddTrajectory,
+      ss_AddPrecomputedTrajectory,
       ss_SetStiffness,
       ss_DeleteTrajectory, 
       ss_CancelAllTrajectories,

@@ -7,21 +7,47 @@
 
 #define PUCK_IDLE 0 
 
-CANbus::CANbus() : puck_state(-1),trq(NULL),pos(NULL),
-		   pucks(NULL),npucks(0),simulation(false) {
+CANbus::CANbus(int bus_id, int num_pucks) : 
+  puck_state(-1),id(bus_id),trq(NULL),
+  pos(NULL), pucks(NULL),npucks(num_pucks),
+  simulation(false)
+{
   //  pthread_mutex_init(&busmutex, NULL);
   pthread_mutex_init(&trqmutex, NULL);
   pthread_mutex_init(&posmutex, NULL);
   pthread_mutex_init(&runmutex, NULL);
   pthread_mutex_init(&statemutex, NULL);
+
+  pucks = new Puck[npucks+1];
+  trq = new long[npucks+1];
+  pos = new double[npucks+1];
+  for(int p=1; p<=npucks; p++){
+    pos[p] = 0.0;
+    trq[p] = 0;
+    pucks[p].ID = p;
+    pucks[p].motor_id = p;
+    if (p<5) { // 4-DOF
+      pucks[p].group_id = 1;
+      pucks[p].group_order = p;
+    } else if (p<8) { // WRIST
+      pucks[p].group_id = 2;
+      pucks[p].group_order = p-4;
+    } else { // HAND
+      pucks[p].group_id = 3;
+      pucks[p].group_order = p-7;
+    }
+    pucks[p].cpr = 4096;
+  }
+
+  for(int p=1; p<=npucks; p++){
+    if(groups[ pucks[p].group() ].insert(&pucks[p]) == OW_FAILURE){
+      ROS_ERROR("CANbus::load: insert failed.");
+      throw OW_FAILURE;
+    }
+  }
 }
 
 int CANbus::init(){
-  if (load() == OW_FAILURE) {
-    ROS_ERROR("CANbus::init: load failed.");
-    return OW_FAILURE;
-  }
-
   if(open() == OW_FAILURE){
     ROS_ERROR("CANbus::init: open failed.");
     return OW_FAILURE;
@@ -30,44 +56,6 @@ int CANbus::init(){
   if(check() == OW_FAILURE){
       //ROS_ERROR("CANbus::init: check failed.");
     return OW_FAILURE;
-  }
-  return OW_SUCCESS;
-}
-
-int CANbus::load(){
-#ifdef WRIST
-  char *fn=strdup("bus7.dat");
-#else
-  char *fn=strdup("bus4.dat");
-#endif
-  ifstream is;
-   
-  is.open(fn);
-  if(!is){
-    ROS_ERROR("CANbus::load: couldn't open file %s",fn);
-    return OW_FAILURE;
-  }
-  free(fn);
-   
-  is >> id;
-  is >> npucks;
-  pucks = new Puck[npucks+1];
-  trq = new long[npucks+1];
-  pos = new double[npucks+1];
-  for(int p=1; p<=npucks; p++){
-    pos[p] = 0.0;
-    trq[p] = 0;
-  }
-   
-  for(int p=1; p<=npucks; p++)
-    is >> pucks[p];
-  is.close();
-
-  for(int p=1; p<=npucks; p++){
-    if(groups[ pucks[p].group() ].insert(&pucks[p]) == OW_FAILURE){
-      ROS_ERROR("CANbus::load: insert failed.");
-      return OW_FAILURE;
-    }
   }
   return OW_SUCCESS;
 }
@@ -161,9 +149,9 @@ int CANbus::check(){
   online_pucks = 0;
   for(int n=NODE_MIN; n<=NODE_MAX; n++){
 
-      //    if(nodes[n] != STATUS_OFFLINE){      // display online nodes
-      //      ROS_DEBUG("Node (id, status): (%d,%s)",n,(nodes[n] == STATUS_RESET)?"reset":"running");
-      //    }
+          if(nodes[n] != STATUS_OFFLINE){      // display online nodes
+            ROS_DEBUG("Node (id, status): (%d,%s)",n,(nodes[n] == STATUS_RESET)?"reset":"running");
+          }
 	 
     if(nodes[n]!=STATUS_OFFLINE && n!=SAFETY_MODULE) 
       online_pucks++;
@@ -173,7 +161,7 @@ int CANbus::check(){
     ROS_INFO_NAMED("cancheck","The wam appears to be turned off");
     return OW_FAILURE;
   }
-  if(online_pucks != npucks){
+  if(online_pucks < npucks){
     ROS_INFO_NAMED("cancheck","Bus has %d pucks. We expected %d",online_pucks,npucks);
     return OW_FAILURE;
   }  
