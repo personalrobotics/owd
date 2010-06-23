@@ -123,6 +123,15 @@ public:
   int read_torques(long* mtrq);
   int send_positions(double* mpos);
   int send_AP(long* apval);
+#ifdef BH280
+  int hand_reset();
+  int hand_move(double p1, double p2, double p3, double p4);
+  int hand_velocity(double v1, double v2, double v3, double v4);
+  int hand_relax();
+  int hand_get_positions(double &p1, double &p2, double &p3, double &p4);
+  int hand_get_modes(int32_t &m1, int32_t &m2, int32_t &m3, int32_t &m4);
+#endif // BH280
+
   
   int limits(double jointVel, double tipVel, double elbowVel);
   friend void* canbus_handler(void* argv);
