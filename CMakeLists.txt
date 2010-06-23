@@ -27,8 +27,8 @@ rosbuild_add_executable(owd owd.cpp openwamdriver.cpp)
 target_link_libraries(owd openwam openmath lapack blas ntcan native gfortran)
 
 rosbuild_add_executable(owdbhd owd.cpp openwamdriver.cpp bhd280.cc)
-target_link_libraries(owd openwambhd openmath lapack blas ntcan native gfortran)
-rosbuild_add_compile_flags(owdbhd "-DBHD280")
+target_link_libraries(owdbhd openwambhd openmath lapack blas ntcan native gfortran)
+rosbuild_add_compile_flags(owdbhd "-DBH280")
 
 rosbuild_add_executable(owdsim owd.cpp openwamdriver.cpp)
 target_link_libraries(owdsim openwamsim openmath lapack blas gfortran)

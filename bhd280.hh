@@ -6,7 +6,7 @@
 #include <pr_msgs/GetDOF.h>
 #include <pr_msgs/RelaxHand.h>
 
-class BHD280 {
+class BHD_280 {
 public:
   ros::Publisher
     pub_handstate;
@@ -21,8 +21,8 @@ public:
   
   pr_msgs::BHState bhstate;
 
-  BHD280(CANbus *cb);
-  ~BHD280();
+  BHD_280(CANbus *cb);
+  ~BHD_280();
   void AdvertiseAndSubscribe(ros::NodeHandle &n);
   void Unadvertise();
   bool Publish();

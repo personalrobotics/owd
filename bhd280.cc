@@ -1,6 +1,6 @@
 #include "bhd280.hh"
 
-BHD280::BHD280(CANbus *cb) : node("bhd"), bus(cb) {
+BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   AdvertiseAndSubscribe(node);
   bhstate.state = pr_msgs::BHState::state_uninitialized;
   bhstate.temperature=0.0f;
@@ -8,23 +8,23 @@ BHD280::BHD280(CANbus *cb) : node("bhd"), bus(cb) {
   bhstate.strain.resize(4, 0.0f);
 }
 
-BHD280::~BHD280() {
+BHD_280::~BHD_280() {
   Unadvertise();
 }
 
-void BHD280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
+void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
   pub_handstate = n.advertise<pr_msgs::BHState>("handstate", 10);
   ss_gethanddof = n.advertiseService("GetHandDOF",
-					&BHD280::GetDOF,this);
+					&BHD_280::GetDOF,this);
   ss_movehand = n.advertiseService("MoveHand",
-				      &BHD280::MoveHand,this);
+				      &BHD_280::MoveHand,this);
   ss_resethand = n.advertiseService("ResetHand",
-				       &BHD280::ResetHand,this);
+				       &BHD_280::ResetHand,this);
   ss_relaxhand = n.advertiseService("RelaxHand",
-				       &BHD280::RelaxHand,this);
+				       &BHD_280::RelaxHand,this);
 }
 
-void BHD280::Unadvertise() {
+void BHD_280::Unadvertise() {
   pub_handstate.shutdown();
   ss_gethanddof.shutdown();
   ss_movehand.shutdown();
@@ -32,7 +32,7 @@ void BHD280::Unadvertise() {
   ss_relaxhand.shutdown();
 }
 
-bool BHD280::Publish() {
+bool BHD_280::Publish() {
   int32_t state;
   if (bus->hand_get_positions(bhstate.positions[0],
 			      bhstate.positions[1],
@@ -57,7 +57,7 @@ bool BHD280::Publish() {
   
 
 // Handle requests for DOF information
-bool BHD280::GetDOF(pr_msgs::GetDOF::Request &req,
+bool BHD_280::GetDOF(pr_msgs::GetDOF::Request &req,
 			 pr_msgs::GetDOF::Response &res) {
   ROS_INFO_NAMED("service","Received GetDOF; returning 4");
   res.nDOF =4;
@@ -65,7 +65,7 @@ bool BHD280::GetDOF(pr_msgs::GetDOF::Request &req,
 }
 
 // Relax command
-bool BHD280::RelaxHand(pr_msgs::RelaxHand::Request &req,
+bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
 			    pr_msgs::RelaxHand::Response &res) {
   if (bus->hand_relax() == OW_SUCCESS) {
     return true;
@@ -75,7 +75,7 @@ bool BHD280::RelaxHand(pr_msgs::RelaxHand::Request &req,
 }
 
 // Reset command
-bool BHD280::ResetHand(pr_msgs::ResetHand::Request &req,
+bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
 			    pr_msgs::ResetHand::Response &res) {
   if (bus->hand_reset() == OW_SUCCESS) {
     return true;
@@ -85,7 +85,7 @@ bool BHD280::ResetHand(pr_msgs::ResetHand::Request &req,
 }
 
 // Move command
-bool BHD280::MoveHand(pr_msgs::MoveHand::Request &req,
+bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
 			   pr_msgs::MoveHand::Response &res) {
   if (bhstate.state == pr_msgs::BHState::state_uninitialized) {
     ROS_WARN_NAMED("bhd280","Rejected MoveHand: hand is uninitialized");
