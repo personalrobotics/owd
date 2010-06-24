@@ -17,6 +17,7 @@
 #include <native/mutex.h>
 
 #include <sys/mman.h>
+#include <queue>
 
 #include "Group.hh"
 #include "globals.h"
@@ -28,6 +29,7 @@ using namespace std;
 
 #define NODE_MIN 1
 #define NODE_MAX 15
+// it looks like NUM_NODES is 1 too many, since +1 seems to be added elsewhere.
 #define NUM_NODES (NODE_MAX - NODE_MIN + 2)
 
 class CANstats{
@@ -46,6 +48,16 @@ public:
   void rosprint() const;
     
 };
+
+#ifdef BH280
+class CANmsg {
+public:
+  int32_t nodeid;
+  int32_t property;
+  int32_t value;
+};
+#endif // BH280
+
 
 class CANbus{
 private:
@@ -82,11 +94,11 @@ public:
   
   int status(long* nodes);
   int parse(int32_t msgid, uint8_t* msg, int32_t msglen,
-	    int32_t* nodeid, int32_t* property, long* value);
+	    int32_t* nodeid, int32_t* property, int32_t* value);
   int compile(int32_t property, long value, uint8_t *msg, int *msglen);
   
-  int set_property(int32_t nid, int32_t property, long value, bool check);
-  int get_property(int32_t nid, int32_t property, long* value);
+  int set_property(int32_t nid, int32_t property, int32_t value, bool check);
+  int get_property(int32_t nid, int32_t property, int32_t* value);
   
   int read(int32_t* msgid, uint8_t* msg, int32_t* msglen, bool block);
   int send(int32_t  msgid, uint8_t* msg, int32_t  msglen, bool block);
@@ -124,10 +136,21 @@ public:
   int send_positions(double* mpos);
   int send_AP(long* apval);
 #ifdef BH280
+private:
   enum {HANDSTATE_UNINIT=0,
     HANDSTATE_DONE,
     HANDSTATE_MOVING };
 
+  std::queue<CANmsg> hand_read_queue;
+  std::queue<CANmsg> hand_write_queue;
+  pthread_mutex_t handmutex;
+
+  int32_t hand_get_property(int32_t id, int32_t prop);
+  void hand_set_property(int32_t id, int32_t prop, int32_t val);
+  int finger_reset(int32_t id);
+
+public:
+  int hand_activate();
   int hand_reset();
   int hand_move(double p1, double p2, double p3, double p4);
   int hand_velocity(double v1, double v2, double v3, double v4);
