@@ -64,8 +64,11 @@ extern double fs[8];  // static friction from Dynamics.cc
 
 
 WamDriver::WamDriver(int canbus_number) :
+#ifndef BH280_ONLY
   cmdnum(0), nJoints(Joint::Jn), bus(canbus_number, Joint::Jn)
-
+#else
+  cmdnum(0), nJoints(Joint::Jn), bus(canbus_number, 0)
+#endif // BH280_ONLY
 {
   gravity_comp_value=1.0;
   min_accel_time=1.0;
@@ -159,11 +162,15 @@ bool WamDriver::Init(const char *joint_cal_file)
     } while (bus.check() == OW_FAILURE);
   }
   
+#ifndef BH280_ONLY
   int32_t WamWasZeroed = 0;
   if (bus.get_property(SAFETY_MODULE, ZERO, &WamWasZeroed) == OW_FAILURE) {
     ROS_FATAL("Unable to query safety puck");
     return false;
   }
+#else 
+  WamWasZeroed=true;
+#endif // BH280_ONLY
   
   owam = new WAM(&bus);
   if (owam->init() == OW_FAILURE) {
@@ -999,6 +1006,7 @@ void WamDriver::start_control_loop() {
     // before starting the control thread, suppress faults and
     // get the position from the WAM, so that the safety module knows
     // where it's starting from
+#ifndef BH280_ONLY
     if(bus.set_property(SAFETY_MODULE, IFAULT, 4, true) == OW_FAILURE){
         ROS_FATAL("Unable to suppress safety module faults.");
         throw -1;
@@ -1010,13 +1018,15 @@ void WamDriver::start_control_loop() {
         ROS_FATAL("Unable to re-activate safety module.");
         throw -1;
     }
-
+#endif // BH280_ONLY
     ROS_INFO("Starting control thread");
 
     if (owam->start() == OW_FAILURE) {
         ROS_FATAL("Failed to start OpenWAM control thread");
         throw -1;
     }
+
+#ifndef BH280_ONLY
     // confirm with user
     ROS_ERROR("Verify the following:");
     ROS_ERROR("  1. WAM has %d joints (%s)",nJoints,nJoints==4?"wrist NOT INSTALLED":nJoints==7?"wrist INSTALLED":"WARNING: UNFAMILIAR CONFIG");
@@ -1041,7 +1051,7 @@ void WamDriver::start_control_loop() {
     while (bus.get_puck_state() != 2) {
       usleep(50000);
     }
-    
+#endif // BH280_ONLY    
 }
 
 void WamDriver::stop_control_loop() {

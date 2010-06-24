@@ -192,6 +192,7 @@ int CANbus::check(){  // DONE MVE
     ROS_INFO_NAMED("cancheck","Bus has %d pucks. We expected %d",online_pucks,npucks);
     return OW_FAILURE;
   }  
+#ifndef BH280_ONLY
   if(nodes[SAFETY_MODULE] == STATUS_OFFLINE){
     ROS_DEBUG_NAMED("cancheck","CANbus::check: safety module is offline");
     return OW_FAILURE;
@@ -269,6 +270,7 @@ int CANbus::check(){  // DONE MVE
     }
   }
   ROS_WARN("done.");
+#endif  // not BH280_ONLY
 #ifdef BH280
   ROS_WARN_NAMED("can_bh280","  Initializing hand pucks 11 to 14...");
   if (hand_activate() != OW_SUCCESS) {
@@ -617,14 +619,12 @@ int CANbus::read_positions(){
   // Compile the packet
   msg[0] = (uint8_t)AP;
 
-  //  pthread_mutex_lock(&busmutex);
 
 #ifdef RT_STATS
   RTIME bt1 = rt_timer_ticks2ns(rt_timer_read());
 #endif
   if(send(GROUPID(0), msg, 1, false) == OW_FAILURE){
     ROS_ERROR("CANbus::get_positions: send failed.");
-    //    pthread_mutex_unlock(&busmutex);
     return OW_FAILURE;
   }
 #ifdef RT_STATS
@@ -632,38 +632,53 @@ int CANbus::read_positions(){
   sendtime += (bt2-bt1) * 1e-6; // ns to ms
 #endif
 
+#ifndef BH280_ONLY
   for(int p=1; p<=npucks; ){
 
     if(read(&msgid, msg, &msglen, true) == OW_FAILURE){
       ROS_ERROR("CANbus::get_positions: read failed.");
-      //      pthread_mutex_unlock(&busmutex);
       return OW_FAILURE;
     }
 
     if(parse(msgid, msg, msglen, &nodeid, &property, &value) == OW_FAILURE){
       ROS_ERROR("CANbus::get_positions: parse failed.");
-      //      pthread_mutex_unlock(&busmutex);
       return OW_FAILURE;
     }
+#else
+  while (read(&msgid, msg, &msglen, true) != OW_FAILURE){
+    if(parse(msgid, msg, msglen, &nodeid, &property, &value) == OW_FAILURE){
+      ROS_ERROR("CANbus::get_positions: parse failed.");
+      return OW_FAILURE;
+    }
+#endif // BH280_ONLY
 #ifdef BH280
     if ((nodeid >= 11) && (nodeid <=14)) {
-      CANmsg msg;
-      msg.nodeid = nodeid;
-      msg.property = property;
-      msg.value = value;
-      pthread_mutex_lock(&handmutex);
-      hand_read_queue.push(msg);
-      pthread_mutex_unlock(&handmutex);
+      if (property == AP) {
+	if (!pthread_mutex_trylock(&handmutex)) {
+	  // it's ok if we miss a few position updates
+	  hand_positions[nodeid-10] = AP;
+	  pthread_mutex_unlock(&handmutex);
+	}
+      } else {
+	CANmsg msg;
+	msg.nodeid = nodeid;
+	msg.property = property;
+	msg.value = value;
+	pthread_mutex_lock(&handmutex);
+	hand_read_queue.push(msg);
+	pthread_mutex_unlock(&handmutex);
+      }
       --p; // this one doesn't count against the arm pucks
+      continue;
     }
-    else // exclude the next "if"
 #endif // BH280
+#ifndef BH280_ONLY
     if(property == AP){
       data[nodeid] = value;
       p++;
     }
   }
-  //  pthread_mutex_unlock(&busmutex);
+#endif // not BH280_ONLY
 
 #ifdef RT_STATS
   bt1 = rt_timer_ticks2ns(rt_timer_read());

@@ -672,11 +672,13 @@ void* control_loop(void* argv){
       RTIME bt1 = ControlLoop::get_time_ns();
       readtime += (bt1-t2 ) * 1e-6;
       
+#ifndef BH280_ONLY
       // CONTROL LOOP
       wam->newcontrol( ((double)(t2-t1)) * 1e-9); // ns to s
 
       RTIME bt2 = ControlLoop::get_time_ns();
       controltime += (bt2-bt1) * 1e-6; // ns to ms
+#endif // BH280_ONLY
 
       // SEND TORQUES
       if(wam->bus->send_torques() == OW_FAILURE){
@@ -687,6 +689,7 @@ void* control_loop(void* argv){
       RTIME bt3 = ControlLoop::get_time_ns();
       sendtime += (bt3-bt2) * 1e-6;
 
+#ifndef BH280_ONLY
       // MOTOR STATE
       // only check the state every 200 cycles
       static int stateperiod=0;
@@ -694,6 +697,7 @@ void* control_loop(void* argv){
         wam->bus->set_puck_state();
         stateperiod=0;
       }
+#endif // BH280_ONLY
 
       // check for slow loops
       double thistime = (t2-t1)* 1e-6;  // milliseconds

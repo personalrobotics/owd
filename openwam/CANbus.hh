@@ -157,6 +157,7 @@ public:
 private:
   std::queue<CANmsg> hand_read_queue;
   std::queue<CANmsg> hand_write_queue;
+  int32_t hand_positions[4+1];
   pthread_mutex_t handmutex;
 
   int32_t hand_get_property(int32_t id, int32_t prop);
