@@ -171,16 +171,16 @@ int CANbus::check(){  // DONE MVE
   online_pucks = 0;
   for(int n=NODE_MIN; n<=NODE_MAX; n++){
 
-          if(nodes[n] != STATUS_OFFLINE){      // display online nodes
-            ROS_DEBUG("Node (id, status): (%d,%s)",n,(nodes[n] == STATUS_RESET)?"reset":"running");
-          }
-	 
-    if(nodes[n]!=STATUS_OFFLINE && n!=SAFETY_MODULE) 
+    if(nodes[n] != STATUS_OFFLINE){      // display online nodes
+      ROS_DEBUG("Node (id, status): (%d,%s)",n,(nodes[n] == STATUS_RESET)?"reset":"running");
+    }
+    
+    if(nodes[n]!=STATUS_OFFLINE && n!=SAFETY_MODULE) {
       online_pucks++;
     }
   }
-
-  if(online_pucks==0){
+  
+  if (online_pucks==0){
     ROS_INFO_NAMED("cancheck","The wam appears to be turned off");
     return OW_FAILURE;
   }
@@ -545,7 +545,7 @@ int CANbus::send_torques(){
     while (hand_write_queue.size() > 0) {
       CANmsg msg = hand_write_queue.front();
       hand_write_queue.pop();
-      set_property(msg.node_id,msg.property,msg.value,false);
+      set_property(msg.nodeid,msg.property,msg.value,false);
     }
     pthread_mutex_unlock(&handmutex);
   }
@@ -652,7 +652,7 @@ int CANbus::read_positions(){
       msg.property = property;
       msg.value = value;
       pthread_mutex_lock(&handmutex);
-      hand_read_queue.push_back(msg);
+      hand_read_queue.push(msg);
       pthread_mutex_unlock(&handmutex);
       --p; // this one doesn't count against the arm pucks
     }
@@ -1159,8 +1159,8 @@ void CANbus::hand_set_property(int32_t id, int32_t prop, int32_t val) {
   msg.property=prop | 0x80; // high bit is 1 for SET
   msg.value=val;
   pthread_mutex_lock(&handmutex);
-  hand_write_queue.push_back(msg);
-  pthread_mutext_unlock(&handmutex);
+  hand_write_queue.push(msg);
+  pthread_mutex_unlock(&handmutex);
 }
 
 int32_t CANbus::hand_get_property(int32_t id, int32_t prop) {
@@ -1169,8 +1169,8 @@ int32_t CANbus::hand_get_property(int32_t id, int32_t prop) {
   msg.property=prop && 0x7F; // make sure high bit is 0 for GET
   msg.value=0;
   pthread_mutex_lock(&handmutex);
-  hand_write_queue.push_back(msg);
-  pthread_mutext_unlock(&handmutex);
+  hand_write_queue.push(msg);
+  pthread_mutex_unlock(&handmutex);
   // give the bus time to respond
   usleep(4000); // at least 2 cycles
   // now watch for the return msg
@@ -1208,11 +1208,11 @@ int CANbus::finger_reset(int32_t nodeid) {
   // now wait for the change in mode
   int32_t mode = hand_get_property(nodeid,MODE);
   unsigned int count = 80; // 4 seconds max
-  while ((mode != MODE_IDLE) && (--count)) {
+  while ((mode != PUCK_IDLE) && (--count)) {
     usleep(50000); // 50ms
     mode = hand_get_property(nodeid,MODE);
   }
-  if (mode != MODE_IDLE) {
+  if (mode != PUCK_IDLE) {
     ROS_WARN_NAMED("can_bh280","Finger puck %d didn't finish HI",nodeid);
     return OW_FAILURE;
   }

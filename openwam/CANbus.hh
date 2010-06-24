@@ -150,11 +150,11 @@ public:
   int send_positions(double* mpos);
   int send_AP(int32_t* apval);
 #ifdef BH280
-private:
   enum {HANDSTATE_UNINIT=0,
     HANDSTATE_DONE,
     HANDSTATE_MOVING };
 
+private:
   std::queue<CANmsg> hand_read_queue;
   std::queue<CANmsg> hand_write_queue;
   pthread_mutex_t handmutex;

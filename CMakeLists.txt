@@ -17,8 +17,8 @@ target_link_libraries(owd openwam openmath lapack blas native gfortran pcan)
 rosbuild_add_compile_flags(owd "-DPEAK_CAN")
 
 rosbuild_add_executable(owdbhd owd.cpp openwamdriver.cpp bhd280.cc)
-target_link_libraries(owdbhd openwambhd openmath lapack blas ntcan native gfortran)
-rosbuild_add_compile_flags(owdbhd "-DBH280")
+target_link_libraries(owdbhd openwambhd openmath lapack blas native gfortran pcan)
+rosbuild_add_compile_flags(owdbhd "-DBH280 -DPEAK_CAN")
 
 rosbuild_add_executable(owdsim owd.cpp openwamdriver.cpp)
 target_link_libraries(owdsim openwamsim openmath lapack blas gfortran)
@@ -66,5 +66,7 @@ if (XENO-CONFIG)
    
    rosbuild_add_compile_flags(owd ${XENOMAI_CFLAGS})
    rosbuild_add_compile_flags(owdsim ${XENOMAI_CFLAGS})
+   rosbuild_add_compile_flags(owdbhd ${XENOMAI_CFLAGS})
    rosbuild_add_link_flags(owd ${XENOMAI_LDFLAGS} -Wl,-rpath,${XENOMAI_LIBDIR})
+   rosbuild_add_link_flags(owdbhd ${XENOMAI_LDFLAGS} -Wl,-rpath,${XENOMAI_LIBDIR})
 endif(XENO-CONFIG)
