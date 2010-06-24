@@ -1,4 +1,7 @@
 #include "DataRecorder.hh"
+#include <stdlib.h>
+#include <string.h>
+
 
 DataRecorder::DataRecorder(int records) : recsize(0),count(0) {
   // just take an initial guess at number of fields (32) in order

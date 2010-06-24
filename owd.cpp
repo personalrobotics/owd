@@ -11,10 +11,12 @@ int main(int argc, char** argv)
   ros::init(argc, argv, std::string("owd"));
 
 #ifndef OWDSIM
+#ifndef NO_RT
   if(mlockall(MCL_CURRENT | MCL_FUTURE) == -1){
-    ROS_FATAL("canbus_handler: mlockall failed: ");
+    ROS_FATAL("owd: mlockall failed: ");
     return NULL;
   }
+#endif
 #endif
 
 

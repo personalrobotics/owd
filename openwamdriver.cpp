@@ -159,7 +159,7 @@ bool WamDriver::Init(const char *joint_cal_file)
     } while (bus.check() == OW_FAILURE);
   }
   
-  long WamWasZeroed = 0;
+  int32_t WamWasZeroed = 0;
   if (bus.get_property(SAFETY_MODULE, ZERO, &WamWasZeroed) == OW_FAILURE) {
     ROS_FATAL("Unable to query safety puck");
     return false;
@@ -496,9 +496,9 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
     if (moff_out) {
         fprintf(moff_out,"WAM encoder offset values\n");
         for (unsigned int puck_id = 1; puck_id <= nJoints; puck_id++) {
-            long mech;
-            long moff = get_puck_offset(puck_id,&mech);
-            fprintf(moff_out,"%d = %ld %ld\n",puck_id,moff,mech);
+            int32_t mech=0;
+            int32_t moff = get_puck_offset(puck_id,&mech);
+            fprintf(moff_out,"%d = %d %d\n",puck_id,moff,mech);
         }
         fclose(moff_out);
         ROS_DEBUG("New offsets written to \"%s\"",joint_calibration_file);
@@ -512,8 +512,8 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
     ROS_DEBUG("New offsets recorded; server ready.");
 }        
 
-int WamDriver::get_puck_offset(int puckid, long *mechout, long *apout) {
-    long p,mech;
+int WamDriver::get_puck_offset(int puckid, int32_t *mechout, int32_t *apout) {
+    int32_t p,mech;
     if (bus.get_property(bus.pucks[puckid].id(), AP, &p) == OW_FAILURE){
         cerr << "Failed to get AP" << endl;
         throw -1;
@@ -916,7 +916,7 @@ void WamDriver::set_home_position() {
     
     if (FILE *moff_file = fopen(joint_calibration_file,"r")) {
       ROS_INFO("Applying encoder offsets from file %s",joint_calibration_file);
-        long initial_mech[nJoints+1];
+        int32_t initial_mech[nJoints+1];
         for (unsigned int m =1; m <= nJoints; ++m) {
             puck_offsets[m] = initial_mech[m]=0;
         }
@@ -928,9 +928,9 @@ void WamDriver::set_home_position() {
             goto NOCALIB;
         } else {
             int puck_id;
-            long offset, initial;
+            int32_t offset, initial;
             unsigned int puckcount=0;
-            while (fscanf(moff_file,"%d = %ld %ld\n",
+            while (fscanf(moff_file,"%d = %d %d\n",
                           &puck_id,&offset,&initial) ==3 ) {
                 puck_offsets[puck_id] = offset;
                 initial_mech[puck_id] = initial;
@@ -940,21 +940,18 @@ void WamDriver::set_home_position() {
                 ROS_ERROR("Unrecognized format in joint calibration file \"%s\"",joint_calibration_file);
                 goto NOCALIB;
             }
-            long apvals[bus.npucks+1];
+            int32_t apvals[bus.npucks+1];
             for (puck_id = 1; puck_id<=bus.npucks; ++puck_id) {
-                long mech;
-                long old_AP;
+	      int32_t mech;
+	      int32_t old_AP;
                 
                 get_puck_offset(bus.pucks[puck_id].id(),&mech,&old_AP);
 
-#ifdef VERBOSE
-                cout << "Puck " << puck_id << " MECH=" << mech << endl;
-#endif // VERBOSE                
                 // Check to make sure we're mapping the offset to
                 // the nearest half-rev of the motor.  If it looks like
                 // we're more than half a rev away for when we saved
                 // the offset, add or subtract a full revolution.
-                long puckdiff = mech - initial_mech[puck_id];
+                int32_t puckdiff = mech - initial_mech[puck_id];
                 if (puckdiff < -2048) {
                     apvals[puck_id] = mech + puck_offsets[puck_id] + 4096;
                 } else if (puckdiff > 2048) {
@@ -971,6 +968,11 @@ void WamDriver::set_home_position() {
                 throw -1;
             }
             ROS_DEBUG("Positions set");
+            for (puck_id = 1; puck_id<=bus.npucks; ++puck_id) {
+                int32_t mech;
+                int32_t old_AP;
+                get_puck_offset(bus.pucks[puck_id].id(),&mech,&old_AP);
+        }
         }
         free(jvalstr);
         fclose(moff_file);

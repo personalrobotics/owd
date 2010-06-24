@@ -4,10 +4,12 @@
 #include "CANdefs.hh"
 #include <ros/ros.h>
 #include <native/task.h>
+#include <stdio.h>
+#include <fcntl.h>
 
 #define PUCK_IDLE 0 
 
-CANbus::CANbus(int bus_id, int num_pucks) : 
+CANbus::CANbus(int32_t bus_id, int num_pucks) :  // DONE MVW
   puck_state(-1),id(bus_id),trq(NULL),
   pos(NULL), pucks(NULL),npucks(num_pucks),
   simulation(false)
@@ -22,7 +24,7 @@ CANbus::CANbus(int bus_id, int num_pucks) :
 #endif // BH280
 
   pucks = new Puck[npucks+1];
-  trq = new long[npucks+1];
+  trq = new int32_t[npucks+1];
   pos = new double[npucks+1];
   for(int p=1; p<=npucks; p++){
     pos[p] = 0.0;
@@ -48,9 +50,14 @@ CANbus::CANbus(int bus_id, int num_pucks) :
       throw OW_FAILURE;
     }
   }
+#ifdef PEAK_CAN
+  can_accept[0] = 0x0000;  mask[0] = 0x03E0;
+  can_accept[1] = 0x0403;  mask[1] = 0x03E0;
+  can_accept[2] = 0x0406;  mask[2] = 0x03E0;
+#endif // PEAK_CAN
 }
 
-int CANbus::init(){
+int CANbus::init(){  // DONE MVW
   if(open() == OW_FAILURE){
     ROS_ERROR("CANbus::init: open failed.");
     return OW_FAILURE;
@@ -63,38 +70,50 @@ int CANbus::init(){
   return OW_SUCCESS;
 }
 
-int CANbus::open(){
+int CANbus::open(){  // DONE MVW
   //  pthread_mutex_lock(&busmutex);
    
-#ifdef PEAK
-  long  retvalue;
+#ifdef PEAK_CAN
+  DWORD  err;
 
-  handle = CAN_Open(HW_ISA_SJA, 0x300, 7);
-  //handle = CAN_Open(HW_ISA_SJA, 0x320, 5);
+  char devicename[20];
+  snprintf(devicename,20,"/dev/pcan%d",id);
+  handle = LINUX_CAN_Open(devicename,O_RDWR);
   
-	if (!handle)
-	{
-		ROS_ERROR("CANbus::open(): CAN_Open(): cannot open device");
-			  //		pthread_mutex_unlock(&busmutex);
-		return OW_FAILURE;
-	}
-     
-	// Clear Status
-	CAN_Status(handle);
-
-	retvalue = CAN_Init(handle, CAN_BAUD_1M, CAN_INIT_TYPE_ST);
-	if (retvalue)
-	{
-	  ROS_ERROR("CANbus::open(): CAN_Init(): failed with %d",retvalue);
-	  //		pthread_mutex_unlock(&busmutex);
-		return OW_FAILURE;		
-	}
-	//	pthread_mutex_unlock(&busmutex);
-
-	CAN_ResetFilter(handle);
-	CAN_MsgFilter(handle, 0x0000, 0x053F, MSGTYPE_STANDARD);
+  if (!handle)
+    {
+      ROS_ERROR("CANbus::open(): CAN_Open(): cannot open device");
+      //		pthread_mutex_unlock(&busmutex);
+      throw OW_FAILURE;
+    }
+  
+  // Clear Status
+  err = CAN_Status(handle);
+  ROS_DEBUG("CANbus::open(): bus status = 0x%x",err);
+  
+  err = CAN_Init(handle, CAN_BAUD_1M, CAN_INIT_TYPE_ST);
+  if (err)
+    {
+      ROS_ERROR("CANbus::open(): CAN_Init(): failed with 0x%x",err);
+      //		pthread_mutex_unlock(&busmutex);
+      return OW_FAILURE;		
+    }
+  //	pthread_mutex_unlock(&busmutex);
+  
+  if (err = CAN_ResetFilter(handle)) {
+    ROS_ERROR("CANbus::open(): Could not Reset Filter: 0x%x",err);
+  }
+  if (err = CAN_MsgFilter(handle, 0x0000, 0x07FF, MSGTYPE_STANDARD)) {
+    ROS_ERROR("CANbus::open(): Could not set Msg Filter: 0x%x",err);
+  }
+#ifdef NDEF
+  if (err = CAN_MsgFilter(handle, 0x0000, 0x00FF, MSGTYPE_EXTENDED)) {
+    ROS_ERROR("CANbus::open(): Could not set Msg Filter: 0x%x",err);
+  }
+#endif
 	
-#else   
+#endif // PEAK_CAN
+#ifdef ESD_CAN
 
 	if(canOpen(id, 0, TX_QUEUE_SIZE, RX_QUEUE_SIZE, 
 		   TX_TIMEOUT, RX_TIMEOUT, &handle) != NTCAN_SUCCESS){  
@@ -127,7 +146,7 @@ int CANbus::open(){
     ROS_ERROR("CANbus::open: allow_message failed.");
     return OW_FAILURE;
   }
-#endif
+#endif // ESD_CAN
 
   // Set the minimum required property values
   // (we'll set the rest once we know the pucks' firmware version
@@ -138,8 +157,8 @@ int CANbus::open(){
   return OW_SUCCESS;
 }
 
-int CANbus::check(){
-  long nodes[NUM_NODES+1];//, value;
+int CANbus::check(){  // DONE MVE
+  int32_t nodes[NUM_NODES+1];//, value;
   int online_pucks, reset_pucks, running_pucks;
 
   //Get status of pucks on bus
@@ -151,10 +170,12 @@ int CANbus::check(){
   //count number of live pucks
   online_pucks = 0;
   for(int n=NODE_MIN; n<=NODE_MAX; n++){
-    if(nodes[n] != STATUS_OFFLINE){      // display online nodes
-      ROS_DEBUG("Node (id, status): (%d,%s)",n,(nodes[n] == STATUS_RESET)?"reset":"running");
-    }
-    if(nodes[n]!=STATUS_OFFLINE && n!=SAFETY_MODULE)  {
+
+          if(nodes[n] != STATUS_OFFLINE){      // display online nodes
+            ROS_DEBUG("Node (id, status): (%d,%s)",n,(nodes[n] == STATUS_RESET)?"reset":"running");
+          }
+	 
+    if(nodes[n]!=STATUS_OFFLINE && n!=SAFETY_MODULE) 
       online_pucks++;
     }
   }
@@ -216,7 +237,7 @@ int CANbus::check(){
       ROS_DEBUG_NAMED("cancheck","OK");
 
       ROS_DEBUG_NAMED("cancheck","Setting max torque...");
-      int max_torque;
+      int32_t max_torque;
       if (p<4) { // pucks 1-3 (shoulder)
           max_torque = 4860;
       } else if (p==4) {  // puck 4 (elbow)
@@ -268,14 +289,16 @@ void CANbus::dump(){
   }
 }
    
-int CANbus::allow_message(int id, int mask){
+int CANbus::allow_message(int32_t id, int32_t mask){  // MVW DONE 
   
-#ifdef PEAK
+#ifdef PEAK_CAN
   
 	//Allows all messages
 	CAN_ResetFilter(handle);
 	
-#else
+#endif // PEAK_CAN
+
+#ifdef ESD_CAN
 	
   int i;
   //  pthread_mutex_lock(&busmutex);
@@ -290,12 +313,12 @@ int CANbus::allow_message(int id, int mask){
   }
   //  pthread_mutex_unlock(&busmutex);
   
-#endif
+#endif  // ESD_CAN
 
   return OW_SUCCESS;
 }
  
-int CANbus::wake_puck(int p){
+int CANbus::wake_puck(int32_t p){  // DONE MVW
     if(set_property(pucks[p].id(), STAT, STATUS_READY, false) == OW_FAILURE){
         // ROS_ERROR("CANbus::wake_puck: set_prop failed.");
         return OW_FAILURE;
@@ -305,11 +328,11 @@ int CANbus::wake_puck(int p){
 }
 
 // Got to make sure that nodes is NUM_NODES+1 long !!!
-int CANbus::status(long* nodes){
+int CANbus::status(int32_t* nodes){
   unsigned char msg[8];
-  int msgid, msglen, nodeid, property;
+  int32_t msgid, msglen, nodeid, property;
   int firstFound = 0;
-  long fw_vers;
+  int32_t fw_vers;
 
   ROS_INFO_NAMED("canstatus","Probing for nodes on the CAN bus");
 
@@ -364,9 +387,9 @@ int CANbus::status(long* nodes){
   return OW_SUCCESS;
 }
 
-int CANbus::set_property(int32_t nid, int32_t property, long value,bool check){
+int CANbus::set_property(int32_t nid, int32_t property, int32_t value,bool check){
   uint8_t msg[8];
-  long response;
+  int32_t response;
   int32_t msglen;
    
   if(compile(property, value, msg, &msglen) ==OW_FAILURE){
@@ -393,7 +416,7 @@ int CANbus::set_property(int32_t nid, int32_t property, long value,bool check){
     // Compare response to value
     if(response != value){
       ROS_ERROR("CANbus::set_property: response and value mismatch.");
-      ROS_ERROR("Puck %d, Property %d Set Value %d Response Value %d",nid,property,value,response);
+      ROS_ERROR("Puck %d, Property %d Set Value %ld Response Value %ld",nid,property,value,response);
       ROS_ERROR("Property P=%d, AP=%d",P,AP);
           
       return OW_FAILURE;
@@ -403,9 +426,10 @@ int CANbus::set_property(int32_t nid, int32_t property, long value,bool check){
   return OW_SUCCESS;
 }
 
-int CANbus::get_property(int32_t nid, int32_t property, long* value){
+int CANbus::get_property(int32_t nid, int32_t property, int32_t* value){
   uint8_t msg[8];
   int32_t msgid, msglen, nodeid, prop;
+  *value=0; // make sure all 64 bits are zero
 
   msg[0] = (uint8_t)property;   
 
@@ -436,7 +460,7 @@ int CANbus::get_property(int32_t nid, int32_t property, long* value){
   return OW_SUCCESS;
 }
 
-int CANbus::send_torques(long* torques){
+int CANbus::send_torques(int32_t* torques){
   if (! pthread_mutex_trylock(&trqmutex)) {
     for(int p=1; p<=npucks; p++)
       trq[p] = torques[p];
@@ -447,17 +471,17 @@ int CANbus::send_torques(long* torques){
 
 int CANbus::send_torques(){
   uint8_t msg[8];
-  int torques[NUM_ORDERS+1];
+  int32_t torques[NUM_ORDERS+1];
   Puck* puck;
 
   static double sendtime=0.0f;
   static unsigned int sendcount=0;
 
   // make a quick copy so that we can release the mutex
-  static long *mytorqs = (long *) malloc(NUM_NODES * sizeof(long));
+  static int32_t *mytorqs = (int32_t *) malloc(NUM_NODES * sizeof(int32_t));
 
   pthread_mutex_lock(&trqmutex);
-  memcpy(mytorqs,trq,NUM_NODES*sizeof(long));
+  memcpy(mytorqs,trq,NUM_NODES*sizeof(int32_t));
   pthread_mutex_unlock(&trqmutex);
 
   static int DEBUGCOUNT=0;
@@ -496,7 +520,9 @@ int CANbus::send_torques(){
           
 	  //          pthread_mutex_lock(&busmutex);
 
+#ifdef RT_STATS
 	  RTIME bt1 = rt_timer_ticks2ns(rt_timer_read());
+#endif
           if(send(GROUPID(groups[g].id()), msg, 8, false) == OW_FAILURE){
               ROS_ERROR("CANbus::set_torques: send failed.");
 	      //              pthread_mutex_unlock(&busmutex);
@@ -504,9 +530,11 @@ int CANbus::send_torques(){
           }
 	  //          pthread_mutex_unlock(&busmutex);
 
+#ifdef RT_STATS
 	  RTIME bt2 = rt_timer_ticks2ns(rt_timer_read());
 	  sendtime += (bt2-bt1) * 1e-6; // ns to ms
 	  ++sendcount;
+#endif
       }
 
   }
@@ -532,9 +560,9 @@ int CANbus::send_torques(){
   return OW_SUCCESS;
 }
 
-int CANbus::read_torques(long* mtrq){
+int CANbus::read_torques(int32_t* mtrq){
   uint8_t  msg[8];
-  long int value;
+  int32_t value;
   int32_t msgid, msglen, nodeid, property;
 
   // Compile the packet
@@ -542,18 +570,18 @@ int CANbus::read_torques(long* mtrq){
 
   //  pthread_mutex_lock(&busmutex);
   if(send(GROUPID(0), msg, 1, true) == OW_FAILURE){
-    ROS_ERROR("CANbus::get_positions: send failed.");;
+    ROS_ERROR("CANbus::read_torques: send failed.");;
     //    pthread_mutex_unlock(&busmutex);
     return OW_FAILURE;
   }
   for(int p=1; p<=npucks; ){
     if(read(&msgid, msg, &msglen, true) == OW_FAILURE){
-      ROS_ERROR("CANbus::get_positions: read failed.");
+      ROS_ERROR("CANbus::read_torques: read failed.");
       //      pthread_mutex_unlock(&busmutex);
       return OW_FAILURE;
     }
     if(parse(msgid, msg, msglen, &nodeid, &property, &value) == OW_FAILURE){
-      ROS_ERROR("CANbus::get_positions: parse failed.");
+      ROS_ERROR("CANbus::read_torques: parse failed.");
       //      pthread_mutex_unlock(&busmutex);
       return OW_FAILURE;
     }
@@ -580,7 +608,7 @@ int CANbus::read_positions(double* positions){
 
 int CANbus::read_positions(){
   uint8_t  msg[8];
-  long data[NUM_NODES+1], value;
+  int32_t data[NUM_NODES+1], value;
   int32_t msgid, msglen, property, nodeid;
   static double sendtime=0.0f;
   static double readtime=0.0f;
@@ -591,14 +619,18 @@ int CANbus::read_positions(){
 
   //  pthread_mutex_lock(&busmutex);
 
+#ifdef RT_STATS
   RTIME bt1 = rt_timer_ticks2ns(rt_timer_read());
+#endif
   if(send(GROUPID(0), msg, 1, false) == OW_FAILURE){
     ROS_ERROR("CANbus::get_positions: send failed.");
     //    pthread_mutex_unlock(&busmutex);
     return OW_FAILURE;
   }
+#ifdef RT_STATS
   RTIME bt2 = rt_timer_ticks2ns(rt_timer_read());
   sendtime += (bt2-bt1) * 1e-6; // ns to ms
+#endif
 
   for(int p=1; p<=npucks; ){
 
@@ -633,8 +665,10 @@ int CANbus::read_positions(){
   }
   //  pthread_mutex_unlock(&busmutex);
 
+#ifdef RT_STATS
   bt1 = rt_timer_ticks2ns(rt_timer_read());
   readtime += (bt1-bt2) * 1e-6; // ns to ms
+#endif
 
   // convert the results
   pthread_mutex_lock(&posmutex);
@@ -654,16 +688,16 @@ int CANbus::read_positions(){
 }
 
 int CANbus::send_positions(double* mpos){
-  long position[npucks+1];
+  int32_t position[npucks+1];
 
   for(int p=1; p<=npucks; p++){
-    position[p] = (long)floor( mpos[ pucks[p].motor() ]*
+    position[p] = (int32_t)floor( mpos[ pucks[p].motor() ]*
 			    pucks[p].CPR()/(2.0*M_PI) );
   }   
   return send_AP(position);
 }
 
-int CANbus::send_AP(long* apval){
+int CANbus::send_AP(int32_t* apval){
 
   //
   // WARNING
@@ -712,9 +746,9 @@ int CANbus::send_AP(long* apval){
 }
 
 int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
-		  int32_t* nodeid, int32_t* property, long* value){
-  int i;
-  int dataHeader;
+		  int32_t* nodeid, int32_t* property, int32_t* value){
+  int32_t i;
+  int32_t dataHeader;
 
   *nodeid = ADDR2NODE(msgid);
   if(*nodeid == -1){
@@ -728,9 +762,9 @@ int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
       
   case 3:  // Data is a packed 22-bit position, SET 
     *value = 0x00000000;
-    *value |= ( (long)msg[0] << 16) & 0x003F0000;
-    *value |= ( (long)msg[1] << 8 ) & 0x0000FF00;
-    *value |= ( (long)msg[2] )      & 0x000000FF;
+    *value |= ( (int32_t)msg[0] << 16) & 0x003F0000;
+    *value |= ( (int32_t)msg[1] << 8 ) & 0x0000FF00;
+    *value |= ( (int32_t)msg[2] )      & 0x000000FF;
       
     if(*value & 0x00200000) // If negative 
       *value |= 0xFFC00000; // Sign-extend 
@@ -739,9 +773,9 @@ int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
 
 #ifdef JOINT_ENCODERS
       jointPosition[*nodeid] = 0;
-      jointPosition[*nodeid] |= ( (long)messageData[3] << 16) & 0x003F0000;
-      jointPosition[*nodeid] |= ( (long)messageData[4] << 8 ) & 0x0000FF00;
-      jointPosition[*nodeid] |= ( (long)messageData[5] ) & 0x000000FF;
+      jointPosition[*nodeid] |= ( (int32_t)messageData[3] << 16) & 0x003F0000;
+      jointPosition[*nodeid] |= ( (int32_t)messageData[4] << 8 ) & 0x0000FF00;
+      jointPosition[*nodeid] |= ( (int32_t)messageData[5] ) & 0x000000FF;
       
       if (jointPosition[*nodeid] & 0x00200000) /* If negative */
          jointPosition[*nodeid] |= 0xFFC00000; /* Sign-extend */
@@ -774,7 +808,7 @@ int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
     //
     *value = 0;
     for(i=0; i<msglen-2; i++)
-      *value |= ((unsigned long)msg[i + 2] << (i * 8))
+      *value |= ((unsigned int32_t)msg[i + 2] << (i * 8))
 	& (0x000000FF << (i * 8));
       
     if (*value & (1 << ((i*8) - 1)))
@@ -795,7 +829,7 @@ int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
   return OW_SUCCESS;
 }
 
-int CANbus::compile(int32_t property, long value, 
+int CANbus::compile(int32_t property, int32_t value, 
 		    uint8_t *msg, int32_t *msglen){
   int i;
    
@@ -822,24 +856,87 @@ int CANbus::compile(int32_t property, long value,
   return OW_SUCCESS;
 }
 
-int CANbus::read(int32_t* msgid, uint8_t* msg, int32_t* msglen, bool block){
-    //    ROS_ERROR("CANbus:: READ");
+int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){ // DONE MVW
 
-  
-  CMSG cmsg;
   int32_t len = 1;
   int i, err;
   
+
+#ifdef PEAK_CAN
+  TPCANRdMsg cmsg;
+  int pendread=0;
+  int pendwrite=0;
+
+  if (block) {
+    err = LINUX_CAN_Read(handle, &cmsg);
+    // filtering seems to be unused in the Barrett code, so
+    // I won't use it here, either.
+    // int filterOK=0
+    // for (i=0; i<MAX_FILTERS; ++i) {
+    //   if (msg.id & ~mask[i] == can_accept[i]) {
+    //  	filterOK = 1;
+    //   }
+    // }
+  } else {
+    err = LINUX_CAN_Extended_Status(handle,&pendread, &pendwrite);
+    if ((err != CAN_ERR_OK) && (err != CAN_ERR_QRCVEMPTY)) {
+      ROS_ERROR("CANbus::read CAN_Extended_Status failed: 0x%x",err);
+      return OW_FAILURE;
+    }
+    if (err == CAN_ERR_QRCVEMPTY) {
+      ROS_DEBUG("Warning: receiver queue empty");
+    }
+    if (pendread) {
+      err = LINUX_CAN_Read(handle,&cmsg);
+    } else {
+      // sleep briefly and try once more
+      usleep(100);
+      pendread=pendwrite=0;
+      err = LINUX_CAN_Extended_Status(handle,&pendread, &pendwrite);
+      if ((err != CAN_ERR_OK) && (err != CAN_ERR_QRCVEMPTY)) {
+	ROS_ERROR("CANbus::read CAN_Extended_Status failed: 0x%x",err);
+	return OW_FAILURE;
+      }
+      if (err == CAN_ERR_QRCVEMPTY) {
+	ROS_DEBUG("Warning: receiver queue empty");
+      }
+      if (!pendread) {
+	ROS_ERROR("CANbus::read No messages to read");
+	return OW_FAILURE;
+      } else {
+	err = LINUX_CAN_Read(handle,&cmsg);
+      }
+    }
+    if (err != CAN_ERR_OK) {
+	ROS_ERROR("CANbus::read LINUX_CAN_Read failed: 0x%x",err);
+	return OW_FAILURE;
+    }
+  }
+  if (err != CAN_ERR_OK) {
+    ROS_ERROR("CANbus::read: canRead failed: 0x%x",err);
+    return OW_FAILURE;
+  }
+  *msgid = cmsg.Msg.ID;
+  *msglen = cmsg.Msg.LEN;
+  for (i=0; i< *msglen; ++i) {
+    msgdata[i] = cmsg.Msg.DATA[i];
+  }
+  return OW_SUCCESS;
+#endif // PEAK_CAN
+
+#ifdef ESD_CAN
+  CMSG msg;
+
   if(block){
     err = canRead(handle, &cmsg, &len, NULL);
     if (err != NTCAN_SUCCESS) {
-      ROS_ERROR("CANbus::read: canRead failed: %x",err);
+      ROS_ERROR("CANbus::read: canRead failed: 0x%x",err);
       return OW_FAILURE;
     }
   }
   else{
     if((err=canTake(handle, &cmsg, &len)) != NTCAN_SUCCESS){
-      ROS_ERROR("CANbus::read: canTake failed: %x",err);
+      ROS_ERROR("CANbus::read: canTake failed: 0x%x",err);
       return OW_FAILURE;
     }
   }
@@ -856,54 +953,89 @@ int CANbus::read(int32_t* msgid, uint8_t* msg, int32_t* msglen, bool block){
   *msgid = cmsg.id;
   *msglen = cmsg.len;
   for(i=0; i<*msglen; i++)
-    msg[i] = cmsg.data[i];
+    msgdata[i] = cmsg.data[i];
  
   return OW_SUCCESS;
+#endif // ESD_CAN
 }
 
-int CANbus::send(int32_t msgid, uint8_t* msg, int32_t msglen, bool block){
+int CANbus::send(int32_t msgid, uint8_t* msgdata, int32_t msglen, bool block){ // DONE MVW
 
 
-  CMSG cmsg;
   int32_t len = 1;
   int i, err;
   
+#ifdef PEAK_CAN
+  TPCANMsg msg;
+  int pendread;
+  int pendwrite=1;
+
+  msg.ID = msgid;
+  msg.MSGTYPE = MSGTYPE_STANDARD;
+  msg.LEN = msglen & 0x0F;
+  for (i=0; i<msglen; ++i) {
+    msg.DATA[i] = msgdata[i];
+  }
+  
+  if (block) {
+    err = CAN_Write(handle,&msg);
+  } else {
+    err = LINUX_CAN_Extended_Status(handle, &pendread, &pendwrite);
+    if ((err != CAN_ERR_OK) && (err != CAN_ERR_QRCVEMPTY)) {
+      ROS_ERROR("CANbus::send could not get CANbus status: 0x%x",err);
+      return OW_FAILURE;
+    }
+    err = CAN_Write(handle,&msg);
+  }
+  if (err != CAN_ERR_OK) {
+    ROS_ERROR("CANbus::send: canWrite failed: 0x%x",err);
+    return OW_FAILURE;
+  }
+
+  return OW_SUCCESS;
+#endif // PEAK_CAN
+
+
+#ifdef ESD_CAN
+  CMSG cmsg;
+
   cmsg.id = msgid;
   cmsg.len = (uint8_t)(msglen & 0x0F);
   for(i=0; i<msglen; i++)
-    cmsg.data[i] = msg[i];
+    cmsg.data[i] = msgdata[i];
   
   if(block == true){
     if( (err=canWrite(handle, &cmsg, &len, NULL)) != NTCAN_SUCCESS){
-      // ROS_ERROR("CANbus::send: canWrite failed: %x",err);
+      // ROS_ERROR("CANbus::send: canWrite failed: 0x%x",err);
       return OW_FAILURE;
     }
   }
   else{
     if( (err=canSend(handle, &cmsg, &len)) != NTCAN_SUCCESS){
-      //      ROS_ERROR("CANbus::send: canSend failed: %x",err);
+      //      ROS_ERROR("CANbus::send: canSend failed: 0x%x",err);
       return OW_FAILURE;
     }
   }
     
   return OW_SUCCESS;
+#endif // ESD_CAN
 }
 
 // set safety limits (does it really work?)
 // it always sets the same property!!
 // 4.2 rad/s corresponds to 240deg/sec
 int CANbus::limits(double jointVel, double tipVel, double elbowVel){
-  long conversion;
+  int32_t conversion;
    
   // MVW 04-29-08
   if ((set_property(SAFETY_MODULE,TL1,6000,true) == OW_FAILURE) ||
       (set_property(SAFETY_MODULE,TL2,9000,true) == OW_FAILURE) ||
-      (set_property(SAFETY_MODULE,VL1,(long)(2*0x1000),true) == OW_FAILURE) ||
-      (set_property(SAFETY_MODULE,VL2,(long)(3*0x1000),true) == OW_FAILURE)) {
+      (set_property(SAFETY_MODULE,VL1,(int32_t)(2*0x1000),true) == OW_FAILURE) ||
+      (set_property(SAFETY_MODULE,VL2,(int32_t)(3*0x1000),true) == OW_FAILURE)) {
       return OW_FAILURE;
   }
 
-  long voltlevel;
+  int32_t voltlevel;
 #ifdef SET_VOLTAGE_LIMITS
   // set appropriate high-voltage levels for battery operation
   if (get_property(SAFETY_MODULE,VOLTH1,&voltlevel) == OW_FAILURE) {
@@ -932,7 +1064,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
   
 #ifdef OLD_VEL_LIMITS
   if(0<jointVel && jointVel<7){           // If the vel (rad/s) is reasonable
-    conversion = (long)(jointVel*0x1000); // Convert to Q4.12 rad/s
+    conversion = (int32_t)(jointVel*0x1000); // Convert to Q4.12 rad/s
     if(set_property(SAFETY_MODULE, VL2, conversion, true) == OW_FAILURE){
       ROS_ERROR("WAM::set_limits: set_prop failed.");
       return OW_FAILURE;
@@ -940,7 +1072,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
   }
    
   if(0<tipVel && tipVel<7){               // If the vel (m/s) is reasonable
-    conversion = (long)(tipVel*0x1000);   // Convert to Q4.12 rad/s
+    conversion = (int32_t)(tipVel*0x1000);   // Convert to Q4.12 rad/s
     if(set_property(SAFETY_MODULE, VL2, conversion, true) == OW_FAILURE){
       ROS_ERROR("WAM::set_limits: set_prop failed.");
       return OW_FAILURE;
@@ -948,7 +1080,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
   }
    
   if(0<elbowVel && elbowVel<7){           // If the vel (m/s) is reasonable
-    conversion = (long)(elbowVel*0x1000); // Convert to Q4.12 rad/s
+    conversion = (int32_t)(elbowVel*0x1000); // Convert to Q4.12 rad/s
     if(set_property(SAFETY_MODULE, VL2, conversion, true) == OW_FAILURE){
       ROS_ERROR("WAM::set_limits: set_prop failed.");
       return OW_FAILURE;
@@ -969,12 +1101,12 @@ int CANbus::run(){
 
 void CANbus::printpos(){
   for(int p=1; p<=npucks; p++)
-    ROS_DEBUG("%d",pos[p]);
+    ROS_DEBUG("%f",pos[p]);
 }
 
 
-long CANbus::get_puck_state() {
-  long pstate;
+int32_t CANbus::get_puck_state() {
+  int32_t pstate;
   pthread_mutex_lock(&statemutex);
   pstate = puck_state;
   pthread_mutex_unlock(&statemutex);
@@ -982,15 +1114,18 @@ long CANbus::get_puck_state() {
 }
 
 void CANbus::set_puck_state() {
-  long puck1_state;
+  int32_t puck1_state;
   static int count=0;
   static double timesum = 0.0f;
+#ifdef RT_STATS
   RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+#endif
   if (get_property(1,MODE,&puck1_state) == OW_FAILURE) {
     ROS_WARN("Failure while trying to get MODE of puck #1");
     puck1_state = -1;
   }
 
+#ifdef RT_STATS
   RTIME t2 = rt_timer_ticks2ns(rt_timer_read());
   timesum += (t2-t1)/1e6;
   if (++count == 100) {
@@ -998,6 +1133,7 @@ void CANbus::set_puck_state() {
     count=0;
     timesum=0.0;
   }
+#endif
 
   pthread_mutex_lock(&statemutex);
   puck_state = puck1_state;
@@ -1139,8 +1275,10 @@ void CANstats::rosprint() const {
   //		  cansend_time);
   //  ROS_DEBUG_NAMED("times","CANbus::read: send=%2.1fms, read=%2.1fms",
   //		  canread_sendtime, canread_readtime);
+#ifdef RT_STATS
   ROS_DEBUG_NAMED("times","CANbus::set_puck_state: %2.2fms",
   		  cansetpuckstate_time);
+#endif
 }
   
 

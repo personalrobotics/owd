@@ -2,29 +2,19 @@ cmake_minimum_required(VERSION 2.4.6)
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 rosbuild_init()
-rosbuild_genmsg()
 rosbuild_gensrv()
 
 set (CMAKE_VERBOSE_MAKEFILE on)
 add_subdirectory(openwam)
 add_subdirectory(openmath)
 
-if( DEFINED ENV{XENOMAI_PATH} )
-   message(STATUS "Using $ENV{XENOMAI_PATH} for xenomai build")
-   link_directories( "$ENV{XENOMAI_PATH}/lib" )
-   include_directories( "$ENV{XENOMAI_PATH}/include" )
-else()
-   message(STATUS "Using /usr/xenomai for xenomai build")
-   link_directories(/usr/xenomai/lib)
-   include_directories(/usr/xenomai/include)
-endif()
-
-link_directories (../lapack ../esdcan-pci200/lib32)
-include_directories (openwam openmath esdcan-pci200/lib32)
+include_directories (openwam openmath)
 add_definitions("-ggdb3 -DWRIST -DBH8")
 
 rosbuild_add_executable(owd owd.cpp openwamdriver.cpp)
-target_link_libraries(owd openwam openmath lapack blas ntcan native gfortran)
+# target_link_libraries(owd openwam openmath lapack blas native gfortran pcan)
+target_link_libraries(owd openwam openmath lapack blas native gfortran pcan)
+rosbuild_add_compile_flags(owd "-DPEAK_CAN")
 
 rosbuild_add_executable(owdbhd owd.cpp openwamdriver.cpp bhd280.cc)
 target_link_libraries(owdbhd openwambhd openmath lapack blas ntcan native gfortran)
@@ -49,5 +39,32 @@ elseif(VENDOR_ID STREQUAL "CentaurHauls")
     add_definitions("-march=c3-2")
 endif()
 
-
-
+# locate Xenomai
+find_program(XENO-CONFIG NAMES xeno-config PATHS $ENV{XENOMAI_PATH} /usr/bin /usr/xenomai/bin)
+if (XENO-CONFIG)
+   execute_process(COMMAND ${XENO-CONFIG} --skin native --cflags
+                   RESULT_VARIABLE XENOMAI_NOTFOUND
+                   OUTPUT_VARIABLE XENOMAI_CFLAGS
+                   OUTPUT_STRIP_TRAILING_WHITESPACE)
+   if (XENOMAI_NOTFOUND)
+       message (SEND_ERROR "Could not find Xenomai include files (command xeno-config --skin native --cflags failed)\n")
+   endif(XENOMAI_NOTFOUND)
+   execute_process(COMMAND ${XENO-CONFIG} --skin native --ldflags
+                   RESULT_VARIABLE XENOMAI_NOTFOUND
+                   OUTPUT_VARIABLE XENOMAI_LDFLAGS
+                   OUTPUT_STRIP_TRAILING_WHITESPACE)
+   if (XENOMAI_NOTFOUND)
+      message (SEND_ERROR "Could not find Xenomai libs (command xeno-config --skin native --ldflags failed)\n")
+   endif (XENOMAI_NOTFOUND)
+   execute_process(COMMAND ${XENO-CONFIG} --skin native --libdir
+                   RESULT_VARIABLE XENOMAI_NOTFOUND
+                   OUTPUT_VARIABLE XENOMAI_LIBDIR
+                   OUTPUT_STRIP_TRAILING_WHITESPACE)
+   if (XENOMAI_NOTFOUND)
+      message (SEND_ERROR "Could not find Xenomai lib dir (command xeno-config --skin native --libdir failed)\n")
+   endif (XENOMAI_NOTFOUND)
+   
+   rosbuild_add_compile_flags(owd ${XENOMAI_CFLAGS})
+   rosbuild_add_compile_flags(owdsim ${XENOMAI_CFLAGS})
+   rosbuild_add_link_flags(owd ${XENOMAI_LDFLAGS} -Wl,-rpath,${XENOMAI_LIBDIR})
+endif(XENO-CONFIG)

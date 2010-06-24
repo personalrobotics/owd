@@ -3,7 +3,7 @@
 
 #include "MacAccelPulse.hh"
 #include "TrajType.hh"
-
+#include <string.h>
 
 class MacQuinticElement {
 protected:

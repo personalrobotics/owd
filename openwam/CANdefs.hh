@@ -17,7 +17,7 @@
 #define GROUPID(n)   (((mbxID + BASE_ID) << 5) | (0x0400 + (n)))
 #define BROADCAST    (GROUPID(0))
 
-typedef unsigned long DWORD;
+// typedef unsigned long DWORD;
 
 #define TX_QUEUE_SIZE       (32)
 #define RX_QUEUE_SIZE       (32)

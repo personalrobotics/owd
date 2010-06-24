@@ -138,7 +138,7 @@ private:
     // internal structures
     char *joint_calibration_file;
     unsigned int nJoints;
-    long puck_offsets[Joint::Jn+1];
+    int32_t puck_offsets[Joint::Jn+1];
     JointPos desiredJointPositions, vLastCommand;
     struct timeval trajstarttime;
     bool intraj;
@@ -161,7 +161,7 @@ private:
     bool move_until_stop(int joint, double stop, double limit, double velocity,
 			 double &orig_joint_pos);
 
-    int get_puck_offset(int puckid,long *mech = NULL,long *apout = NULL);
+    int get_puck_offset(int puckid,int32_t *mech = NULL,int32_t *apout = NULL);
     void save_joint_offset(double jointval, double *offset);
     int get_joint_num();
     double get_nearest_joint_value(double jointval, double tolerance);

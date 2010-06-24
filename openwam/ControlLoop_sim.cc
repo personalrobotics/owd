@@ -77,7 +77,7 @@ int ControlLoop::state(){
 }
 
 void ControlLoop::wait() {
-  usleep(1700);
+  usleep(700);
 }
 
 RTIME ControlLoop::get_time_ns() {

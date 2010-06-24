@@ -476,10 +476,10 @@ int WAM::recv_mpos(){
  * Used to send motor torques on the bus. The torques *are* converted
  */
 int WAM::send_mtrq(){
-  long mtrq[NUM_NODES+1];
+  int32_t mtrq[NUM_NODES+1];
 
   for(int m=Motor::M1; m<=Motor::Mn; m++)
-    mtrq[ motors[m].id() ] = (long) (motors[m].trq() * motors[m].IPNm());
+    mtrq[ motors[m].id() ] = (int32_t) (motors[m].trq() * motors[m].IPNm());
 
   if (bus->simulation) { // allow running without CANbus for simulation
     return OW_SUCCESS;
@@ -1055,7 +1055,7 @@ void WAM::newcontrol(double dt){
     }
     
     this->unlock();
-    long response;
+    int32_t response;
     if (!bus->simulation) { // skip if running in simulation
       int puckstate=bus->get_puck_state();
       if (puckstate != 2) {

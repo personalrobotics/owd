@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <iostream>
 #include <math.h>
+#include <stdio.h>
 
 SmoothJoint::SmoothJoint( SmoothArm* _pArm, int _jointIndex, double startPosition) {
 

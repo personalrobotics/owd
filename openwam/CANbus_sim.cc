@@ -7,7 +7,7 @@
 
 #define PUCK_IDLE 0 
 
-CANbus::CANbus(int bus_id, int num_pucks) : 
+CANbus::CANbus(int32_t bus_id, int num_pucks) : 
   puck_state(2),id(bus_id),
   trq(NULL),pos(NULL),
   pucks(NULL),npucks(num_pucks),simulation(true)
@@ -18,7 +18,7 @@ CANbus::CANbus(int bus_id, int num_pucks) :
   pthread_mutex_init(&statemutex, NULL);
 
   pucks = new Puck[npucks+1];
-  trq = new long[npucks+1];
+  trq = new int32_t[npucks+1];
   pos = new double[npucks+1];
   for(int p=1; p<=npucks; p++){
     pos[p] = 0.0;
@@ -70,27 +70,27 @@ int CANbus::check(){
 void CANbus::dump(){
 }
    
-int CANbus::allow_message(int id, int mask){
+int CANbus::allow_message(int32_t id, int32_t mask){
   return OW_SUCCESS;
 }
  
-int CANbus::wake_puck(int p){
+int CANbus::wake_puck(int32_t p){
     return OW_SUCCESS;
 }
 
-int CANbus::status(long* nodes){
+int CANbus::status(int32_t* nodes){
   return OW_SUCCESS;
 }
 
-int CANbus::set_property(int32_t nid, int32_t property, long value,bool check){
+int CANbus::set_property(int32_t nid, int32_t property, int32_t value,bool check){
   return OW_SUCCESS;
 }
 
-int CANbus::get_property(int32_t nid, int32_t property, long* value){
+int CANbus::get_property(int32_t nid, int32_t property, int32_t* value){
   return OW_SUCCESS;
 }
 
-int CANbus::send_torques(long* torques){
+int CANbus::send_torques(int32_t* torques){
   return OW_SUCCESS;
 }
 
@@ -98,7 +98,7 @@ int CANbus::send_torques(){
   return OW_SUCCESS;
 }
 
-int CANbus::read_torques(long* mtrq){
+int CANbus::read_torques(int32_t* mtrq){
   return OW_SUCCESS;
 }
 
@@ -117,16 +117,16 @@ int CANbus::send_positions(double* mpos){
   return OW_SUCCESS;
 }
 
-int CANbus::send_AP(long* apval){
+int CANbus::send_AP(int32_t* apval){
   return OW_SUCCESS;
 }
 
 int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
-		  int32_t* nodeid, int32_t* property, long* value){
+		  int32_t* nodeid, int32_t* property, int32_t* value){
   return OW_SUCCESS;
 }
 
-int CANbus::compile(int32_t property, long value, 
+int CANbus::compile(int32_t property, int32_t value, 
 		    uint8_t *msg, int32_t *msglen){
   return OW_SUCCESS;
 }
@@ -162,8 +162,8 @@ void CANbus::printpos(){
 }
 
 
-long CANbus::get_puck_state() {
-  long pstate;
+int32_t CANbus::get_puck_state() {
+  int32_t pstate;
   pthread_mutex_lock(&statemutex);
   pstate = puck_state;
   pthread_mutex_unlock(&statemutex);
@@ -186,7 +186,7 @@ void CANstats::rosprint() const {
 }
   
 
-void CANbus::initPropertyDefs(int firmwareVersion){
+void CANbus::initPropertyDefs(int32_t firmwareVersion){
    int i = 0;
    if(firmwareVersion < 40){
       VERS = i++;

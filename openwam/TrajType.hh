@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <math.h>
+#include <stdio.h>
 
 // a vector of joint angles defines a single Wam position
 class JointPos : public std::vector<double> {

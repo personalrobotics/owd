@@ -1,5 +1,6 @@
 #include "ConstrainedForceTrajectory.hh"
 #include "Joint.hh"
+#include <stdlib.h>
 
 extern "C" {
   void dgemv_(char *trans, int *m, int *n, double *alpha, double *a, int *lda,
