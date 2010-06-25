@@ -664,6 +664,10 @@ void* control_loop(void* argv){
       t2 = ControlLoop::get_time_ns(); // record the time
       
       // GET POSITIONS
+#ifdef BH280_ONLY
+      // only log messages if we're not trying to control the WAM in RT
+      //      ROS_DEBUG_NAMED("can_bh280","reading positions");
+#endif
       if(wam->bus->read_positions() == OW_FAILURE){
         ROS_FATAL("control_handler: read_positions failed");
         return NULL;
@@ -675,11 +679,15 @@ void* control_loop(void* argv){
 #ifndef BH280_ONLY
       // CONTROL LOOP
       wam->newcontrol( ((double)(t2-t1)) * 1e-9); // ns to s
+#endif // BH280_ONLY
 
       RTIME bt2 = ControlLoop::get_time_ns();
       controltime += (bt2-bt1) * 1e-6; // ns to ms
-#endif // BH280_ONLY
 
+#ifdef BH280_ONLY
+      // only log messages if we're not trying to control the WAM in RT
+      //      ROS_DEBUG_NAMED("can_bh280","sending torques");
+#endif
       // SEND TORQUES
       if(wam->bus->send_torques() == OW_FAILURE){
         ROS_FATAL("control_handler: send_torques failed.");

@@ -28,6 +28,10 @@ rosbuild_add_compile_flags(openwam "-DPEAK_CAN")
 
 add_library(openwambhd STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc DataRecorder.cc ConstrainedForceTrajectory.cc)
 rosbuild_add_compile_flags(openwambhd "-DPEAK_CAN -DBH280")
+
+add_library(openwam_canbhd STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc DataRecorder.cc ConstrainedForceTrajectory.cc)
+rosbuild_add_compile_flags(openwam_canbhd "-DPEAK_CAN -DBH280 -DBH280_ONLY")
+
 #set_property(TARGET openwambhd PROPERTY COMPILE_FLAGS "-DBH280")
 
 # set (WRIST 1)
@@ -61,7 +65,9 @@ if (XENO-CONFIG)
    
    rosbuild_add_compile_flags(openwam ${XENOMAI_CFLAGS})
    rosbuild_add_compile_flags(openwambhd ${XENOMAI_CFLAGS})
+   rosbuild_add_compile_flags(openwam_canbhd ${XENOMAI_CFLAGS})
    rosbuild_add_compile_flags(openwamsim ${XENOMAI_CFLAGS})
    rosbuild_add_link_flags(openwam ${XENOMAI_LDFLAGS})
    rosbuild_add_link_flags(openwambhd ${XENOMAI_LDFLAGS})
+   rosbuild_add_link_flags(openwam_canbhd ${XENOMAI_LDFLAGS})
 endif()

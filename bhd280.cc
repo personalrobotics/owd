@@ -32,6 +32,14 @@ void BHD_280::Unadvertise() {
   ss_relaxhand.shutdown();
 }
 
+void BHD_280::Pump(const ros::TimerEvent& e) {
+  // publish our state info
+  this->Publish();
+
+  // let the driver update
+  // this->Update();
+}
+
 bool BHD_280::Publish() {
   int32_t state;
   if (bus->hand_get_positions(bhstate.positions[0],
@@ -78,8 +86,10 @@ bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
 bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
 			    pr_msgs::ResetHand::Response &res) {
   if (bus->hand_reset() == OW_SUCCESS) {
+    bhstate.state = pr_msgs::BHState::state_done;
     return true;
   } else {
+    bhstate.state = pr_msgs::BHState::state_uninitialized;
     return false;
   }
 }

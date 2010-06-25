@@ -4,6 +4,7 @@
 #include <pr_msgs/IndexedJointValues.h>
 #include <pr_msgs/WamSetupSeaCtrl.h>
 #include "openwamdriver.h"
+#include "bhd280.hh"
 #include <sys/mman.h>
 
 int main(int argc, char** argv)
@@ -31,8 +32,11 @@ int main(int argc, char** argv)
 
   WamDriver wam(canbus_number);
   wam.Init(calibration_filename.c_str());
-
   wam.AdvertiseAndSubscribe(n);
+
+#ifdef BH280
+  BHD_280 bhd(&(wam.bus));
+#endif // BH280
 
 #ifdef BUILD_FOR_SEA
   usleep(100000);
@@ -41,6 +45,9 @@ int main(int argc, char** argv)
 
   ROS_DEBUG("Creating timer and spinner threads");
   ros::Timer wam_timer = n.createTimer(ros::Duration(0.1), &WamDriver::Pump, &wam);
+#ifdef BH280
+  ros::Timer bhd_timer = n.createTimer(ros::Duration(0.1), &BHD_280::Pump, &bhd);
+#endif
   ros::MultiThreadedSpinner s(3);
   ROS_DEBUG("Spinning");
   ros::spin(s);

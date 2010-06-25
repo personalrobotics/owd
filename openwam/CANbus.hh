@@ -163,6 +163,10 @@ private:
   int32_t hand_get_property(int32_t id, int32_t prop);
   void hand_set_property(int32_t id, int32_t prop, int32_t val);
   int finger_reset(int32_t id);
+  double finger_encoder_to_radians(int32_t enc);
+  int32_t finger_radians_to_encoder(double radians);
+  double spread_encoder_to_radians(int32_t enc);
+  int32_t spread_radians_to_encoder(double radians);
 
 public:
   int hand_activate();

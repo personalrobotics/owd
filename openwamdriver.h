@@ -168,7 +168,9 @@ private:
     void apply_joint_offsets(double *joint_offsets);
     TrajType ros2owd_traj (pr_msgs::JointTraj &jt);
 
+ public: // make this public so that it can be shared with BHD_280
     CANbus bus;
+ private:
     WAM *owam;
     boost::mutex queue_mutex;
     boost::mutex wscb_mutex;

@@ -23,8 +23,7 @@ public:
 
   BHD_280(CANbus *cb);
   ~BHD_280();
-  void AdvertiseAndSubscribe(ros::NodeHandle &n);
-  void Unadvertise();
+  void Pump(const ros::TimerEvent& e);
   bool Publish();
   bool GetDOF(pr_msgs::GetDOF::Request &req,
 	      pr_msgs::GetDOF::Response &res);
@@ -35,6 +34,9 @@ public:
   bool MoveHand(pr_msgs::MoveHand::Request &req,
 		pr_msgs::MoveHand::Response &res);
   
+private:
+  void AdvertiseAndSubscribe(ros::NodeHandle &n);
+  void Unadvertise();
 
 };
   

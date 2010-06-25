@@ -169,7 +169,7 @@ bool WamDriver::Init(const char *joint_cal_file)
     return false;
   }
 #else 
-  WamWasZeroed=true;
+  int32_t WamWasZeroed=1;
 #endif // BH280_ONLY
   
   owam = new WAM(&bus);
@@ -533,7 +533,7 @@ int WamDriver::get_puck_offset(int puckid, int32_t *mechout, int32_t *apout) {
         cerr << "Failed to get MECH" << endl;
         throw -1;
     }
-    ROS_DEBUG("Puck %d  AP=%ld  OFFSET=%ld  MECH=%ld",puckid,p,p-mech,mech);
+    ROS_DEBUG("Puck %d  AP=%d  OFFSET=%d  MECH=%d",puckid,p,p-mech,mech);
     if (mechout) {
         // return the value of MECH, too
         *mechout = mech;
@@ -967,7 +967,7 @@ void WamDriver::set_home_position() {
                     apvals[puck_id] = mech + puck_offsets[puck_id];
                 }
                 
-                ROS_DEBUG("Changing puck %d from AP=%ld to %ld",puck_id,old_AP,apvals[puck_id]);
+                ROS_DEBUG("Changing puck %d from AP=%d to %d",puck_id,old_AP,apvals[puck_id]);
             }
             ROS_DEBUG("Setting new positions");
             if (bus.send_AP(apvals) == OW_FAILURE) {
