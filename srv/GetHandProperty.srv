@@ -1,0 +1,4 @@
+int32 nodeid
+int32 property
+---
+int32 value
