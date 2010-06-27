@@ -707,6 +707,15 @@ void* control_loop(void* argv){
       }
 #endif // BH280_ONLY
 
+#ifdef BH280
+      // Hand moving?
+      static int handstateperiod=25; // start offset from motor state
+      if (++handstateperiod == 50) { // every 0.1 seconds
+	wam->bus->hand_set_state();
+	handstateperiod=0;
+      }
+#endif // BH280
+
       // check for slow loops
       double thistime = (t2-t1)* 1e-6;  // milliseconds
       if (thistime > 2.0) {

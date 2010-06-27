@@ -159,6 +159,7 @@ private:
   std::queue<CANmsg> hand_write_queue;
   int32_t hand_positions[4+1];
   pthread_mutex_t handmutex;
+  int32_t handstate;
 
   int finger_reset(int32_t id);
   double finger_encoder_to_radians(int32_t enc);
@@ -169,6 +170,7 @@ private:
 public:
   int32_t hand_get_property(int32_t id, int32_t prop);
   void hand_set_property(int32_t id, int32_t prop, int32_t val);
+  int hand_set_state();
   int hand_activate();
   int hand_reset();
   int hand_move(double p1, double p2, double p3, double p4);
