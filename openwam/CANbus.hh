@@ -26,7 +26,6 @@
 #include <native/mutex.h>
 
 #include <sys/mman.h>
-#include <queue>
 
 #include "Group.hh"
 #include "globals.h"
@@ -111,7 +110,7 @@ public:
 	    int32_t* nodeid, int32_t* property, int32_t* value);
   int compile(int32_t property, int32_t value, uint8_t *msg, int32_t *msglen);
   
-  int set_property(int32_t nid, int32_t property, int32_t value, bool check);
+  int set_property(int32_t nid, int32_t property, int32_t value, bool check=false);
   int get_property(int32_t nid, int32_t property, int32_t* value);
   
   int read(int32_t* msgid, uint8_t* msg, int32_t* msglen, bool block);
@@ -155,8 +154,6 @@ public:
     HANDSTATE_MOVING };
 
 private:
-  std::queue<CANmsg> hand_read_queue;
-  std::queue<CANmsg> hand_write_queue;
   int32_t hand_positions[4+1];
   pthread_mutex_t handmutex;
   int32_t handstate;
@@ -168,8 +165,6 @@ private:
   int32_t spread_radians_to_encoder(double radians);
 
 public:
-  int32_t hand_get_property(int32_t id, int32_t prop);
-  void hand_set_property(int32_t id, int32_t prop, int32_t val);
   int hand_set_state();
   int hand_activate();
   int hand_reset();

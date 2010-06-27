@@ -296,6 +296,7 @@ int CANbus::allow_message(int32_t id, int32_t mask){  // MVW DONE
   pthread_mutex_lock(&busmutex);
 
 #ifdef PEAK_CAN
+  DWORD err;
   if (err = CAN_ResetFilter(handle)) {
     ROS_ERROR("CANbus::open(): Could not Reset Filter: 0x%x",err);
   }
@@ -367,6 +368,7 @@ int CANbus::status(int32_t* nodes){
 	ROS_DEBUG_NAMED("canstatus","parsed response from node %d",NODE2ADDR(n));
 	if (!firstFound) {
 	  ROS_DEBUG_NAMED("canstatus","trying to wake node %d",n);
+	  pthread_mutex_unlock(&busmutex);
 	  if ((wake_puck(NODE2ADDR(n)) == OW_SUCCESS) &&
 	      (get_property(NODE2ADDR(n), 0, &fw_vers) == OW_SUCCESS)){
 	    ROS_DEBUG_NAMED("canstatus","CANbus::status: puck %d firmware version %ld",n,fw_vers);
@@ -376,6 +378,7 @@ int CANbus::status(int32_t* nodes){
 	  else {
 	    ROS_DEBUG_NAMED("canstatus","CANbus::status: unable to get firmware vers from puck %d",n);
 	  }
+	  pthread_mutex_lock(&busmutex);
 	}
       }
     }
@@ -544,40 +547,6 @@ int CANbus::send_torques(){
       }
 
   }
-#ifdef BH280
-  // only send if we can quickly get the mutex; otherwise
-  // it will have to wait until the next cycle
-  if (! pthread_mutex_trylock(&handmutex)) {
-    while (hand_write_queue.size() > 0) {
-      CANmsg msg = hand_write_queue.front();
-      hand_write_queue.pop();
-      if (msg.property & 0x80) {
-	// if bit 8 is 1 it's a set
-	
-	if (set_property(msg.nodeid,msg.property & 0x7F,msg.value,false)
-	    != OW_SUCCESS) {
-	  ROS_WARN_NAMED("can_bh280","Error setting property %d = %d on hand puck %d",
-			 msg.property, msg.value, msg.nodeid);
-	} else {
-	  ROS_DEBUG_NAMED("can_bh280","Sent PROP %d = %d to hand puck %d",
-			  msg.property & 0x7F,msg.value,msg.nodeid);
-	}
-      } else {
-	ROS_DEBUG_NAMED("can_bh280","Sending GET PROP %d to hand puck %d",
-			msg.property,msg.nodeid);
-	if (get_property(msg.nodeid, msg.property, &msg.value) != OW_SUCCESS) {
-	  ROS_WARN_NAMED("can_bh280","Error getting property %d from hand puck %d",
-			 msg.property, msg.nodeid);
-	} else {
-	  ROS_DEBUG_NAMED("can_bh280","Received PROP %d = %d from hand puck %d",
-			  msg.property,msg.value,msg.nodeid);
-	  hand_read_queue.push(msg);
-	}
-      }
-    }
-    pthread_mutex_unlock(&handmutex);
-  }
-#endif // BH280
 
   if (sendcount > 2000) {
     stats.cansend_time = sendtime/sendcount;
@@ -596,21 +565,22 @@ int CANbus::read_torques(int32_t* mtrq){
   // Compile the packet
   msg[0] = (uint8_t)TORQ;
 
-  //  pthread_mutex_lock(&busmutex);
+  pthread_mutex_lock(&busmutex);
+
   if(send(GROUPID(0), msg, 1, true) == OW_FAILURE){
     ROS_ERROR("CANbus::read_torques: send failed.");;
-    //    pthread_mutex_unlock(&busmutex);
+    pthread_mutex_unlock(&busmutex);
     return OW_FAILURE;
   }
   for(int p=1; p<=npucks; ){
     if(read(&msgid, msg, &msglen, true) == OW_FAILURE){
       ROS_ERROR("CANbus::read_torques: read failed.");
-      //      pthread_mutex_unlock(&busmutex);
+      pthread_mutex_unlock(&busmutex);
       return OW_FAILURE;
     }
     if(parse(msgid, msg, msglen, &nodeid, &property, &value) == OW_FAILURE){
       ROS_ERROR("CANbus::read_torques: parse failed.");
-      //      pthread_mutex_unlock(&busmutex);
+      pthread_mutex_unlock(&busmutex);
       return OW_FAILURE;
     }
     if(property == TORQ){
@@ -618,7 +588,7 @@ int CANbus::read_torques(int32_t* mtrq){
       p++;
     }
   }
-  //  pthread_mutex_unlock(&busmutex);
+  pthread_mutex_unlock(&busmutex);
 
   return OW_SUCCESS;
 }
@@ -636,6 +606,7 @@ int CANbus::read_positions(double* positions){
 
 int CANbus::read_positions(){
   uint8_t  msg[8];
+
   int32_t data[NUM_NODES+1], value;
   int32_t msgid, msglen, property, nodeid;
   static double sendtime=0.0f;
@@ -650,8 +621,11 @@ int CANbus::read_positions(){
   RTIME bt1 = rt_timer_ticks2ns(rt_timer_read());
 #endif
 
+  pthread_mutex_lock(&busmutex);
+
   if(send(GROUPID(0), msg, 1, false) == OW_FAILURE){
     ROS_ERROR("CANbus::get_positions: send failed.");
+    pthread_mutex_unlock(&busmutex);
     return OW_FAILURE;
   }
 
@@ -667,28 +641,21 @@ int CANbus::read_positions(){
 #endif // BH280
     if(read(&msgid, msg, &msglen, true) == OW_FAILURE){
       ROS_ERROR("CANbus::get_positions: read failed.");
+      pthread_mutex_unlock(&busmutex);
       return OW_FAILURE;
     }
 
     if(parse(msgid, msg, msglen, &nodeid, &property, &value) == OW_FAILURE){
       ROS_ERROR("CANbus::get_positions: parse failed.");
+      pthread_mutex_unlock(&busmutex);
       return OW_FAILURE;
     }
     if (property == AP) {
-#ifdef BH280
-      if ((nodeid >= 11) && (nodeid <=14)) {
-	//ROS_DEBUG_NAMED("can_bh280","received AP from hand puck %d",nodeid);
-	// it's ok if we miss a few position updates, so just "try"
-	if (!pthread_mutex_trylock(&handmutex)) {
-	  hand_positions[nodeid-10] = AP;
-	  pthread_mutex_unlock(&handmutex);
-	}
-      } else
-#endif // BH280
-	data[nodeid] = value;
+      data[nodeid] = value;
       p++;
     }
   }
+  pthread_mutex_unlock(&busmutex);
 
 #ifdef RT_STATS
   bt1 = rt_timer_ticks2ns(rt_timer_read());
@@ -701,6 +668,16 @@ int CANbus::read_positions(){
     pos[ pucks[p].motor() ] = 2.0*M_PI*( (double) data[ pucks[p].id() ] )/ 
                                        ( (double) pucks[p].CPR() );
   pthread_mutex_unlock(&posmutex);
+
+#ifdef BH280
+  // it's ok if we miss a few position updates, so just "try"
+  if (!pthread_mutex_trylock(&handmutex)) {
+    for (int p=1; p<=4; ++p) {
+      hand_positions[p] = data[p+10];
+    }
+    pthread_mutex_unlock(&handmutex);
+  }
+#endif // BH280
 
   if (++loopcount == 1000) {
     stats.canread_sendtime=sendtime/1000.0;
@@ -894,22 +871,11 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
 
   if (block) {
     err = LINUX_CAN_Read(handle, &cmsg);
-    // filtering seems to be unused in the Barrett code, so
-    // I won't use it here, either.
-    // int filterOK=0
-    // for (i=0; i<MAX_FILTERS; ++i) {
-    //   if (msg.id & ~mask[i] == can_accept[i]) {
-    //  	filterOK = 1;
-    //   }
-    // }
   } else {
     err = LINUX_CAN_Extended_Status(handle,&pendread, &pendwrite);
     if ((err != CAN_ERR_OK) && (err != CAN_ERR_QRCVEMPTY)) {
       ROS_INFO("CANbus status is 0x%x",err);
     }
-    //    if (err == CAN_ERR_QRCVEMPTY) {
-    //      ROS_DEBUG("Warning: receiver queue empty");
-    //    }
     if (pendread) {
       err = LINUX_CAN_Read(handle,&cmsg);
     } else {
@@ -920,9 +886,6 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
       if ((err != CAN_ERR_OK) && (err != CAN_ERR_QRCVEMPTY)) {
 	ROS_INFO("CANbus status is 0x%x",err);
       }
-      //      if (err == CAN_ERR_QRCVEMPTY) {
-      //	ROS_DEBUG("Warning: receiver queue empty");
-      //      }
       if (!pendread) {
 	return OW_FAILURE; // just means nothing was read
       } else {
@@ -1172,64 +1135,7 @@ int CANbus::hand_activate() {
   return OW_SUCCESS;
 }
 
-void CANbus::hand_set_property(int32_t id, int32_t prop, int32_t val) {
-  CANmsg msg;
-  msg.nodeid=id;
-  msg.property=prop | 0x80; // set the high bit to 1
-  msg.value=val;
-  pthread_mutex_lock(&handmutex);
-  hand_write_queue.push(msg);
-  pthread_mutex_unlock(&handmutex);
-  ROS_DEBUG_NAMED("can_bh280",
-		  "Added a SETPROP %d = %d to hand write queue",
-		  prop,val);
-}
-
-int32_t CANbus::hand_get_property(int32_t id, int32_t prop) {
-  CANmsg msg;
-  msg.nodeid=id;
-  msg.property=prop;
-  msg.value=0;
-  pthread_mutex_lock(&handmutex);
-  hand_write_queue.push(msg);
-  pthread_mutex_unlock(&handmutex);
-  ROS_DEBUG_NAMED("can_bh280",
-		  "Added a PUCK %d GETPROP %d to hand write queue", id, prop);
-  // give the bus time to respond
-  usleep(4000); // at least 2 cycles
-  // now watch for the return msg
-  unsigned int count=250; // don't wait more than 500ms
-  //  ROS_DEBUG_NAMED("can_bh280", "Waiting for response in hand read queue...");
-  pthread_mutex_lock(&handmutex);
-  while ((hand_read_queue.size() == 0) && (--count)) {
-    pthread_mutex_unlock(&handmutex);
-    usleep(2000);
-    pthread_mutex_lock(&handmutex);
-  }
-  if (count==0) {
-    pthread_mutex_unlock(&handmutex);
-    ROS_WARN_NAMED("can_bh280","No response from hand puck %d",id);
-    throw "No response from hand puck";
-  }
-  msg=hand_read_queue.front();
-  hand_read_queue.pop();
-  pthread_mutex_unlock(&handmutex);
-  //  ROS_DEBUG_NAMED("can_bh280", "Got something in hand read queue.");
-  if (msg.nodeid != id) {
-    ROS_WARN_NAMED("can_bh280","Expecting response from hand puck %d but got message from puck %d",id,msg.nodeid);
-    throw "Got response from wrong hand puck";
-  }
-  if (msg.property != prop) {
-    ROS_WARN_NAMED("can_bh280","Asked hand puck %d for property %d but got property %d",id,prop,msg.property);
-    throw "Wrong property from hand puck";
-  }
-  return msg.value;
-}
-
 int CANbus::hand_set_state() {
-  // this function is only to be called directly by the WAM control
-  // loop, so we don't need to use the protected hand message queues.
-  
   // If any of the first three fingers aren't in MODE_IDLE, the
   // hand is still considered MOVING (since HOLD=0)
   int32_t mode, nodeid;
@@ -1260,12 +1166,10 @@ int CANbus::hand_set_state() {
   return OW_SUCCESS;
 }
 
-// can only call this function while the main bus loop isn't running
-// or there will be contention for the CAN device
 int CANbus::finger_reset(int32_t nodeid) {
   // send the HI to this finger
   ROS_DEBUG_NAMED("can_bh280", "Sending HI");
-  if (set_property(nodeid,CMD,13,false) != OW_SUCCESS) {
+  if (set_property(nodeid,CMD,13) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280","Error sending HI to hand puck %d",nodeid);
     return OW_FAILURE;
   }
@@ -1325,14 +1229,14 @@ int CANbus::hand_reset() {
 
   // Set the torque stop value to 50 to reduce heating on stall
   for (int32_t nodeid=11; nodeid<=13; ++nodeid) {
-    set_property(nodeid,TSTOP,50,false);
+    set_property(nodeid,TSTOP,50);
     usleep(100);
-    set_property(nodeid,HOLD,0,false);
+    set_property(nodeid,HOLD,0);
     usleep(100);
   }
-  set_property(14,TSTOP,100,false);
+  set_property(14,TSTOP,100);
   usleep(100);
-  set_property(14,HOLD,1,false);
+  set_property(14,HOLD,1);
   usleep(100);
   for (int32_t nodeid=11; nodeid<=14; ++nodeid) {
     int32_t value;
@@ -1350,46 +1254,56 @@ int CANbus::hand_reset() {
 }
 
 int CANbus::hand_move(double p1, double p2, double p3, double p4) {
-  hand_set_property(11,DP,finger_radians_to_encoder(p1));
-  hand_set_property(12,DP,finger_radians_to_encoder(p2));
-  hand_set_property(13,DP,finger_radians_to_encoder(p3));
-  hand_set_property(14,DP,spread_radians_to_encoder(p4));
-  hand_set_property(11,CMD,19);  // M = 19 ("move")
-  hand_set_property(12,CMD,19);
-  hand_set_property(13,CMD,19);
-  hand_set_property(14,CMD,19);
+  /*  set_property(11,DP,finger_radians_to_encoder(p1));
+  set_property(12,DP,finger_radians_to_encoder(p2));
+  set_property(13,DP,finger_radians_to_encoder(p3));
+  set_property(14,DP,spread_radians_to_encoder(p4));
+  set_property(11,CMD,19);  // M = 19 ("move")
+  set_property(12,CMD,19);
+  set_property(13,CMD,19);
+  set_property(14,CMD,19); */
+  set_property(11,E,finger_radians_to_encoder(p1));
+  set_property(12,E,finger_radians_to_encoder(p2));
+  set_property(13,E,finger_radians_to_encoder(p3));
+  set_property(14,E,spread_radians_to_encoder(p4));
+  set_property(11,MODE,5);  // 5 = trapezoid
+  set_property(12,MODE,5);
+  set_property(13,MODE,5);
+  set_property(14,MODE,5);
   handstate = HANDSTATE_MOVING;
   return OW_SUCCESS;
 }
 
 int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
-  hand_set_property(11,V,finger_radians_to_encoder(v1)/1000.0);
-  hand_set_property(12,V,finger_radians_to_encoder(v2)/1000.0);
-  hand_set_property(13,V,finger_radians_to_encoder(v3)/1000.0);
-  hand_set_property(14,V,finger_radians_to_encoder(v4)/1000.0);
+  set_property(11,V,finger_radians_to_encoder(v1)/1000.0);
+  set_property(12,V,finger_radians_to_encoder(v2)/1000.0);
+  set_property(13,V,finger_radians_to_encoder(v3)/1000.0);
+  set_property(14,V,finger_radians_to_encoder(v4)/1000.0);
   
-  hand_set_property(11,MODE,MODE_VELOCITY);
-  hand_set_property(12,MODE,MODE_VELOCITY);
-  hand_set_property(13,MODE,MODE_VELOCITY);
-  hand_set_property(14,MODE,MODE_VELOCITY);
+  set_property(11,MODE,MODE_VELOCITY);
+  set_property(12,MODE,MODE_VELOCITY);
+  set_property(13,MODE,MODE_VELOCITY);
+  set_property(14,MODE,MODE_VELOCITY);
   handstate = HANDSTATE_MOVING;
   return OW_SUCCESS;
 }
 
 int CANbus::hand_relax() {
-  hand_set_property(11,MODE,PUCK_IDLE);
-  hand_set_property(12,MODE,PUCK_IDLE);
-  hand_set_property(13,MODE,PUCK_IDLE);
-  hand_set_property(14,MODE,PUCK_IDLE);
+  set_property(11,MODE,PUCK_IDLE);
+  set_property(12,MODE,PUCK_IDLE);
+  set_property(13,MODE,PUCK_IDLE);
+  set_property(14,MODE,PUCK_IDLE);
   handstate = HANDSTATE_DONE;
   return OW_SUCCESS;
 }
 
 int CANbus::hand_get_positions(double &p1, double &p2, double &p3, double &p4) {
+  pthread_mutex_lock(&handmutex);
   p1 = finger_encoder_to_radians(hand_positions[1]);
   p2 = finger_encoder_to_radians(hand_positions[2]);
   p3 = finger_encoder_to_radians(hand_positions[3]);
   p4 = spread_encoder_to_radians(hand_positions[4]);
+  pthread_mutex_unlock(&handmutex);
   return OW_SUCCESS;
 }
  

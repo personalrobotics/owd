@@ -157,9 +157,6 @@ bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
 // Reset command
 bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
 			    pr_msgs::ResetHand::Response &res) {
-  // no longer necessary; it would be bad if we actually did it
-
-#ifdef NDEF
   if (bus->hand_reset() == OW_SUCCESS) {
     bhstate.state = pr_msgs::BHState::state_done;
     return true;
@@ -167,7 +164,6 @@ bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
     bhstate.state = pr_msgs::BHState::state_uninitialized;
     return false;
   }
-#endif // NDEF
   return false;
 }
 
@@ -212,17 +208,19 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
 
 bool BHD_280::SetHandProperty(pr_msgs::SetHandProperty::Request &req,
 			  pr_msgs::SetHandProperty::Response &res) {
-  bus->hand_set_property(req.nodeid,req.property,req.value);
+  if (bus->set_property(req.nodeid,req.property,req.value) != OW_SUCCESS) {
+    ROS_WARN_NAMED("bhd280","Failed to set property %d = %d on puck %d",
+		   req.property,req.value,req.nodeid);
+    return false;
+  }
   return true;
 }
 
 bool BHD_280::GetHandProperty(pr_msgs::GetHandProperty::Request &req,
 			  pr_msgs::GetHandProperty::Response &res) {
-  try {
-    res.value = bus->hand_get_property(req.nodeid,req.property);
-  } catch (const char *err) {
-    ROS_WARN_NAMED("bhd280","Failure getting property %d from puck %d: %s",
-		   req.property,req.nodeid,err);
+  if (bus->get_property(req.nodeid,req.property,&res.value) != OW_SUCCESS) {
+    ROS_WARN_NAMED("bhd280","Failure getting property %d from puck %d",
+		   req.property,req.nodeid);
     return false;
   }
   return true;
