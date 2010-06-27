@@ -8,6 +8,12 @@
 #include <fcntl.h>
 
 #define PUCK_IDLE 0 
+#define MODE_IDLE      0
+#define MODE_TORQUE    2
+#define MODE_PID       3
+#define MODE_VELOCITY  4
+#define MODE_TRAPEZOID 5
+
 
 CANbus::CANbus(int32_t bus_id, int num_pucks) :  // DONE MVW
   puck_state(-1),id(bus_id),trq(NULL),
