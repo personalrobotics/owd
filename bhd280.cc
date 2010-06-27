@@ -2,10 +2,12 @@
 
 BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   AdvertiseAndSubscribe(node);
-  bhstate.state = pr_msgs::BHState::state_uninitialized;
+  tf_broadcaster = new tf::TransformBroadcaster();
+  bhstate.state = pr_msgs::BHState::state_done;
   bhstate.temperature=0.0f;
   bhstate.positions.resize(4, 0.0f);
   bhstate.strain.resize(4, 0.0f);
+  baseShift = btTransform(btMatrix3x3(cos(M_PI_2), -sin(M_PI_2), 0, sin(M_PI_2), cos(M_PI_2), 0, 0, 0, 1), btVector3(0,0,.06));
 }
 
 BHD_280::~BHD_280() {
@@ -22,6 +24,10 @@ void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 				       &BHD_280::ResetHand,this);
   ss_relaxhand = n.advertiseService("RelaxHand",
 				       &BHD_280::RelaxHand,this);
+  ss_gethandprop = n.advertiseService("SetProperty",
+				       &BHD_280::SetHandProperty,this);
+  ss_sethandprop = n.advertiseService("GetProperty",
+				       &BHD_280::GetHandProperty,this);
 }
 
 void BHD_280::Unadvertise() {
@@ -60,9 +66,75 @@ bool BHD_280::Publish() {
   }
   
   pub_handstate.publish(bhstate);
+
+  // calculate the transforms
+  // code by Andrew Yeager, CMU
+  static double t[4][4][4];
+  
+  static const int r[3] = {-1, 1, 0};
+  static const int j[3] = {1, 1, -1};
+  
+  static const double A[4] = {25, 50, 70, 50};
+  static const double D[4] = {84, 0, 0, 9.5};
+  static const double PHI[3] = {0, .0429351, .8726646};
+    
+  int i;
+
+  for (int finger=1; finger <=3; ++finger) {
+    
+    createT(r[finger-1]*A[0], 0, D[0], r[finger-1] * bhstate.positions[(finger-1)*3] - M_PI_2*j[finger-1], t[0]);
+    createT(A[1], M_PI_2, D[1], bhstate.positions[1 + (finger-1)*3] + PHI[1], t[1]);
+    createT(A[2], 0, D[2], bhstate.positions[2 + (finger-1)*3] + PHI[2], t[2]);                 
+    createT(A[3], -M_PI_2, D[3], 0, t[3]);
+    
+    //Publish Transform Information
+    tf::StampedTransform baseShift_stf(baseShift, ros::Time::now(), "wam7" , "BHDBase");
+    tf_broadcaster->sendTransform(baseShift_stf);
+    for(i = 0; i < 4; i++) {
+      char jref[50], jname[50];
+      if(i > 0)
+	snprintf(jref, 50, "finger%d_%d", finger-1, i-1);
+      else
+	snprintf(jref, 50, "BHDBase");
+      
+      snprintf(jname, 50, "finger%d_%d", finger-1, i);
+      
+      btTransform finger_tf = btTransform(btMatrix3x3(t[i][0][0],t[i][0][1],t[i][0][2],t[i][1][0],t[i][1][1],t[i][1][2],t[i][2][0],t[i][2][1],t[i][2][2]), btVector3(t[i][0][3]/1000,t[i][1][3]/1000,t[i][2][3]/1000));                                                  
+      tf::StampedTransform finger_stf(finger_tf, ros::Time::now(), jref, jname);
+      
+      
+      tf_broadcaster->sendTransform(finger_stf);
+    }
+  }
+  
   return true;
 }
   
+void BHD_280::createT(double a, double alpha, double d, double theta, double result[4][4])
+{
+  // code by Andrew Yeager, CMU
+  double cosTheta = cos(theta);
+  double sinTheta = sin(theta);
+  double cosAlpha = cos(alpha);
+  double sinAlpha = sin(alpha);     
+  
+  result[0][0] = cosTheta;
+  result[0][1] = -sinTheta;
+  result[0][2] = 0;
+  result[0][3] = a;
+  result[1][0] = sinTheta*cosAlpha;
+  result[1][1] = cosTheta*cosAlpha;
+  result[1][2] = -sinAlpha;
+  result[1][3] = -sinAlpha*d;
+  result[2][0] = sinTheta*sinAlpha;
+  result[2][1] = cosTheta*sinAlpha;
+  result[2][2] = cosAlpha;
+  result[2][3] = cosAlpha*d;
+  result[3][0] = 0;
+  result[3][1] = 0;
+  result[3][2] = 0;
+  result[3][3] = 1;  
+}
 
 // Handle requests for DOF information
 bool BHD_280::GetDOF(pr_msgs::GetDOF::Request &req,
@@ -85,6 +157,9 @@ bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
 // Reset command
 bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
 			    pr_msgs::ResetHand::Response &res) {
+  // no longer necessary; it would be bad if we actually did it
+
+#ifdef NDEF
   if (bus->hand_reset() == OW_SUCCESS) {
     bhstate.state = pr_msgs::BHState::state_done;
     return true;
@@ -92,6 +167,8 @@ bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
     bhstate.state = pr_msgs::BHState::state_uninitialized;
     return false;
   }
+#endif // NDEF
+  return false;
 }
 
 // Move command
@@ -131,4 +208,22 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
       return true;
     }
   }
+}
+
+bool BHD_280::SetHandProperty(pr_msgs::SetHandProperty::Request &req,
+			  pr_msgs::SetHandProperty::Response &res) {
+  bus->hand_set_property(req.nodeid,req.property,req.value);
+  return true;
+}
+
+bool BHD_280::GetHandProperty(pr_msgs::GetHandProperty::Request &req,
+			  pr_msgs::GetHandProperty::Response &res) {
+  try {
+    res.value = bus->hand_get_property(req.nodeid,req.property);
+  } catch (const char *err) {
+    ROS_WARN_NAMED("bhd280","Failure getting property %d from puck %d: %s",
+		   req.property,req.nodeid,err);
+    return false;
+  }
+  return true;
 }

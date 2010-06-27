@@ -162,6 +162,15 @@ bool WamDriver::Init(const char *joint_cal_file)
     } while (bus.check() == OW_FAILURE);
   }
   
+#ifdef BH280
+  ROS_FATAL("Please move the hand to a safe position and hit <RETURN> to reset the hand");
+  char *line=NULL;
+  size_t linelen = 0;
+  getline(&line,&linelen,stdin);
+  free(line);
+  bus.hand_reset();
+#endif // BH280
+
 #ifndef BH280_ONLY
   int32_t WamWasZeroed = 0;
   if (bus.get_property(SAFETY_MODULE, ZERO, &WamWasZeroed) == OW_FAILURE) {
@@ -202,11 +211,6 @@ bool WamDriver::Init(const char *joint_cal_file)
     Dynamics::g=9.81; // turn on Gravity
     owam->jsdynamics() = true; // turn on feed-forward dynamics
     
-    //#define CALIBRATE_ON_STARTUP
-#ifdef CALIBRATE_ON_STARTUP
-    calibrate_joint_angles();
-#endif // CALIBRATE_ON_STARTUP
-    
   } else {
     if (!powerup) {
       // still need to tell the user what to do
@@ -219,10 +223,6 @@ bool WamDriver::Init(const char *joint_cal_file)
       start_control_loop();
       Dynamics::g=0.0; // turn off Gravity
       owam->jsdynamics() = true; // turn on feed-forward dynamics
-      
-#ifdef CALIBRATE_ON_STARTUP
-      calibrate_joint_angles();
-#endif // CALIBRATE_ON_STARTUP
       
       ROS_INFO("Robot will make small movements to verify home position, and");
       ROS_INFO("then will turn on gravity compensation.");
@@ -911,15 +911,15 @@ void WamDriver::write_pulse_data() {
 
 void WamDriver::set_home_position() {
 
-        ROS_ERROR("\007When ready, type HOME<return>\007");
-        char *line=NULL;
-        size_t linelen = 0;
-        getline(&line,&linelen,stdin);
-        while (strncmp(line,"HOME",4)) {
-        ROS_ERROR("\007\nYou must type the word HOME and press <return>\007");
-        getline(&line,&linelen,stdin);
-    }
-    free(line);
+  ROS_ERROR("\007When ready, type HOME<return>\007");
+  char *line=NULL;
+  size_t linelen = 0;
+  getline(&line,&linelen,stdin);
+  while (strncmp(line,"HOME",4)) {
+    ROS_ERROR("\007\nYou must type the word HOME and press <return>\007");
+    getline(&line,&linelen,stdin);
+  }
+  free(line);
     
     if (FILE *moff_file = fopen(joint_calibration_file,"r")) {
       ROS_INFO("Applying encoder offsets from file %s",joint_calibration_file);
