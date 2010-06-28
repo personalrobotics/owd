@@ -27,6 +27,7 @@ public:
   btTransform baseShift;  
 
   pr_msgs::BHState bhstate;
+  double max_velocity;
 
   BHD_280(CANbus *cb);
   ~BHD_280();
@@ -47,6 +48,7 @@ public:
   
 private:
   void AdvertiseAndSubscribe(ros::NodeHandle &n);
+  void GetParameters(ros::NodeHandle &n);
   void Unadvertise();
   void createT(double a, double alpha, double d, double theta, double result[4][4]);
 

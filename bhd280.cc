@@ -2,6 +2,7 @@
 
 BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   AdvertiseAndSubscribe(node);
+  GetParameters(node);
   tf_broadcaster = new tf::TransformBroadcaster();
   bhstate.state = pr_msgs::BHState::state_done;
   bhstate.temperature=0.0f;
@@ -30,6 +31,10 @@ void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 				       &BHD_280::GetHandProperty,this);
 }
 
+void BHD_280::GetParameters(ros::NodeHandle &n) {
+  n.param("max_velocity",max_velocity,2.4);
+}
+  
 void BHD_280::Unadvertise() {
   pub_handstate.shutdown();
   ss_gethanddof.shutdown();
@@ -194,6 +199,19 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
     }
   } else if (req.movetype == pr_msgs::MoveHand::Request::movetype_velocity) {
     bhstate.state = pr_msgs::BHState::state_moving;
+    for (unsigned int i=0; i<4; ++i) {
+      if (req.positions[i] < -max_velocity) {
+	ROS_WARN_NAMED("bhd280",
+		       "Joint %d velocity request of %2.2f limited to max of %2.2f radians/sec",
+		       i+,req.positions[i],-max_velocity);
+	req.positions[i]=-max_velocity;
+      } else if (req.positions[i] > max_velocity) {
+	ROS_WARN_NAMED("bhd280",
+		       "Joint %d velocity request of %2.2f limited to max of %2.2f radians/sec",
+		       i+,req.positions[i],max_velocity);
+	req.positions[i]=max_velocity;
+      }
+    }
     pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
     if (bus->hand_velocity(req.positions[0],
 			   req.positions[1],
@@ -203,6 +221,9 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
     } else {
       return true;
     }
+  }
+  else {
+    return false; // unknown move type
   }
 }
 

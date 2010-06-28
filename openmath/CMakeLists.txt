@@ -5,7 +5,7 @@ add_library(openmath STATIC Inertia.cc SE3.cc SO3.cc ZYX.cc)
 
 include(../detect_cpu.cmake)
 
-if( DEFINED ENV{ROS_MARCH_FLAGS} )
+if (DEFINED ENV{ROS_MARCH_FLAGS})
     message(STATUS "Using mtune flags set in environment: $ENV{ROS_MARCH_FLAGS}")
     add_definitions( "$ENV{ROS_MARCH_FLAGS}" )
 elseif(VENDOR_ID STREQUAL "GenuineIntel" AND CPU_FAMILY EQUAL 6 AND MODEL EQUAL 28)
@@ -14,7 +14,7 @@ elseif(VENDOR_ID STREQUAL "GenuineIntel" AND CPU_FAMILY EQUAL 6 AND MODEL EQUAL 
 elseif(VENDOR_ID STREQUAL "CentaurHauls")
     message(STATUS "Building for VIA - Original Barrett WAM PC")
     add_definitions("-march=c3-2")
-endif()
+endif  (DEFINED ENV{ROS_MARCH_FLAGS})
 
 add_definitions("-ggdb3")
 

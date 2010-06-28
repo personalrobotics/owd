@@ -3,7 +3,7 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 include(../../detect_cpu.cmake)
 
-if( DEFINED ENV{OWD_MARCH_FLAGS} )
+if (DEFINED ENV{OWD_MARCH_FLAGS})
     message(STATUS "Using mtune flags set in environment: $ENV{OWD_MARCH_FLAGS}")
     add_definitions( "$ENV{OWD_MARCH_FLAGS}" )
 elseif(VENDOR_ID STREQUAL "GenuineIntel" AND CPU_FAMILY EQUAL 6 AND MODEL EQUAL 28)
@@ -12,7 +12,7 @@ elseif(VENDOR_ID STREQUAL "GenuineIntel" AND CPU_FAMILY EQUAL 6 AND MODEL EQUAL 
 elseif(VENDOR_ID STREQUAL "CentaurHauls")
     message(STATUS "Building for VIA - Original Barrett WAM PC")
     add_definitions("-march=c3-2")
-endif()
+endif  (DEFINED ENV{OWD_MARCH_FLAGS})
 
 add_definitions("-ggdb3 -DWRIST -DBH8")
 add_library(positionInterface STATIC SmoothArm.cc  SmoothJoint.cc)
