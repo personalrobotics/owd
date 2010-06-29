@@ -6,11 +6,11 @@ set (CANBUS_TYPE "ESD")
 #set (CANBUS_TYPE "PEAK")
 set (CMAKE_VERBOSE_MAKEFILE on)
 
-add_subdirectory(openwam)
-add_subdirectory(openmath)
-
 rosbuild_init()
 rosbuild_gensrv()
+
+add_subdirectory(openwam)
+# add_subdirectory(openmath)
 
 include_directories (openwam openmath)
 add_definitions("-ggdb3 -DWRIST -DBH8")
@@ -24,12 +24,16 @@ set (RT_LIBS "")
 endif (RT)
 
 if (CANBUS_TYPE STREQUAL "ESD")
-set (CANBUS_DEFS "-DESD_CAN")
+message(STATUS "using ESD CANbus driver")
+set (CANBUS_DEFS "-DESD_CAN -I../esdcan-pci200/lib32")
 set (CANBUS_LIBS "ntcan")
+set (CANBUS_LDFLAGS "-L../esdcan-pci200/lib32")
 elseif (CANBUS_TYPE  STREQUAL "PEAK")
+message(STATUS "using PEAK CANbus driver")
 set (CANBUS_DEFS "-DPEAK_CAN")
 set (CANBUS_LIBS "pcan")
 else (CANBUS_TYPE STREQUAL "ESD")
+message(SEND_ERROR "No CANbus type recognized")
 set (CANBUS_DEFS "")
 set (CANBUS_LIBS "")
 endif (CANBUS_TYPE STREQUAL "ESD")
@@ -38,20 +42,23 @@ rosbuild_add_executable(owd owd.cpp openwamdriver.cpp)
 target_link_libraries(owd openwam openmath lapack blas
 			  gfortran ${CANBUS_LIBS} ${RT_LIBS})
 rosbuild_add_compile_flags(owd "${CANBUS_DEFS} ${RT_DEFS}")
+rosbuild_add_link_flags(owd "${CANBUS_LDFLAGS}")
 
 rosbuild_add_executable(owdbhd owd.cpp openwamdriver.cpp bhd280.cc)
 target_link_libraries(owdbhd openwambhd openmath lapack blas
 			     gfortran ${CANBUS_LIBS} ${RT_LIBS})
 rosbuild_add_compile_flags(owdbhd "-DBH280 ${CANBUS_DEFS} ${RT_DEFS}")
+rosbuild_add_link_flags(owdbhd "${CANBUS_LDFLAGS}")
 
 rosbuild_add_executable(canbhd owd.cpp openwamdriver.cpp bhd280.cc)
 target_link_libraries(canbhd openwam_canbhd openmath lapack blas
 			     gfortran ${CANBUS_LIBS} ${RT_LIBS})
 rosbuild_add_compile_flags(canbhd "-DBH280 -DBH280_ONLY ${CANBUS_DEFS} ${RT_DEFS}")
+rosbuild_add_link_flags(canbhd "${CANBUS_LDFLAGS}")
 
 rosbuild_add_executable(owdsim owd.cpp openwamdriver.cpp)
 target_link_libraries(owdsim openwamsim openmath lapack blas gfortran)
-rosbuild_add_compile_flags(owdsim "-DOWDSIM")
+rosbuild_add_compile_flags(owdsim "-DOWDSIM ${RT_DEFS}")
 
 rosbuild_add_executable(owd_test test.cpp)
 

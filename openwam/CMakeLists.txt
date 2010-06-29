@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 2.4.6)
 set (ROS_BUILD_STATIC_LIBS true)
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
-add_subdirectory(positionInterface)
-link_directories (positionInterface)
+# add_subdirectory(positionInterface)
+# link_directories (positionInterface)
 
 include(../detect_cpu.cmake)
 
@@ -20,32 +20,18 @@ endif (DEFINED ENV{OWD_MARCH_FLAGS})
 
 add_definitions("-ggdb3 -DWRIST -DBH8")
 
-rosbuild_add_library(openwam STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc DataRecorder.cc ConstrainedForceTrajectory.cc)
-if (RT)
-rosbuild_add_compile_flags(openwam "-DPEAK_CAN")
-else (RT)
-rosbuild_add_compile_flags(openwam "-DPEAK_CAN -DNO_RT")
-endif (RT)
+add_library(openwam STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc DataRecorder.cc ConstrainedForceTrajectory.cc)
 
-rosbuild_add_library(openwambhd STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc DataRecorder.cc ConstrainedForceTrajectory.cc)
-if (RT)
-rosbuild_add_compile_flags(openwambhd "-DPEAK_CAN -DBH280")
-else (RT)
-rosbuild_add_compile_flags(openwambhd "-DBH280 -DNO_RT")
-endif (RT)
+add_library(openwambhd STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc DataRecorder.cc ConstrainedForceTrajectory.cc)
 
-rosbuild_add_library(openwam_canbhd STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc DataRecorder.cc ConstrainedForceTrajectory.cc)
-rosbuild_add_compile_flags(openwam_canbhd "-DPEAK_CAN -DBH280 -DBH280_ONLY")
+add_library(openwam_canbhd STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc DataRecorder.cc ConstrainedForceTrajectory.cc)
 
-rosbuild_add_library(openwamsim STATIC  Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc ControlLoop_sim.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc DataRecorder.cc ConstrainedForceTrajectory.cc)
-rosbuild_add_compile_flags(openwamsim "-DOWDSIM")
+add_library(openwamsim STATIC  Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc ControlLoop_sim.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc DataRecorder.cc ConstrainedForceTrajectory.cc)
 
 target_link_libraries(openwam positionInterface)
 include_directories (../openmath positionInterface)
 
-if (DEFINED XENOMAI_LDFLAGS)
-message (STATUS "XENOMAI_LDFLAGS was already defined as ${XENOMAI_LDFLAGS}")
-endif (DEFINED XENOMAI_LDFLAGS)
+set (RT true)
 
 if (RT)
 # locate Xenomai
@@ -67,16 +53,18 @@ if (XENO-CONFIG)
    endif (XENOMAI_NOTFOUND)
    
 elseif ("$ENV{XENOMAI_PATH}" STRGREATER "")
+message(STATUS "Using XENOMAI_PATH=$ENV{XENOMAI_PATH}")
    set (XENOMAI_CFLAGS "-I$ENV{XENOMAI_PATH}/include")
    set (XENOMAI_LDFLAGS "-L$ENV{XENOMAI_PATH}/lib -lnative")
 endif (XENO-CONFIG)
-
-   rosbuild_add_compile_flags(openwam ${XENOMAI_CFLAGS})
-   rosbuild_add_compile_flags(openwambhd ${XENOMAI_CFLAGS})
-   rosbuild_add_compile_flags(openwam_canbhd ${XENOMAI_CFLAGS})
-   rosbuild_add_compile_flags(openwamsim ${XENOMAI_CFLAGS})
-   rosbuild_add_link_flags(openwam ${XENOMAI_LDFLAGS})
-   rosbuild_add_link_flags(openwambhd ${XENOMAI_LDFLAGS})
-   rosbuild_add_link_flags(openwam_canbhd ${XENOMAI_LDFLAGS})
-
 endif(RT)
+
+rosbuild_add_compile_flags(openwam "${XENOMAI_CFLAGS} -DESD_CAN -I../../esdcan-pci200/lib32")
+rosbuild_add_compile_flags(openwambhd "${XENOMAI_CFLAGS} -DESD_CAN -DBH280 -I../../esdcan-pci200/lib32")
+rosbuild_add_compile_flags(openwam_canbhd "${XENOMAI_CFLAGS} -DESD_CAN -DBH280 -DBH280_ONLY -I../../esdcan-pci200/lib32")
+rosbuild_add_compile_flags(openwamsim "${XENOMAI_CFLAGS} -DOWDSIM")
+
+rosbuild_add_link_flags(openwam "${XENOMAI_LDFLAGS} -lntcan")
+rosbuild_add_link_flags(openwambhd "${XENOMAI_LDFLAGS} -lntcan")
+rosbuild_add_link_flags(openwam_canbhd "${XENOMAI_LDFLAGS} -lntcan")
+

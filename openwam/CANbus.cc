@@ -906,7 +906,7 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
 #endif // PEAK_CAN
 
 #ifdef ESD_CAN
-  CMSG msg;
+  CMSG cmsg;
 
   if(block){
     err = canRead(handle, &cmsg, &len, NULL);

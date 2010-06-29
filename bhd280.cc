@@ -203,12 +203,12 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
       if (req.positions[i] < -max_velocity) {
 	ROS_WARN_NAMED("bhd280",
 		       "Joint %d velocity request of %2.2f limited to max of %2.2f radians/sec",
-		       i+,req.positions[i],-max_velocity);
+		       i+1,req.positions[i],-max_velocity);
 	req.positions[i]=-max_velocity;
       } else if (req.positions[i] > max_velocity) {
 	ROS_WARN_NAMED("bhd280",
 		       "Joint %d velocity request of %2.2f limited to max of %2.2f radians/sec",
-		       i+,req.positions[i],max_velocity);
+		       i+1,req.positions[i],max_velocity);
 	req.positions[i]=max_velocity;
       }
     }
