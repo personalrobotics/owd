@@ -462,8 +462,14 @@ int CANbus::get_property(int32_t nid, int32_t property, int32_t* value){
   }
       
   // Check that the ids and properties match
-  if(nodeid!=nid || prop!=property){
-    ROS_ERROR("CANbus::get_prop: id or property mismatch.");
+  if(nodeid!=nid) {
+    ROS_WARN("Asked for property %d from node %d but got answer from node %d",
+	     property, nid, nodeid);
+    return OW_FAILURE;
+  }
+  else if (prop!=property) {
+    ROS_WARN("Asked node %d for property %d but property %d",
+	     nid, property, prop);
     return OW_FAILURE;
   }   
   return OW_SUCCESS;
@@ -510,7 +516,7 @@ int CANbus::send_torques(){
                                     Puck::MIN_TRQ[puck->id()], 
                                     Puck::MAX_TRQ[puck->id()] );
 		  if (DEBUGCOUNT==0) {
-		    ROS_DEBUG_NAMED("torques","Puck %d Torque %d",puck->id(),torques[p]);
+		    //		    ROS_DEBUG_NAMED("torques","Puck %d Torque %d",puck->id(),torques[p]);
 		  }
               }
               else{
@@ -909,7 +915,13 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
   CMSG cmsg;
 
   if(block){
+    //    int count=10;
+    //    while (((err = canRead(handle, &cmsg, &len, NULL)) == NTCAN_RX_TIMEOUT) &&
+    //	   (++count > 0)) {
+    //      usleep(400);
+    //    }
     err = canRead(handle, &cmsg, &len, NULL);
+
     if (err != NTCAN_SUCCESS) {
       ROS_ERROR("CANbus::read: canRead failed: 0x%x",err);
       return OW_FAILURE;
@@ -922,11 +934,10 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
     }
   }
 
-  // Just to avoid printing anoying output during status checkup
   if(len == 0){
+    ROS_ERROR("read something with length zero");
     return OW_FAILURE;
-  }
-  else if(len != 1){
+  } else if(len != 1){
     ROS_ERROR("CANbus::read: received a message of length: %d",len);
     return OW_FAILURE;
   }
@@ -1195,6 +1206,17 @@ int CANbus::finger_reset(int32_t nodeid) {
     return OW_FAILURE;
   }
   ROS_DEBUG_NAMED("can_bh280", "Finger reset");
+  usleep(1000000);
+  pthread_mutex_lock(&busmutex);
+  int32_t msgid, msglen;
+  unsigned char msg[8];
+  int clearcount=0;
+  while (read(&msgid, msg, &msglen, false) == OW_SUCCESS) {
+    clearcount++;
+  }
+  pthread_mutex_unlock(&busmutex);
+  ROS_DEBUG("Cleared %d old CAN messages",clearcount);
+
   return OW_SUCCESS;
 }
 
