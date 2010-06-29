@@ -277,6 +277,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("StepJoint", &WamDriver::StepJoint, this);
   ss_SetGains =
     n.advertiseService("SetGains", &WamDriver::SetGains, this);
+  ss_SetGains =
+    n.advertiseService("Idle", &WamDriver::Idle, this);
 
 #ifdef BUILD_FOR_SEA
   sub_wam_joint_targets = 
@@ -1039,19 +1041,23 @@ void WamDriver::start_control_loop() {
         ROS_FATAL("Error changing mode of puck 10");
         throw -1;
     }
+#endif
     for (int p=1; p<8; p++) {
         if (bus.set_property(p,MODE,2,false) == OW_FAILURE) {
             ROS_FATAL("Error changing mode of puck %d",p);
             throw -1;
         }
     }
-#endif // AUTO_ACTIVATE
     
+#ifdef NDEF
+#ifdef BH280_ONLY
     // check the mode of puck 1 to detect when active was pressed
     while (bus.get_puck_state() != 2) {
       usleep(50000);
     }
-#endif // BH280_ONLY    
+#endif // BH280_ONLY
+#endif // NDEF
+
 }
 
 void WamDriver::stop_control_loop() {
@@ -1865,6 +1871,16 @@ bool WamDriver::StepJoint(owd::StepJoint::Request &req,
 bool WamDriver::SetGains(owd::SetGains::Request &req,
 			 owd::SetGains::Response &res) {
   return owam->set_gains(req.joint,req.gains);
+}
+
+bool WamDriver::SetGains(owd::SetGains::Request &req,
+			 owd::SetGains::Response &res) {
+    for (int p=1; p<8; p++) {
+        if (bus.set_property(p,MODE,2,false) == OW_FAILURE) {
+            ROS_FATAL("Error changing mode of puck %d",p);
+            throw -1;
+        }
+    }
 }
 
 #ifdef BUILD_FOR_SEA
