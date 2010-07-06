@@ -669,8 +669,8 @@ void* control_loop(void* argv){
       //      ROS_DEBUG_NAMED("can_bh280","reading positions");
 #endif
       if(wam->bus->read_positions() == OW_FAILURE){
-        ROS_FATAL("control_handler: read_positions failed");
-        return NULL;
+        ROS_WARN("control_handler: read_positions failed");
+	//        return NULL;
       }
       
       RTIME bt1 = ControlLoop::get_time_ns();
@@ -1077,6 +1077,7 @@ void WAM::newcontrol(double dt){
     
     this->unlock();
     int32_t response;
+#ifdef NDEF
     if (!bus->simulation) { // skip if running in simulation
       int puckstate=bus->get_puck_state();
       if (puckstate != 2) {
@@ -1103,6 +1104,7 @@ void WAM::newcontrol(double dt){
         motor_state=MOTORS_ACTIVE;
       }        
     }    
+#endif
 }
 
 bool WAM::safety_torques_exceeded(double t[]) {

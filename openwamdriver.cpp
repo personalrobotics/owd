@@ -277,7 +277,7 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("StepJoint", &WamDriver::StepJoint, this);
   ss_SetGains =
     n.advertiseService("SetGains", &WamDriver::SetGains, this);
-  ss_SetGains =
+  ss_Idle =
     n.advertiseService("Idle", &WamDriver::Idle, this);
 
 #ifdef BUILD_FOR_SEA
@@ -1036,27 +1036,24 @@ void WamDriver::start_control_loop() {
     
     ROS_ERROR("\nPress Shift-Activate to activate motors and start system.");
 
-#ifdef AUTO_ACTIVATE
-    if (bus.set_property(10,MODE,2,false) == OW_FAILURE) {
-        ROS_FATAL("Error changing mode of puck 10");
-        throw -1;
+#ifdef NDEF
+    // check the mode of puck 1 to detect when active was pressed
+    while (bus.get_puck_state() != 2) {
+      usleep(50000);
     }
-#endif
+#endif // NDEF
+
     for (int p=1; p<8; p++) {
         if (bus.set_property(p,MODE,2,false) == OW_FAILURE) {
             ROS_FATAL("Error changing mode of puck %d",p);
             throw -1;
         }
     }
+
+#endif // BH280_ONLY 
+
+
     
-#ifdef NDEF
-#ifdef BH280_ONLY
-    // check the mode of puck 1 to detect when active was pressed
-    while (bus.get_puck_state() != 2) {
-      usleep(50000);
-    }
-#endif // BH280_ONLY
-#endif // NDEF
 
 }
 
@@ -1873,8 +1870,8 @@ bool WamDriver::SetGains(owd::SetGains::Request &req,
   return owam->set_gains(req.joint,req.gains);
 }
 
-bool WamDriver::SetGains(owd::SetGains::Request &req,
-			 owd::SetGains::Response &res) {
+bool WamDriver::Idle(pr_msgs::Idle::Request &req,
+		     pr_msgs::Idle::Response &res) {
     for (int p=1; p<8; p++) {
         if (bus.set_property(p,MODE,2,false) == OW_FAILURE) {
             ROS_FATAL("Error changing mode of puck %d",p);
