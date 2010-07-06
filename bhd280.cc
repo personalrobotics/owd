@@ -188,6 +188,7 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
   
   if (req.movetype == pr_msgs::MoveHand::Request::movetype_position) {
     bhstate.state = pr_msgs::BHState::state_moving;
+    ROS_ERROR_NAMED("bhd280", "Received MoveHand");
     pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
     if (bus->hand_move(req.positions[0],
 		       req.positions[1],
@@ -199,6 +200,7 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
     }
   } else if (req.movetype == pr_msgs::MoveHand::Request::movetype_velocity) {
     bhstate.state = pr_msgs::BHState::state_moving;
+    ROS_ERROR_NAMED("bhd280", "Received MoveHand Velocity");
     for (unsigned int i=0; i<4; ++i) {
       if (req.positions[i] < -max_velocity) {
 	ROS_WARN_NAMED("bhd280",

@@ -1284,6 +1284,8 @@ int CANbus::hand_move(double p1, double p2, double p3, double p4) {
   set_property(12,CMD,19);
   set_property(13,CMD,19);
   set_property(14,CMD,19); */
+  ROS_ERROR_NAMED("bhd280", "executing hand_move");
+
   set_property(11,E,finger_radians_to_encoder(p1));
   set_property(12,E,finger_radians_to_encoder(p2));
   set_property(13,E,finger_radians_to_encoder(p3));
@@ -1293,10 +1295,12 @@ int CANbus::hand_move(double p1, double p2, double p3, double p4) {
   set_property(13,MODE,5);
   set_property(14,MODE,5);
   handstate = HANDSTATE_MOVING;
+  ROS_ERROR_NAMED("bhd280", "done hand_move");
   return OW_SUCCESS;
 }
 
 int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
+  ROS_ERROR_NAMED("bhd280", "executing hand_velocity");
   set_property(11,V,finger_radians_to_encoder(v1)/1000.0);
   set_property(12,V,finger_radians_to_encoder(v2)/1000.0);
   set_property(13,V,finger_radians_to_encoder(v3)/1000.0);
@@ -1307,6 +1311,7 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   set_property(13,MODE,MODE_VELOCITY);
   set_property(14,MODE,MODE_VELOCITY);
   handstate = HANDSTATE_MOVING;
+  ROS_ERROR_NAMED("bhd280", "done executing hand_velocity");
   return OW_SUCCESS;
 }
 
