@@ -39,7 +39,6 @@ WAM::WAM(CANbus* cb) :
 
   pthread_mutex_init(&mutex, NULL);
 
-  bus = cb;
   se3traj = NULL;
   jointstraj = NULL;
   pulsetraj = NULL;

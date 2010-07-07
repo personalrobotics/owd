@@ -46,11 +46,13 @@ public:
   double canread_sendtime;
   double canread_readtime;
   double cansetpuckstate_time;
+  double cansethandstate_time;
 
   CANstats() : cansend_time(0.0f),
 	       canread_sendtime(0.0f),
 	       canread_readtime(0.0f),
-	       cansetpuckstate_time(0.0f)
+	       cansetpuckstate_time(0.0f),
+	       cansethandstate_time(0.0f)
   {}
 
   void rosprint() const;
@@ -93,6 +95,8 @@ public:
 
   pthread_mutex_t trqmutex;
   pthread_mutex_t posmutex;
+
+  char last_error[200];
 
 #ifndef OWDSIM
   HANDLE handle;
@@ -157,6 +161,7 @@ private:
   int32_t hand_positions[4+1];
   pthread_mutex_t handmutex;
   int32_t handstate;
+  int first_moving_finger;
 
   int finger_reset(int32_t id);
   double finger_encoder_to_radians(int32_t enc);
