@@ -171,7 +171,7 @@ private:
 
 public:
   int hand_set_state();
-  int hand_activate();
+  int hand_activate(int32_t *nodes);
   int hand_reset();
   int hand_move(double p1, double p2, double p3, double p4);
   int hand_velocity(double v1, double v2, double v3, double v4);

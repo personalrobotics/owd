@@ -225,7 +225,7 @@ int CANbus::check(){  // DONE MVE
     ROS_DEBUG_NAMED("cancheck","Checking puck %d",pucks[p].id());
 	 
     if(nodes[ pucks[p].id() ] == STATUS_RESET){
-      ROS_DEBUG_NAMED("cancheck"," (reset) ->Waking up the puck...");
+      ROS_DEBUG_NAMED("cancheck","Waking up the puck %d",pucks[p].id());
       if(wake_puck(pucks[p].id()) == OW_FAILURE){
 	ROS_WARN_NAMED("cancheck","wake_puck failed.");
 	return OW_FAILURE;
@@ -276,7 +276,7 @@ int CANbus::check(){  // DONE MVE
 #endif  // not BH280_ONLY
 #ifdef BH280
   ROS_INFO_NAMED("can_bh280","  Initializing hand pucks 11 to 14...");
-  if (hand_activate() != OW_SUCCESS) {
+  if (hand_activate(nodes) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280","Hand not initialized");
     return OW_FAILURE;
   }
@@ -1126,13 +1126,24 @@ void CANbus::set_puck_state() {
 
 #ifdef BH280
 
-int CANbus::hand_activate() {
+int CANbus::hand_activate(int32_t *nodes) {
   for (int32_t nodeid=11; nodeid<15; ++nodeid) {
-    if (wake_puck(nodeid) != OW_SUCCESS) {
-      ROS_WARN_NAMED("can_bh280","Could not wake hand puck %d",nodeid);
-      return OW_FAILURE;
+    if (nodes[nodeid] == STATUS_RESET) {
+      ROS_DEBUG_NAMED("can_bh280","Waking up puck %d...",nodeid);
+      if (wake_puck(nodeid) != OW_SUCCESS) {
+	ROS_WARN_NAMED("can_bh280","Could not wake hand puck %d",nodeid);
+	return OW_FAILURE;
+      }
+      ROS_DEBUG_NAMED("can_bh280","done");
+    } else {
+      ROS_DEBUG_NAMED("can_bh280","setting puck %d to idle mode...",nodeid);
+      // this was set to CONTROLLER_IDLE originally
+      if(set_property(nodeid, MODE, PUCK_IDLE, true) == OW_FAILURE){
+	ROS_WARN_NAMED("cancheck","Failed to set MODE=PUCK_IDLE on puck %d",nodeid);
+	return OW_FAILURE;
+      }
+      ROS_DEBUG_NAMED("can_bh280","done");
     }
-    ROS_DEBUG_NAMED("can_bh280","Woke up hand puck %d", nodeid);
   }
   return OW_SUCCESS;
 }
@@ -1191,13 +1202,12 @@ int CANbus::hand_set_state() {
 
 int CANbus::finger_reset(int32_t nodeid) {
   // send the HI to this finger
-  ROS_DEBUG_NAMED("can_bh280", "Sending HI");
   if (set_property(nodeid,CMD,13) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280","Error sending HI to hand puck %d",nodeid);
     return OW_FAILURE;
   }
   // give the finger a little time to work
-  usleep(250000); // 0.25 secs
+  usleep(500000); // 0.5 secs
   // now wait for the change in mode
   ROS_DEBUG_NAMED("can_bh280", "Waiting for MODE change to IDLE");
   int32_t mode;
@@ -1208,7 +1218,7 @@ int CANbus::finger_reset(int32_t nodeid) {
   while ((mode != PUCK_IDLE) && (--count)) {
     usleep(50000); // 50ms
     if (get_property(nodeid,MODE,&mode) != OW_SUCCESS) {
-      ROS_WARN_NAMED("can_bh280","Could not get MODE from hand puck %d; still waiting", nodeid);
+      ROS_DEBUG_NAMED("can_bh280","Could not get MODE from hand puck %d; still waiting", nodeid);
     }
   }
   if (mode != PUCK_IDLE) {
@@ -1216,17 +1226,7 @@ int CANbus::finger_reset(int32_t nodeid) {
     return OW_FAILURE;
   }
   ROS_DEBUG_NAMED("can_bh280", "Finger reset");
-  usleep(1000000);
-  pthread_mutex_lock(&busmutex);
-  int32_t msgid, msglen;
-  unsigned char msg[8];
-  int clearcount=0;
-  while (read(&msgid, msg, &msglen, false) == OW_SUCCESS) {
-    clearcount++;
-  }
-  pthread_mutex_unlock(&busmutex);
-  ROS_DEBUG("Cleared %d old CAN messages",clearcount);
-
+  
   return OW_SUCCESS;
 }
 
@@ -1238,7 +1238,31 @@ int CANbus::hand_reset() {
   //       Open F3
   //    }
   //    Open F4
-
+  bool ready=true;
+  for (int nodeid=11; nodeid<=14; ++nodeid) {
+    int32_t tstop;
+    if (get_property(nodeid,TSTOP,&tstop) != OW_SUCCESS) {
+      ROS_ERROR("Could not get TSTOP property from hand puck %d",
+		nodeid);
+      return OW_FAILURE;
+    }
+    if (tstop != 50) {
+      ready=false;
+      break;
+    }
+  }
+  
+  if (ready) {
+    // all the fingers have already been HI'd
+    return OW_SUCCESS;
+  }
+  
+  ROS_FATAL("Please move the hand to a safe position and hit <RETURN> to reset the hand");
+  char *line=NULL;
+  size_t linelen = 0;
+  getline(&line,&linelen,stdin);
+  free(line);
+  
   for (unsigned int attempts =0; attempts < 3; ++attempts) {
     // F1-F3
     for (int32_t nodeid=11; nodeid<14; ++nodeid) {
@@ -1263,11 +1287,13 @@ int CANbus::hand_reset() {
   for (int32_t nodeid=11; nodeid<=13; ++nodeid) {
     set_property(nodeid,TSTOP,50);
     usleep(100);
+    // F1 to F3 have HOLD=0 because they're not backdrivable
     set_property(nodeid,HOLD,0);
     usleep(100);
   }
-  set_property(14,TSTOP,100);
+  set_property(14,TSTOP,50);
   usleep(100);
+  // F4 has HOLD=1 so that it won't flop around
   set_property(14,HOLD,1);
   usleep(100);
   for (int32_t nodeid=11; nodeid<=14; ++nodeid) {

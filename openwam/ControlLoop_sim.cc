@@ -23,30 +23,29 @@
 #include <time.h>
 
 
-static void* control_handler(void* argv){
-  ControlLoop* ctrl_loop;
+ControlLoop::ControlLoop(int tasknum, void (*fnc)(void*), void* argv) :
+  task_number(tasknum), ctrl_fnc(fnc), ctrl_argv(argv) {
 
-  ctrl_loop = (ControlLoop*)argv;
-
-  ctrl_loop->ctrl_fnc( ctrl_loop->ctrl_argv );
-
-  return argv;
-}
-
-ControlLoop::ControlLoop(int tasknum) : task_number(tasknum){
   pthread_mutex_init(&mutex, NULL);
+
+  snprintf(taskname,20,"OWDTASK%02d",task_number);
 }
 
-int ControlLoop::start(void* (*fnc)(void*), void* argv){
+void *ControlLoop::start_thread(void *data) {
+  ControlLoop *cl = (ControlLoop*)data;
+  (*cl->ctrl_fnc)(cl->ctrl_argv);
+  return NULL;
+}
 
-  ctrl_fnc = fnc;
-  ctrl_argv = argv;
+
+int ControlLoop::start() {
 
   lock();
   cls = CONTROLLOOP_RUN;
   unlock();
 
-  if(pthread_create(&ctrlthread, NULL, control_handler, this)){
+  //  if(pthread_create(&ctrlthread, NULL, ctrl_fnc, ctrl_argv)){
+  if(pthread_create(&ctrlthread, NULL, &ControlLoop::start_thread, this)) {
     ROS_FATAL("ControlLoop::start: pthread_create failed.");
     lock();
     cls = CONTROLLOOP_STOP;
@@ -57,6 +56,11 @@ int ControlLoop::start(void* (*fnc)(void*), void* argv){
 }
 
 int ControlLoop::stop(){
+  if (cls == CONTROLLOOP_STOP) {
+    ROS_DEBUG("ControlLoop: thread %s was already stopped", taskname);
+    return OW_SUCCESS;
+  }
+
   lock();
   cls = CONTROLLOOP_STOP;
   unlock();
@@ -84,4 +88,8 @@ RTIME ControlLoop::get_time_ns() {
   timeval t;
   gettimeofday(&t, NULL);
   return t.tv_sec * 1e9 + t.tv_usec * 1e3;
+}
+
+ControlLoop::~ControlLoop() {
+  stop();
 }

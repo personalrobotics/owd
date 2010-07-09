@@ -38,28 +38,37 @@ enum CONTROLLOOP_STATE{CONTROLLOOP_STOP, CONTROLLOOP_RUN};
 typedef unsigned long long RTIME; // usually defined in xenomai types.h
 #else
 #include <native/types.h>
+#include <native/task.h>
 #endif
 
-class ControlLoop{
+class ControlLoop {
 private:
+#ifdef OWDSIM
   pthread_t ctrlthread;
+  static void *start_thread(void *data);
+#else 
+  RT_TASK task;
+#endif
+
   pthread_mutex_t mutex;
   CONTROLLOOP_STATE cls;
+  char taskname[20];
 
 public:
   //static const double PERIOD = 0.01;
   //static const double PERIOD = 0.002;
   static const double PERIOD = 0.002;
   int task_number; // must be unique on the machine
-  void* (*ctrl_fnc)(void*);
+  void (*ctrl_fnc)(void*);
   void* ctrl_argv;
 
   void lock(){pthread_mutex_lock(&mutex);}
   void unlock(){pthread_mutex_unlock(&mutex);}
 
-  ControlLoop(int tasknum);
+  ControlLoop(int tasknum, void (*fnc)(void*), void* argv);
+  ~ControlLoop();
   
-  int start(void* ctrl_fnc(void*), void* argv);
+  int start();
   int stop();
   int state();
   void wait();

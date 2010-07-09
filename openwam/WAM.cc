@@ -19,10 +19,9 @@
 
 #include "WAM.hh"
 #include <ros/ros.h>
-#include <native/task.h>
-#include <native/timer.h>
+#include <stdio.h>
 
-static void* control_loop(void* argv);
+static void control_loop(void* argv);
 
 extern int MODE;  // puck parameter
 
@@ -33,7 +32,7 @@ extern int MODE;  // puck parameter
 WAM::WAM(CANbus* cb) :
     check_safety_torques(true),rec(false),wsdyn(false),jsdyn(false),
     holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
-    pid_count(0),safety_hold(false),bus(cb),ctrl_loop(cb->id),
+    pid_count(0),safety_hold(false),bus(cb),ctrl_loop(cb->id, &control_loop, this),
     motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000)
 {
 
@@ -602,7 +601,7 @@ void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *sim
 int WAM::start(){
   // start the control loop and uses control_loop (below) as the main function
   // pass this WAM as an argument to control_loop
-  if(ctrl_loop.start(&control_loop, this) == OW_FAILURE){
+  if(ctrl_loop.start() == OW_FAILURE){
     ROS_ERROR("WAM::start: starting control loop failed." );
   }
   return OW_SUCCESS;
@@ -619,7 +618,7 @@ void WAM::stop(){
  * timer and call the WAM's control method.
  * The parameter argv is the WAM object
  */
-void* control_loop(void* argv){
+void control_loop(void* argv){
   WAM* wam = (WAM*)argv;                      // read the WAM argument
   ControlLoop* ctrl_loop = &(wam->ctrl_loop); // get the ControlLoop member
   RTIME t1,t2,t4;
@@ -656,21 +655,25 @@ void* control_loop(void* argv){
   unsigned int slowcount=0;
 
   t1 = ControlLoop::get_time_ns();  // first-time initialization
+  ROS_DEBUG("Control loop started");
 
   // Main control loop
   while(ctrl_loop->state() == CONTROLLOOP_RUN){
+    printf("waiting for next timeslot\n");
       ctrl_loop->wait();         // wait for the next control iteration;
       t2 = ControlLoop::get_time_ns(); // record the time
-      
+      printf("loop execution\n");
+
       // GET POSITIONS
 #ifdef BH280_ONLY
       // only log messages if we're not trying to control the WAM in RT
       //      ROS_DEBUG_NAMED("can_bh280","reading positions");
 #endif
       if(wam->bus->read_positions() == OW_FAILURE){
-        ROS_FATAL("control_handler: read_positions failed");
-        return NULL;
+        ROS_FATAL("control_loop: read_positions failed");
+        return;
       }
+      printf("read positions\n");
       
       RTIME bt1 = ControlLoop::get_time_ns();
       readtime += (bt1-t2 ) * 1e-6;
@@ -689,9 +692,10 @@ void* control_loop(void* argv){
 #endif
       // SEND TORQUES
       if(wam->bus->send_torques() == OW_FAILURE){
-        ROS_FATAL("control_handler: send_torques failed.");
-        return NULL;
+        ROS_FATAL("control_loop: send_torques failed.");
+        return;
       }
+      printf("sent torques\n");
 
       RTIME bt3 = ControlLoop::get_time_ns();
       sendtime += (bt3-bt2) * 1e-6;
@@ -701,8 +705,10 @@ void* control_loop(void* argv){
       // only check the state every 200 cycles
       static int stateperiod=0;
       if (++stateperiod == 200) {
+        printf("checking puck state\n");
         wam->bus->set_puck_state();
         stateperiod=0;
+        printf("puck state checked\n");
       }
 #endif // BH280_ONLY
 
@@ -710,8 +716,10 @@ void* control_loop(void* argv){
       // Hand moving?
       static int handstateperiod=25; // start offset from motor state
       if (++handstateperiod == 50) { // every 0.1 seconds
+        printf("checking hand state\n");
 	wam->bus->hand_set_state();
 	handstateperiod=0;
+        printf("hand state checked\n");
       }
 #endif // BH280
 
@@ -750,7 +758,9 @@ void* control_loop(void* argv){
       
       // get ready for next pass
       t1 = t2;
+      printf("bottom of loop\n");
   }
+  ROS_DEBUG("Control loop finished");
 
 #ifdef __LATENCY__
   FILE* fp = fopen("latencies_dir/latencies", "w");
@@ -767,7 +777,7 @@ void* control_loop(void* argv){
   ROS_DEBUG("Data dumped in file: identification" );
 #endif
 
-  return NULL;
+  return;
 }
 
 

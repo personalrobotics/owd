@@ -163,11 +163,6 @@ bool WamDriver::Init(const char *joint_cal_file)
   }
   
 #ifdef BH280
-  ROS_FATAL("Please move the hand to a safe position and hit <RETURN> to reset the hand");
-  char *line=NULL;
-  size_t linelen = 0;
-  getline(&line,&linelen,stdin);
-  free(line);
   bus.hand_reset();
 #endif // BH280
 
@@ -1050,8 +1045,13 @@ void WamDriver::start_control_loop() {
     // check the mode of puck 1 to detect when active was pressed
     while (bus.get_puck_state() != 2) {
       usleep(50000);
+      static int statcount=0;
+      if (++statcount == 20) {
+	owam->rosprint_stats();
+	statcount=0;
+      }
     }
-#endif // BH280_ONLY    
+#endif // not BH280_ONLY    
 }
 
 void WamDriver::stop_control_loop() {

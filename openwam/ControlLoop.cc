@@ -18,97 +18,116 @@
 */
 
 #include "ControlLoop.hh"
-#include <native/task.h>
 #include <native/timer.h>
 #include <ros/ros.h>
 
-static void* control_handler(void* argv){
-  RT_TASK task;
-  RTIME samper, now;
-  ControlLoop* ctrl_loop;
-
-  ctrl_loop = (ControlLoop*)argv;
-
-  //RTAI:  rt_allow_nonroot_hrt();
-
-  char taskname[20];
-  snprintf(taskname,20,"OWDTASK%02d",ctrl_loop->task_number);
-  int retvalue = rt_task_create(&task, taskname, 0, 99, T_CPU(1));
-  if(retvalue){
-    ROS_FATAL("control_handler: rt_task_create failed");
-    return NULL;
+ControlLoop::ControlLoop(int tasknum, void (*fnc)(void*), void* argv) : 
+  task_number(tasknum), ctrl_fnc(fnc), ctrl_argv(argv) {
+  
+  RTIME rtperiod;
+  
+  pthread_mutex_init(&mutex, NULL);
+  
+  snprintf(taskname,20,"OWDTASK%02d",task_number);
+  
+  // Xenomai example uses TASK_MODE 0 instead of T_CPU(1)
+  int retval = rt_task_create(&task, taskname, 0, 99, T_CPU(1));
+  if(retval){
+    ROS_FATAL("ControlLoop: failed to create RT task %s: %d", taskname, retval);
+    throw OW_FAILURE;
   }
   if(mlockall(MCL_CURRENT | MCL_FUTURE) == -1){
-    ROS_FATAL("control_handler: mlockall failed");
-    ROS_ERROR_COND(
-		   rt_task_delete(&task), "Problem deleting RT task");
-    return NULL;
+    ROS_FATAL("ControlLoop: mlockall failed");
+    if ((retval=rt_task_delete(&task))) {
+      ROS_ERROR("Problem deleting RT task %s: %d", taskname, retval);
+      throw OW_FAILURE;
+    }
   }
-
-#ifdef NOT_NECESSARY // causes an error
-    retvalue = rt_task_set_mode(0, T_PRIMARY, NULL);
-  if (retvalue) {
-    ROS_FATAL("Unable to run task in Primary mode: return=%d",retvalue);
-    ROS_ERROR_COND(
-		   rt_task_delete(&task),"Problem deleting RT task");
-    return NULL;
+  
+#ifdef NOT_NECESSARY ( causes an error)
+  retval = rt_task_set_mode(0, T_PRIMARY, NULL);
+  if (retval) {
+    ROS_FATAL("Unable to run task %s in Primary mode: return=%d",taskname,retval);
+    if ((retval=rt_task_delete(&task))) {
+      ROS_ERROR("Problem deleting RT task %s: %d",taskname,retval);
+      throw OW_FAILURE;
+    }
+    throw OW_FAILURE;
   }
 #endif   
-  // 
-  retvalue = rt_timer_set_mode(TM_ONESHOT);
-  ROS_ERROR_COND(retvalue,"Unable to set timer in oneshot mode");
 
-  samper = rt_timer_ns2ticks( (RTIME)(ControlLoop::PERIOD*1000000000.0) );
-
-  // start_rt_timer(samper);
-  //  now = rt_timer_read();
-
-  if(rt_task_set_periodic(&task, TM_NOW, samper) != 0){
-    ROS_FATAL("control_handler: rt_task_make_periodic failed.");
-    ROS_ERROR_COND(
-		   rt_task_delete(&task),"Problem deleting RT task");
-    return NULL;
+  // if CONFIG_XENO_OPT_NATIVE_PERIOD was set to zero (default) when building
+  // Xenomai, then the time is expressed in nanoseconds.
+  rtperiod = (RTIME)(ControlLoop::PERIOD*1000000000.0); 
+  
+  if((retval=rt_task_set_periodic(&task, TM_NOW, rtperiod))) {
+    ROS_FATAL("ControlLoop: rt_task_set_periodic failed for RT task %s: %d", taskname,retval);
+    if ((retval = rt_task_delete(&task))) {
+      ROS_ERROR("Problem deleting RT task %s: %d",taskname,retval);
+      throw OW_FAILURE;
+    }
   }
-
-  ctrl_loop->ctrl_fnc( ctrl_loop->ctrl_argv );
-
-  ROS_ERROR_COND(
-		 rt_task_delete(&task),"Problem deleting RT task");
-
-  return argv;
 }
 
-ControlLoop::ControlLoop(int tasknum) : task_number(tasknum) {
-  pthread_mutex_init(&mutex, NULL);
-}
+int ControlLoop::start(){
 
-
-int ControlLoop::start(void* (*fnc)(void*), void* argv){
-
-  ctrl_fnc = fnc;
-  ctrl_argv = argv;
+  if (cls == CONTROLLOOP_RUN) {
+    return OW_SUCCESS;
+  }
 
   lock();
   cls = CONTROLLOOP_RUN;
   unlock();
 
-  if(pthread_create(&ctrlthread, NULL, control_handler, this)){
-    ROS_FATAL("ControlLoop::start: pthread_create failed.");
+  RT_TASK_INFO info;
+  int retval = rt_task_inquire(&task, &info);
+  if (retval) {
     lock();
     cls = CONTROLLOOP_STOP;
     unlock();
+    ROS_ERROR("ControlLoop: Unable to get status of RT task %s: %d", taskname, retval);
     return OW_FAILURE;
   }
+  if (info.status & T_STARTED) {
+    if ((retval=rt_task_resume(&task))) {
+      lock();
+      cls = CONTROLLOOP_STOP;
+      unlock();
+      ROS_ERROR("ControlLoop: Unable to resume RT task %s: %d", taskname, retval);
+      return OW_FAILURE;
+    }
+    ROS_DEBUG("Resumed RT task %s", taskname);
+    return OW_SUCCESS;
+  }
+
+  retval = rt_task_start(&task,ctrl_fnc,ctrl_argv);
+  if (retval) {
+    lock();
+    cls = CONTROLLOOP_STOP;
+    unlock();
+    ROS_FATAL("ControlLoop: could not start RT task %s: %d",taskname,retval);
+    return OW_FAILURE;
+  }
+  ROS_DEBUG("Started RT task %s",taskname);
   return OW_SUCCESS;
 }
 
 int ControlLoop::stop(){
+  if (cls == CONTROLLOOP_STOP) {
+    ROS_DEBUG("ControlLoop: RT task %s was already stopped", taskname);
+    return OW_SUCCESS;
+  }
+
   lock();
   cls = CONTROLLOOP_STOP;
   unlock();
 
-  if(pthread_join(ctrlthread, NULL) != 0){
-    ROS_FATAL("ControlLoop::stop: pthread_join failed.");
+  int retval = rt_task_suspend(&task);
+  if(retval){
+    lock();
+    cls = CONTROLLOOP_RUN;
+    unlock();
+    ROS_ERROR("ControlLoop: failed to suspend RT task %s: %d",taskname,retval);
     return OW_FAILURE;
   }
   return OW_SUCCESS;
@@ -122,8 +141,17 @@ int ControlLoop::state(){
   return s;
 }
 
-void ControlLoop::wait(){rt_task_wait_period(NULL);}
+void ControlLoop::wait() {
+  rt_task_wait_period(NULL);
+}
 
 RTIME ControlLoop::get_time_ns() {
   return rt_timer_ticks2ns(rt_timer_read());
+}
+
+ControlLoop::~ControlLoop() {
+  int retval = rt_task_delete(&task);
+  if (retval) {
+    ROS_ERROR("ControlLoop: error deleting RT task %s: %d", taskname,retval);
+  }
 }
