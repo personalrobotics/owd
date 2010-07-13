@@ -461,3 +461,8 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
    }
 }
  
+ CANbus::~CANbus(){
+    if(pucks!=NULL) delete pucks; 
+    if(trq!=NULL) delete trq; 
+    if(pos!=NULL) delete pos;
+ }

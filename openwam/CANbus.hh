@@ -30,6 +30,10 @@
 #include "Group.hh"
 #include "globals.h"
 
+#ifdef CAN_RECORD
+#include "DataRecorder.cc"
+#endif // CAN_RECORD
+
 #ifndef __CANBUS_H__
 #define __CANBUS_H__
 
@@ -99,8 +103,20 @@ public:
   char last_error[200];
 
 #ifndef OWDSIM
+#ifdef CAN_RECORD
+typedef struct {
+  int32_t secs;
+  int32_t usecs;
+  bool send;
+  int32_t msgid;
+  int32_t msglen;
+  int32_t msgdata[4];
+} canio_data;
+DataRecorder<canio_data> candata;
+#endif // CAN_RECORD
+
   HANDLE handle;
-#endif
+#endif // OWDSIM
 
   int load();
   int open();
@@ -134,11 +150,7 @@ public:
 
 
   CANbus(int32_t bus_id, int num_pucks);
-  ~CANbus(){
-    if(pucks!=NULL) delete pucks; 
-    if(trq!=NULL) delete trq; 
-    if(pos!=NULL) delete pos;
-  }
+  ~CANbus();
 
   int init();
   int start();

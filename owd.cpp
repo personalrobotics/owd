@@ -31,8 +31,33 @@ int main(int argc, char** argv)
   ROS_DEBUG("Using CANbus number %d",canbus_number);
 
   WamDriver wam(canbus_number);
-  wam.Init(calibration_filename.c_str());
-  wam.AdvertiseAndSubscribe(n);
+  try {
+    if (! wam.Init(calibration_filename.c_str())) {
+      ROS_FATAL("WamDriver::Init() returned false; exiting.");
+#ifdef CAN_RECORD
+      wam.bus.~CANbus();
+      ROS_FATAL("dumped CANbus logs to candata.log");
+#endif
+      exit(1);
+    }
+  } catch (int error) {
+    ROS_FATAL("Error during WamDriver::Init(); exiting.");
+#ifdef CAN_RECORD
+    wam.bus.~CANbus();
+    ROS_FATAL("dumped CANbus logs to candata.log");
+#endif
+    exit(1);
+  }
+  try {
+    wam.AdvertiseAndSubscribe(n);
+  } catch (int error) {
+    ROS_FATAL("Error during WamDriver::AdvertiseAndSubscribe(); exiting.");
+#ifdef CAN_RECORD
+    wam.bus.~CANbus();
+    ROS_FATAL("dumped CANbus logs to candata.log");
+#endif
+    exit(1);
+  }
 
 #ifdef BH280
   BHD_280 bhd(&(wam.bus));

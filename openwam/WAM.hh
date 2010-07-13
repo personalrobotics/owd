@@ -47,7 +47,7 @@
 #include "JointCtrlSea.hh"
 #endif // BUILD_FOR_SEA
 
-#include "DataRecorder.hh"
+#include "DataRecorder.cc"
 
 #ifndef __WAM_H__
 #define __WAM_H__
@@ -232,7 +232,7 @@ public:
   motor_state_t motor_state;
 
   float stiffness;
-  DataRecorder recorder;
+  DataRecorder<double> recorder;
 
 };
 

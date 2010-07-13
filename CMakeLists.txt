@@ -13,7 +13,7 @@ add_subdirectory(openwam)
 add_subdirectory(openmath)
 
 include_directories (openwam openmath)
-add_definitions("-ggdb3 -DWRIST -DBH8")
+add_definitions("-ggdb3 -DWRIST -DBH8 -DCAN_RECORD")
 
 if (RT)
 set (RT_DEFS "")

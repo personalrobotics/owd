@@ -19,6 +19,9 @@ CANbus::CANbus(int32_t bus_id, int num_pucks) :  // DONE MVW
   puck_state(-1),id(bus_id),trq(NULL),
   pos(NULL), pucks(NULL),npucks(num_pucks),
   simulation(false)
+#ifdef CAN_RECORD
+, candata(100000)
+#endif CAN_RECORD
 {
   pthread_mutex_init(&busmutex, NULL);
   pthread_mutex_init(&trqmutex, NULL);
@@ -862,29 +865,32 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
   int pendread=0;
   int pendwrite=0;
 
-  if (block) {
-    err = LINUX_CAN_Read(handle, &cmsg);
+  int retrycount = block? 30 : 1;
+
+  err = LINUX_CAN_Extended_Status(handle,&pendread, &pendwrite);
+  if ((err != CAN_ERR_OK) && (err != CAN_ERR_QRCVEMPTY)) {
+    //      ROS_INFO("CANbus status is 0x%x",err);
+  }
+  if (pendread) {
+    err = LINUX_CAN_Read(handle,&cmsg);
   } else {
-    err = LINUX_CAN_Extended_Status(handle,&pendread, &pendwrite);
-    if ((err != CAN_ERR_OK) && (err != CAN_ERR_QRCVEMPTY)) {
-      //      ROS_INFO("CANbus status is 0x%x",err);
-    }
-    if (pendread) {
-      err = LINUX_CAN_Read(handle,&cmsg);
-    } else {
-      // sleep briefly and try once more
+    while (retrycount-- > 0) {
+      // sleep briefly and try again
       usleep(100);
       pendread=pendwrite=0;
       err = LINUX_CAN_Extended_Status(handle,&pendread, &pendwrite);
       if ((err != CAN_ERR_OK) && (err != CAN_ERR_QRCVEMPTY)) {
 	//	ROS_INFO("CANbus status is 0x%x",err);
       }
-      if (!pendread) {
-	snprintf(last_error,200,"nothing to read");
-	return OW_FAILURE; // just means nothing was read
-      } else {
-	err = LINUX_CAN_Read(handle,&cmsg);
+      if (pendread) {
+	break;
       }
+    }
+    if (!pendread) {
+      snprintf(last_error,200,"nothing to read");
+      return OW_FAILURE; // just means nothing was read
+    } else {
+      err = LINUX_CAN_Read(handle,&cmsg);
     }
   }
   if (err != CAN_ERR_OK) {
@@ -896,7 +902,6 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
   for (i=0; i< *msglen; ++i) {
     msgdata[i] = cmsg.Msg.DATA[i];
   }
-  return OW_SUCCESS;
 #endif // PEAK_CAN
 
 #ifdef ESD_CAN
@@ -935,8 +940,29 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
   for(i=0; i<*msglen; i++)
     msgdata[i] = cmsg.data[i];
  
-  return OW_SUCCESS;
 #endif // ESD_CAN
+
+#ifdef CAN_RECORD
+  std::vector<canio_data> crecord;
+  canio_data cdata;
+  RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+  cdata.secs = t1 / 1e9;
+  cdata.usecs = (t1 - cdata.secs*1e9) / 1e3;
+  cdata.send=false;
+  cdata.msgid = *msgid;
+  cdata.msglen = *msglen;
+  for (unsigned int i=0; i<4; ++i) {
+    if (i < *msglen) {
+      cdata.msgdata[i] = msgdata[i];
+    } else {
+      cdata.msgdata[i] = 0; // must pad the extra space with zeros
+    }
+  }
+  crecord.push_back(cdata);
+  candata.add(crecord);
+#endif // CAN_RECORD
+
+  return OW_SUCCESS;
 }
 
 int CANbus::send(int32_t msgid, uint8_t* msgdata, int32_t msglen, bool block){ // DONE MVW
@@ -948,6 +974,27 @@ int CANbus::send(int32_t msgid, uint8_t* msgdata, int32_t msglen, bool block){ /
   int32_t len = 1;
   int i;
   int32_t err;
+
+#ifdef CAN_RECORD
+  std::vector<canio_data> crecord;
+  canio_data cdata;
+  RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+  cdata.secs = t1 / 1e9;
+  cdata.usecs = (t1 - cdata.secs*1e9) / 1e3;
+  cdata.send=true;
+  cdata.msgid = msgid;
+  cdata.msglen = msglen;
+  for (unsigned int i=0; i<4; ++i) {
+    if (i < msglen) {
+      cdata.msgdata[i] = msgdata[i];
+    } else {
+      cdata.msgdata[i] = 0; // must pad the extra space with zeros
+    }
+  }
+  crecord.push_back(cdata);
+  candata.add(crecord);
+#endif // CAN_RECORD
+  
   
 #ifdef PEAK_CAN
   TPCANMsg msg;
@@ -1688,4 +1735,53 @@ void CANbus::initPropertyDefs(int firmwareVersion){
       TENSION = FET1;
    }
 }
- 
+
+#ifdef CAN_RECORD 
+ template<> inline bool DataRecorder<CANbus::canio_data>::dump (const char *fname) {
+  FILE *csv = fopen(fname,"w");
+  if (csv) {
+    for (unsigned int i=0; i<count; ++i) {
+      CANbus::canio_data cdata = data[i];
+      fprintf(csv,"%d.%06d ",cdata.secs,cdata.usecs);
+      if (cdata.send) {
+	fprintf(csv,"SEND ");
+      } else {
+	fprintf(csv,"READ ");
+      }
+      int32_t recv_id = cdata.msgid & 0x1F; // bits 0-4
+      int32_t send_id = (cdata.msgid >> 5) & 0x1F;  // bits 5-9
+      fprintf(csv,"%02d ", send_id);
+      if (cdata.msgid & 0x400) {
+	fprintf(csv,"G%02d ",recv_id);
+      } else {
+	fprintf(csv," %02d ",recv_id);
+      }
+      if (cdata.msgdata[0] & 0x80) {
+	fprintf(csv,"SET ");
+      } else {
+	fprintf(csv,"GET ");
+      }
+      int32_t value = (cdata.msgdata[3] << 8) + cdata.msgdata[2];
+      if (cdata.msglen == 6) {
+	value += (cdata.msgdata[4] << 16) + (cdata.msgdata[5] << 24);
+      }
+      fprintf(csv,"%03d=%d",cdata.msgdata[0] & 0x7F, value);
+      fprintf(csv,"\n");
+    }
+    fclose(csv);
+    return true;
+  } else {
+    return false;
+  }
+}
+#endif // CAN_RECORD
+
+ CANbus::~CANbus(){
+    if(pucks!=NULL) delete pucks; 
+    if(trq!=NULL) delete trq; 
+    if(pos!=NULL) delete pos;
+#ifdef CAN_RECORD
+    candata.dump("candata.log");
+    ROS_DEBUG("dumped CANbus logs to candata.log");
+#endif    
+  }
