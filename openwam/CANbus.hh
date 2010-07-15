@@ -110,7 +110,7 @@ typedef struct {
   bool send;
   int32_t msgid;
   int32_t msglen;
-  int32_t msgdata[4];
+  int32_t msgdata[8];
 } canio_data;
 DataRecorder<canio_data> candata;
 #endif // CAN_RECORD

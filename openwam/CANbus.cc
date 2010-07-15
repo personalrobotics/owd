@@ -6,6 +6,8 @@
 #include <native/task.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <time.h>
+#include <sys/time.h>
 
 #define PUCK_IDLE 0 
 #define MODE_IDLE      0
@@ -333,7 +335,7 @@ int CANbus::wake_puck(int32_t puck_id){  // DONE MVW
       ROS_WARN("CANbus::wake_puck: set_property failed for puck %d.",puck_id);
         return OW_FAILURE;
     }
-    usleep(750000); // Wait 750ms for puck to initialize    
+    usleep(500000); // Wait 500ms for puck to initialize    
     return OW_SUCCESS;
 }
 
@@ -945,13 +947,17 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
 #ifdef CAN_RECORD
   std::vector<canio_data> crecord;
   canio_data cdata;
-  RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
-  cdata.secs = t1 / 1e9;
-  cdata.usecs = (t1 - cdata.secs*1e9) / 1e3;
+  //  RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+  //  cdata.secs = t1 / 1e9;
+  //  cdata.usecs = (t1 - cdata.secs*1e9) / 1e3;
+  struct timeval tv;
+  gettimeofday(&tv,NULL);
+  cdata.secs = tv.tv_sec;
+  cdata.usecs = tv.tv_usec;
   cdata.send=false;
   cdata.msgid = *msgid;
   cdata.msglen = *msglen;
-  for (unsigned int i=0; i<4; ++i) {
+  for (unsigned int i=0; i<8; ++i) {
     if (i < *msglen) {
       cdata.msgdata[i] = msgdata[i];
     } else {
@@ -978,13 +984,17 @@ int CANbus::send(int32_t msgid, uint8_t* msgdata, int32_t msglen, bool block){ /
 #ifdef CAN_RECORD
   std::vector<canio_data> crecord;
   canio_data cdata;
-  RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
-  cdata.secs = t1 / 1e9;
-  cdata.usecs = (t1 - cdata.secs*1e9) / 1e3;
+  //  RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+  //  cdata.secs = t1 / 1e9;
+  //  cdata.usecs = (t1 - cdata.secs*1e9) / 1e3;
+  struct timeval tv;
+  gettimeofday(&tv,NULL);
+  cdata.secs = tv.tv_sec;
+  cdata.usecs = tv.tv_usec;
   cdata.send=true;
   cdata.msgid = msgid;
   cdata.msglen = msglen;
-  for (unsigned int i=0; i<4; ++i) {
+  for (unsigned int i=0; i<8; ++i) {
     if (i < msglen) {
       cdata.msgdata[i] = msgdata[i];
     } else {
@@ -1260,15 +1270,18 @@ int CANbus::finger_reset(int32_t nodeid) {
   int32_t mode;
   if (get_property(nodeid,MODE,&mode) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280","Could not get MODE from hand puck %d; still waiting", nodeid);
+    mode=MODE_VELOCITY;  // set it to anything other than MODE_IDLE so that
+                         // it goes into the wait loop below
   }
-  unsigned int count = 80; // 4 seconds max
-  while ((mode != PUCK_IDLE) && (--count)) {
+  unsigned int count = 120; // 6 seconds max
+  while ((mode != MODE_IDLE) && (--count)) {
     usleep(50000); // 50ms
     if (get_property(nodeid,MODE,&mode) != OW_SUCCESS) {
       ROS_DEBUG_NAMED("can_bh280","Could not get MODE from hand puck %d; still waiting", nodeid);
+      mode=MODE_VELOCITY;
     }
   }
-  if (mode != PUCK_IDLE) {
+  if (mode != MODE_IDLE) {
     ROS_WARN_NAMED("can_bh280","Finger puck %d didn't finish HI",nodeid);
     return OW_FAILURE;
   }
@@ -1742,7 +1755,12 @@ void CANbus::initPropertyDefs(int firmwareVersion){
   if (csv) {
     for (unsigned int i=0; i<count; ++i) {
       CANbus::canio_data cdata = data[i];
-      fprintf(csv,"%d.%06d ",cdata.secs,cdata.usecs);
+      char timestring[100];
+      time_t logtime = cdata.secs;
+	//	+ 4*3600; // shift by 4 hours to account for EDT - GMT shift
+      strftime(timestring,100,"%F %T",localtime(&logtime));
+	
+      fprintf(csv,"[%s,%06d] ",timestring,cdata.usecs);
       if (cdata.send) {
 	fprintf(csv,"SEND ");
       } else {
@@ -1757,15 +1775,30 @@ void CANbus::initPropertyDefs(int firmwareVersion){
 	fprintf(csv," %02d ",recv_id);
       }
       if (cdata.msgdata[0] & 0x80) {
-	fprintf(csv,"SET ");
+	if (cdata.msgdata[0] == (42 | 0x80)) {
+	  // Packed Torque message
+	  int32_t tq1 = (cdata.msgdata[1] << 6) +
+	    (cdata.msgdata[2] >> 2);
+	  int32_t tq2 = ((cdata.msgdata[2] & 0x03) << 12) + 
+	    (cdata.msgdata[3] << 4) +
+	    (cdata.msgdata[4] >> 4);
+	  int32_t tq3 = ((cdata.msgdata[4] & 0x0F) << 10) +
+	    (cdata.msgdata[5] << 2) +
+	    (cdata.msgdata[6] >> 6);
+	  int32_t tq4 = ((cdata.msgdata[6] & 0x3F) << 8) +
+	    cdata.msgdata[7];
+	  fprintf(csv,"SET %03d=%d,%d,%d,%d",cdata.msgdata[0] & 0x7F, tq1,tq2,tq3,tq4);
+	} else {
+	  int32_t value = (cdata.msgdata[3] << 8) + cdata.msgdata[2];
+	  if (cdata.msglen == 6) {
+	    value += (cdata.msgdata[4] << 16) + (cdata.msgdata[5] << 24);
+	  }
+	  fprintf(csv,"SET %03d=%d",cdata.msgdata[0] & 0x7F, value);
+	}
       } else {
-	fprintf(csv,"GET ");
+	fprintf(csv,"GET %03d",cdata.msgdata[0]);
       }
-      int32_t value = (cdata.msgdata[3] << 8) + cdata.msgdata[2];
-      if (cdata.msglen == 6) {
-	value += (cdata.msgdata[4] << 16) + (cdata.msgdata[5] << 24);
-      }
-      fprintf(csv,"%03d=%d",cdata.msgdata[0] & 0x7F, value);
+      
       fprintf(csv,"\n");
     }
     fclose(csv);
