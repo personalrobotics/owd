@@ -159,16 +159,23 @@ bool WamDriver::Init(const char *joint_cal_file)
     powerup=true;
     do {
       usleep(100000); // wait for the user, and try again
-    } while (bus.check() == OW_FAILURE);
+      bus.clear();
+    } while ((bus.check() == OW_FAILURE) && (ros::ok()));
   }
-  
+
+  if (!ros::ok()) {
+    return false;
+  }
+
 #ifdef BH280
-  bus.hand_reset();
+  if (bus.hand_reset() != OW_SUCCESS) {
+    return false;
+  }
 #endif // BH280
 
 #ifndef BH280_ONLY
   int32_t WamWasZeroed = 0;
-  if (bus.get_property(SAFETY_MODULE, ZERO, &WamWasZeroed) == OW_FAILURE) {
+  if (bus.get_property(SAFETY_MODULE, ZERO, &WamWasZeroed,10000) == OW_FAILURE) {
     ROS_FATAL("Unable to query safety puck");
     return false;
   }
@@ -516,7 +523,7 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
 
 int WamDriver::get_puck_offset(int puckid, int32_t *mechout, int32_t *apout) {
     int32_t p,mech;
-    if (bus.get_property(bus.pucks[puckid].id(), AP, &p) == OW_FAILURE){
+    if (bus.get_property(bus.pucks[puckid].id(), AP, &p, 10000) == OW_FAILURE){
         cerr << "Failed to get AP" << endl;
         throw -1;
     }
@@ -524,7 +531,7 @@ int WamDriver::get_puck_offset(int puckid, int32_t *mechout, int32_t *apout) {
         cerr << "Failed to set address of MECH" << endl;
         throw -1;
     }
-    if(bus.get_property(bus.pucks[puckid].id(), VALUE, &mech) == OW_FAILURE) {
+    if(bus.get_property(bus.pucks[puckid].id(), VALUE, &mech, 10000) == OW_FAILURE) {
         cerr << "Failed to get MECH" << endl;
         throw -1;
     }
@@ -1002,14 +1009,14 @@ void WamDriver::start_control_loop() {
     // get the position from the WAM, so that the safety module knows
     // where it's starting from
 #ifndef BH280_ONLY
-    if(bus.set_property(SAFETY_MODULE, IFAULT, 4, true) == OW_FAILURE){
+  if(bus.set_property(SAFETY_MODULE, IFAULT, 4, true, 10000) == OW_FAILURE){
         ROS_FATAL("Unable to suppress safety module faults.");
         throw -1;
     }
     double jointpos[nJoints+1];
     owam->get_current_data(jointpos,NULL,NULL); // update the joint positions
     // Re-activate the tip velocity-limit checking.
-    if(bus.set_property(SAFETY_MODULE, ZERO, 1, true) == OW_FAILURE){
+    if(bus.set_property(SAFETY_MODULE, ZERO, 1, true, 10000) == OW_FAILURE){
         ROS_FATAL("Unable to re-activate safety module.");
         throw -1;
     }
@@ -1043,13 +1050,16 @@ void WamDriver::start_control_loop() {
 #endif // AUTO_ACTIVATE
     
     // check the mode of puck 1 to detect when active was pressed
-    while (bus.get_puck_state() != 2) {
+    while ((bus.get_puck_state() != 2) && (ros::ok())) {
       usleep(50000);
       static int statcount=0;
       if (++statcount == 20) {
 	owam->rosprint_stats();
 	statcount=0;
       }
+    }
+    if (!ros::ok()) {
+      throw -1;
     }
 #endif // not BH280_ONLY    
 }

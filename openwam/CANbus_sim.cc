@@ -78,15 +78,19 @@ int CANbus::wake_puck(int32_t p){
     return OW_SUCCESS;
 }
 
+int CANbus::clear() {
+  return OW_SUCCESS;
+}
+  
 int CANbus::status(int32_t* nodes){
   return OW_SUCCESS;
 }
 
-int CANbus::set_property(int32_t nid, int32_t property, int32_t value,bool check){
+int CANbus::set_property(int32_t nid, int32_t property, int32_t value,bool check, int32_t usecs){
   return OW_SUCCESS;
 }
 
-int CANbus::get_property(int32_t nid, int32_t property, int32_t* value){
+int CANbus::get_property(int32_t nid, int32_t property, int32_t* value, int32_t usecs){
   return OW_SUCCESS;
 }
 
@@ -131,12 +135,12 @@ int CANbus::compile(int32_t property, int32_t value,
   return OW_SUCCESS;
 }
 
-int CANbus::read(int32_t* msgid, uint8_t* msg, int32_t* msglen, bool block){
+int CANbus::read(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs){
     //    ROS_ERROR("CANbus:: READ");
   return OW_SUCCESS;
 }
 
-int CANbus::send(int32_t msgid, uint8_t* msg, int32_t msglen, bool block){
+int CANbus::send(int32_t msgid, uint8_t* msg, int32_t msglen, int32_t usecs){
   return OW_SUCCESS;
 }
 
@@ -170,10 +174,11 @@ int32_t CANbus::get_puck_state() {
   return pstate;
 }
 
-void CANbus::set_puck_state() {
+int CANbus::set_puck_state() {
   pthread_mutex_lock(&statemutex);
   puck_state = 2;
   pthread_mutex_unlock(&statemutex);
+  return OW_SUCCESS;
 }
 
 void CANstats::rosprint() const {

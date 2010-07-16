@@ -130,14 +130,15 @@ DataRecorder<canio_data> candata;
 	    int32_t* nodeid, int32_t* property, int32_t* value);
   int compile(int32_t property, int32_t value, uint8_t *msg, int32_t *msglen);
   
-  int set_property(int32_t nid, int32_t property, int32_t value, bool check=false);
-  int get_property(int32_t nid, int32_t property, int32_t* value);
+  int set_property(int32_t nid, int32_t property, int32_t value, bool check=false, int32_t usecs=100);
+  int get_property(int32_t nid, int32_t property, int32_t* value, int32_t usecs=100);
   
-  int read(int32_t* msgid, uint8_t* msg, int32_t* msglen, bool block);
-  int send(int32_t  msgid, uint8_t* msg, int32_t  msglen, bool block);
+  int read(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs);
+  int send(int32_t  msgid, uint8_t* msg, int32_t  msglen, int32_t usecs);
   
+  int clear();
   int32_t get_puck_state();
-  void set_puck_state();
+  int set_puck_state();
 
   int send_torques();
   int read_positions();

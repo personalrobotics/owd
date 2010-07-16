@@ -658,11 +658,11 @@ void control_loop(void* argv){
   ROS_DEBUG("Control loop started");
 
   // Main control loop
-  while(ctrl_loop->state() == CONTROLLOOP_RUN){
-    printf("waiting for next timeslot\n");
+  while((ctrl_loop->state() == CONTROLLOOP_RUN) && (ros::ok())){
+    //    printf("waiting for next timeslot\n");
       ctrl_loop->wait();         // wait for the next control iteration;
       t2 = ControlLoop::get_time_ns(); // record the time
-      printf("loop execution\n");
+      //      printf("loop execution\n");
 
       // GET POSITIONS
 #ifdef BH280_ONLY
@@ -673,7 +673,7 @@ void control_loop(void* argv){
         ROS_FATAL("control_loop: read_positions failed");
         return;
       }
-      printf("read positions\n");
+      //      printf("read positions\n");
       
       RTIME bt1 = ControlLoop::get_time_ns();
       readtime += (bt1-t2 ) * 1e-6;
@@ -695,7 +695,7 @@ void control_loop(void* argv){
         ROS_FATAL("control_loop: send_torques failed.");
         return;
       }
-      printf("sent torques\n");
+      //      printf("sent torques\n");
 
       RTIME bt3 = ControlLoop::get_time_ns();
       sendtime += (bt3-bt2) * 1e-6;
@@ -705,10 +705,12 @@ void control_loop(void* argv){
       // only check the state every 200 cycles
       static int stateperiod=0;
       if (++stateperiod == 200) {
-        printf("checking puck state\n");
-        wam->bus->set_puck_state();
+	//        printf("checking puck state\n");
+        if (wam->bus->set_puck_state() != OW_SUCCESS) {
+	  // what to do?
+	}
         stateperiod=0;
-        printf("puck state checked\n");
+	//        printf("puck state checked\n");
       }
 #endif // BH280_ONLY
 
@@ -716,10 +718,10 @@ void control_loop(void* argv){
       // Hand moving?
       static int handstateperiod=25; // start offset from motor state
       if (++handstateperiod == 50) { // every 0.1 seconds
-        printf("checking hand state\n");
+	//        printf("checking hand state\n");
 	wam->bus->hand_set_state();
 	handstateperiod=0;
-        printf("hand state checked\n");
+	//        printf("hand state checked\n");
       }
 #endif // BH280
 
@@ -758,7 +760,7 @@ void control_loop(void* argv){
       
       // get ready for next pass
       t1 = t2;
-      printf("bottom of loop\n");
+      //      printf("bottom of loop\n");
   }
   ROS_DEBUG("Control loop finished");
 

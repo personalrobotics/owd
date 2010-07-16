@@ -24,294 +24,159 @@
 #define TX_TIMEOUT          (50)
 #define RX_TIMEOUT          (50)
 
-#define L08       (1)
-#define L16       (2)
-#define L24       (3)
-#define L32       (4)
-#define EE        (0x0008)
+// initialize everything to -10.  Only some of these will get set to
+// proper values based on the firmware version.  If CANbus::compile is
+// called with an unset property for that puck version, it will complain.
 
-// keyword, index, readFunction, writeFunction, defaultVal, type
-const int dataType[]={
-   /* VERS */  L16 ,
-   /* ROLE */ L16 | EE ,
-   /* SN */ L16 | EE ,
-   /* ID */ L16 | EE ,
-   /* ERROR */ L16 ,
-   /* STAT */ L16 ,
-   /* ADDR */ L16 ,
-   /* VALUE */ L16 ,
-   /* MODE */ L16 ,
-   /* D */ L16 ,
-   /* TORQ */ L16 ,
-   /* V */ L16 ,
-   /* B */ L16 ,
-   /* P */ L32 ,
-   /* P2 */ L16 ,
-   /* E */ L32 ,
-   /* E2 */ L16 ,
-   /* MT */ L16 | EE ,
-   /* MV */ L16 | EE ,
-   /* MCV */ L16 | EE ,
-   /* MOV */ L16 | EE ,
-   /* MOFST */ L16 | EE ,
-   /* IOFST */ L16 | EE ,
-   /* PTEMP */ L16 | EE ,
-   /* UPSECS */ L16 | EE ,
-   /* OD */ L16 | EE ,
-   /* MDS */ L16 | EE ,
-   /* AP */ L32 | EE ,
-   /* AP2 */ L16 ,
-   /* MECH */ L32 ,
-   /* MECH2 */ L16 ,
-   /* CTS */ L32 | EE ,
-   /* CTS2 */ L16 ,
-   /* DP */ L32 | EE ,
-   /* DP2 */ L16 ,
-   /* OT */ L32 | EE ,
-   /* OT2 */ L16 ,
-   /* CT */ L32 | EE ,
-   /* CT2 */ L16 ,
-   /* BAUD */ L16 ,
-   /* TEMP */ L16 ,
-   /* OTEMP */ L16 ,
-   /* LOCK */ L16 ,
-   /* DIG0 */ L16 ,
-   /* DIG1 */ L16 ,
-   /* ANA0 */ L16 ,
-   /* ANA1 */ L16 ,
-   /* THERM */ L16 ,
-   /* VBUS */ L16 ,
-   /* IMOTOR */ L16 ,
-   /* VLOGIC */ L16 ,
-   /* ILOGIC */ L16 ,
-   /* GRPA */ L16 | EE ,
-   /* GRPB */ L16 | EE ,
-   /* GRPC */ L16 | EE ,
-   /* PIDX */ L16 | EE ,
-   /* ZERO */ L16 ,
-   /* SG */ L16 ,
-   /* HSG */ L16 | EE ,
-   /* LSG */ L16 | EE ,
-   /* DS */ L16 | EE ,
-   /* IVEL */ L16 | EE ,
-   /* IOFF */ L16 | EE ,
-   /* MPE */ L16 | EE ,
-   /* EN */ L16 ,
-   /* TSTOP */ L16 | EE ,
-   /* KP */ L16 | EE ,
-   /* KD */ L16 | EE ,
-   /* KI */ L16 | EE ,
-   /* SAMPLE */ L16 | EE ,
-   /* ACCEL */ L16 | EE ,
-   /* TENSION */ L16 ,
-   /* UNITS */ L16 | EE ,
-   /* RATIO */ L16 | EE ,
-   /* LOG */ L16 ,
-   /* DUMP */ L16 ,
-   /* LOG1 */ L16 ,
-   /* LOG2 */ L16 ,
-   /* LOG3 */ L16 ,
-   /* LOG4 */ L16 ,
-   /* GAIN1 */ L16 | EE ,
-   /* GAIN2 */ L16 | EE ,
-   /* GAIN3 */ L16 | EE ,
-   /* OFFSET1 */ L16 | EE ,
-   /* OFFSET2 */ L16 | EE ,
-   /* OFFSET3 */ L16 | EE ,
-   /* PEN */ L16 ,
-   /* SAFE */ L16 ,
-   /* SAVE */ L16 ,
-   /* LOAD */ L16 ,
-   /* DEF */ L16 ,
-   /* VL1 */ L16 ,
-   /* VL2 */ L16 ,
-   /* TL1 */ L16 ,
-   /* TL2 */ L16 ,
-   /* VOLTL1 */ L16 | EE ,
-   /* VOLTL2 */ L16 | EE ,
-   /* VOLTH1 */ L16 | EE ,
-   /* VOLTH2 */ L16 | EE ,
-   /* MAXPWR */ L16 ,
-   /* PWR */ L16 ,
-   /* IFAULT */ L16 ,
-   /* IKP */ L16 | EE ,
-   /* IKI */ L16 | EE ,
-   /* IKCOR */ L16 | EE ,
-   /* VNOM */ L16 ,
-   /* TENST */ L16 | EE ,
-   /* TENSO */ L16 | EE ,
-   /* JIDX */ L16 | EE ,
-   /* IPNM */ L16 | EE ,
-   /* HALLS */ L16 ,
-   /* HALLH */ L32 ,
-   /* HALLH2 */ L16 ,
-   /* POLES */ L16 | EE ,
-   /* ECMAX */ L16 ,
-   /* ECMIN */ L16 ,
-   /* ISQ */ L16 ,
-   /* TETAE */ L16 ,
-   /* FIND */ L16 ,
-   /* LCV */ L16 ,
-   /* LCVC */ L16 ,
-   /* LFV */ L16 ,
-   /* LFS */ L16 ,
-   /* LFAP */ L16 ,
-   /* LFDP */ L16 ,
-   /* LFT */ L16 ,
-   /* VALUE32 */ L16
-};
+int VERS=-10;
+int ROLE=-10;
+int SN=-10;
+int ID=-10;
+int ERROR=-10;
+int STAT=-10;
+int ADDR=-10;
+int VALUE=-10;
+int MODE=-10;
+int TEMP=-10;
+int PTEMP=-10;
+int OTEMP=-10;
+int BAUD=-10;
+int _LOCK=-10;
+int DIG0=-10;
+int DIG1=-10;
+int FET0=-10;
+int FET1=-10;
+int ANA0=-10;
+int ANA1=-10;
+int THERM=-10;
+int VBUS=-10;
+int IMOTOR=-10;
+int VLOGIC=-10;
+int ILOGIC=-10;
+int SG=-10;
+int GRPA=-10;
+int GRPB=-10;
+int GRPC=-10;
+int CMD=-10;
+int SAVE=-10;
+int LOAD=-10;
+int DEF=-10;
+int FIND=-10;
+int X0=-10;
+int X1=-10;
+int X2=-10;
+int X3=-10;
+int X4=-10;
+int X5=-10;
+int X6=-10;
+int X7=-10;
+int COMMON_END=-10;
+int ZERO=-10;
+int PEN=-10;
+int SAFE=-10;
+int VL1=-10;
+int VL2=-10;
+int TL1=-10;
+int TL2=-10;
+int VOLTL1=-10;
+int VOLTL2=-10;
+int VOLTH1=-10;
+int VOLTH2=-10;
+int PWR=-10;
+int MAXPWR=-10;
+int IFAULT=-10;
+int VNOM=-10;
+int SAFETY_END=-10;
+int T=-10;
+int MT=-10;
+int V=-10;
+int MV=-10;
+int MCV=-10;
+int MOV=-10;
+int P=-10;
+int P2=-10;
+int DP=-10;
+int DP2=-10;
+int E=-10;
+int E2=-10;
+int OT=-10;
+int OT2=-10;
+int CT=-10;
+int CT2=-10;
+int M=-10;
+int M2=-10;
+int _DS=-10;
+int MOFST=-10;
+int IOFST=-10;
+int UPSECS=-10;
+int OD=-10;
+int MDS=-10;
+int MECH=-10;
+int MECH2=-10;
+int CTS=-10;
+int CTS2=-10;
+int PIDX=-10;
+int HSG=-10;
+int LSG=-10;
+int IVEL=-10;
+int IOFF=-10;
+int IOFF2=-10;
+int MPE=-10;
+int HOLD=-10;
+int TSTOP=-10;
+int KP=-10;
+int KD=-10;
+int KI=-10;
+int ACCEL=-10;
+int TENST=-10;
+int TENSO=-10;
+int JIDX=-10;
+int IPNM=-10;
+int HALLS=-10;
+int HALLH=-10;
+int HALLH2=-10;
+int POLES=-10;
+int IKP=-10;
+int IKI=-10;
+int IKCOR=-10;
+int EN=-10;
+int EN2=-10;
+int JP=-10;
+int JP2=-10;
+int JOFST=-10;
+int JOFST2=-10;
+int TIE=-10;
+int ECMAX=-10;
+int ECMIN=-10;
+int LFLAGS=-10;
+int LCTC=-10;
+int LCVC=-10;
+int TACT=-10;
+int TACTID=-10;
+int PROP_END=-10;
+int AP=-10;
+int TENSION=-10;
 
-int VERS;
-int ROLE;
-int SN;
-int ID;
-int ERROR;
-int STAT;
-int ADDR;
-int VALUE;
-int MODE;
-int D;
-int TORQ;
-int MD;
-int V;
-int B;
-int P;
-int P2;
-int E;
-int E2;
-int MT;
-int MV;
-int MCV;
-int MOV;
-int MOFST;
-int IOFST;
-int PTEMP;
-int UPSECS;
-int OD;
-int MDS;
-int AP;
-int AP2;
-int MECH;
-int MECH2;
-int CTS;
-int CTS2;
-int DP;
-int DP2;
-int OT;
-int OT2;
-int CT;
-int CT2;
-int BAUD;
-int TEMP;
-int OTEMP;
-int _LOCK;
-int DIG0;
-int DIG1;
-int ANA0;
-int ANA1;
-int THERM;
-int VBUS;
-int IMOTOR;
-int VLOGIC;
-int ILOGIC;
-int GRPA;
-int GRPB;
-int GRPC;
-int PIDX;
-int ZERO;
-int SG;
-int HSG;
-int LSG;
-int _DS;
-int IVEL;
-int IOFF;
-int MPE;
-int EN;
-int TSTOP;
-int KP;
-int KD;
-int KI;
-int SAMPLE;
-int ACCEL;
-int TENSION;
-int UNITS;
-int  RATIO;
-int LOG;
-int DUMP;
-int LOG1;
-int LOG2;
-int LOG3;
-int LOG4;
-int GAIN1;
-int GAIN2;
-int GAIN3;
-int OFFSET1;
-int OFFSET2;
-int OFFSET3;
-int PEN;
-int SAFE;
-int SAVE;
-int LOAD;
-int DEF;
-int VL1;
-int VL2;
-int TL1;
-int TL2;
-int VOLTL1;
-int VOLTL2;
-int VOLTH1;
-int VOLTH2;
-int MAXPWR;
-int PWR;
-int IFAULT;
-int IKP;
-int IKI;
-int IKCOR;
-int VNOM;
-int TENST;
-int TENSO;
-int JIDX;
-int IPNM;
-int HALLS;
-int HALLH;
-int HALLH2;
-int POLES;
-int ECMAX;
-int ECMIN;
-int ISQ;
-int TETAE;
-int FIND;
-int LCV;
-int LCVC;
-int LFV;
-int LFS;
-int LFAP;
-int LFDP;
-int LFT;
-int VALUE32;
-int PROP_END;
-
-int LOCK;
-int FET0;
-int FET1;
-int CMD;
-int X0;
-int X1;
-int X2;
-int X3;
-int X4;
-int X5;
-int X6;
-int X7;
-int COMMON_END;
-int SAFETY_END;
-int T;
-int M;
-int M2;
-int IOFF2;
-int HOLD;
-int TIE;
-int LFLAGS;
-int LCTC;
+// older properties (firmware < 40)
+int D=-10;
+int TORQ=-10;
+int B=-10;
+int MD=-10;
+int AP2=-10;
+int SAMPLE=-10;
+int UNITS=-10;
+int RATIO=-10;
+int LOG=-10;
+int DUMP=-10;
+int LOG1=-10;
+int LOG2=-10;
+int LOG3=-10;
+int LOG4=-10;
+int GAIN1=-10;
+int GAIN2=-10;
+int GAIN3=-10;
+int OFFSET1=-10;
+int OFFSET2=-10;
+int OFFSET3=-10;
 
 #endif

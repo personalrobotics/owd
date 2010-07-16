@@ -16,6 +16,9 @@
 #define MODE_VELOCITY  4
 #define MODE_TRAPEZOID 5
 
+#define CMD_HI 13
+#define CMD_M 19
+
 
 CANbus::CANbus(int32_t bus_id, int num_pucks) :  // DONE MVW
   puck_state(-1),id(bus_id),trq(NULL),
@@ -194,12 +197,23 @@ int CANbus::check(){  // DONE MVE
   }
 #ifdef BH280
   if(online_pucks < npucks + 4 ){
+    ROS_INFO_NAMED("cancheck","Bus has %d pucks. We expected %d",online_pucks,npucks+4);
+    ROS_INFO_NAMED("cancheck","Attempting to reset all pucks");
+    for (int32_t node=1; node<=15; ++node) {
+      if (node != 10) {
+	// reset everything except the safety puck
+	set_property(node,STAT,STATUS_RESET,false);
+      }
+    }
+    return OW_FAILURE;
+  }
 #else
   if(online_pucks < npucks){
-#endif
     ROS_INFO_NAMED("cancheck","Bus has %d pucks. We expected %d",online_pucks,npucks);
     return OW_FAILURE;
   }  
+#endif
+
 #ifndef BH280_ONLY
   if(nodes[SAFETY_MODULE] == STATUS_OFFLINE){
     ROS_DEBUG_NAMED("cancheck","Safety module is offline");
@@ -239,7 +253,7 @@ int CANbus::check(){  // DONE MVE
       usleep(10000);
       
       ROS_DEBUG_NAMED("cancheck","Setting PID values");
-      if(set_property(pucks[p].id(),PIDX, pucks[p].order(),true)==OW_FAILURE){
+      if(set_property(pucks[p].id(),PIDX, pucks[p].order(),true,15000)==OW_FAILURE){
 	ROS_WARN_NAMED("cancheck","set_property failed (PID)");
 	return OW_FAILURE;
       }
@@ -260,7 +274,7 @@ int CANbus::check(){  // DONE MVE
 	throw -1;  // unknown puck id
       }
           
-      if(set_property(pucks[p].id(), MT, max_torque, true) == OW_FAILURE){
+      if(set_property(pucks[p].id(), MT, max_torque, true,15000) == OW_FAILURE){
 	ROS_WARN_NAMED("cancheck","set_property failed (max torque)");
 	return OW_FAILURE;
       }
@@ -269,8 +283,7 @@ int CANbus::check(){  // DONE MVE
     else{
       ROS_DEBUG_NAMED("cancheck"," (running)");
       ROS_DEBUG_NAMED("cancheck","setting idle mode...");
-      // this was set to CONTROLLER_IDLE originally
-      if(set_property(pucks[p].id(), MODE, PUCK_IDLE, true) == OW_FAILURE){
+      if(set_property(pucks[p].id(), MODE, PUCK_IDLE, true, 10000) == OW_FAILURE){
 	ROS_WARN_NAMED("cancheck","set_property failed (MODE)");
 	return OW_FAILURE;
       }
@@ -335,9 +348,19 @@ int CANbus::wake_puck(int32_t puck_id){  // DONE MVW
       ROS_WARN("CANbus::wake_puck: set_property failed for puck %d.",puck_id);
         return OW_FAILURE;
     }
-    usleep(500000); // Wait 500ms for puck to initialize    
+    usleep(750000); // Wait 500ms for puck to initialize    
     return OW_SUCCESS;
 }
+
+int CANbus::clear() {
+  unsigned char msg[8];
+  int32_t msgid, msglen;
+  
+  while (read(&msgid, msg, &msglen, 100) == OW_SUCCESS) {
+  }
+  return OW_SUCCESS;
+}
+
 
 // Got to make sure that nodes is NUM_NODES+1 long !!!
 int CANbus::status(int32_t* nodes){
@@ -354,7 +377,7 @@ int CANbus::status(int32_t* nodes){
     msg[0] = (unsigned char) 5;   // STAT = 5 for all firmware versions
     nodes[n] = STATUS_OFFLINE;      // Initialize node as offline
 
-    if(send(NODE2ADDR(n), msg, 1, true) == OW_FAILURE){
+    if(send(NODE2ADDR(n), msg, 1, 100) == OW_FAILURE){
       pthread_mutex_unlock(&busmutex);
       ROS_WARN_NAMED("canstatus","send failed: %s",last_error);
       return OW_FAILURE;
@@ -362,7 +385,7 @@ int CANbus::status(int32_t* nodes){
     ROS_DEBUG_NAMED("canstatus","Sent probe message to puck %d id %d",n,NODE2ADDR(n));
 
     usleep(40000);
-    if(read(&msgid, msg, &msglen, false) == OW_FAILURE){
+    if(read(&msgid, msg, &msglen, 100) == OW_FAILURE){
       ROS_DEBUG_NAMED("canstatus","node %d didn't answer",NODE2ADDR(n));
     }
     else{
@@ -377,13 +400,14 @@ int CANbus::status(int32_t* nodes){
 	  pthread_mutex_unlock(&busmutex);
 	  ROS_DEBUG_NAMED("canstatus","trying to wake node %d",n);
 	  if ((wake_puck(NODE2ADDR(n)) == OW_SUCCESS) &&
-	      (get_property(NODE2ADDR(n), 0, &fw_vers) == OW_SUCCESS)){
+	      (get_property(NODE2ADDR(n), 0, &fw_vers, 500) == OW_SUCCESS)){
 	    ROS_DEBUG_NAMED("canstatus","puck %d firmware version %d",n,fw_vers);
 	    initPropertyDefs(fw_vers);
 	    firstFound = 1;
 	  }
 	  else {
 	    ROS_DEBUG_NAMED("canstatus","unable to get firmware vers from puck %d",n);
+	    return OW_FAILURE;
 	  }
 	  pthread_mutex_lock(&busmutex);
 	}
@@ -404,7 +428,7 @@ int CANbus::status(int32_t* nodes){
   return OW_SUCCESS;
 }
 
-int CANbus::set_property(int32_t nid, int32_t property, int32_t value,bool check){
+ int CANbus::set_property(int32_t nid, int32_t property, int32_t value,bool check, int32_t usecs){
   uint8_t msg[8];
   int32_t response;
   int32_t msglen;
@@ -416,7 +440,7 @@ int CANbus::set_property(int32_t nid, int32_t property, int32_t value,bool check
   msg[0] |= (uint8_t)0x80; // Set the 'Set' bit
 
   pthread_mutex_lock(&busmutex);
-  if(send(NODE2ADDR(nid), msg, msglen, true) == OW_FAILURE){
+  if(send(NODE2ADDR(nid), msg, msglen, usecs) == OW_FAILURE){
     pthread_mutex_unlock(&busmutex);
     ROS_WARN("CANbus::set_property: send failed: %s",last_error);
     return OW_FAILURE;
@@ -425,7 +449,7 @@ int CANbus::set_property(int32_t nid, int32_t property, int32_t value,bool check
    
   if(check){
     // Get the new value of the property
-    if(get_property(nid, property, &response) == OW_FAILURE){
+    if(get_property(nid, property, &response, usecs) == OW_FAILURE){
       ROS_WARN("CANbus::set_property: get_property failed.");
       return OW_FAILURE;
     }
@@ -441,20 +465,25 @@ int CANbus::set_property(int32_t nid, int32_t property, int32_t value,bool check
   return OW_SUCCESS;
 }
 
-int CANbus::get_property(int32_t nid, int32_t property, int32_t* value){
+ int CANbus::get_property(int32_t nid, int32_t property, int32_t* value, int32_t usecs){
   uint8_t msg[8];
   int32_t msgid, msglen, nodeid, prop;
   *value=0;
 
+  if ((property > PROP_END) || (property < 0)) {
+    ROS_WARN("get_property: requested property is not valid for this puck's firmware version");
+    return OW_FAILURE;
+  }
+
   msg[0] = (uint8_t)property;   
 
   pthread_mutex_lock(&busmutex);
-  if(send(NODE2ADDR(nid), msg, 1, true) == OW_FAILURE){
+  if(send(NODE2ADDR(nid), msg, 1, usecs) == OW_FAILURE){
     ROS_WARN("CANbus::get_property: send failed: %s",last_error);
     pthread_mutex_unlock(&busmutex);
     return OW_FAILURE;
   }
-  if(read(&msgid, msg, &msglen, true) == OW_FAILURE){
+  if(read(&msgid, msg, &msglen, usecs) == OW_FAILURE){
     pthread_mutex_unlock(&busmutex);
     ROS_WARN("CANbus::get_property: read failed: %s",last_error);
     return OW_FAILURE;
@@ -545,7 +574,7 @@ int CANbus::send_torques(){
           msg[7] = (uint8_t)(  torques[4]    &0x00FF);
           
 	  pthread_mutex_lock(&busmutex);
-          if(send(GROUPID(groups[g].id()), msg, 8, false) == OW_FAILURE) {
+          if(send(GROUPID(groups[g].id()), msg, 8, 100) == OW_FAILURE) {
 	    pthread_mutex_unlock(&busmutex);
 	    ROS_ERROR("CANbus::set_torques: send failed: %s",last_error);
 	    return OW_FAILURE;
@@ -579,13 +608,13 @@ int CANbus::read_torques(int32_t* mtrq){
 
   pthread_mutex_lock(&busmutex);
 
-  if(send(GROUPID(0), msg, 1, true) == OW_FAILURE){
+  if(send(GROUPID(0), msg, 1, 100) == OW_FAILURE){
     pthread_mutex_unlock(&busmutex);
     ROS_WARN("CANbus::read_torques: send failed: %s", last_error);
     return OW_FAILURE;
   }
   for(int p=1; p<=npucks; ){
-    if(read(&msgid, msg, &msglen, true) == OW_FAILURE){
+    if(read(&msgid, msg, &msglen, 100) == OW_FAILURE){
       pthread_mutex_unlock(&busmutex);
       ROS_WARN("CANbus::read_torques: read failed on puck %d: %s",p,last_error);
       return OW_FAILURE;
@@ -635,7 +664,7 @@ int CANbus::read_positions(){
 
   pthread_mutex_lock(&busmutex);
 
-  if(send(GROUPID(0), msg, 1, false) == OW_FAILURE){
+  if(send(GROUPID(0), msg, 1, 100) == OW_FAILURE){
     pthread_mutex_unlock(&busmutex);
     ROS_WARN("CANbus::get_positions: send failed: %s",last_error);
     return OW_FAILURE;
@@ -651,21 +680,25 @@ int CANbus::read_positions(){
 #else
   for(int p=1; p<=npucks; ){
 #endif // BH280
-    if(read(&msgid, msg, &msglen, true) == OW_FAILURE){
+    if(read(&msgid, msg, &msglen, 30000) == OW_FAILURE){
       pthread_mutex_unlock(&busmutex);
-      ROS_WARN("CANbus::get_positions: read failed: %s",last_error);
+      ROS_WARN("CANbus::read_positions: read failed: %s",last_error);
       return OW_FAILURE;
     }
 
     if(parse(msgid, msg, msglen, &nodeid, &property, &value) == OW_FAILURE){
       pthread_mutex_unlock(&busmutex);
-      ROS_WARN("CANbus::get_positions: parse failed: %s",last_error);
+      ROS_WARN("CANbus::read_positions: parse failed: %s",last_error);
       return OW_FAILURE;
     }
     if (property == AP) {
       data[nodeid] = value;
-      p++;
+    } else {
+      ROS_WARN("CANbus::read_positions: unexpected packet received.");
+      ROS_WARN("  from node %d, property %d, value %d",nodeid,property,value);
     }
+    p++;
+
   }
   pthread_mutex_unlock(&busmutex);
 
@@ -713,7 +746,7 @@ int CANbus::send_positions(double* mpos){
 
 int CANbus::send_AP(int32_t* apval){
 
-  if(set_property(SAFETY_MODULE, IFAULT, 8, true) == OW_FAILURE){
+  if(set_property(SAFETY_MODULE, IFAULT, 8, true,15000) == OW_FAILURE){
     ROS_WARN("CANbus::send_AP: set_property IFAULT=8 failed.");
     return OW_FAILURE;
   }
@@ -729,7 +762,7 @@ int CANbus::send_AP(int32_t* apval){
   read_positions();
    
   // start monitoring tip velocity again
-  if(set_property(SAFETY_MODULE, ZERO, 1, true) == OW_FAILURE){
+  if(set_property(SAFETY_MODULE, ZERO, 1, true,15000) == OW_FAILURE){
     ROS_WARN("CANbus::send_AP: set_property ZERO=1 failed.");
     return OW_FAILURE;
   }
@@ -836,6 +869,11 @@ int CANbus::compile(int32_t property, int32_t value,
     return OW_FAILURE;
   }
    
+  if (property < 0) {
+    ROS_WARN("CANbus::compile: property was not defined for this firmware version");
+    return OW_FAILURE;
+  }
+
   msg[0] = (uint8_t)property; // Insert the property
   msg[1] = 0;                 // To align the values for the tater's DSP
    
@@ -853,7 +891,7 @@ int CANbus::compile(int32_t property, int32_t value,
   return OW_SUCCESS;
 }
 
-int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){ // DONE MVW
+int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t usecs){ // DONE MVW
 
   int32_t len = 1;
   int i, err;
@@ -862,12 +900,30 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
   // DON'T ADD ANY TERMINAL I/O TO THIS FUNCTION (IT WILL SLOW THINGS
   // DOWN TOO MUCH).
 
+  int32_t sleeptime;
+  if (usecs < 2000) {
+    sleeptime=100; // for short delays, sleep in 100 microsecond intervals
+  } else {
+    sleeptime=1000; // for longer delays, sleep for 1ms
+  }
+  int retrycount = usecs / sleeptime + 0.5;
+
 #ifdef PEAK_CAN
   TPCANRdMsg cmsg;
   int pendread=0;
   int pendwrite=0;
-
-  int retrycount = block? 30 : 1;
+  
+  if ((err=LINUX_CAN_Read_Timeout(handle,&cmsg,usecs)) != CAN_ERR_OK) {
+    snprintf(last_error,200,"LINUX_CAN_Read_Timeout failed: 0x%x",err);
+    return OW_FAILURE;
+  }
+  *msgid = cmsg.Msg.ID;
+  *msglen = cmsg.Msg.LEN;
+  for (i=0; i< *msglen; ++i) {
+    msgdata[i] = cmsg.Msg.DATA[i];
+  }
+#ifdef NDEF
+  /*  
 
   err = LINUX_CAN_Extended_Status(handle,&pendread, &pendwrite);
   if ((err != CAN_ERR_OK) && (err != CAN_ERR_QRCVEMPTY)) {
@@ -878,7 +934,7 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
   } else {
     while (retrycount-- > 0) {
       // sleep briefly and try again
-      usleep(100);
+      usleep(sleeptime);
       pendread=pendwrite=0;
       err = LINUX_CAN_Extended_Status(handle,&pendread, &pendwrite);
       if ((err != CAN_ERR_OK) && (err != CAN_ERR_QRCVEMPTY)) {
@@ -904,29 +960,21 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
   for (i=0; i< *msglen; ++i) {
     msgdata[i] = cmsg.Msg.DATA[i];
   }
+  */
+#endif // NDEF
+
 #endif // PEAK_CAN
 
 #ifdef ESD_CAN
   CMSG cmsg;
 
-  if(block){
-    //    int count=10;
-    //    while (((err = canRead(handle, &cmsg, &len, NULL)) == NTCAN_RX_TIMEOUT) &&
-    //	   (++count > 0)) {
-    //      usleep(400);
-    //    }
-    err = canRead(handle, &cmsg, &len, NULL);
-
-    if (err != NTCAN_SUCCESS) {
-      snprintf(last_error,200,"canRead failed: 0x%x",err);
-      return OW_FAILURE;
-    }
+  while (((err=canTake(handle, &cmsg, &len)) != NTCAN_SUCCESS)
+	 && (retrycount-- > 0)) {
+    usleep(sleeptime);
   }
-  else{
-    if((err=canTake(handle, &cmsg, &len)) != NTCAN_SUCCESS){
-      snprintf(last_error,200,"canTake failed: 0x%x",err);
-      return OW_FAILURE;
-    }
+  if (err != NTCAN_SUCCESS) {
+    snprintf(last_error,200,"canTake failed: 0x%x",err);
+    return OW_FAILURE;
   }
 
   if(len == 0){
@@ -971,7 +1019,7 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, bool block){
   return OW_SUCCESS;
 }
 
-int CANbus::send(int32_t msgid, uint8_t* msgdata, int32_t msglen, bool block){ // DONE MVW
+int CANbus::send(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t usecs) { // DONE MVW
 
   // THIS FUNCTION MUST BE CALLED WHILE HOLDING THE BUS MUTEX.
   // DON'T ADD ANY TERMINAL I/O TO THIS FUNCTION (IT WILL SLOW THINGS
@@ -980,6 +1028,14 @@ int CANbus::send(int32_t msgid, uint8_t* msgdata, int32_t msglen, bool block){ /
   int32_t len = 1;
   int i;
   int32_t err;
+
+  int32_t sleeptime;
+  if (usecs < 2000) {
+    sleeptime=100; // for short delays, sleep in 100 microsecond intervals
+  } else {
+    sleeptime=1000; // for longer delays, sleep for 1ms
+  }
+  int retrycount = usecs / sleeptime + 0.5;
 
 #ifdef CAN_RECORD
   std::vector<canio_data> crecord;
@@ -1018,14 +1074,9 @@ int CANbus::send(int32_t msgid, uint8_t* msgdata, int32_t msglen, bool block){ /
     msg.DATA[i] = msgdata[i];
   }
   
-  if (block) {
-    err = CAN_Write(handle,&msg);
-  } else {
-    err = LINUX_CAN_Extended_Status(handle, &pendread, &pendwrite);
-    if ((err != CAN_ERR_OK) && (err != CAN_ERR_QRCVEMPTY)) {
-      //      ROS_WARN("CANbus status is 0x%x",err);
-    }
-    err = CAN_Write(handle,&msg);
+  while (((err = CAN_Write(handle,&msg)) != CAN_ERR_OK) &&
+	 (retrycount-- > 0)) {
+    usleep(sleeptime);
   }
   if (err != CAN_ERR_OK) {
     snprintf(last_error,200,"canWrite failed: 0x%x",err);
@@ -1044,17 +1095,13 @@ int CANbus::send(int32_t msgid, uint8_t* msgdata, int32_t msglen, bool block){ /
   for(i=0; i<msglen; i++)
     cmsg.data[i] = msgdata[i];
   
-  if(block == true){
-    if( (err=canWrite(handle, &cmsg, &len, NULL)) != NTCAN_SUCCESS){
-      snprintf(last_error,200,"canWrite failed: 0x%x",err);
-      return OW_FAILURE;
-    }
+  while (((err=canSend(handle, &cmsg, &len)) != NTCAN_SUCCESS) && 
+	 (retrycount-- > 0)) {
+    usleep(sleeptime);
   }
-  else{
-    if( (err=canSend(handle, &cmsg, &len)) != NTCAN_SUCCESS){
-      snprintf(last_error,200,"canSend failed: 0x%x",err);
-      return OW_FAILURE;
-    }
+  if (err != NTCAN_SUCCESS) {
+    snprintf(last_error,200,"canSend failed: 0x%x",err);
+    return OW_FAILURE;
   }
     
   return OW_SUCCESS;
@@ -1068,10 +1115,10 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
   int32_t conversion;
    
   // MVW 04-29-08
-  if ((set_property(SAFETY_MODULE,TL1,6000,true) == OW_FAILURE) ||
-      (set_property(SAFETY_MODULE,TL2,9000,true) == OW_FAILURE) ||
-      (set_property(SAFETY_MODULE,VL1,(int32_t)(2*0x1000),true) == OW_FAILURE) ||
-      (set_property(SAFETY_MODULE,VL2,(int32_t)(3*0x1000),true) == OW_FAILURE)) {
+  if ((set_property(SAFETY_MODULE,TL1,6000,true,15000) == OW_FAILURE) ||
+      (set_property(SAFETY_MODULE,TL2,9000,true,15000) == OW_FAILURE) ||
+      (set_property(SAFETY_MODULE,VL1,(int32_t)(2*0x1000),true,15000) == OW_FAILURE) ||
+      (set_property(SAFETY_MODULE,VL2,(int32_t)(3*0x1000),true,15000) == OW_FAILURE)) {
       return OW_FAILURE;
   }
 
@@ -1083,8 +1130,9 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
       return OW_FAILURE;
   }
   ROS_DEBUG_NAMED("canlimits","VOLTH1 was %d, changing to 54",voltlevel);
-  if (set_property(SAFETY_MODULE,VOLTH1,54,true) == OW_FAILURE) {
+  if (set_property(SAFETY_MODULE,VOLTH1,54,true,15000) == OW_FAILURE) {
       ROS_ERROR("CANbus::limits: set_prop failed");
+      return OW_FAILURE;
   }
 
   if (get_property(SAFETY_MODULE,VOLTH2,&voltlevel) == OW_FAILURE) {
@@ -1092,20 +1140,18 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
       return OW_FAILURE;
   }
   ROS_DEBUG_NAMED("canlimits","VOLTH1 was %d, changing to 57",voltlevel);
-  if (set_property(SAFETY_MODULE,VOLTH2,57,true) == OW_FAILURE) {
+  if (set_property(SAFETY_MODULE,VOLTH2,57,true,15000) == OW_FAILURE) {
       ROS_ERROR("CANbus::limits: set_prop failed");
+      return OW_FAILURE;
   }
 #endif
-
-
-
 
   return OW_SUCCESS;
   
 #ifdef OLD_VEL_LIMITS
   if(0<jointVel && jointVel<7){           // If the vel (rad/s) is reasonable
     conversion = (int32_t)(jointVel*0x1000); // Convert to Q4.12 rad/s
-    if(set_property(SAFETY_MODULE, VL2, conversion, true) == OW_FAILURE){
+    if(set_property(SAFETY_MODULE, VL2, conversion, true,15000) == OW_FAILURE){
       ROS_ERROR("WAM::set_limits: set_prop failed.");
       return OW_FAILURE;
     }
@@ -1113,7 +1159,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
    
   if(0<tipVel && tipVel<7){               // If the vel (m/s) is reasonable
     conversion = (int32_t)(tipVel*0x1000);   // Convert to Q4.12 rad/s
-    if(set_property(SAFETY_MODULE, VL2, conversion, true) == OW_FAILURE){
+    if(set_property(SAFETY_MODULE, VL2, conversion, true,15000) == OW_FAILURE){
       ROS_ERROR("WAM::set_limits: set_prop failed.");
       return OW_FAILURE;
     }
@@ -1121,7 +1167,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
    
   if(0<elbowVel && elbowVel<7){           // If the vel (m/s) is reasonable
     conversion = (int32_t)(elbowVel*0x1000); // Convert to Q4.12 rad/s
-    if(set_property(SAFETY_MODULE, VL2, conversion, true) == OW_FAILURE){
+    if(set_property(SAFETY_MODULE, VL2, conversion, true,15000) == OW_FAILURE){
       ROS_ERROR("WAM::set_limits: set_prop failed.");
       return OW_FAILURE;
     }
@@ -1153,7 +1199,7 @@ int32_t CANbus::get_puck_state() {
   return pstate;
 }
 
-void CANbus::set_puck_state() {
+int CANbus::set_puck_state() {
   int32_t puck1_state;
   static int count=0;
   static double timesum = 0.0f;
@@ -1163,6 +1209,7 @@ void CANbus::set_puck_state() {
   if (get_property(1,MODE,&puck1_state) == OW_FAILURE) {
     ROS_WARN("Failure while trying to get MODE of puck #1");
     puck1_state = -1;
+    return OW_FAILURE;
   }
 
 #ifdef RT_STATS
@@ -1195,7 +1242,7 @@ int CANbus::hand_activate(int32_t *nodes) {
     } else {
       ROS_DEBUG_NAMED("can_bh280","setting puck %d to idle mode...",nodeid);
       // this was set to CONTROLLER_IDLE originally
-      if(set_property(nodeid, MODE, PUCK_IDLE, true) == OW_FAILURE){
+      if(set_property(nodeid, MODE, PUCK_IDLE, true, 10000) == OW_FAILURE){
 	ROS_WARN_NAMED("cancheck","Failed to set MODE=PUCK_IDLE on puck %d",nodeid);
 	return OW_FAILURE;
       }
@@ -1259,30 +1306,28 @@ int CANbus::hand_set_state() {
 
 int CANbus::finger_reset(int32_t nodeid) {
   // send the HI to this finger
-  if (set_property(nodeid,CMD,13) != OW_SUCCESS) {
+  if (set_property(nodeid,CMD,CMD_HI) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280","Error sending HI to hand puck %d",nodeid);
     return OW_FAILURE;
   }
-  // give the finger a little time to work
-  usleep(500000); // 0.5 secs
   // now wait for the change in mode
   ROS_DEBUG_NAMED("can_bh280", "Waiting for MODE change to IDLE");
-  int32_t mode;
-  if (get_property(nodeid,MODE,&mode) != OW_SUCCESS) {
-    ROS_WARN_NAMED("can_bh280","Could not get MODE from hand puck %d; still waiting", nodeid);
-    mode=MODE_VELOCITY;  // set it to anything other than MODE_IDLE so that
-                         // it goes into the wait loop below
-  }
-  unsigned int count = 120; // 6 seconds max
-  while ((mode != MODE_IDLE) && (--count)) {
-    usleep(50000); // 50ms
-    if (get_property(nodeid,MODE,&mode) != OW_SUCCESS) {
-      ROS_DEBUG_NAMED("can_bh280","Could not get MODE from hand puck %d; still waiting", nodeid);
-      mode=MODE_VELOCITY;
+  int32_t mode = MODE_VELOCITY;
+  int32_t sleepcount=0;
+  while ((get_property(nodeid,MODE,&mode,1000000) == OW_SUCCESS) &&
+	 (mode == MODE_VELOCITY) &&
+	 ros::ok()) {
+    usleep(50000);
+    if (++sleepcount ==20) {
+      ROS_WARN_NAMED("can_bh280","Still waiting for finger to finish HI; mode is %d", mode);
+      sleepcount=0;
     }
   }
-  if (mode != MODE_IDLE) {
-    ROS_WARN_NAMED("can_bh280","Finger puck %d didn't finish HI",nodeid);
+  if (!ros::ok()) {
+    return OW_FAILURE;
+  }
+  if (mode == MODE_VELOCITY) {
+    ROS_WARN_NAMED("can_bh280","No response within 700ms from finger puck %d while waiting for HI",nodeid);
     return OW_FAILURE;
   }
   ROS_DEBUG_NAMED("can_bh280", "Finger reset");
@@ -1301,7 +1346,7 @@ int CANbus::hand_reset() {
   bool ready=true;
   for (int nodeid=11; nodeid<=14; ++nodeid) {
     int32_t tstop;
-    if (get_property(nodeid,TSTOP,&tstop) != OW_SUCCESS) {
+    if (get_property(nodeid,TSTOP,&tstop,2000) != OW_SUCCESS) {
       ROS_ERROR("Could not get TSTOP property from hand puck %d",
 		nodeid);
       return OW_FAILURE;
@@ -1345,26 +1390,42 @@ int CANbus::hand_reset() {
 
   // Set the torque stop value to 50 to reduce heating on stall
   for (int32_t nodeid=11; nodeid<=13; ++nodeid) {
-    set_property(nodeid,TSTOP,50);
+    if (set_property(nodeid,TSTOP,50) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
     usleep(100);
     // F1 to F3 have HOLD=0 because they're not backdrivable
-    set_property(nodeid,HOLD,0);
+    if (set_property(nodeid,HOLD,0) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
     usleep(100);
   }
-  set_property(14,TSTOP,50);
+  if (set_property(14,TSTOP,50) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
   usleep(100);
   // F4 has HOLD=1 so that it won't flop around
-  set_property(14,HOLD,1);
+  if (set_property(14,HOLD,1) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
   usleep(100);
   for (int32_t nodeid=11; nodeid<=14; ++nodeid) {
     int32_t value;
-    get_property(nodeid,HOLD,&value);
+    if (get_property(nodeid,HOLD,&value,20000) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
     ROS_INFO_NAMED("can_bh280","Puck %d HOLD is %d",nodeid,value);
-    get_property(nodeid,GRPA,&value);
+    if (get_property(nodeid,GRPA,&value,20000) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
     ROS_INFO_NAMED("can_bh280","Puck %d GRPA is %d",nodeid,value);
-    get_property(nodeid,GRPB,&value);
+    if (get_property(nodeid,GRPB,&value,20000) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
     ROS_INFO_NAMED("can_bh280","Puck %d GRPB is %d",nodeid,value);
-    get_property(nodeid,GRPC,&value);
+    if (get_property(nodeid,GRPC,&value,20000) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
     ROS_INFO_NAMED("can_bh280","Puck %d GRPC is %d",nodeid,value);
   }
   handstate = HANDSTATE_DONE;
@@ -1376,20 +1437,36 @@ int CANbus::hand_move(double p1, double p2, double p3, double p4) {
   set_property(12,DP,finger_radians_to_encoder(p2));
   set_property(13,DP,finger_radians_to_encoder(p3));
   set_property(14,DP,spread_radians_to_encoder(p4));
-  set_property(11,CMD,19);  // M = 19 ("move")
-  set_property(12,CMD,19);
-  set_property(13,CMD,19);
-  set_property(14,CMD,19); */
+  set_property(11,CMD,CMD_M);
+  set_property(12,CMD,CMD_M);
+  set_property(13,CMD,CMD_M);
+  set_property(14,CMD,CMD_M); */
   ROS_INFO_NAMED("bhd280", "executing hand_move");
 
-  set_property(11,E,finger_radians_to_encoder(p1));
-  set_property(12,E,finger_radians_to_encoder(p2));
-  set_property(13,E,finger_radians_to_encoder(p3));
-  set_property(14,E,spread_radians_to_encoder(p4));
-  set_property(11,MODE,5);  // 5 = trapezoid
-  set_property(12,MODE,5);
-  set_property(13,MODE,5);
-  set_property(14,MODE,5);
+  if (set_property(11,E,finger_radians_to_encoder(p1)) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  if (set_property(12,E,finger_radians_to_encoder(p2)) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  if (set_property(13,E,finger_radians_to_encoder(p3)) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  if (set_property(14,E,spread_radians_to_encoder(p4)) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  if (set_property(11,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  if (set_property(12,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  if (set_property(13,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  if (set_property(14,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
   first_moving_finger=11;
   handstate = HANDSTATE_MOVING;
   ROS_INFO_NAMED("bhd280", "done hand_move");
@@ -1398,15 +1475,31 @@ int CANbus::hand_move(double p1, double p2, double p3, double p4) {
 
 int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   ROS_INFO_NAMED("bhd280", "executing hand_velocity");
-  set_property(11,V,finger_radians_to_encoder(v1)/1000.0);
-  set_property(12,V,finger_radians_to_encoder(v2)/1000.0);
-  set_property(13,V,finger_radians_to_encoder(v3)/1000.0);
-  set_property(14,V,finger_radians_to_encoder(v4)/1000.0);
+  if (set_property(11,V,finger_radians_to_encoder(v1)/1000.0) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  if (set_property(12,V,finger_radians_to_encoder(v2)/1000.0) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  if (set_property(13,V,finger_radians_to_encoder(v3)/1000.0) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  if (set_property(14,V,finger_radians_to_encoder(v4)/1000.0) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
   
-  set_property(11,MODE,MODE_VELOCITY);
-  set_property(12,MODE,MODE_VELOCITY);
-  set_property(13,MODE,MODE_VELOCITY);
-  set_property(14,MODE,MODE_VELOCITY);
+  if (set_property(11,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  if (set_property(12,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  if (set_property(13,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  if (set_property(14,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
   first_moving_finger=11;
   handstate = HANDSTATE_MOVING;
   ROS_INFO_NAMED("bhd280", "done executing hand_velocity");
@@ -1414,10 +1507,18 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
 }
 
 int CANbus::hand_relax() {
-  set_property(11,MODE,PUCK_IDLE);
-  set_property(12,MODE,PUCK_IDLE);
-  set_property(13,MODE,PUCK_IDLE);
-  set_property(14,MODE,PUCK_IDLE);
+  if (set_property(11,MODE,PUCK_IDLE) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  if (set_property(12,MODE,PUCK_IDLE) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  if (set_property(13,MODE,PUCK_IDLE) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  if (set_property(14,MODE,PUCK_IDLE) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
   handstate = HANDSTATE_DONE;
   return OW_SUCCESS;
 }
@@ -1614,138 +1715,146 @@ void CANbus::initPropertyDefs(int firmwareVersion){
    }
    else
    {
-   /* Common */
-     VERS = i++; // 0
-      ROLE = i++; /* P=PRODUCT, R=ROLE: XXXX PPPP XXXX RRRR */
-      SN = i++;
-      ID = i++;
-      ERROR = i++;
-      STAT = i++;
-      ADDR = i++;
-      VALUE = i++;
-      MODE = i++;
-      TEMP = i++;
-      PTEMP = i++; // 10
-      OTEMP = i++;
-      BAUD = i++;
-      _LOCK = i++;
-      DIG0 = i++;
-      DIG1 = i++;
-      FET0 = i++;
-      FET1 = i++;
-      ANA0 = i++;
-      ANA1 = i++;
-      THERM = i++; // 20
-      VBUS = i++;
-      IMOTOR = i++;
-      VLOGIC = i++;
-      ILOGIC = i++;
-      SG = i++;
-      GRPA = i++;
-      GRPB = i++;
-      GRPC = i++;
-      CMD = i++; /* For commands w/o values: RESET,HOME,KEEP,PASS,LOOP,HI,IC,IO,TC,TO,C,O,T */
-      SAVE = i++; // 30
-      LOAD = i++;
-      DEF = i++;
-      FIND = i++;
-      X0 = i++;
-      X1 = i++;
-      X2 = i++;
-      X3 = i++;
-      X4 = i++;
-      X5 = i++;
-      X6 = i++; // 40
-      X7 = i++;
-      
-      COMMON_END = i++; // 42
-   
-   /* Safety */
-      i = COMMON_END; 
-      ZERO = i++; // 42
-      PEN = i++;
-      SAFE = i++;
-      VL1 = i++;
-      VL2 = i++;
-      TL1 = i++;
-      TL2 = i++;
-      VOLTL1 = i++;
-      VOLTL2 = i++; // 50
-      VOLTH1 = i++;
-      VOLTH2 = i++;
-      PWR = i++;
-      MAXPWR = i++;
-      IFAULT = i++;
-      VNOM = i++;
-      
-      SAFETY_END = i++;
-   
-   /* Tater */
-      i = COMMON_END;
-      T = i++;  // 42
-      MT = i++;
-      V = i++;
-      MV = i++;
-      MCV = i++;
-      MOV = i++;
-      P = i++; /* 32-Bit Present Position */
-      P2 = i++;
-      DP = i++; // 50  /* 32-Bit Default Position */
-      DP2 = i++;
-      E = i++; /* 32-Bit Endpoint */
-      E2 = i++;
-      OT = i++; /* 32-Bit Open Target */
-      OT2 = i++;
-      CT = i++; /* 32-Bit Close Target */
-      CT2 = i++;
-      M = i++; /* 32-Bit Move command for CAN*/
-      M2 = i++;
-      _DS = i++; // 60
-      MOFST = i++;
-      IOFST = i++;
-      UPSECS = i++;
-      OD = i++;
-      MDS = i++;
-      MECH = i++; /* 32-Bit */
-      MECH2 = i++;
-      CTS = i++; /* 32-Bit */
-      CTS2 = i++;
-      PIDX = i++;  // 70
-      HSG = i++;
-      LSG = i++;
-      IVEL = i++;
-      IOFF = i++; /* 32-Bit */
-      IOFF2 = i++;
-      MPE = i++;
-      EN = i++;
-      TSTOP = i++;
-      KP = i++;
-      KD = i++;  // 80
-      KI = i++;
-      ACCEL = i++;
-      TENST = i++;
-      TENSO = i++;
-      JIDX = i++;
-      IPNM = i++;
-      HALLS = i++;
-      HALLH = i++; /* 32-Bit */
-      HALLH2 = i++;
-      POLES = i++;  // 90
-      IKP = i++;
-      IKI = i++;
-      IKCOR = i++;
-      HOLD = i++;
-      TIE = i++;
-      ECMAX = i++;
-      ECMIN = i++;
-      LFLAGS = i++;
-      LCTC = i++;
-      LCVC = i++;  // 100
-      
-      PROP_END = i++;
-      
-      AP = P; // Handle parameter name change
-      TENSION = FET1;
+     /* Common */
+     VERS = i++;
+     ROLE = i++; /* P=PRODUCT, R=ROLE: XXXX PPPP XXXX RRRR */
+     SN = i++;
+     ID = i++;
+     ERROR = i++;
+     STAT = i++;
+     ADDR = i++;
+     VALUE = i++;
+     MODE = i++;
+     TEMP = i++;
+     PTEMP = i++;
+     OTEMP = i++;
+     BAUD = i++;
+     _LOCK = i++;
+     DIG0 = i++;
+     DIG1 = i++;
+     FET0 = i++;
+     FET1 = i++;
+     ANA0 = i++;
+     ANA1 = i++;
+     THERM = i++;
+     VBUS = i++;
+     IMOTOR = i++;
+     VLOGIC = i++;
+     ILOGIC = i++;
+     SG = i++;
+     GRPA = i++;
+     GRPB = i++;
+     GRPC = i++;
+     CMD = i++; /* For commands w/o values: RESET,HOME,KEEP,PASS,LOOP,HI,IC,IO,TC,TO,C,O,T */
+     SAVE = i++;
+     LOAD = i++;
+     DEF = i++;
+     FIND = i++;
+     X0 = i++;
+     X1 = i++;
+     X2 = i++;
+     X3 = i++;
+     X4 = i++;
+     X5 = i++;
+     X6 = i++;
+     X7 = i++;
+
+     COMMON_END = i++;
+
+     /* Safety */
+     i = COMMON_END;
+     ZERO = i++;
+     PEN = i++;
+     SAFE = i++;
+     VL1 = i++;
+     VL2 = i++;
+     TL1 = i++;
+     TL2 = i++;
+     VOLTL1 = i++;
+     VOLTL2 = i++;
+     VOLTH1 = i++;
+     VOLTH2 = i++;
+     PWR = i++;
+     MAXPWR = i++;
+     IFAULT = i++;
+     VNOM = i++;
+
+     SAFETY_END = i++;
+
+     /* Tater */
+     i = COMMON_END;
+     T = i++;
+     MT = i++;
+     V = i++;
+     MV = i++;
+     MCV = i++;
+     MOV = i++;
+     P = i++; /* 32-Bit Present Position */
+     P2 = i++;
+     DP = i++; /* 32-Bit Default Position */
+     DP2 = i++;
+     E = i++; /* 32-Bit Endpoint */
+     E2 = i++;
+     OT = i++; /* 32-Bit Open Target */
+     OT2 = i++;
+     CT = i++; /* 32-Bit Close Target */
+     CT2 = i++;
+     M = i++; /* 32-Bit Move command for CAN*/
+     M2 = i++;
+     _DS = i++;
+     MOFST = i++;
+     IOFST = i++;
+     UPSECS = i++;
+     OD = i++;
+     MDS = i++;
+     MECH = i++; /* 32-Bit */
+     MECH2 = i++;
+     CTS = i++; /* 32-Bit */
+     CTS2 = i++;
+     PIDX = i++;
+     HSG = i++;
+     LSG = i++;
+     IVEL = i++;
+     IOFF = i++; /* 32-Bit */
+     IOFF2 = i++;
+     MPE = i++;
+     HOLD = i++;
+     TSTOP = i++;
+     KP = i++;
+     KD = i++;
+     KI = i++;
+     ACCEL = i++;
+     TENST = i++;
+     TENSO = i++;
+     JIDX = i++;
+     IPNM = i++;
+     HALLS = i++;
+     HALLH = i++; /* 32-Bit */
+     HALLH2 = i++;
+     POLES = i++;
+     IKP = i++;
+     IKI = i++;
+     IKCOR = i++;
+     EN = i++;
+     EN2 = i++;
+     JP = i++;
+     JP2 = i++;
+     JOFST = i++;
+     JOFST2 = i++;
+     TIE = i++;
+     ECMAX = i++;
+     ECMIN = i++;
+     LFLAGS = i++;
+     LCTC = i++;
+     LCVC = i++;
+     TACT = i++;
+     TACTID = i++;
+
+     PROP_END = i++;
+
+     AP = P; // Handle parameter name change
+     TENSION = FET1;
+     TORQ=T;
    }
 }
 
@@ -1788,7 +1897,14 @@ void CANbus::initPropertyDefs(int firmwareVersion){
 	  int32_t tq4 = ((cdata.msgdata[6] & 0x3F) << 8) +
 	    cdata.msgdata[7];
 	  fprintf(csv,"SET %03d=%d,%d,%d,%d",cdata.msgdata[0] & 0x7F, tq1,tq2,tq3,tq4);
+	} else if ((cdata.msgid & 0x41F) == 0x403) {
+	  // message set to GROUP 3 are 22-bit position updates
+	  int32_t value = (cdata.msgdata[0] << 16) +
+	    (cdata.msgdata[1] << 8) +
+	    cdata.msgdata[2];
+	  fprintf(csv,"SET P=%d",value);
 	} else {
+	  // regular property
 	  int32_t value = (cdata.msgdata[3] << 8) + cdata.msgdata[2];
 	  if (cdata.msglen == 6) {
 	    value += (cdata.msgdata[4] << 16) + (cdata.msgdata[5] << 24);
