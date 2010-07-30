@@ -11,13 +11,11 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, std::string("owd"));
 
-#ifndef OWDSIM
-#ifndef NO_RT
+#if ! defined(OWDSIM) || ! defined(OWD_RT)
   if(mlockall(MCL_CURRENT | MCL_FUTURE) == -1){
     ROS_FATAL("owd: mlockall failed: ");
     return NULL;
   }
-#endif
 #endif
 
 
@@ -42,6 +40,13 @@ int main(int argc, char** argv)
     }
   } catch (int error) {
     ROS_FATAL("Error during WamDriver::Init(); exiting.");
+#ifdef CAN_RECORD
+    wam.bus.~CANbus();
+    ROS_FATAL("dumped CANbus logs to candata.log");
+#endif
+    exit(1);
+  } catch (char *errmsg) {
+    ROS_FATAL("Error during WamDriver::Init(): %s",errmsg);
 #ifdef CAN_RECORD
     wam.bus.~CANbus();
     ROS_FATAL("dumped CANbus logs to candata.log");

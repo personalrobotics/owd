@@ -24,6 +24,7 @@
 #include <native/task.h>
 #include <native/timer.h>
 #include <native/mutex.h>
+#include <native/intr.h>
 
 #include <sys/mman.h>
 
@@ -116,6 +117,7 @@ DataRecorder<canio_data> candata;
 #endif // CAN_RECORD
 
   HANDLE handle;
+  RT_INTR rt_can_intr;
 #endif // OWDSIM
 
   int load();

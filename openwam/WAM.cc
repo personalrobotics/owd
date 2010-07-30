@@ -758,6 +758,34 @@ void control_loop(void* argv){
         loopcount=slowcount=0;
       }
       
+      if (!wam->bus->simulation) { // skip if running in simulation
+	int puckstate=wam->bus->get_puck_state();
+	if (puckstate != 2) {
+	  wam->motor_state=WAM::MOTORS_IDLE;
+	  //ROS_DEBUG("Puckstate = %d",puckstate);
+	  if (wam->exit_on_pendant_press) {
+	    // The motors have been idled (someone pressed shift-idle), so go ahead
+	    // and exit without being told.
+	    // first, though, send a zero-torque packet to extinguish
+	    // the torque warning light
+	    for(int m=Motor::M1; m<=Motor::Mn; m++) {
+	      wam->motors[m].trq(0.0);
+	    }
+	    wam->send_mtrq();
+            
+	    ROS_WARN("Detected motor switch to idle; exiting controller.");
+	    ROS_WARN("If the pendant shows a torque or velocity fault, and the yellow idle");
+	    ROS_WARN("button is still lit, you can clear the fault by pressing shift-idle");
+	    ROS_WARN("again, and encoder values will be preserved.");
+	    ROS_WARN("To restart the controller, just re-run the previous command.");
+	    break;
+	  }
+	} else {
+	  wam->motor_state=WAM::MOTORS_ACTIVE;
+	}        
+      }    
+
+
       // get ready for next pass
       t1 = t2;
       //      printf("bottom of loop\n");
@@ -1087,33 +1115,6 @@ void WAM::newcontrol(double dt){
     }
     
     this->unlock();
-    int32_t response;
-    if (!bus->simulation) { // skip if running in simulation
-      int puckstate=bus->get_puck_state();
-      if (puckstate != 2) {
-        motor_state=MOTORS_IDLE;
-        //ROS_DEBUG("Puckstate = %d",puckstate);
-        if (exit_on_pendant_press) {
-	  // The motors have been idled (someone pressed shift-idle), so go ahead
-	  // and exit without being told.
-	  // first, though, send a zero-torque packet to extinguish
-	  // the torque warning light
-	  for(int m=Motor::M1; m<=Motor::Mn; m++) {
-	    motors[m].trq(0.0);
-	  }
-	  send_mtrq();
-            
-	  ROS_WARN("Detected motor switch to idle; exiting controller.");
-	  ROS_WARN("If the pendant shows a torque or velocity fault, and the yellow idle");
-	  ROS_WARN("button is still lit, you can clear the fault by pressing shift-idle");
-	  ROS_WARN("again, and encoder values will be preserved.");
-	  ROS_WARN("To restart the controller, just re-run the previous command.");
-	  exit(0);
-        }
-      } else {
-        motor_state=MOTORS_ACTIVE;
-      }        
-    }    
 }
 
 bool WAM::safety_torques_exceeded(double t[]) {

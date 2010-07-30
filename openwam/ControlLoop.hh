@@ -55,9 +55,8 @@ private:
   char taskname[20];
 
 public:
-  //static const double PERIOD = 0.01;
   //static const double PERIOD = 0.002;
-  static const double PERIOD = 0.002;
+  static const double PERIOD = 0.005;
   int task_number; // must be unique on the machine
   void (*ctrl_fnc)(void*);
   void* ctrl_argv;

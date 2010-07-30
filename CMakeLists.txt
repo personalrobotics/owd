@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 2.4.6)
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 set (RT on)
-#set (CANBUS_TYPE "ESD")
-set (CANBUS_TYPE "PEAK")
+set (CANBUS_TYPE "ESD")
+#set (CANBUS_TYPE "PEAK")
 set (CMAKE_VERBOSE_MAKEFILE on)
 
 rosbuild_init()

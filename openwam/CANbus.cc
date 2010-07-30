@@ -85,6 +85,25 @@ int CANbus::init(){  // DONE MVW
     ROS_ERROR("CANbus::init: check failed.");
     return OW_FAILURE;
   }
+
+#ifdef ESD_CAN
+  int err = rt_intr_create(&rt_can_intr, "ESDCAN_IRQ", 12, I_PROPAGATE);
+#endif
+#ifdef PEAK_CAN
+  int err = rt_intr_create(&rt_can_intr, "PEAKCAN_IRQ", 19, I_PROPAGATE);
+#endif
+  
+  if (err) {
+    ROS_ERROR("Failed to create interrupt management object: %d",err);
+    return OW_FAILURE;
+  }
+
+  err = rt_intr_enable(&rt_can_intr);
+  if (err) {
+    ROS_ERROR("Failed to enable interrupt for CAN interface: %d",err);
+    return OW_FAILURE;
+  }
+
   return OW_SUCCESS;
 }
 
@@ -386,7 +405,7 @@ int CANbus::status(int32_t* nodes){
 
     usleep(40000);
     if(read(&msgid, msg, &msglen, 100) == OW_FAILURE){
-      ROS_DEBUG_NAMED("canstatus","node %d didn't answer",NODE2ADDR(n));
+      ROS_DEBUG_NAMED("canstatus","node %d didn't answer: %s",NODE2ADDR(n), last_error);
     }
     else{
       if(parse(msgid, msg, msglen,&nodeid,&property,&nodes[n])==OW_FAILURE){
@@ -893,20 +912,31 @@ int CANbus::compile(int32_t property, int32_t value,
 
 int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t usecs){ // DONE MVW
 
-  int32_t len = 1;
+  int32_t len;
   int i, err;
   
   // THIS FUNCTION MUST BE CALLED WHILE HOLDING THE BUS MUTEX.
   // DON'T ADD ANY TERMINAL I/O TO THIS FUNCTION (IT WILL SLOW THINGS
   // DOWN TOO MUCH).
 
-  int32_t sleeptime;
+  RTIME sleeptime; // time to wait for interrupts, in nanoseconds
   if (usecs < 2000) {
     sleeptime=100; // for short delays, sleep in 100 microsecond intervals
   } else {
     sleeptime=1000; // for longer delays, sleep for 1ms
   }
   int retrycount = usecs / sleeptime + 0.5;
+  
+
+#ifdef CAN_RECORD
+  std::vector<canio_data> crecord;
+  canio_data cdata;
+  //  RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
+  //  cdata.secs = t1 / 1e9;
+  //  cdata.usecs = (t1 - cdata.secs*1e9) / 1e3;
+  struct timeval tv;
+#endif // CAN_RECORD
+
 
 #ifdef PEAK_CAN
   TPCANRdMsg cmsg;
@@ -968,19 +998,61 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t usec
 #ifdef ESD_CAN
   CMSG cmsg;
 
-  while (((err=canTake(handle, &cmsg, &len)) != NTCAN_SUCCESS)
-	 && (retrycount-- > 0)) {
-    usleep(sleeptime);
-  }
-  if (err != NTCAN_SUCCESS) {
-    snprintf(last_error,200,"canTake failed: 0x%x",err);
-    return OW_FAILURE;
-  }
+  int zerocount(0);
+  len=1;
+  bool done=false;
+  while (!done) {
+    err=canTake(handle, &cmsg, &len);
+    if ((err == NTCAN_RX_TIMEOUT)
+	|| ((err == NTCAN_SUCCESS) && (len == 0))) {
+      if (retrycount-- > 0) {
+	usleep(sleeptime); // give time for the CAN message to arrive
+	int err = rt_intr_wait(&rt_can_intr,5000); // process any interrupts
+	rt_task_sleep(50000);
 
-  if(len == 0){
-    snprintf(last_error,200,"read something with length zero");
-    return OW_FAILURE;
-  } else if(len != 1){
+#ifdef CAN_RECORD
+	gettimeofday(&tv,NULL);
+	cdata.secs = tv.tv_sec;
+	cdata.usecs = tv.tv_usec;
+	cdata.send=false;
+	cdata.msgid = -1;
+	cdata.msglen = 1;
+	if (err == -ETIMEDOUT) {
+	  cdata.msgdata[0] = 1;
+	} else {
+	  cdata.msgdata[0] =0;
+	}
+	for (unsigned int i=1; i<8; ++i) {
+	  cdata.msgdata[i] = 0; // must pad the extra space with zeros
+	}
+	crecord.push_back(cdata);
+	candata.add(crecord);
+	crecord.clear();
+#endif // CAN_RECORD
+	
+	if (err == -EINVAL) {
+	  snprintf(last_error,200,"Unable to wait for CAN interrupt: invalid interrupt descriptor");
+	  return OW_FAILURE;
+	} else if (err == -EIDRM) {
+	  snprintf(last_error,200,"Unable to wait for CAN interrupt: interrupt object has been deleted");
+	  return OW_FAILURE;
+	}
+	
+	len=1; // make sure we pass in the right len each time
+      } else {
+	snprintf(last_error,200,"timeout during read");
+	return OW_FAILURE;
+      }
+    } else if (err == NTCAN_SUCCESS) {
+      done=true;
+      break;
+    } else {
+      snprintf(last_error,200,"canTake failed: 0x%x",err);
+      return OW_FAILURE;
+    }
+  }
+  
+  if (len != 1) {
     snprintf(last_error,200,"received a message of length: %d",len);
     return OW_FAILURE;
   }
@@ -993,12 +1065,6 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t usec
 #endif // ESD_CAN
 
 #ifdef CAN_RECORD
-  std::vector<canio_data> crecord;
-  canio_data cdata;
-  //  RTIME t1 = rt_timer_ticks2ns(rt_timer_read());
-  //  cdata.secs = t1 / 1e9;
-  //  cdata.usecs = (t1 - cdata.secs*1e9) / 1e3;
-  struct timeval tv;
   gettimeofday(&tv,NULL);
   cdata.secs = tv.tv_sec;
   cdata.usecs = tv.tv_usec;
@@ -1359,6 +1425,7 @@ int CANbus::hand_reset() {
   
   if (ready) {
     // all the fingers have already been HI'd
+    handstate=HANDSTATE_DONE;
     return OW_SUCCESS;
   }
   
@@ -1870,6 +1937,14 @@ void CANbus::initPropertyDefs(int firmwareVersion){
       strftime(timestring,100,"%F %T",localtime(&logtime));
 	
       fprintf(csv,"[%s,%06d] ",timestring,cdata.usecs);
+      if (cdata.msgid == -1) {
+	if (cdata.msgdata[0]) {
+	  fprintf(csv,"NO INTR (timed out)\n");
+	} else {
+	  fprintf(csv,"INTR\n");
+	}
+	continue;
+      }
       if (cdata.send) {
 	fprintf(csv,"SEND ");
       } else {
@@ -1926,11 +2001,13 @@ void CANbus::initPropertyDefs(int firmwareVersion){
 #endif // CAN_RECORD
 
  CANbus::~CANbus(){
-    if(pucks!=NULL) delete pucks; 
-    if(trq!=NULL) delete trq; 
-    if(pos!=NULL) delete pos;
+   rt_intr_delete(&rt_can_intr);   
+   if(pucks!=NULL) delete pucks; 
+   if(trq!=NULL) delete trq; 
+   if(pos!=NULL) delete pos;
 #ifdef CAN_RECORD
-    candata.dump("candata.log");
-    ROS_DEBUG("dumped CANbus logs to candata.log");
+   candata.dump("candata.log");
+   ROS_DEBUG("dumped CANbus logs to candata.log");
 #endif    
-  }
+ }
+ 
