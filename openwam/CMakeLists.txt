@@ -24,19 +24,19 @@ endif (DEFINED ENV{OWD_MARCH_FLAGS})
 
 add_definitions("-ggdb3 -DWRIST -DBH8 -DRT_STATS -DCAN_RECORD")
 
-add_library(openwam STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc ConstrainedForceTrajectory.cc)
+add_library(openwam STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc  ConstrainedForceTrajectory.cc)
 
-add_library(openwambhd STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc ConstrainedForceTrajectory.cc)
+add_library(openwambhd STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc  ConstrainedForceTrajectory.cc)
 
-add_library(openwam_canbhd STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc ConstrainedForceTrajectory.cc)
+add_library(openwam_canbhd STATIC  Joint.cc CANbus.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc  ConstrainedForceTrajectory.cc)
 
-add_library(openwamsim STATIC  Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc ControlLoop_sim.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc JointCtrlSea.cc ConstrainedForceTrajectory.cc)
+add_library(openwamsim STATIC  Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc ServoTraj.cc StepTraj.cc  ConstrainedForceTrajectory.cc)
 
 # target_link_libraries(openwam positionInterface)
 #include_directories (../openmath positionInterface)
 include_directories (../openmath)
 
-if (RT)
+if (OWD_RT)
 # locate Xenomai
 find_program(XENO-CONFIG NAMES xeno-config PATHS $ENV{XENOMAI_PATH}/bin /usr/bin /usr/xenomai/bin)
 if (XENO-CONFIG)
@@ -57,14 +57,14 @@ if (XENO-CONFIG)
    
 elseif ("$ENV{XENOMAI_PATH}" STRGREATER "")
 message(STATUS "Using XENOMAI_PATH=$ENV{XENOMAI_PATH}")
-   set (RT_DEFS "-I$ENV{XENOMAI_PATH}/include")
+   set (RT_DEFS "-DOWD_RT -I$ENV{XENOMAI_PATH}/include")
    set (RT_LIBS "-L$ENV{XENOMAI_PATH}/lib -lnative")
 endif (XENO-CONFIG)
 
-else (RT)
-set (RT_DEFS "-DNO_RT")
+else (OWD_RT)
+set (RT_DEFS "")
 set (RT_LIBS "")
-endif(RT)
+endif(OWD_RT)
 
 
 if (CANBUS_TYPE STREQUAL "ESD")

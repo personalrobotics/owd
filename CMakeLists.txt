@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.4.6)
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
-set (RT on)
+set (OWD_RT on)
 set (CANBUS_TYPE "ESD")
 #set (CANBUS_TYPE "PEAK")
 set (CMAKE_VERBOSE_MAKEFILE on)
@@ -15,13 +15,13 @@ add_subdirectory(openmath)
 include_directories (openwam openmath)
 add_definitions("-ggdb3 -DWRIST -DBH8 -DCAN_RECORD")
 
-if (RT)
-set (RT_DEFS "")
+if (OWD_RT)
+set (RT_DEFS "-DOWD_RT")
 set (RT_LIBS "native")
-else (RT)
-set (RT_DEFS "-DNO_RT")
+else (OWD_RT)
+set (RT_DEFS "")
 set (RT_LIBS "")
-endif (RT)
+endif (OWD_RT)
 
 if (CANBUS_TYPE STREQUAL "ESD")
 message(STATUS "using ESD CANbus driver")
@@ -76,7 +76,7 @@ elseif (VENDOR_ID STREQUAL "CentaurHauls")
 endif  (DEFINED ENV{OWD_MARCH_FLAGS})
 
 # locate Xenomai
-if (RT)
+if (OWD_RT)
 find_program(XENO-CONFIG NAMES xeno-config PATHS $ENV{XENOMAI_PATH} /usr/bin /usr/xenomai/bin)
 if (XENO-CONFIG)
    execute_process(COMMAND ${XENO-CONFIG} --skin native --cflags

@@ -21,10 +21,13 @@
 #endif // OWDSIM
 
 #include <stdint.h>
+#ifdef OWD_RT
 #include <native/task.h>
 #include <native/timer.h>
 #include <native/mutex.h>
 #include <native/intr.h>
+#include <native/pipe.h>
+#endif // OWD_RT
 
 #include <sys/mman.h>
 
@@ -70,6 +73,7 @@ public:
   int32_t nodeid;
   int32_t property;
   int32_t value;
+
 };
 #endif // BH280
 
@@ -117,7 +121,15 @@ DataRecorder<canio_data> candata;
 #endif // CAN_RECORD
 
   HANDLE handle;
+#ifdef OWD_RT
   RT_INTR rt_can_intr;
+
+#ifdef BH280
+  RT_PIPE handpipe;
+  int handpipe_fd;
+#endif // BH280
+
+#endif // OWD_RT
 #endif // OWDSIM
 
   int load();
@@ -185,6 +197,8 @@ private:
   int32_t spread_radians_to_encoder(double radians);
 
 public:
+  int hand_get_property(int32_t id, int32_t prop, int32_t *val);
+  int hand_set_property(int32_t id, int32_t prop, int32_t val);
   int hand_set_state();
   int hand_activate(int32_t *nodes);
   int hand_reset();

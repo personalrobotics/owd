@@ -221,7 +221,7 @@ int WAM::init(){
   //                        Kp    Kd    Ki
     jointsctrl[5].set_gains(  40,  0.5, 0.5);
     jointsctrl[6].set_gains(  40,  0.5, 0.5);
-    jointsctrl[7].set_gains(  16,  0.2, 0.1);
+    jointsctrl[7].set_gains(  8,  0.08, 0.1);
   }
   if (Joint::Jn > 7) {
     // set 280 Hand gains here
@@ -727,7 +727,7 @@ void control_loop(void* argv){
 
       // check for slow loops
       double thistime = (t2-t1)* 1e-6;  // milliseconds
-      if (thistime > 2.0) {
+      if (thistime > 5.0) {
         slowcount++;
         slowtime += thistime;
 	if (thistime > slowmax) {
@@ -1268,23 +1268,6 @@ void WAM::move_sigmoid(const SE3& E02){
   se3ctrl.set(FK());
   se3ctrl.run();
 }
-
-void WAM::move_sigmoid(const double q2[Joint::Jn+1]){
-  Profile* profs[Joint::Jn+1];
-  double q1[Joint::Jn+1];
-
-  for(int j=Joint::J1; j<=Joint::Jn; j++){
-    q1[j] = joints[j].pos();
-    profs[j] = new Sigmoid(0.1);
-  }
-  
-  for(int j=Joint::J1; j<=Joint::Jn; j++){
-    jointsctrl[j].reset();
-    jointsctrl[j].set(joints[j].pos());
-    jointsctrl[j].run();
-  }
-}
-
 
 void WAM::set_stiffness(float s) {
   this->lock("set_stiffness");

@@ -40,11 +40,14 @@ void *ControlLoop::start_thread(void *data) {
 
 int ControlLoop::start() {
 
+  if (cls == CONTROLLOOP_RUN) {
+    return OW_SUCCESS;
+  }
+
   lock();
   cls = CONTROLLOOP_RUN;
   unlock();
 
-  //  if(pthread_create(&ctrlthread, NULL, ctrl_fnc, ctrl_argv)){
   if(pthread_create(&ctrlthread, NULL, &ControlLoop::start_thread, this)) {
     ROS_FATAL("ControlLoop::start: pthread_create failed.");
     lock();

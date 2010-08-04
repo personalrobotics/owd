@@ -18,18 +18,24 @@
 */
 
 #include "ControlLoop.hh"
+
+#if defined(OWDSIM) || ! defined(OWD_RT)
+#include <sys/time.h>
+#include <time.h>
+#else
 #include <native/timer.h>
+#endif
+
 #include <ros/ros.h>
 
 ControlLoop::ControlLoop(int tasknum, void (*fnc)(void*), void* argv) : 
   task_number(tasknum), ctrl_fnc(fnc), ctrl_argv(argv) {
   
-  RTIME rtperiod;
-  
   pthread_mutex_init(&mutex, NULL);
   
   snprintf(taskname,20,"OWDTASK%02d",task_number);
   
+#if defined(OWD_RT) && ! defined(OWDSIM)
   // Xenomai example uses TASK_MODE 0 instead of T_CPU(1)
   int retval = rt_task_create(&task, taskname, 0, 99, T_CPU(1));
   if(retval){
@@ -58,7 +64,7 @@ ControlLoop::ControlLoop(int tasknum, void (*fnc)(void*), void* argv) :
 
   // if CONFIG_XENO_OPT_NATIVE_PERIOD was set to zero (default) when building
   // Xenomai, then the time is expressed in nanoseconds.
-  rtperiod = (RTIME)(ControlLoop::PERIOD*1000000000.0); 
+  RTIME rtperiod = (RTIME)(ControlLoop::PERIOD*1000000000.0); 
   
   if((retval=rt_task_set_periodic(&task, TM_NOW, rtperiod))) {
     ROS_FATAL("ControlLoop: rt_task_set_periodic failed for RT task %s: %d", taskname,retval);
@@ -67,7 +73,17 @@ ControlLoop::ControlLoop(int tasknum, void (*fnc)(void*), void* argv) :
       throw OW_FAILURE;
     }
   }
+
+#endif // OWD_RT
 }
+
+#if defined(OWDSIM) || ! defined(OWD_RT)
+void *ControlLoop::start_thread(void *data) {
+  ControlLoop *cl = (ControlLoop*)data;
+  (*cl->ctrl_fnc)(cl->ctrl_argv);
+  return NULL;
+}
+#endif
 
 int ControlLoop::start(){
 
@@ -79,6 +95,17 @@ int ControlLoop::start(){
   cls = CONTROLLOOP_RUN;
   unlock();
 
+#if defined(OWDSIM) || ! defined(OWD_RT)
+
+  if(pthread_create(&ctrlthread, NULL, &ControlLoop::start_thread, this)) {
+    ROS_FATAL("ControlLoop::start: pthread_create failed.");
+    lock();
+    cls = CONTROLLOOP_STOP;
+    unlock();
+    return OW_FAILURE;
+  }
+
+#else
   RT_TASK_INFO info;
   int retval = rt_task_inquire(&task, &info);
   if (retval) {
@@ -109,6 +136,8 @@ int ControlLoop::start(){
     return OW_FAILURE;
   }
   ROS_DEBUG("Started RT task %s",taskname);
+
+#endif 
   return OW_SUCCESS;
 }
 
@@ -122,6 +151,12 @@ int ControlLoop::stop(){
   cls = CONTROLLOOP_STOP;
   unlock();
 
+#if defined(OWDSIM) || ! defined(OWD_RT)
+  if(pthread_join(ctrlthread, NULL) != 0){
+    ROS_FATAL("ControlLoop::stop: pthread_join failed.");
+    return OW_FAILURE;
+  }
+#else
   int retval = rt_task_suspend(&task);
   if(retval){
     lock();
@@ -130,6 +165,7 @@ int ControlLoop::stop(){
     ROS_ERROR("ControlLoop: failed to suspend RT task %s: %d",taskname,retval);
     return OW_FAILURE;
   }
+#endif
   return OW_SUCCESS;
 }
 
@@ -142,16 +178,30 @@ int ControlLoop::state(){
 }
 
 void ControlLoop::wait() {
+#if defined(OWDSIM) || ! defined(OWD_RT)
+  usleep(700);
+#else
   rt_task_wait_period(NULL);
+#endif
 }
 
 RTIME ControlLoop::get_time_ns() {
+#if defined(OWDSIM) || ! defined(OWD_RT)
+  timeval t;
+  gettimeofday(&t, NULL);
+  return t.tv_sec * 1e9 + t.tv_usec * 1e3;
+#else
   return rt_timer_ticks2ns(rt_timer_read());
+#endif
 }
 
 ControlLoop::~ControlLoop() {
+#if defined(OWDSIM) || ! defined(OWD_RT)
+  stop();
+#else
   int retval = rt_task_delete(&task);
   if (retval) {
     ROS_ERROR("ControlLoop: error deleting RT task %s: %d", taskname,retval);
   }
+#endif
 }

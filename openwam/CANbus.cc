@@ -3,11 +3,16 @@
 #include "CANbus.hh"
 #include "CANdefs.hh"
 #include <ros/ros.h>
-#include <native/task.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <time.h>
 #include <sys/time.h>
+
+#ifdef BH280
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#endif // BH280
 
 #define PUCK_IDLE 0 
 #define MODE_IDLE      0
@@ -26,7 +31,7 @@ CANbus::CANbus(int32_t bus_id, int num_pucks) :  // DONE MVW
   simulation(false)
 #ifdef CAN_RECORD
 , candata(100000)
-#endif CAN_RECORD
+#endif // CAN_RECORD
 {
   pthread_mutex_init(&busmutex, NULL);
   pthread_mutex_init(&trqmutex, NULL);
@@ -37,6 +42,19 @@ CANbus::CANbus(int32_t bus_id, int num_pucks) :  // DONE MVW
   pthread_mutex_init(&handmutex, NULL);
   handstate = HANDSTATE_UNINIT;
   first_moving_finger=11;
+#ifdef OWD_RT
+  int err = rt_pipe_create(&handpipe,"HANDPIPE",P_MINOR_AUTO,0);
+  if (err) {
+    ROS_ERROR("Could not create RT message pipe for hand communications: %d",err);
+    throw OW_FAILURE;
+  }
+  handpipe_fd = ::open("/proc/xenomai/registry/native/pipes/HANDPIPE",O_RDWR);
+  if (handpipe_fd < 0) {
+    ROS_ERROR("Could not open user-side of RT message pipe: %d",errno);
+    throw OW_FAILURE;
+  }
+
+#endif // OWD_RT
 #endif // BH280
 
   pucks = new Puck[npucks+1];
@@ -86,6 +104,7 @@ int CANbus::init(){  // DONE MVW
     return OW_FAILURE;
   }
 
+#ifdef OWD_RT
 #ifdef ESD_CAN
   int err = rt_intr_create(&rt_can_intr, "ESDCAN_IRQ", 12, I_PROPAGATE);
 #endif
@@ -103,6 +122,7 @@ int CANbus::init(){  // DONE MVW
     ROS_ERROR("Failed to enable interrupt for CAN interface: %d",err);
     return OW_FAILURE;
   }
+#endif // OWD_RT
 
   return OW_SUCCESS;
 }
@@ -603,6 +623,52 @@ int CANbus::send_torques(){
       }
       
   }
+
+#ifdef BH280
+  // only send if we can quickly get the mutex; otherwise
+  // it will have to wait until the next cycle
+  static uint8_t msgbuf[20];
+  CANmsg handmsg;
+  ssize_t bytecount = rt_pipe_read(&handpipe,&handmsg,sizeof(CANmsg),TM_NONBLOCK);
+  if (bytecount > 0) {
+    if (bytecount < sizeof(CANmsg)) {
+      snprintf(last_error,200,"Incomplete read of CANmsg from RT message pipe");
+      return OW_FAILURE;
+    }
+    if (handmsg.property & 0x80) {
+      // if bit 7 is 1 it's a set
+      
+      if (set_property(handmsg.nodeid,handmsg.property & 0x7F,handmsg.value,false)
+	  != OW_SUCCESS) {
+	snprintf(last_error,200,"Error setting property %d = %d on hand puck %d",
+		       handmsg.property, handmsg.value, handmsg.nodeid);
+	return OW_FAILURE;
+      }
+    } else {
+      if (get_property(handmsg.nodeid, handmsg.property, &handmsg.value) != OW_SUCCESS) {
+	snprintf(last_error,200,"Error getting property %d from hand puck %d",
+		       handmsg.property, handmsg.nodeid);
+	return OW_FAILURE;
+      }
+      //      ssize_t bytes = msg.to_buffer(msgbuf,20);
+      //      if (bytes < 0) {
+      //        snprintf(last_error,200,"Unable to serialize message for hand message pipe");
+      //	return OW_FAILURE;
+      //      }
+      bytecount = rt_pipe_write(&handpipe,&handmsg,sizeof(CANmsg),P_NORMAL);
+      if (bytecount < sizeof(CANmsg)) {
+	if (bytecount < 0) {
+	  snprintf(last_error,200,"Error writing to hand message pipe: %d",bytecount);
+	} else {
+	  snprintf(last_error,200,"Incomplete write to hand message pipe: only %d of %d bytes were written",
+		   bytecount,sizeof(CANmsg));
+	}
+	return OW_FAILURE;
+      }
+    }
+  }
+#endif // BH280
+
   
 #ifdef RT_STATS
   RTIME bt2 = rt_timer_ticks2ns(rt_timer_read());
@@ -710,6 +776,7 @@ int CANbus::read_positions(){
       ROS_WARN("CANbus::read_positions: parse failed: %s",last_error);
       return OW_FAILURE;
     }
+
     if (property == AP) {
       data[nodeid] = value;
     } else {
@@ -1296,6 +1363,65 @@ int CANbus::set_puck_state() {
 
 #ifdef BH280
 
+int CANbus::hand_set_property(int32_t id, int32_t prop, int32_t val) {
+  CANmsg msg;
+  msg.nodeid=id;
+  msg.property=prop | 0x80; // set the high bit to 1
+  msg.value=val;
+
+  ssize_t bytes = ::write(handpipe_fd,&msg,sizeof(CANmsg));
+  if (bytes < sizeof(CANmsg)) {
+    if (bytes < 0) {
+      ROS_ERROR_NAMED("can_bh280","Error writing to hand message pipe: %d",bytes);
+    } else {
+      ROS_ERROR_NAMED("can_bh280","Incomplete write of data to hand message pipe: only %d of %d bytes written",
+		      bytes,sizeof(CANmsg));
+    }
+    return OW_FAILURE;
+  }
+  return OW_SUCCESS;
+}
+ 
+int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
+  CANmsg msg;
+  msg.nodeid=id;
+  msg.property=prop;
+  msg.value=0;
+  int bytes = ::write(handpipe_fd,&msg,sizeof(CANmsg));
+  if (bytes < sizeof(CANmsg)) {
+    if (bytes < 0) {
+      ROS_ERROR_NAMED("can_bh280","Error writing to hand message pipe: %d", bytes);
+    } else {
+      ROS_ERROR_NAMED("can_bh280","Incomplete write of data to hand message pipe: only %d of %d bytes written",
+		      bytes,sizeof(CANmsg));
+    }
+    return OW_FAILURE;
+  }
+  // now read from the pipe; the read will return as soon as the data is available
+  bytes = ::read(handpipe_fd, &msg, sizeof(CANmsg));
+  if (bytes < 0) {
+    ROS_ERROR_NAMED("can_bh280","Error reading data from hand message pipe: %d", errno);
+    return OW_FAILURE;
+  }
+  if (bytes < sizeof(CANmsg)) {
+    ROS_ERROR_NAMED("can_bh280","Incomplete read of message from hand message pipe: expected %d but got %d bytes",
+		    sizeof(CANmsg),bytes);
+    return OW_FAILURE;
+  }
+  if (msg.nodeid != id) {
+    ROS_ERROR_NAMED("can_bh280","Expecting response from hand puck %d but got message from puck %d",
+	     id,msg.nodeid);
+    return OW_FAILURE;
+  }
+  if (msg.property != prop) {
+    ROS_ERROR_NAMED("can_bh280","Asked hand puck %d for property %d but got property %d",id,prop,msg.property);
+    return OW_FAILURE;
+  }
+  *value = msg.value;
+  return OW_SUCCESS;
+}
+
+
 int CANbus::hand_activate(int32_t *nodes) {
   for (int32_t nodeid=11; nodeid<15; ++nodeid) {
     if (nodes[nodeid] == STATUS_RESET) {
@@ -1333,9 +1459,9 @@ int CANbus::hand_set_state() {
 
   // otherwise, check one finger for movement
   int32_t mode;
-  if (get_property(first_moving_finger,MODE,&mode) != OW_SUCCESS) {
+  if (hand_get_property(first_moving_finger,MODE,&mode) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280",
-		   "Failed to get MODE from hand puck %d",first_moving_finger);
+		   "Failed to get MODE from hand puck %d: ",first_moving_finger, last_error);
     handstate = HANDSTATE_UNINIT;
     return OW_FAILURE;
   }
@@ -1510,28 +1636,28 @@ int CANbus::hand_move(double p1, double p2, double p3, double p4) {
   set_property(14,CMD,CMD_M); */
   ROS_INFO_NAMED("bhd280", "executing hand_move");
 
-  if (set_property(11,E,finger_radians_to_encoder(p1)) != OW_SUCCESS) {
+  if (hand_set_property(11,E,finger_radians_to_encoder(p1)) != OW_SUCCESS) {
       return OW_FAILURE;
     }
-  if (set_property(12,E,finger_radians_to_encoder(p2)) != OW_SUCCESS) {
+  if (hand_set_property(12,E,finger_radians_to_encoder(p2)) != OW_SUCCESS) {
       return OW_FAILURE;
     }
-  if (set_property(13,E,finger_radians_to_encoder(p3)) != OW_SUCCESS) {
+  if (hand_set_property(13,E,finger_radians_to_encoder(p3)) != OW_SUCCESS) {
       return OW_FAILURE;
     }
-  if (set_property(14,E,spread_radians_to_encoder(p4)) != OW_SUCCESS) {
+  if (hand_set_property(14,E,spread_radians_to_encoder(p4)) != OW_SUCCESS) {
       return OW_FAILURE;
     }
-  if (set_property(11,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+  if (hand_set_property(11,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
       return OW_FAILURE;
     }
-  if (set_property(12,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+  if (hand_set_property(12,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
       return OW_FAILURE;
     }
-  if (set_property(13,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+  if (hand_set_property(13,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
       return OW_FAILURE;
     }
-  if (set_property(14,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+  if (hand_set_property(14,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
       return OW_FAILURE;
     }
   first_moving_finger=11;
@@ -1542,29 +1668,29 @@ int CANbus::hand_move(double p1, double p2, double p3, double p4) {
 
 int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   ROS_INFO_NAMED("bhd280", "executing hand_velocity");
-  if (set_property(11,V,finger_radians_to_encoder(v1)/1000.0) != OW_SUCCESS) {
+  if (hand_set_property(11,V,finger_radians_to_encoder(v1)/1000.0) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (set_property(12,V,finger_radians_to_encoder(v2)/1000.0) != OW_SUCCESS) {
+  if (hand_set_property(12,V,finger_radians_to_encoder(v2)/1000.0) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (set_property(13,V,finger_radians_to_encoder(v3)/1000.0) != OW_SUCCESS) {
+  if (hand_set_property(13,V,finger_radians_to_encoder(v3)/1000.0) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (set_property(14,V,finger_radians_to_encoder(v4)/1000.0) != OW_SUCCESS) {
+  if (hand_set_property(14,V,finger_radians_to_encoder(v4)/1000.0) != OW_SUCCESS) {
     return OW_FAILURE;
   }
   
-  if (set_property(11,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+  if (hand_set_property(11,MODE,MODE_VELOCITY) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (set_property(12,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+  if (hand_set_property(12,MODE,MODE_VELOCITY) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (set_property(13,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+  if (hand_set_property(13,MODE,MODE_VELOCITY) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (set_property(14,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+  if (hand_set_property(14,MODE,MODE_VELOCITY) != OW_SUCCESS) {
     return OW_FAILURE;
   }
   first_moving_finger=11;
@@ -1574,16 +1700,16 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
 }
 
 int CANbus::hand_relax() {
-  if (set_property(11,MODE,PUCK_IDLE) != OW_SUCCESS) {
+  if (hand_set_property(11,MODE,PUCK_IDLE) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (set_property(12,MODE,PUCK_IDLE) != OW_SUCCESS) {
+  if (hand_set_property(12,MODE,PUCK_IDLE) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (set_property(13,MODE,PUCK_IDLE) != OW_SUCCESS) {
+  if (hand_set_property(13,MODE,PUCK_IDLE) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (set_property(14,MODE,PUCK_IDLE) != OW_SUCCESS) {
+  if (hand_set_property(14,MODE,PUCK_IDLE) != OW_SUCCESS) {
     return OW_FAILURE;
   }
   handstate = HANDSTATE_DONE;

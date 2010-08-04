@@ -27,6 +27,11 @@
 
 #include <sys/mman.h>
 
+#if ! defined(OWDSIM) && defined(OWD_RT)
+#include <native/intr.h>
+#include <native/task.h>
+#endif
+
 #ifndef __CONTROL_LOOP_H__
 #define __CONTROL_LOOP_H__
 
@@ -34,7 +39,7 @@ using namespace std;
 
 enum CONTROLLOOP_STATE{CONTROLLOOP_STOP, CONTROLLOOP_RUN};
 
-#ifdef OWDSIM
+#if defined(OWDSIM) || ! defined(OWD_RT)
 typedef unsigned long long RTIME; // usually defined in xenomai types.h
 #else
 #include <native/types.h>
@@ -43,7 +48,7 @@ typedef unsigned long long RTIME; // usually defined in xenomai types.h
 
 class ControlLoop {
 private:
-#ifdef OWDSIM
+#if defined(OWDSIM) || ! defined(OWD_RT)
   pthread_t ctrlthread;
   static void *start_thread(void *data);
 #else 

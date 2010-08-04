@@ -27,10 +27,8 @@ class JointCtrlPID : public JointCtrl{
 
 private:
   double Kp, Kd, Ki;
-  // double laste;
-  double last_q;
+  double last_e;
   double se;         // Sum of error
-    //  static const double Isaturation = 500;
   static const double Isaturation = 5;
 
     double _GetSign(double in)
@@ -48,14 +46,13 @@ public:
   
   double evaluate(double qs, double q, double dt){
     if(state() == Controller::RUN){
-      set(qs);   // backup the command
       lock();
+      qref = qs; // backup the command
       double e = qs - q;
-      //      double ed = (e - laste)/dt;
-      double ed = (last_q - q)/dt;
+      double ed = (e - last_e)/dt;
       se += e;
-      //laste = e;
-      last_q = q;
+      last_e = e;
+
       double Isign = _GetSign(se);
       if(Isign*se > Isaturation)
       {
@@ -69,8 +66,7 @@ public:
 
 
   void reset(){
-    // lock();  laste = 0;  unlock();
-    lock();  last_q = 0;  unlock();
+    lock();  s = Controller::STOP; last_e = 0; se=0;  unlock();
   }
 
   istream& get(istream& s){    s >> Kp >> Kd >> Ki;    return s;  }
