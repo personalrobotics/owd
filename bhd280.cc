@@ -231,7 +231,7 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
 
 bool BHD_280::SetHandProperty(pr_msgs::SetHandProperty::Request &req,
 			  pr_msgs::SetHandProperty::Response &res) {
-  if (bus->set_property(req.nodeid,req.property,req.value) != OW_SUCCESS) {
+  if (bus->hand_set_property(req.nodeid,req.property,req.value) != OW_SUCCESS) {
     ROS_WARN_NAMED("bhd280","Failed to set property %d = %d on puck %d",
 		   req.property,req.value,req.nodeid);
     return false;
@@ -241,7 +241,7 @@ bool BHD_280::SetHandProperty(pr_msgs::SetHandProperty::Request &req,
 
 bool BHD_280::GetHandProperty(pr_msgs::GetHandProperty::Request &req,
 			  pr_msgs::GetHandProperty::Response &res) {
-  if (bus->get_property(req.nodeid,req.property,&res.value) != OW_SUCCESS) {
+  if (bus->hand_get_property(req.nodeid,req.property,&res.value) != OW_SUCCESS) {
     ROS_WARN_NAMED("bhd280","Failure getting property %d from puck %d",
 		   req.property,req.nodeid);
     return false;

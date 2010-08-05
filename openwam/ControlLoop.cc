@@ -19,6 +19,8 @@
 
 #include "ControlLoop.hh"
 
+
+
 #if defined(OWDSIM) || ! defined(OWD_RT)
 #include <sys/time.h>
 #include <time.h>
@@ -37,7 +39,7 @@ ControlLoop::ControlLoop(int tasknum, void (*fnc)(void*), void* argv) :
   
 #if defined(OWD_RT) && ! defined(OWDSIM)
   // Xenomai example uses TASK_MODE 0 instead of T_CPU(1)
-  int retval = rt_task_create(&task, taskname, 0, 99, T_CPU(1));
+  int retval = rt_task_create(&task, taskname, 0, 50, T_CPU(1));
   if(retval){
     ROS_FATAL("ControlLoop: failed to create RT task %s: %d", taskname, retval);
     throw OW_FAILURE;

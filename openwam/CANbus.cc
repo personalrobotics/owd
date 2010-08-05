@@ -106,22 +106,22 @@ int CANbus::init(){  // DONE MVW
 
 #ifdef OWD_RT
 #ifdef ESD_CAN
-  int err = rt_intr_create(&rt_can_intr, "ESDCAN_IRQ", 12, I_PROPAGATE);
+  //  int err = rt_intr_create(&rt_can_intr, "ESDCAN_IRQ", 12, I_PROPAGATE);
 #endif
 #ifdef PEAK_CAN
-  int err = rt_intr_create(&rt_can_intr, "PEAKCAN_IRQ", 19, I_PROPAGATE);
+  //  int err = rt_intr_create(&rt_can_intr, "PEAKCAN_IRQ", 19, I_PROPAGATE);
 #endif
   
-  if (err) {
-    ROS_ERROR("Failed to create interrupt management object: %d",err);
-    return OW_FAILURE;
-  }
+  //  if (err) {
+  //    ROS_ERROR("Failed to create interrupt management object: %d",err);
+  //    return OW_FAILURE;
+  //  }
 
-  err = rt_intr_enable(&rt_can_intr);
-  if (err) {
-    ROS_ERROR("Failed to enable interrupt for CAN interface: %d",err);
-    return OW_FAILURE;
-  }
+  //  err = rt_intr_enable(&rt_can_intr);
+  //  if (err) {
+  //    ROS_ERROR("Failed to enable interrupt for CAN interface: %d",err);
+  //    return OW_FAILURE;
+  //  }
 #endif // OWD_RT
 
   return OW_SUCCESS;
@@ -1074,7 +1074,7 @@ int CANbus::read(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t usec
 	|| ((err == NTCAN_SUCCESS) && (len == 0))) {
       if (retrycount-- > 0) {
 	usleep(sleeptime); // give time for the CAN message to arrive
-	int err = rt_intr_wait(&rt_can_intr,5000); // process any interrupts
+	//	int err = rt_intr_wait(&rt_can_intr,5000); // process any interrupts
 	rt_task_sleep(50000);
 
 #ifdef CAN_RECORD
@@ -1445,6 +1445,9 @@ int CANbus::hand_activate(int32_t *nodes) {
 }
 
 int CANbus::hand_set_state() {
+  // THIS FUNCTION IS ALREADY CALLED FROM THE RT LOOP, SO WE USE
+  // GET_PROPERTY DIRECTLY INSTEAD OF HAND_GET_PROPERTY.
+
   // If we were already stationary, assume we're still
   // stationary.
   if (handstate != HANDSTATE_MOVING) {
@@ -1459,7 +1462,7 @@ int CANbus::hand_set_state() {
 
   // otherwise, check one finger for movement
   int32_t mode;
-  if (hand_get_property(first_moving_finger,MODE,&mode) != OW_SUCCESS) {
+  if (get_property(first_moving_finger,MODE,&mode) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280",
 		   "Failed to get MODE from hand puck %d: ",first_moving_finger, last_error);
     handstate = HANDSTATE_UNINIT;
@@ -2127,7 +2130,7 @@ void CANbus::initPropertyDefs(int firmwareVersion){
 #endif // CAN_RECORD
 
  CANbus::~CANbus(){
-   rt_intr_delete(&rt_can_intr);   
+   //   rt_intr_delete(&rt_can_intr);   
    if(pucks!=NULL) delete pucks; 
    if(trq!=NULL) delete trq; 
    if(pos!=NULL) delete pos;
