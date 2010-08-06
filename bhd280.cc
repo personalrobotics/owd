@@ -80,7 +80,7 @@ bool BHD_280::Publish() {
   static const int j[3] = {1, 1, -1};
   
   static const double A[4] = {25, 50, 70, 50};
-  static const double D[4] = {84, 0, 0, 9.5};
+  static const double D[4] = {84-19, 0, 0, 9.5};  // new 280 hand is 19mm shorter
   static const double PHI[3] = {0, .0429351, .8726646};
     
   int i;
