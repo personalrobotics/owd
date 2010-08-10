@@ -21,8 +21,10 @@ void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 					&BHD_280::GetDOF,this);
   ss_movehand = n.advertiseService("MoveHand",
 				      &BHD_280::MoveHand,this);
-  ss_resethand = n.advertiseService("ResetHand",
-				       &BHD_280::ResetHand,this);
+  // DON'T ALLOW RESET HAND WITH THE 280 MODEL; IT SEEMS LIKE IT'S
+  // UPSETTING THE SAFETY PUCK
+  //  ss_resethand = n.advertiseService("ResetHand",
+  //				       &BHD_280::ResetHand,this);
   ss_relaxhand = n.advertiseService("RelaxHand",
 				       &BHD_280::RelaxHand,this);
   ss_gethandprop = n.advertiseService("SetProperty",

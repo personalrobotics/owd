@@ -1596,7 +1596,7 @@ int CANbus::hand_reset() {
     }
     usleep(100);
   }
-  if (set_property(14,TSTOP,50) != OW_SUCCESS) {
+  if (set_property(14,TSTOP,200) != OW_SUCCESS) {
     return OW_FAILURE;
   }
   usleep(100);
@@ -1684,24 +1684,28 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
     return OW_FAILURE;
   }
   
-  if (hand_set_property(11,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+  if ((v1 != 0.0)
+      && (hand_set_property(11,MODE,MODE_VELOCITY) != OW_SUCCESS)) {
     return OW_FAILURE;
   }
-  if (hand_set_property(12,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+ if ((v2 != 0.0)
+     && (hand_set_property(12,MODE,MODE_VELOCITY) != OW_SUCCESS)) {
     return OW_FAILURE;
   }
-  if (hand_set_property(13,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+ if ((v3 != 0.0)
+     && (hand_set_property(13,MODE,MODE_VELOCITY) != OW_SUCCESS)) {
     return OW_FAILURE;
-  }
-  if (hand_set_property(14,MODE,MODE_VELOCITY) != OW_SUCCESS) {
-    return OW_FAILURE;
-  }
-  first_moving_finger=11;
-  handstate = HANDSTATE_MOVING;
-  ROS_INFO_NAMED("bhd280", "done executing hand_velocity");
-  return OW_SUCCESS;
+ }
+ if ((v4 != 0.0)
+     && (hand_set_property(14,MODE,MODE_VELOCITY) != OW_SUCCESS)) {
+   return OW_FAILURE;
+ }
+ first_moving_finger=11;
+ handstate = HANDSTATE_MOVING;
+ ROS_INFO_NAMED("bhd280", "done executing hand_velocity");
+ return OW_SUCCESS;
 }
-
+ 
 int CANbus::hand_relax() {
   if (hand_set_property(11,MODE,PUCK_IDLE) != OW_SUCCESS) {
     return OW_FAILURE;
