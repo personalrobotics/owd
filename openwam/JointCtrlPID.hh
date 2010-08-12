@@ -46,7 +46,7 @@ public:
   
   double evaluate(double qs, double q, double dt){
     if(state() == Controller::RUN){
-      lock();
+      //      lock();
       qref = qs; // backup the command
       double e = qs - q;
       double ed = (e - last_e)/dt;
@@ -58,7 +58,7 @@ public:
       {
           se = Isign*Isaturation;
       }
-      unlock();
+      //      unlock();
       return Kp*e + Kd*ed + Ki*se;
     }
     return 0.0;
@@ -66,7 +66,11 @@ public:
 
 
   void reset(){
-    lock();  s = Controller::STOP; last_e = 0; se=0;  unlock();
+    //    lock();
+    s = Controller::STOP;
+    last_e = 0;
+    se=0;
+    //    unlock();
   }
 
   istream& get(istream& s){    s >> Kp >> Kd >> Ki;    return s;  }

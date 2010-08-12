@@ -74,9 +74,9 @@ public:
   
   int start();
   int stop();
-  int state();
-  void wait();
-  static RTIME get_time_ns();
+  int state_rt();
+  void wait_rt();
+  static RTIME get_time_ns_rt();
 
 };
 

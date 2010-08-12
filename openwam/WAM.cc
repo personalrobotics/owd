@@ -21,7 +21,7 @@
 #include <ros/ros.h>
 #include <stdio.h>
 
-static void control_loop(void* argv);
+static void control_loop_rt(void* argv);
 
 extern int MODE;  // puck parameter
 
@@ -32,11 +32,15 @@ extern int MODE;  // puck parameter
 WAM::WAM(CANbus* cb) :
     check_safety_torques(true),rec(false),wsdyn(false),jsdyn(false),
     holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
-    pid_count(0),safety_hold(false),bus(cb),ctrl_loop(cb->id, &control_loop, this),
+    pid_count(0),safety_hold(false),bus(cb),ctrl_loop(cb->id, &control_loop_rt, this),
     motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000)
 {
 
+#if defined( OWD_RT ) && ! defined ( OWDSIM )
+  rt_mutex_create(&rt_mutex,"WAM_CC");
+#else
   pthread_mutex_init(&mutex, NULL);
+#endif
 
   se3traj = NULL;
   jointstraj = NULL;
@@ -477,7 +481,7 @@ int WAM::send_mtrq(){
   int32_t mtrq[NUM_NODES+1];
 
   for(int m=Motor::M1; m<=Motor::Mn; m++)
-    mtrq[ motors[m].id() ] = (int32_t) (motors[m].trq() * motors[m].IPNm());
+    mtrq[ motors[m].id() ] = (int32_t) (motors[m].t * motors[m].IPNm());
 
   if (bus->simulation) { // allow running without CANbus for simulation
     return OW_SUCCESS;
@@ -493,40 +497,40 @@ int WAM::send_mtrq(){
 
 // convert motors positions to joints positions
 void WAM::mpos2jpos(){
-  joints[1].pos( -motors[1].pos()/mN1 );
-  joints[2].pos(  motors[2].pos()*0.5/mN2     -motors[3].pos()*0.5/mN3 );
-  joints[3].pos( -motors[2].pos()*0.5*mn3/mN2 -motors[3].pos()*0.5*mn3/mN3 );
-  joints[4].pos( -motors[4].pos()/mN4 );
+  joints[1].q = -motors[1].q/mN1 ;
+  joints[2].q =  motors[2].q*0.5/mN2     -motors[3].q*0.5/mN3 ;
+  joints[3].q = -motors[2].q*0.5*mn3/mN2 -motors[3].q*0.5*mn3/mN3 ;
+  joints[4].q = -motors[4].q/mN4 ;
 #ifdef WRIST
-  joints[5].pos(  motors[5].pos()*0.5/mN5     +motors[6].pos()*0.5/mN6 );
-  joints[6].pos( -motors[5].pos()*0.5*mn6/mN5 +motors[6].pos()*0.5*mn6/mN6 );
-  joints[7].pos( -motors[7].pos()/mN7 );
+  joints[5].q =  motors[5].q*0.5/mN5     +motors[6].q*0.5/mN6 ;
+  joints[6].q = -motors[5].q*0.5*mn6/mN5 +motors[6].q*0.5*mn6/mN6 ;
+  joints[7].q = -motors[7].q/mN7 ;
 #endif
 }
 
 // convert joints positions to motors positions
 void WAM::jpos2mpos(){
-  motors[1].pos( -joints[1].pos()*mN1 );
-  motors[2].pos(  joints[2].pos()*mN2 - joints[3].pos()*mN2/mn3 );
-  motors[3].pos( -joints[2].pos()*mN3 - joints[3].pos()*mN3/mn3 );
-  motors[4].pos( -joints[4].pos()*mN4 );
+  motors[1].q = -joints[1].q *mN1 ;
+  motors[2].q =  joints[2].q*mN2 - joints[3].q*mN2/mn3 ;
+  motors[3].q = -joints[2].q*mN3 - joints[3].q*mN3/mn3 ;
+  motors[4].q = -joints[4].q*mN4 ;
 #ifdef WRIST
-  motors[5].pos(  joints[5].pos()*mN5 - joints[6].pos()*mN5/mn6 );
-  motors[6].pos(  joints[5].pos()*mN6 + joints[6].pos()*mN6/mn6 );
-  motors[7].pos( -joints[7].pos()*mN7 );
+  motors[5].q =  joints[5].q*mN5 - joints[6].q*mN5/mn6 ;
+  motors[6].q =  joints[5].q*mN6 + joints[6].q*mN6/mn6 ;
+  motors[7].q = -joints[7].q*mN7 ;
 #endif
 }
 
 // convert joints torques to motor torques
 void WAM::jtrq2mtrq(){
-  motors[1].trq( -joints[1].trq()/mN1 );
-  motors[2].trq(  joints[2].trq()*0.5/mN2 - joints[3].trq()*0.5*mn3/mN3 );
-  motors[3].trq( -joints[2].trq()*0.5/mN2 - joints[3].trq()*0.5*mn3/mN3 );
-  motors[4].trq( -joints[4].trq()/mN4 );
+  motors[1].t = -joints[1].t/mN1 ;
+  motors[2].t =  joints[2].t*0.5/mN2 - joints[3].t*0.5*mn3/mN3 ;
+  motors[3].t = -joints[2].t*0.5/mN2 - joints[3].t*0.5*mn3/mN3 ;
+  motors[4].t = -joints[4].t/mN4 ;
 #ifdef WRIST
-  motors[5].trq(  joints[5].trq()*0.5/mN5 - joints[6].trq()*0.5*mn6/mN6 );
-  motors[6].trq(  joints[5].trq()*0.5/mN5 + joints[6].trq()*0.5*mn6/mN6 );
-  motors[7].trq( -joints[7].trq()/mN7 );
+  motors[5].t =  joints[5].t*0.5/mN5 - joints[6].t*0.5*mn6/mN6 ;
+  motors[6].t =  joints[5].t*0.5/mN5 + joints[6].t*0.5*mn6/mN6 ;
+  motors[7].t = -joints[7].t/mN7 ;
 #endif
 }
 
@@ -553,7 +557,7 @@ int WAM::set_jpos(double* pos){
   // copy the positions in the array
   for(int m=Motor::M1; m<=Motor::Mn; m++)
   {
-    mpos[ motors[m].id() ] = motors[m].pos();
+    mpos[ motors[m].id() ] = motors[m].q;
   }
 
   // send the position array on the CAN bus
@@ -572,12 +576,12 @@ void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *sim
     if (pos) {
       // joint positions
       for(int j=Joint::J1; j<=Joint::Jn; j++)
-        pos[ joints[j].id() ] = joints[j].pos();
+        pos[ joints[j].id() ] = joints[j].q;
     }
     if (trq) {
       // actual motor torques
       for(int j=Joint::J1; j<=Joint::Jn; j++)
-        trq[ joints[j].id() ] = joints[j].trq();
+        trq[ joints[j].id() ] = joints[j].t;
     }
     if (nettrq) {
       // subtracts out static (gravity) and dynamic (acceleration) torques to
@@ -599,8 +603,8 @@ void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *sim
  * Start the control timer and loop
  */
 int WAM::start(){
-  // start the control loop and uses control_loop (below) as the main function
-  // pass this WAM as an argument to control_loop
+  // start the control loop and uses control_loop_rt (below) as the main function
+  // pass this WAM as an argument to control_loop_rt
   if(ctrl_loop.start() == OW_FAILURE){
     ROS_ERROR("WAM::start: starting control loop failed." );
   }
@@ -618,7 +622,7 @@ void WAM::stop(){
  * timer and call the WAM's control method.
  * The parameter argv is the WAM object
  */
-void control_loop(void* argv){
+void control_loop_rt(void* argv){
   WAM* wam = (WAM*)argv;                      // read the WAM argument
   ControlLoop* ctrl_loop = &(wam->ctrl_loop); // get the ControlLoop member
   RTIME t1,t2,t4;
@@ -654,14 +658,14 @@ void control_loop(void* argv){
   unsigned int loopcount = 0;
   unsigned int slowcount=0;
 
-  t1 = ControlLoop::get_time_ns();  // first-time initialization
+  t1 = ControlLoop::get_time_ns_rt();  // first-time initialization
   ROS_DEBUG("Control loop started");
 
   // Main control loop
-  while((ctrl_loop->state() == CONTROLLOOP_RUN) && (ros::ok())){
+  while((ctrl_loop->state_rt() == CONTROLLOOP_RUN) && (ros::ok())){
     //    printf("waiting for next timeslot\n");
-      ctrl_loop->wait();         // wait for the next control iteration;
-      t2 = ControlLoop::get_time_ns(); // record the time
+      ctrl_loop->wait_rt();         // wait for the next control iteration;
+      t2 = ControlLoop::get_time_ns_rt(); // record the time
       //      printf("loop execution\n");
 
       // GET POSITIONS
@@ -669,21 +673,21 @@ void control_loop(void* argv){
       // only log messages if we're not trying to control the WAM in RT
       //      ROS_DEBUG_NAMED("can_bh280","reading positions");
 #endif
-      if(wam->bus->read_positions() == OW_FAILURE){
+      if(wam->bus->read_positions_rt() == OW_FAILURE){
         ROS_FATAL("control_loop: read_positions failed");
         return;
       }
       //      printf("read positions\n");
       
-      RTIME bt1 = ControlLoop::get_time_ns();
+      RTIME bt1 = ControlLoop::get_time_ns_rt();
       readtime += (bt1-t2 ) * 1e-6;
       
 #ifndef BH280_ONLY
       // CONTROL LOOP
-      wam->newcontrol( ((double)(t2-t1)) * 1e-9); // ns to s
+      wam->newcontrol_rt( ((double)(t2-t1)) * 1e-9); // ns to s
 #endif // BH280_ONLY
 
-      RTIME bt2 = ControlLoop::get_time_ns();
+      RTIME bt2 = ControlLoop::get_time_ns_rt();
       controltime += (bt2-bt1) * 1e-6; // ns to ms
 
 #ifdef BH280_ONLY
@@ -691,13 +695,13 @@ void control_loop(void* argv){
       //      ROS_DEBUG_NAMED("can_bh280","sending torques");
 #endif
       // SEND TORQUES
-      if(wam->bus->send_torques() == OW_FAILURE){
+      if(wam->bus->send_torques_rt() == OW_FAILURE){
         ROS_FATAL("control_loop: send_torques failed.");
         return;
       }
       //      printf("sent torques\n");
 
-      RTIME bt3 = ControlLoop::get_time_ns();
+      RTIME bt3 = ControlLoop::get_time_ns_rt();
       sendtime += (bt3-bt2) * 1e-6;
 
 #ifndef BH280_ONLY
@@ -706,7 +710,7 @@ void control_loop(void* argv){
       static int stateperiod=0;
       if (++stateperiod == 200) {
 	//        printf("checking puck state\n");
-        if (wam->bus->set_puck_state() != OW_SUCCESS) {
+        if (wam->bus->set_puck_state_rt() != OW_SUCCESS) {
 	  // what to do?
 	}
         stateperiod=0;
@@ -719,7 +723,7 @@ void control_loop(void* argv){
       static int handstateperiod=25; // start offset from motor state
       if (++handstateperiod == 50) { // every 0.1 seconds
 	//        printf("checking hand state\n");
-	wam->bus->hand_set_state();
+	wam->bus->hand_set_state_rt();
 	handstateperiod=0;
 	//        printf("hand state checked\n");
       }
@@ -827,7 +831,7 @@ void control_loop(void* argv){
 //   5. check control torque for limits
 //   6. apply jsdynamics torq plus control torq
 // question: will control torque be trying to do more than necessary?
-void WAM::newcontrol(double dt){
+void WAM::newcontrol_rt(double dt){
     static double   q[Joint::Jn+1];
     static double   q_target[Joint::Jn+1];
     static double  qd_target[Joint::Jn+1];
@@ -843,37 +847,69 @@ void WAM::newcontrol(double dt){
     static double trajtime=0.0f;
     static int safety_torque_count=0;
     
-    this->lock("newcontrol");
-
     double traj_timestep;
     static double timestep_factor = 1.0f;
-    if (dt > .004) {
-      // ROS_WARN("%0.3fs elapsed between control calls",dt);
+    /*    if (dt > .004) {
       traj_timestep = .004; // bound the time in case the system got delayed; don't want to lurch
     } else {
       traj_timestep = dt;
     }
+    */
     
-    if(recv_mpos() == OW_SUCCESS){  // read new motor positions
-        mpos2jpos();    // convert to joint positions
-        
+    // read new motor positions
+    if(recv_mpos() != OW_SUCCESS){
+      // We lost communication with the pucks (someone probably hit the e-stop).
+      motor_state=MOTORS_OFF;
+      if (exit_on_pendant_press) {
+	ROS_FATAL("WAM::control_loop: lost communication with the WAM; shutting down.");
+	ROS_FATAL("If you want to restart the controller, make sure power is applied");
+	ROS_FATAL("and all e-stops are released, then re-run.");
+	exit(1);
+      }
+    }
+
+    mpos2jpos();    // convert to joint positions
+    
+    for(int j=Joint::J1; j<=Joint::Jn; j++){
+      q_target[j] = q[j] = joints[j].q; // set q_target for traj->eval
+      links[j].theta(q[j]);
+      sim_links[j].theta(q[j]);
+      qd_target[j] = qdd_target[j] = 0.0; // zero out
+    }
+    std::vector<double> data;
+    bool data_recorded=false;
+
+    // is there a joint trajectory running
+    static int skipped_locks=0;
+    
+    if (! this->lock_rt("newcontrol") ) {
+      // if we couldn't get the lock in the time we wanted, then
+      // just republish the previous torques.  we will only do this
+      // 10 times before giving up on the current trajectory
+      if (++skipped_locks > 10) {
+	// reduce the torque
         for(int j=Joint::J1; j<=Joint::Jn; j++){
-	  q_target[j] = q[j] = joints[j].pos(); // set q_target for traj->eval
-	  links[j].theta(q[j]);
-	  sim_links[j].theta(q[j]);
-	  qd_target[j] = qdd_target[j] = 0.0; // zero out
+	  joints[j].t *= 0.99; // this should bring the WAM to zero torque in about 250 cycles (0.5 secs)
         }
-	std::vector<double> data;
-	bool data_recorded=false;
-        // is there a joint trajectory running
-        if(jointstraj != NULL){
+        jtrq2mtrq();         // results in motor::torque
+	// need to push an error message through a message pipe
+      }
+      if(send_mtrq() == OW_FAILURE) {
+	ROS_ERROR("WAM::control_loop: send_mtrq failed.");
+      }
+      return;
+    }
+
+    skipped_locks=0;
+
+    if(jointstraj != NULL){
 #ifdef BUILD_FOR_SEA
-          posSmoother.invalidate();
+      posSmoother.invalidate();
 #endif // BUILD_FOR_SEA
-          try {
-            RTIME t3 = ControlLoop::get_time_ns();        
+      try {
+            RTIME t3 = ControlLoop::get_time_ns_rt();        
             jointstraj->evaluate(q_target, qd_target, qdd_target, traj_timestep * timestep_factor);
-            RTIME t4 = ControlLoop::get_time_ns();        
+            RTIME t4 = ControlLoop::get_time_ns_rt();        
             trajtime += (t4-t3) / 1e6;
             for(int j=Joint::J1; j<=Joint::Jn; j++){
               qd_target[j] *= timestep_factor;
@@ -896,9 +932,9 @@ void WAM::newcontrol(double dt){
             }
             
             // ask the controllers to compute the correction torques.
-            RTIME t1 = ControlLoop::get_time_ns();
-            newJSControl(q_target,q,dt,pid_torq);
-            RTIME t2 = ControlLoop::get_time_ns();
+            RTIME t1 = ControlLoop::get_time_ns_rt();
+            newJSControl_rt(q_target,q,dt,pid_torq);
+            RTIME t2 = ControlLoop::get_time_ns_rt();
             jscontroltime += (t2-t1) / 1e6;
             
 	    // inform the trajectory of how much torque it's causing
@@ -975,9 +1011,9 @@ void WAM::newcontrol(double dt){
               q_target[i] = heldPositions[i];
             }
             // ask the controllers to compute the correction torques.
-            RTIME t1 = ControlLoop::get_time_ns();
-            newJSControl(q_target,q,dt,pid_torq);
-            RTIME t2 = ControlLoop::get_time_ns();
+            RTIME t1 = ControlLoop::get_time_ns_rt();
+            newJSControl_rt(q_target,q,dt,pid_torq);
+            RTIME t2 = ControlLoop::get_time_ns_rt();
             jscontroltime += (t2-t1) / 1e6;
             
           }
@@ -989,7 +1025,7 @@ void WAM::newcontrol(double dt){
             std::vector<double> startPosVec;
             // get current joint positions
             for(int j=0; j<=Joint::Jn; j++) {
-              startPosVec.push_back(joints[j].pos());
+              startPosVec.push_back(joints[j].q);
             }
             posSmoother.reset(startPosVec);
           }
@@ -1007,9 +1043,9 @@ void WAM::newcontrol(double dt){
           }
           
           // ask the controllers to compute the correction torques.
-          RTIME t1 = ControlLoop::get_time_ns();
-          newJSControl(q_target,q,dt,pid_torq);
-          RTIME t2 = ControlLoop::get_time_ns();
+          RTIME t1 = ControlLoop::get_time_ns_rt();
+          newJSControl_rt(q_target,q,dt,pid_torq);
+          RTIME t2 = ControlLoop::get_time_ns_rt();
           jscontroltime += (t2-t1) / 1e6;
           
           if (safety_torques_exceeded(pid_torq)) {
@@ -1020,12 +1056,12 @@ void WAM::newcontrol(double dt){
             // reset the posSmoother at a new
             // target pos 10% towards the current pos 
             for(int j=0; j<=Joint::Jn; j++) {
-              slipPosVec.push_back(0.9 * heldPositions[j] + 0.1 * joints[j].pos());
+              slipPosVec.push_back(0.9 * heldPositions[j] + 0.1 * joints[j].q);
             }
             posSmoother.reset(slipPosVec);
 #else // BUILD_FOR_SEA
 	    for(int jj = Joint::J1; jj <= Joint::Jn; jj++) {
-	      double jointdiff = joints[jj].pos() - heldPositions[jj];
+	      double jointdiff = joints[jj].q - heldPositions[jj];
 	      // inch the target pos 10% towards the current pos
 	      heldPositions[jj] += 0.1f * jointdiff;
 	    }
@@ -1063,9 +1099,9 @@ void WAM::newcontrol(double dt){
 	  }
 	}
         if(jsdyn){
-          RTIME t4 = ControlLoop::get_time_ns();
+          RTIME t4 = ControlLoop::get_time_ns_rt();
           JSdynamics(dyn_torq, links, qd_target, qdd_target); 
-          RTIME t5 = ControlLoop::get_time_ns();
+          RTIME t5 = ControlLoop::get_time_ns_rt();
           dyntime += (t5-t4) / 1e6;
           if (++dyncount == 1000) {
             stats.dyntime = dyntime/1000.0;
@@ -1100,20 +1136,9 @@ void WAM::newcontrol(double dt){
 	  // as if they instantly moved to where we wanted.
 	  this->unlock();
 	  set_jpos(q_target);
-	  this->lock("newcontrol2");
+	  this->lock_rt("newcontrol2");
 	}
 
-    } else {
-        // We lost communication with the pucks (someone probably hit the e-stop).
-        motor_state=MOTORS_OFF;
-        if (exit_on_pendant_press) {
-          ROS_FATAL("WAM::control_loop: lost communication with the WAM; shutting down.");
-          ROS_FATAL("If you want to restart the controller, make sure power is applied");
-          ROS_FATAL("and all e-stops are released, then re-run.");
-          exit(1);
-        }
-    }
-    
     this->unlock();
 }
 
@@ -1162,7 +1187,7 @@ R6 WAM::WSControl(double dt){
   return F;
 }
 
-void WAM::newJSControl(double q_target[],double q[],double dt,double pid_torq[]) {
+void WAM::newJSControl_rt(double q_target[],double q[],double dt,double pid_torq[]) {
    for(int j=Joint::J1; j<=Joint::Jn; j++) {
        if (suppress_controller[j]) {
            pid_torq[j] = 0;
@@ -1177,7 +1202,7 @@ void WAM::JSControl(double qdd[Joint::Jn+1], double dt){
 
   for(int j=Joint::J1; j<=Joint::Jn; j++){
     qdd[j] = qd[j] = 0.0;
-    q[j] = joints[j].pos();   // initialize the position to the current values
+    q[j] = joints[j].q;   // initialize the position to the current values
   }                           // in case that no trajectory is running and the
                               // controllers are
   // if no trajectory is running, then all values are left intact
@@ -1185,7 +1210,7 @@ void WAM::JSControl(double qdd[Joint::Jn+1], double dt){
 
   // if the controllers aren't running the values are left intact
   for(int j=Joint::J1; j<=Joint::Jn; j++)   // + feedback
-    qdd[j] = qdd[j] + jointsctrl[j].evaluate( q[j], joints[j].pos(), dt );
+    qdd[j] = qdd[j] + jointsctrl[j].evaluate( q[j], joints[j].q, dt );
 }
 
 int WAM::run_trajectory(Trajectory *traj) {
@@ -1219,9 +1244,7 @@ int WAM::pause_trajectory() {
         // there was no trajectory running
         return OW_FAILURE;
     }
-    this->lock("pause_traj");
     jointstraj->stop();
-    this->unlock("pause_traj");
     return OW_SUCCESS;
 }
 
@@ -1246,7 +1269,7 @@ int WAM::cancel_trajectory() {
     jointstraj->stop();
 
     for(int i = Joint::J1; i<=Joint::Jn; i++) {
-      heldPositions[i] = joints[i].pos();
+      heldPositions[i] = joints[i].q;
     }
 #ifdef BUILD_FOR_SEA
     posSmoother.reset(heldPositions, Joint::Jn+1);   
@@ -1317,7 +1340,7 @@ int WAM::hold_position(double jval[],bool grab_lock)
 
     for(int i = Joint::J1; i <= Joint::Jn; i++)
     {
-        heldPositions[i] = joints[i].pos();
+        heldPositions[i] = joints[i].q;
         jointsctrl[i].reset();
         jointsctrl[i].set(heldPositions[i]);
         jointsctrl[i].run();
@@ -1364,16 +1387,20 @@ void WAM::release_position(bool grab_lock)
 
 void WAM::printjpos(){
   for(int j=Joint::J1; j<=Joint::Jn; j++)
-    ROS_DEBUG("J%d: %2.2f",j,joints[j].pos());
+    ROS_DEBUG("J%d: %2.2f",j,joints[j].q);
 }
 void WAM::printmtrq(){
   for(int m=Motor::M1; m<=Motor::Mn; m++)
-    ROS_DEBUG("M%d: %2.2f",m,motors[m].trq());
+    ROS_DEBUG("M%d: %2.2f",m,motors[m].t);
 }
 
 void WAM::lock(const char *name) {
   static char last_locked_by[100];
+#if defined( OWD_RT ) && ! defined ( OWDSIM )
+  rt_mutex_acquire(&rt_mutex,TM_INFINITE);
+#else
   pthread_mutex_lock(&mutex);
+#endif
   strncpy(last_locked_by,name,100);
   last_locked_by[99]=0; // just in case it was more than 99 chars long
     if (name) {
@@ -1385,15 +1412,40 @@ void WAM::lock(const char *name) {
     }
 }
 
+bool WAM::lock_rt(const char *name) {
+  static char last_locked_by[100];
+#if defined( OWD_RT ) && ! defined ( OWDSIM )
+  RTIME waittime(100000); // wait up to 100us for the lock
+  if (rt_mutex_acquire(&rt_mutex,waittime)) {
+    return false;
+  }
+#else
+  pthread_mutex_lock(&mutex);
+#endif
+  strncpy(last_locked_by,name,100);
+  last_locked_by[99]=0; // just in case it was more than 99 chars long
+  //  if (name) {
+  //    static char msg[200];
+  //      sprintf(msg,"OPENWAM locked by %s",name);
+  //      syslog(LOG_ERR,msg);
+  //    } else {
+  //        syslog(LOG_ERR,"OPENWAM locked by (unknown)");
+  //  }
+}
+
 void WAM::unlock(const char *name) {
-    static char msg[200];
-    if (name) {
-      //      sprintf(msg,"OPENWAM unlocked by %s",name);
-      //      syslog(LOG_ERR,msg);
-      //    } else {
-      //        syslog(LOG_ERR,"OPENWAM unlocked by (unknown)");
-    }
-    pthread_mutex_unlock(&mutex);
+  //  if (name) {
+  //    static char msg[200];
+  //    sprintf(msg,"OPENWAM unlocked by %s",name);
+  //    syslog(LOG_ERR,msg);
+  //  } else {
+  //    syslog(LOG_ERR,"OPENWAM unlocked by (unknown)");
+  //  }
+#if defined( OWD_RT ) && ! defined ( OWDSIM )
+  rt_mutex_release(&rt_mutex);
+#else
+  pthread_mutex_unlock(&mutex);
+#endif
 }
 
 void WAMstats::rosprint(int recorder_count) const {

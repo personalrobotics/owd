@@ -144,18 +144,18 @@ DataRecorder<canio_data> candata;
 	    int32_t* nodeid, int32_t* property, int32_t* value);
   int compile(int32_t property, int32_t value, uint8_t *msg, int32_t *msglen);
   
-  int set_property(int32_t nid, int32_t property, int32_t value, bool check=false, int32_t usecs=100);
-  int get_property(int32_t nid, int32_t property, int32_t* value, int32_t usecs=100);
+  int set_property_rt(int32_t nid, int32_t property, int32_t value, bool check=false, int32_t usecs=100);
+  int get_property_rt(int32_t nid, int32_t property, int32_t* value, int32_t usecs=200);
   
-  int read(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs);
-  int send(int32_t  msgid, uint8_t* msg, int32_t  msglen, int32_t usecs);
+  int read_rt(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs);
+  int send_rt(int32_t  msgid, uint8_t* msg, int32_t  msglen, int32_t usecs);
   
   int clear();
   int32_t get_puck_state();
-  int set_puck_state();
+  int set_puck_state_rt();
 
-  int send_torques();
-  int read_positions();
+  int send_torques_rt();
+  int read_positions_rt();
 
   void initPropertyDefs(int firmwareVersion);
 
@@ -176,7 +176,7 @@ DataRecorder<canio_data> candata;
   
   int send_torques(int32_t* mtrq);
   int read_positions(double* mpos);
-  int read_torques(int32_t* mtrq);
+  //  int read_torques(int32_t* mtrq);
   int send_positions(double* mpos);
   int send_AP(int32_t* apval);
 #ifdef BH280
@@ -199,7 +199,7 @@ private:
 public:
   int hand_get_property(int32_t id, int32_t prop, int32_t *val);
   int hand_set_property(int32_t id, int32_t prop, int32_t val);
-  int hand_set_state();
+  int hand_set_state_rt();
   int hand_activate(int32_t *nodes);
   int hand_reset();
   int hand_move(double p1, double p2, double p3, double p4);

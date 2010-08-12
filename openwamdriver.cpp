@@ -175,7 +175,7 @@ bool WamDriver::Init(const char *joint_cal_file)
 
 #ifndef BH280_ONLY
   int32_t WamWasZeroed = 0;
-  if (bus.get_property(SAFETY_MODULE, ZERO, &WamWasZeroed,10000) == OW_FAILURE) {
+  if (bus.get_property_rt(SAFETY_MODULE, ZERO, &WamWasZeroed,10000) == OW_FAILURE) {
     ROS_FATAL("Unable to query safety puck");
     return false;
   }
@@ -523,15 +523,15 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
 
 int WamDriver::get_puck_offset(int puckid, int32_t *mechout, int32_t *apout) {
     int32_t p,mech;
-    if (bus.get_property(bus.pucks[puckid].id(), AP, &p, 10000) == OW_FAILURE){
+    if (bus.get_property_rt(bus.pucks[puckid].id(), AP, &p, 10000) == OW_FAILURE){
         cerr << "Failed to get AP" << endl;
         throw -1;
     }
-    if(bus.set_property(bus.pucks[puckid].id(), ADDR, 0x84D7, false) == OW_FAILURE){
+    if(bus.set_property_rt(bus.pucks[puckid].id(), ADDR, 0x84D7, false) == OW_FAILURE){
         cerr << "Failed to set address of MECH" << endl;
         throw -1;
     }
-    if(bus.get_property(bus.pucks[puckid].id(), VALUE, &mech, 10000) == OW_FAILURE) {
+    if(bus.get_property_rt(bus.pucks[puckid].id(), VALUE, &mech, 10000) == OW_FAILURE) {
         cerr << "Failed to get MECH" << endl;
         throw -1;
     }
@@ -1009,14 +1009,14 @@ void WamDriver::start_control_loop() {
     // get the position from the WAM, so that the safety module knows
     // where it's starting from
 #ifndef BH280_ONLY
-  if(bus.set_property(SAFETY_MODULE, IFAULT, 4, true, 10000) == OW_FAILURE){
+  if(bus.set_property_rt(SAFETY_MODULE, IFAULT, 4, true, 10000) == OW_FAILURE){
         ROS_FATAL("Unable to suppress safety module faults.");
         throw -1;
     }
     double jointpos[nJoints+1];
     owam->get_current_data(jointpos,NULL,NULL); // update the joint positions
     // Re-activate the tip velocity-limit checking.
-    if(bus.set_property(SAFETY_MODULE, ZERO, 1, true, 10000) == OW_FAILURE){
+    if(bus.set_property_rt(SAFETY_MODULE, ZERO, 1, true, 10000) == OW_FAILURE){
         ROS_FATAL("Unable to re-activate safety module.");
         throw -1;
     }
@@ -1037,12 +1037,12 @@ void WamDriver::start_control_loop() {
     ROS_ERROR("\nPress Shift-Activate to activate motors and start system.");
 
 #ifdef AUTO_ACTIVATE
-    if (bus.set_property(10,MODE,2,false) == OW_FAILURE) {
+    if (bus.set_property_rt(10,MODE,2,false) == OW_FAILURE) {
         ROS_FATAL("Error changing mode of puck 10");
         throw -1;
     }
     for (int p=1; p<8; p++) {
-        if (bus.set_property(p,MODE,2,false) == OW_FAILURE) {
+        if (bus.set_property_rt(p,MODE,2,false) == OW_FAILURE) {
             ROS_FATAL("Error changing mode of puck %d",p);
             throw -1;
         }

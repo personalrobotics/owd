@@ -171,15 +171,15 @@ int ControlLoop::stop(){
   return OW_SUCCESS;
 }
 
-int ControlLoop::state(){
+int ControlLoop::state_rt(){
   CONTROLLOOP_STATE s;
-  lock();
+  //  lock();
   s = cls;
-  unlock();
+  //  unlock();
   return s;
 }
 
-void ControlLoop::wait() {
+void ControlLoop::wait_rt() {
 #if defined(OWDSIM) || ! defined(OWD_RT)
   usleep(700);
 #else
@@ -187,7 +187,7 @@ void ControlLoop::wait() {
 #endif
 }
 
-RTIME ControlLoop::get_time_ns() {
+RTIME ControlLoop::get_time_ns_rt() {
 #if defined(OWDSIM) || ! defined(OWD_RT)
   timeval t;
   gettimeofday(&t, NULL);

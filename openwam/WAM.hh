@@ -114,7 +114,11 @@ public:
   static const double M2_MM2 = 1.0/1000000;
 
 
+#if defined( OWD_RT ) && ! defined ( OWDSIM )
+  RT_MUTEX rt_mutex;
+#else
   pthread_mutex_t mutex;                   // Use to lock the WAM
+#endif
   Joint joints[Joint::Jn+1];               // Array of joints
   Motor motors[Motor::Mn+1];               // Array of motors
   Link links[Link::Ln+1];                  // Array of links
@@ -164,9 +168,10 @@ public:
 
   R6 WSControl(double dt);
   void JSControl(double qdd[Joint::Jn+1], double dt);
-  void newJSControl(double q_target[], double q[], double dt, double pid_torq[]); // Mike
+  void newJSControl_rt(double q_target[], double q[], double dt, double pid_torq[]); // Mike
 
   void lock(const char *name="unspecified");
+  bool lock_rt(const char *name="unspecified");
   void unlock(const char *name=NULL);
 
   CANbus* bus;                             // pointer to the CAN bus
@@ -190,7 +195,7 @@ public:
 
   int start();                      // start the control loop
   void stop();                      // stop the control loop
-  void newcontrol(double dt);          // main control function
+  void newcontrol_rt(double dt);          // main control function
   bool safety_torques_exceeded(double t[]); // check pid torqs against thresholds
 
   int  set_targ_jpos(double* pos);          // set the target joint positions online 

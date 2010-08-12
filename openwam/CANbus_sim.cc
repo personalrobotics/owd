@@ -86,11 +86,11 @@ int CANbus::status(int32_t* nodes){
   return OW_SUCCESS;
 }
 
-int CANbus::set_property(int32_t nid, int32_t property, int32_t value,bool check, int32_t usecs){
+int CANbus::set_property_rt(int32_t nid, int32_t property, int32_t value,bool check, int32_t usecs){
   return OW_SUCCESS;
 }
 
-int CANbus::get_property(int32_t nid, int32_t property, int32_t* value, int32_t usecs){
+int CANbus::get_property_rt(int32_t nid, int32_t property, int32_t* value, int32_t usecs){
   return OW_SUCCESS;
 }
 
@@ -98,13 +98,17 @@ int CANbus::send_torques(int32_t* torques){
   return OW_SUCCESS;
 }
 
-int CANbus::send_torques(){
+int CANbus::send_torques_rt(){
   return OW_SUCCESS;
 }
 
+#ifdef NDEF
+/*
 int CANbus::read_torques(int32_t* mtrq){
   return OW_SUCCESS;
 }
+*/
+#endif
 
 int CANbus::read_positions(double* positions){
   for(int p=1; p<=npucks; p++) {
@@ -113,7 +117,7 @@ int CANbus::read_positions(double* positions){
   return OW_SUCCESS;
 }
 
-int CANbus::read_positions(){
+int CANbus::read_positions_rt(){
   return OW_SUCCESS;
 }
 
@@ -135,12 +139,12 @@ int CANbus::compile(int32_t property, int32_t value,
   return OW_SUCCESS;
 }
 
-int CANbus::read(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs){
+int CANbus::read_rt(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs){
     //    ROS_ERROR("CANbus:: READ");
   return OW_SUCCESS;
 }
 
-int CANbus::send(int32_t msgid, uint8_t* msg, int32_t msglen, int32_t usecs){
+int CANbus::send_rt(int32_t msgid, uint8_t* msg, int32_t msglen, int32_t usecs){
   return OW_SUCCESS;
 }
 
@@ -174,7 +178,7 @@ int32_t CANbus::get_puck_state() {
   return pstate;
 }
 
-int CANbus::set_puck_state() {
+int CANbus::set_puck_state_rt() {
   pthread_mutex_lock(&statemutex);
   puck_state = 2;
   pthread_mutex_unlock(&statemutex);
