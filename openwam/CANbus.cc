@@ -1046,9 +1046,54 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
   int pendread=0;
   int pendwrite=0;
   
-  if ((err=LINUX_CAN_Read_Timeout(handle,&cmsg,usecs)) != CAN_ERR_OK) {
-    snprintf(last_error,200,"LINUX_CAN_Read_Timeout failed: 0x%x",err);
-    return OW_FAILURE;
+  bool done=false;
+  while (!done) {
+    if ((err=LINUX_CAN_Read_Timeout(handle,&cmsg,100)) == CAN_ERR_QRCVEMPTY) {
+      if (retrycount-- > 0) {
+#if defined( OWD_RT ) && ! defined( OWDSIM )
+	if (!rt_task_self()) {
+	  // we're not being called from an RT context, so use regular usleep
+	  usleep(sleeptime);
+	} else {
+	  if ((err=rt_task_sleep(sleeptime * 1000))) {  // (convert usecs to nsecs)
+	    snprintf(last_error,200,"Error during rt_task_sleep: %d",err);
+	    return OW_FAILURE;
+	  }
+	}
+#else
+	usleep(sleeptime);	// give time for the CAN message to arrive
+#endif
+#ifdef CAN_RECORD
+	gettimeofday(&tv,NULL);
+	cdata.secs = tv.tv_sec;
+	cdata.usecs = tv.tv_usec;
+	cdata.send=false;
+	cdata.msgid = -1;
+	cdata.msglen = 1;
+	if (err == -ETIMEDOUT) {
+	  cdata.msgdata[0] = 1;
+	} else {
+	  cdata.msgdata[0] =0;
+	}
+	for (unsigned int i=1; i<8; ++i) {
+	  cdata.msgdata[i] = 0; // must pad the extra space with zeros
+	}
+	crecord.push_back(cdata);
+	candata.add(crecord);
+	crecord.clear();
+#endif // CAN_RECORD
+	
+      } else {
+	snprintf(last_error,200,"timeout during read after %d microseconds",usecs);
+	return OW_FAILURE;
+      }
+    } else if (err == CAN_ERR_OK) {
+      done=true;
+      break;
+    } else {
+      snprintf(last_error,200,"LINUX_CAN_Read_Timeout failed: 0x%x",err);
+      return OW_FAILURE;
+    }
   }
   *msgid = cmsg.Msg.ID;
   *msglen = cmsg.Msg.LEN;
@@ -1419,6 +1464,7 @@ int CANbus::set_puck_state_rt() {
   //  pthread_mutex_lock(&statemutex);
   puck_state = puck1_state;
   //  pthread_mutex_unlock(&statemutex);
+  return OW_SUCCESS;
 }
 
 
