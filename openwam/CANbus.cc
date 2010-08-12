@@ -1048,7 +1048,7 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
   
   bool done=false;
   while (!done) {
-    if ((err=LINUX_CAN_Read_Timeout(handle,&cmsg,100)) == CAN_ERR_QRCVEMPTY) {
+    if ((err=LINUX_CAN_Read_Timeout(handle,&cmsg,0)) == CAN_ERR_QRCVEMPTY) {
       if (retrycount-- > 0) {
 #if defined( OWD_RT ) && ! defined( OWDSIM )
 	if (!rt_task_self()) {
