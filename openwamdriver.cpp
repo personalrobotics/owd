@@ -333,6 +333,7 @@ WamDriver::~WamDriver() {
 #endif  // AUTO_SHUTDOWN
   
   owam->stop();
+  bus.~CANbus();
   ROS_INFO("WAM driver exiting normally");
 }
 
