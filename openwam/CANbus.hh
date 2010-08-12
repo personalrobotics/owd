@@ -55,15 +55,17 @@ public:
   double canread_readtime;
   double cansetpuckstate_time;
   double cansethandstate_time;
+  int    canread_badpackets;
 
   CANstats() : cansend_time(0.0f),
 	       canread_sendtime(0.0f),
 	       canread_readtime(0.0f),
 	       cansetpuckstate_time(0.0f),
-	       cansethandstate_time(0.0f)
+	       cansethandstate_time(0.0f),
+	       canread_badpackets(0)
   {}
 
-  void rosprint() const;
+  void rosprint();
     
 };
 

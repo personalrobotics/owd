@@ -185,7 +185,7 @@ int CANbus::set_puck_state_rt() {
   return OW_SUCCESS;
 }
 
-void CANstats::rosprint() const {
+void CANstats::rosprint()  {
   //  ROS_DEBUG_NAMED("times","CANbus::send %2.1fms per group (2 groups)",
   //		  cansend_time);
   //  ROS_DEBUG_NAMED("times","CANbus::read: send=%2.1fms, read=%2.1fms",

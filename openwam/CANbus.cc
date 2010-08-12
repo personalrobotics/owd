@@ -156,10 +156,10 @@ int CANbus::open(){  // DONE MVW
   }
   //  pthread_mutex_unlock(&busmutex);
   
-  if (err = CAN_ResetFilter(handle)) {
+  if ((err = CAN_ResetFilter(handle))) {
     ROS_ERROR("CANbus::open(): Could not Reset Filter: 0x%x",err);
   }
-  if (err = CAN_MsgFilter(handle, 0x0000, 0x07FF, MSGTYPE_STANDARD)) {
+  if ((err = CAN_MsgFilter(handle, 0x0000, 0x07FF, MSGTYPE_STANDARD))) {
     ROS_ERROR("CANbus::open(): Could not set Msg Filter: 0x%x",err);
   }
 	
@@ -439,7 +439,7 @@ int CANbus::status(int32_t* nodes){
 	  //	  pthread_mutex_unlock(&busmutex);
 	  ROS_DEBUG_NAMED("canstatus","trying to wake node %d",n);
 	  if ((wake_puck(NODE2ADDR(n)) == OW_SUCCESS) &&
-	      (get_property_rt(NODE2ADDR(n), 0, &fw_vers, 500) == OW_SUCCESS)){
+	      (get_property_rt(NODE2ADDR(n), 0, &fw_vers) == OW_SUCCESS)){
 	    ROS_DEBUG_NAMED("canstatus","puck %d firmware version %d",n,fw_vers);
 	    initPropertyDefs(fw_vers);
 	    firstFound = 1;
@@ -756,6 +756,7 @@ int CANbus::read_positions_rt(){
   static double sendtime=0.0f;
   static double readtime=0.0f;
   static unsigned int loopcount=0;
+  static int missing_data_cycles=0;
 
   // Compile the packet
   msg[0] = (uint8_t)AP;
@@ -779,6 +780,7 @@ int CANbus::read_positions_rt(){
   sendtime += (bt2-bt1) * 1e-6; // ns to ms
 #endif
 
+  bool missed_read=false;
 #ifdef BH280
   for(int p=1; p<=npucks + 4; ){
 #else
@@ -786,8 +788,10 @@ int CANbus::read_positions_rt(){
 #endif // BH280
     if(read_rt(&msgid, msg, &msglen, 30000) == OW_FAILURE){
       //pthread_mutex_unlock(&busmutex);
-      ROS_WARN("CANbus::read_positions: read failed: %s",last_error);
-      return OW_FAILURE;
+      // ROS_WARN("CANbus::read_positions: read failed: %s",last_error);
+      missed_read=true;
+      p++;
+      continue;
     }
 
     if(parse(msgid, msg, msglen, &nodeid, &property, &value) == OW_FAILURE){
@@ -799,12 +803,25 @@ int CANbus::read_positions_rt(){
     if (property == AP) {
       data[nodeid] = value;
     } else {
-      ROS_WARN("CANbus::read_positions: unexpected packet received.");
-      ROS_WARN("  from node %d, property %d, value %d",nodeid,property,value);
+      // count bad packets
+      stats.canread_badpackets++;
+      //  ROS_WARN("CANbus::read_positions: unexpected packet received.");
+      //  ROS_WARN("  from node %d, property %d, value %d",nodeid,property,value);
     }
     p++;
 
   }
+  if (missed_read) {
+    if (++missing_data_cycles == 10) {
+      // we went 10 cycles in a row while missing values from at
+      // least 1 puck; give up!
+      snprintf(last_error,200,"Missed CANbus replies from 10 cycles in a row");
+      return OW_FAILURE;
+    }
+  } else {
+    missing_data_cycles = 0;
+  }
+
   //  pthread_mutex_unlock(&busmutex);
 
 #ifdef RT_STATS
@@ -1506,7 +1523,7 @@ int CANbus::hand_set_state_rt() {
 
   // otherwise, check one finger for movement
   int32_t mode;
-  if (get_property_rt(first_moving_finger,MODE,&mode,500) != OW_SUCCESS) {
+  if (get_property_rt(first_moving_finger,MODE,&mode) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280",
 		   "Failed to get MODE from hand puck %d: ",first_moving_finger, last_error);
     //    handstate = HANDSTATE_UNINIT;
@@ -1595,7 +1612,7 @@ int CANbus::hand_reset() {
   bool ready=true;
   for (int nodeid=11; nodeid<=14; ++nodeid) {
     int32_t tstop;
-    if (get_property_rt(nodeid,TSTOP,&tstop,2000) != OW_SUCCESS) {
+    if (get_property_rt(nodeid,TSTOP,&tstop,4000) != OW_SUCCESS) {
       ROS_ERROR("Could not get TSTOP property from hand puck %d",
 		nodeid);
       return OW_FAILURE;
@@ -1816,12 +1833,15 @@ int32_t CANbus::spread_radians_to_encoder(double radians) {
 #endif // BH280
 
 
-void CANstats::rosprint() const {
+void CANstats::rosprint() {
 #ifdef RT_STATS
   ROS_DEBUG_NAMED("times","CANbus::send %2.1fms per group (2 groups)",
 		  cansend_time);
   ROS_DEBUG_NAMED("times","CANbus::read: send=%2.1fms, read=%2.1fms",
 		  canread_sendtime, canread_readtime);
+  ROS_DEBUG_NAMED("times","CANbus::read: bad packets = %d",
+		  canread_badpackets);
+  canread_badpackets = 0;
   ROS_DEBUG_NAMED("times","CANbus::set_puck_state: %2.2fms",
   		  cansetpuckstate_time);
   ROS_DEBUG_NAMED("times","CANbus::set_hand_state: %2.2fms",

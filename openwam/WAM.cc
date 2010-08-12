@@ -731,7 +731,8 @@ void control_loop_rt(void* argv){
 
       // check for slow loops
       double thistime = (t2-t1)* 1e-6;  // milliseconds
-      if (thistime > ControlLoop::PERIOD * 1.1) {
+      if (thistime > ControlLoop::PERIOD * 1000 * 1.1) {
+	// more than 10% above expected period
         slowcount++;
         slowtime += thistime;
 	if (thistime > slowmax) {

@@ -3,8 +3,8 @@ set (ROS_BUILD_STATIC_LIBS true)
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 set (OWD_RT on)
-set (CANBUS_TYPE "ESD")
-#set (CANBUS_TYPE "PEAK")
+#set (CANBUS_TYPE "ESD")
+set (CANBUS_TYPE "PEAK")
 
 # add_subdirectory(positionInterface)
 # link_directories (positionInterface)
@@ -57,9 +57,10 @@ if (XENO-CONFIG)
    
 elseif ("$ENV{XENOMAI_PATH}" STRGREATER "")
 message(STATUS "Using XENOMAI_PATH=$ENV{XENOMAI_PATH}")
-   set (RT_DEFS "-DOWD_RT -I$ENV{XENOMAI_PATH}/include")
+   set (RT_DEFS "-I$ENV{XENOMAI_PATH}/include")
    set (RT_LIBS "-L$ENV{XENOMAI_PATH}/lib -lnative")
 endif (XENO-CONFIG)
+set (RT_DEFS "-DOWD_RT ${RT_DEFS}")
 
 else (OWD_RT)
 set (RT_DEFS "")
