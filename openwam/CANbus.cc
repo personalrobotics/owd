@@ -28,10 +28,11 @@
 CANbus::CANbus(int32_t bus_id, int num_pucks) :  // DONE MVW
   puck_state(-1),id(bus_id),trq(NULL),
   pos(NULL), pucks(NULL),npucks(num_pucks),
-  simulation(false)
+  simulation(false),
 #ifdef CAN_RECORD
-, candata(100000)
+  candata(100000),
 #endif // CAN_RECORD
+  unread_packets(0)
 {
   pthread_mutex_init(&busmutex, NULL);
   pthread_mutex_init(&trqmutex, NULL);
@@ -423,8 +424,7 @@ int CANbus::status(int32_t* nodes){
     }
     ROS_DEBUG_NAMED("canstatus","Sent probe message to puck %d id %d",n,NODE2ADDR(n));
 
-    usleep(40000);
-    if(read_rt(&msgid, msg, &msglen, 100) == OW_FAILURE){
+    if(read_rt(&msgid, msg, &msglen, 40000) == OW_FAILURE){
       ROS_DEBUG_NAMED("canstatus","node %d didn't answer: %s",NODE2ADDR(n), last_error);
     }
     else{
@@ -522,9 +522,11 @@ int CANbus::status(int32_t* nodes){
     //    pthread_mutex_unlock(&busmutex);
     return OW_FAILURE;
   }
+ REREAD:
   if(read_rt(&msgid, msg, &msglen, usecs) == OW_FAILURE){
     //    pthread_mutex_unlock(&busmutex);
     ROS_WARN("CANbus::get_property: read failed: %s",last_error);
+    ++unread_packets;
     return OW_FAILURE;
   }
   //  pthread_mutex_unlock(&busmutex);
@@ -539,11 +541,23 @@ int CANbus::status(int32_t* nodes){
   if(nodeid!=nid) {
     ROS_WARN("Asked for property %d from node %d but got answer from node %d",
     	     property, nid, nodeid);
+    if (unread_packets > 0) {
+      ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)",
+	       unread_packets);
+      --unread_packets;
+      goto REREAD;
+    }
     return OW_FAILURE;
   }
   else if (prop!=property) {
     ROS_WARN("Asked node %d for property %d but got property %d",
     	     nid, property, prop);
+    if (unread_packets > 0) {
+      ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)",
+	       unread_packets);
+      --unread_packets;
+      goto REREAD;
+    }
     return OW_FAILURE;
   }   
   return OW_SUCCESS;
@@ -992,10 +1006,10 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
   // DOWN TOO MUCH).
 
   RTIME sleeptime; // time to wait for interrupts, in microseconds
-  if (usecs < 2000) {
-    sleeptime=100; // for short delays, sleep in 100 microsecond intervals
+  if (usecs < 5000) {
+    sleeptime=200; // for short delays, sleep in 200 microsecond intervals
   } else {
-    sleeptime=1000; // for longer delays, sleep for 1ms
+    sleeptime=4000; // for longer delays, sleep for 4ms
   }
   int retrycount = usecs / sleeptime + 0.5; // round to nearest int
   
@@ -1591,7 +1605,6 @@ int CANbus::hand_reset() {
       ready=false;
       break;
     }
-    i
   }
   
   if (ready) {

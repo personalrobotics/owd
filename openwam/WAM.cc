@@ -731,7 +731,7 @@ void control_loop_rt(void* argv){
 
       // check for slow loops
       double thistime = (t2-t1)* 1e-6;  // milliseconds
-      if (thistime > 5.0) {
+      if (thistime > ControlLoop::PERIOD * 1.1) {
         slowcount++;
         slowtime += thistime;
 	if (thistime > slowmax) {
@@ -849,6 +849,7 @@ void WAM::newcontrol_rt(double dt){
     
     double traj_timestep;
     static double timestep_factor = 1.0f;
+    traj_timestep = dt;
     /*    if (dt > .004) {
       traj_timestep = .004; // bound the time in case the system got delayed; don't want to lurch
     } else {
@@ -1095,7 +1096,7 @@ void WAM::newcontrol_rt(double dt){
 	JSdynamics(sim_torq, sim_links, qd_target, qdd_target); 
 	if (data_recorded) {
 	  for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
-	    data.push_back(dyn_torq[j]);
+	    data.push_back(dyn_torq[j]); // torques from sim model
 	  }
 	}
         if(jsdyn){
@@ -1115,7 +1116,7 @@ void WAM::newcontrol_rt(double dt){
         }
 	if (data_recorded) {
 	  for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
-	    data.push_back(dyn_torq[j]);
+	    data.push_back(dyn_torq[j]); // dynamic torques
 	  }
 	  recorder.add(data);
 	}
@@ -1233,9 +1234,9 @@ int WAM::run_trajectory(Trajectory *traj) {
       ROS_DEBUG("Starting trajectory %d in paused state",traj->id);
       // app must call resume_trajectory() to start
     }
-    this->lock("run_traj");
+    //    this->lock("run_traj");
     jointstraj = traj;
-    this->unlock("run_traj");
+    //    this->unlock("run_traj");
     return OW_SUCCESS;
 }
 
@@ -1254,9 +1255,9 @@ int WAM::resume_trajectory() {
         return OW_FAILURE;
     }
 
-    this->lock("resume_traj");
+    //    this->lock("resume_traj");
     jointstraj->run();
-    this->unlock("resume_traj");
+    //    this->unlock("resume_traj");
     return OW_SUCCESS;
 }
 
@@ -1431,6 +1432,7 @@ bool WAM::lock_rt(const char *name) {
   //    } else {
   //        syslog(LOG_ERR,"OPENWAM locked by (unknown)");
   //  }
+  return true;
 }
 
 void WAM::unlock(const char *name) {
