@@ -3,8 +3,8 @@ set (ROS_BUILD_STATIC_LIBS true)
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 set (OWD_RT on)
-#set (CANBUS_TYPE "ESD")
-set (CANBUS_TYPE "PEAK")
+set (CANBUS_TYPE "ESD")
+#set (CANBUS_TYPE "PEAK")
 
 # add_subdirectory(positionInterface)
 # link_directories (positionInterface)

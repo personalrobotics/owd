@@ -82,5 +82,7 @@ int main(int argc, char** argv)
   ROS_DEBUG("Spinning");
   ros::spin(s);
   ROS_DEBUG("Done spinning; exiting");
-
+  wam.bus.~CANbus();
+  ROS_FATAL("dumped CANbus logs to candata.log");
+  exit(0);
 }

@@ -463,6 +463,7 @@ int WAM::recv_mpos(){
 
   // fetch positions from the bus
   if(bus->read_positions(mpos) == OW_FAILURE){
+    // never happens; this call always succeeds
     ROS_ERROR("WAM::recv_mpos: read_positions failed." );
     return OW_FAILURE;
   }
@@ -663,21 +664,16 @@ void control_loop_rt(void* argv){
 
   // Main control loop
   while((ctrl_loop->state_rt() == CONTROLLOOP_RUN) && (ros::ok())){
-    //    printf("waiting for next timeslot\n");
       ctrl_loop->wait_rt();         // wait for the next control iteration;
       t2 = ControlLoop::get_time_ns_rt(); // record the time
-      //      printf("loop execution\n");
 
       // GET POSITIONS
-#ifdef BH280_ONLY
-      // only log messages if we're not trying to control the WAM in RT
-      //      ROS_DEBUG_NAMED("can_bh280","reading positions");
-#endif
       if(wam->bus->read_positions_rt() == OW_FAILURE){
         ROS_FATAL("control_loop: read_positions failed");
         return;
       }
-      //      printf("read positions\n");
+      
+      wam->bus->clear();
       
       RTIME bt1 = ControlLoop::get_time_ns_rt();
       readtime += (bt1-t2 ) * 1e-6;
@@ -690,16 +686,11 @@ void control_loop_rt(void* argv){
       RTIME bt2 = ControlLoop::get_time_ns_rt();
       controltime += (bt2-bt1) * 1e-6; // ns to ms
 
-#ifdef BH280_ONLY
-      // only log messages if we're not trying to control the WAM in RT
-      //      ROS_DEBUG_NAMED("can_bh280","sending torques");
-#endif
       // SEND TORQUES
       if(wam->bus->send_torques_rt() == OW_FAILURE){
         ROS_FATAL("control_loop: send_torques failed.");
         return;
       }
-      //      printf("sent torques\n");
 
       RTIME bt3 = ControlLoop::get_time_ns_rt();
       sendtime += (bt3-bt2) * 1e-6;
@@ -714,7 +705,6 @@ void control_loop_rt(void* argv){
 	  // what to do?
 	}
         stateperiod=0;
-	//        printf("puck state checked\n");
       }
 #endif // BH280_ONLY
 
@@ -722,10 +712,8 @@ void control_loop_rt(void* argv){
       // Hand moving?
       static int handstateperiod=25; // start offset from motor state
       if (++handstateperiod == 50) { // every 0.1 seconds
-	//        printf("checking hand state\n");
 	wam->bus->hand_set_state_rt();
 	handstateperiod=0;
-	//        printf("hand state checked\n");
       }
 #endif // BH280
 
@@ -793,7 +781,6 @@ void control_loop_rt(void* argv){
 
       // get ready for next pass
       t1 = t2;
-      //      printf("bottom of loop\n");
   }
   ROS_DEBUG("Control loop finished");
 
@@ -859,16 +846,7 @@ void WAM::newcontrol_rt(double dt){
     */
     
     // read new motor positions
-    if(recv_mpos() != OW_SUCCESS){
-      // We lost communication with the pucks (someone probably hit the e-stop).
-      motor_state=MOTORS_OFF;
-      if (exit_on_pendant_press) {
-	ROS_FATAL("WAM::control_loop: lost communication with the WAM; shutting down.");
-	ROS_FATAL("If you want to restart the controller, make sure power is applied");
-	ROS_FATAL("and all e-stops are released, then re-run.");
-	exit(1);
-      }
-    }
+    recv_mpos(); // will always succeed, since it's just a copy
 
     mpos2jpos();    // convert to joint positions
     

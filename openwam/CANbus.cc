@@ -396,9 +396,11 @@ int CANbus::clear() {
   unsigned char msg[8];
   int32_t msgid, msglen;
   
-  while (read_rt(&msgid, msg, &msglen, 100) == OW_SUCCESS) {
+  int count(0);
+  while (read_rt(&msgid, msg, &msglen, 0) == OW_SUCCESS) {
+    ++count;
   }
-  return OW_SUCCESS;
+  return count;
 }
 
 
@@ -539,11 +541,10 @@ int CANbus::status(int32_t* nodes){
       
   // Check that the ids and properties match
   if(nodeid!=nid) {
-    ROS_WARN("Asked for property %d from node %d but got answer from node %d",
-    	     property, nid, nodeid);
+    ROS_WARN("Asked for property %d from node %d but got answer from node %d, %d previously missed messages",
+    	     property, nid, nodeid, unread_packets);
     if (unread_packets > 0) {
-      ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)",
-	       unread_packets);
+      ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)", unread_packets);
       --unread_packets;
       goto REREAD;
     }
@@ -664,11 +665,6 @@ int CANbus::send_torques_rt(){
 		       handmsg.property, handmsg.nodeid);
 	return OW_FAILURE;
       }
-      //      ssize_t bytes = msg.to_buffer(msgbuf,20);
-      //      if (bytes < 0) {
-      //        snprintf(last_error,200,"Unable to serialize message for hand message pipe");
-      //	return OW_FAILURE;
-      //      }
       bytecount = rt_pipe_write(&handpipe,&handmsg,sizeof(CANmsg),P_NORMAL);
       if (bytecount < sizeof(CANmsg)) {
 	if (bytecount < 0) {
@@ -751,12 +747,24 @@ int CANbus::read_positions(double* positions){
 int CANbus::read_positions_rt(){
   uint8_t  msg[8];
 
-  int32_t data[NUM_NODES+1], value;
+  int32_t *data=NULL;
+  int32_t value;
   int32_t msgid, msglen, property, nodeid;
   static double sendtime=0.0f;
   static double readtime=0.0f;
   static unsigned int loopcount=0;
   static int missing_data_cycles=0;
+
+  // we want to keep data around between calls so that we
+  // can reuse previous joint values in case of a missed
+  // CANbus message, but we need to initialize it to zero
+  // the first time, so the best way is to allocate it once
+  if (!data) {
+    data = (int32_t *) calloc(NUM_NODES+1, sizeof(int32_t));
+    if (!data) {
+      return OW_FAILURE;
+    }
+  }
 
   // Compile the packet
   msg[0] = (uint8_t)AP;
@@ -780,16 +788,16 @@ int CANbus::read_positions_rt(){
   sendtime += (bt2-bt1) * 1e-6; // ns to ms
 #endif
 
-  bool missed_read=false;
+  int missed_reads(0);
 #ifdef BH280
   for(int p=1; p<=npucks + 4; ){
 #else
   for(int p=1; p<=npucks; ){
 #endif // BH280
-    if(read_rt(&msgid, msg, &msglen, 30000) == OW_FAILURE){
+    if(read_rt(&msgid, msg, &msglen, 3000) == OW_FAILURE){
       //pthread_mutex_unlock(&busmutex);
       // ROS_WARN("CANbus::read_positions: read failed: %s",last_error);
-      missed_read=true;
+      ++missed_reads;
       p++;
       continue;
     }
@@ -811,8 +819,12 @@ int CANbus::read_positions_rt(){
     p++;
 
   }
-  if (missed_read) {
-    if (++missing_data_cycles == 10) {
+  if (missed_reads > 0) {
+    if (missed_reads > 1) {
+      // we're missing too many messages
+      snprintf(last_error,200,"Missed CANbus replies from %d pucks in a single read cycle",missed_reads);
+      return OW_FAILURE;
+    } else if (++missing_data_cycles == 10) {
       // we went 10 cycles in a row while missing values from at
       // least 1 puck; give up!
       snprintf(last_error,200,"Missed CANbus replies from 10 cycles in a row");
@@ -820,6 +832,15 @@ int CANbus::read_positions_rt(){
     }
   } else {
     missing_data_cycles = 0;
+    if (unread_packets > 0) {
+      // if we got a full read with no misses, but we still missed a packet
+      // sometime in the past, it may be showing up now, so do a quick
+      // check of the bus to see if there are any leftover packets that
+      // we can throw away.
+      if(read_rt(&msgid, msg, &msglen, 0) != OW_FAILURE){
+	--unread_packets;
+      }
+    }
   }
 
   //  pthread_mutex_unlock(&busmutex);
