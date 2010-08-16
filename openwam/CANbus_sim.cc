@@ -3,7 +3,8 @@
 #include "CANbus.hh"
 #include "CANdefs.hh"
 #include <ros/ros.h>
-#include <native/task.h>
+#include <time.h>
+#include <sys/time.h>
 
 #define PUCK_IDLE 0 
 
@@ -12,10 +13,10 @@ CANbus::CANbus(int32_t bus_id, int num_pucks) :
   trq(NULL),pos(NULL),
   pucks(NULL),npucks(num_pucks),simulation(true)
 {
-  pthread_mutex_init(&trqmutex, NULL);
-  pthread_mutex_init(&posmutex, NULL);
-  pthread_mutex_init(&runmutex, NULL);
-  pthread_mutex_init(&statemutex, NULL);
+  //  pthread_mutex_init(&trqmutex, NULL);
+  //  pthread_mutex_init(&posmutex, NULL);
+  //  pthread_mutex_init(&runmutex, NULL);
+  //  pthread_mutex_init(&statemutex, NULL);
 
   pucks = new Puck[npucks+1];
   trq = new int32_t[npucks+1];
@@ -157,9 +158,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
 
 int CANbus::run(){
   int r;
-  pthread_mutex_lock(&runmutex);
   r = bus_run;
-  pthread_mutex_unlock(&runmutex);
   return r;
 }
 
@@ -172,16 +171,12 @@ void CANbus::printpos(){
 
 int32_t CANbus::get_puck_state() {
   int32_t pstate;
-  pthread_mutex_lock(&statemutex);
   pstate = puck_state;
-  pthread_mutex_unlock(&statemutex);
   return pstate;
 }
 
 int CANbus::set_puck_state_rt() {
-  pthread_mutex_lock(&statemutex);
   puck_state = 2;
-  pthread_mutex_unlock(&statemutex);
   return OW_SUCCESS;
 }
 
@@ -194,6 +189,12 @@ void CANstats::rosprint()  {
   		  cansetpuckstate_time);
 }
   
+ RTIME CANbus::time_now_ns() {
+   struct timeval tv;
+   gettimeofday(&tv,NULL);
+   return (tv.tv_sec * 1e6 + tv.tv_usec);
+ }
+
 
 void CANbus::initPropertyDefs(int32_t firmwareVersion){
    int i = 0;

@@ -114,11 +114,11 @@ public:
   static const double M2_MM2 = 1.0/1000000;
 
 
-#if defined( OWD_RT ) && ! defined ( OWDSIM )
+#ifdef OWD_RT
   RT_MUTEX rt_mutex;
-#else
+#else // ! OWD_RT
   pthread_mutex_t mutex;                   // Use to lock the WAM
-#endif
+#endif // ! OWD_RT
   Joint joints[Joint::Jn+1];               // Array of joints
   Motor motors[Motor::Mn+1];               // Array of motors
   Link links[Link::Ln+1];                  // Array of links

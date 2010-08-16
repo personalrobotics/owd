@@ -10,9 +10,9 @@
 
 #ifdef ESD_CAN
 #include <ntcan.h>
-#else
+#else // ! ESD_CAN
 #include <stdint.h>
-#endif
+#endif // ! ESD_CAN
 
 #ifdef PEAK_CAN
 #include <libpcan.h>
@@ -27,7 +27,10 @@
 #include <native/mutex.h>
 #include <native/intr.h>
 #include <native/pipe.h>
-#endif // OWD_RT
+#else // ! OWD_RT
+#include <queue>
+typedef unsigned long long RTIME; // usually defined in xenomai types.h
+#endif // ! OWD_RT
 
 #include <sys/mman.h>
 
@@ -82,10 +85,10 @@ public:
 
 class CANbus{
 private:
-  pthread_mutex_t busmutex;
+  //  pthread_mutex_t busmutex;
   pthread_t canthread;
-  pthread_mutex_t runmutex;
-  pthread_mutex_t statemutex;
+  //  pthread_mutex_t runmutex;
+  //  pthread_mutex_t statemutex;
   int bus_run;
   int32_t puck_state;
   CANstats stats;
@@ -104,8 +107,8 @@ public:
   int npucks;
   bool simulation;
 
-  pthread_mutex_t trqmutex;
-  pthread_mutex_t posmutex;
+  //  pthread_mutex_t trqmutex;
+  //  pthread_mutex_t posmutex;
 
   char last_error[200];
 
@@ -124,16 +127,22 @@ DataRecorder<canio_data> candata;
 
   int unread_packets;
   HANDLE handle;
+
 #ifdef OWD_RT
   RT_INTR rt_can_intr;
+#endif // OWD_RT
+
+#endif // ! OWDSIM
 
 #ifdef BH280
+#ifdef OWD_RT
   RT_PIPE handpipe;
   int handpipe_fd;
+#else // ! OWD_RT
+  std::queue<CANmsg> hand_command_queue;
+  std::queue<CANmsg> hand_response_queue;
+#endif // ! OWD_RT
 #endif // BH280
-
-#endif // OWD_RT
-#endif // OWDSIM
 
   int load();
   int open();
@@ -161,6 +170,8 @@ DataRecorder<canio_data> candata;
   int read_positions_rt();
 
   void initPropertyDefs(int firmwareVersion);
+  RTIME time_now_ns();
+
 
   inline void rosprint_stats() {
     stats.rosprint();
@@ -182,6 +193,7 @@ DataRecorder<canio_data> candata;
   //  int read_torques(int32_t* mtrq);
   int send_positions(double* mpos);
   int send_AP(int32_t* apval);
+
 #ifdef BH280
   enum {HANDSTATE_UNINIT=0,
     HANDSTATE_DONE,
@@ -189,7 +201,8 @@ DataRecorder<canio_data> candata;
 
 private:
   int32_t hand_positions[4+1];
-  pthread_mutex_t handmutex;
+  pthread_mutex_t hand_queue_mutex;
+  pthread_mutex_t hand_cmd_mutex;
   int32_t handstate;
   int first_moving_finger;
 
@@ -217,4 +230,4 @@ public:
   friend void* canbus_handler(void* argv);
 };
 
-#endif
+#endif // __CANBUS_H__

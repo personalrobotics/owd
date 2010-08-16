@@ -36,11 +36,11 @@ WAM::WAM(CANbus* cb) :
     motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000)
 {
 
-#if defined( OWD_RT ) && ! defined ( OWDSIM )
+#ifdef OWD_RT
   rt_mutex_create(&rt_mutex,"WAM_CC");
-#else
+#else // ! OWD_RT
   pthread_mutex_init(&mutex, NULL);
-#endif
+#endif // ! OWD_RT
 
   se3traj = NULL;
   jointstraj = NULL;
@@ -1376,11 +1376,11 @@ void WAM::printmtrq(){
 
 void WAM::lock(const char *name) {
   static char last_locked_by[100];
-#if defined( OWD_RT ) && ! defined ( OWDSIM )
+#ifdef OWD_RT
   rt_mutex_acquire(&rt_mutex,TM_INFINITE);
-#else
+#else // ! OWD_RT
   pthread_mutex_lock(&mutex);
-#endif
+#endif // ! OWD_RT
   strncpy(last_locked_by,name,100);
   last_locked_by[99]=0; // just in case it was more than 99 chars long
     if (name) {
@@ -1394,14 +1394,14 @@ void WAM::lock(const char *name) {
 
 bool WAM::lock_rt(const char *name) {
   static char last_locked_by[100];
-#if defined( OWD_RT ) && ! defined ( OWDSIM )
+#ifdef OWD_RT
   RTIME waittime(100000); // wait up to 100us for the lock
   if (rt_mutex_acquire(&rt_mutex,waittime)) {
     return false;
   }
-#else
+#else // ! OWD_RT
   pthread_mutex_lock(&mutex);
-#endif
+#endif // ! OWD_RT
   strncpy(last_locked_by,name,100);
   last_locked_by[99]=0; // just in case it was more than 99 chars long
   //  if (name) {
@@ -1422,11 +1422,11 @@ void WAM::unlock(const char *name) {
   //  } else {
   //    syslog(LOG_ERR,"OPENWAM unlocked by (unknown)");
   //  }
-#if defined( OWD_RT ) && ! defined ( OWDSIM )
+#ifdef OWD_RT
   rt_mutex_release(&rt_mutex);
-#else
+#else // ! OWD_RT
   pthread_mutex_unlock(&mutex);
-#endif
+#endif // ! OWD_RT
 }
 
 void WAMstats::rosprint(int recorder_count) const {
@@ -1473,3 +1473,4 @@ WAM::~WAM() {
     recorder.dump("/tmp/wamstats_final.csv");
   }
 }
+
