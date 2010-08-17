@@ -1034,7 +1034,7 @@ void WamDriver::start_control_loop() {
     ROS_ERROR("  1. WAM has %d joints (%s)",nJoints,nJoints==4?"wrist NOT INSTALLED":nJoints==7?"wrist INSTALLED":"WARNING: UNFAMILIAR CONFIG");
     ROS_ERROR("  2. Tool mass is %fkg (%s)",owam->links[nJoints].mass,owam->links[nJoints].mass==1.3?"Barrett Hand with cameras":owam->links[nJoints].mass==0.0?"no tool":"custom tool");
     
-    ROS_ERROR("\nPress Shift-Activate to activate motors and start system.");
+    ROS_ERROR("Press Shift-Activate to activate motors and start system.");
 
 #ifdef AUTO_ACTIVATE
     if (bus.set_property_rt(10,MODE,2,false) == OW_FAILURE) {

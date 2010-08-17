@@ -4,8 +4,8 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 include(../find_xenomai.cmake)
 include(../detect_cpu.cmake)
 
-set (CANBUS_TYPE "ESD")
-#set (CANBUS_TYPE "PEAK")
+#set (CANBUS_TYPE "ESD")
+set (CANBUS_TYPE "PEAK")
 
 if (CANBUS_TYPE STREQUAL "ESD")
 message(STATUS "using ESD CANbus driver")

@@ -812,14 +812,16 @@ int CANbus::read_positions_rt(){
 
   }
   if (missed_reads > 0) {
-    if (missed_reads > 1) {
-      // we're missing too many messages
-      snprintf(last_error,200,"Missed CANbus replies from %d pucks in a single read cycle",missed_reads);
-      return OW_FAILURE;
-    } else if (++missing_data_cycles == 10) {
+    //    if (missed_reads > 1) {
+    //      // we're missing too many messages
+    //      ROS_WARN("Missed CANbus replies from %d pucks in a single read cycle",missed_reads);
+    //      return OW_FAILURE;
+    //    } else 
+
+    if (++missing_data_cycles == 10) {
       // we went 10 cycles in a row while missing values from at
       // least 1 puck; give up!
-      snprintf(last_error,200,"Missed CANbus replies from 10 cycles in a row");
+      ROS_WARN("Missed CANbus replies from 10 cycles in a row");
       return OW_FAILURE;
     }
   } else {
@@ -2253,8 +2255,10 @@ void CANbus::initPropertyDefs(int firmwareVersion){
    if(trq!=NULL) delete trq; 
    if(pos!=NULL) delete pos;
 #ifdef CAN_RECORD
-   candata.dump("candata.log");
-   ROS_DEBUG("dumped CANbus logs to candata.log");
+   char dumpname[200];
+   snprintf(dumpname,200,"candata%d.log",id);
+   candata.dump(dumpname);
+   ROS_DEBUG("dumped CANbus logs to %s",dumpname);
 #endif    
  }
  

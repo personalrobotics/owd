@@ -22,3 +22,4 @@ message(STATUS "Using XENOMAI_PATH=$ENV{XENOMAI_PATH}")
 endif (XENO-CONFIG)
 
 set (RT_DEFS "-DOWD_RT ${RT_DEFS}")
+set (RT_LIBS "-lnative ${RT_LIBS}")
