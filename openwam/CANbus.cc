@@ -34,18 +34,13 @@ CANbus::CANbus(int32_t bus_id, int num_pucks) :
 #endif // CAN_RECORD
   unread_packets(0)
 {
-  //  pthread_mutex_init(&busmutex, NULL);
-  //  pthread_mutex_init(&trqmutex, NULL);
-  //  pthread_mutex_init(&posmutex, NULL);
-  //  pthread_mutex_init(&runmutex, NULL);
-  //  pthread_mutex_init(&statemutex, NULL);
 #ifdef BH280
   // hand_queue_mutex is used to manage access to the hand command/response queues
-  pthread_mutex_init(&hand_queue_mutex, NULL);
+  mutex_init(&hand_queue_mutex, NULL);
 
   // hand_cmd_queue is used to prevent trouble with multiple ROS service calls occurring at once.  it
   // makes sure that the response you get from the queue corresponds to the command you sent.
-  pthread_mutex_init(&hand_cmd_mutex, NULL);
+  mutex_init(&hand_cmd_mutex, NULL);
 
   handstate = HANDSTATE_UNINIT;
   first_moving_finger=11;
@@ -624,7 +619,9 @@ int CANbus::send_torques_rt(){
     message_received=true;
   }
 #else // ! OWD_RT
-  if (!pthread_mutex_trylock(&hand_queue_mutex)) {
+  bool mutex_locked=false;
+  if (!mutex_trylock(&hand_queue_mutex)) {
+    mutex_locked=true;
     if (hand_command_queue.size() > 0) {
       handmsg = hand_command_queue.front();
       hand_command_queue.pop();
@@ -641,7 +638,7 @@ int CANbus::send_torques_rt(){
 	snprintf(last_error,200,"Error setting property %d = %d on hand puck %d",
 		       handmsg.property, handmsg.value, handmsg.nodeid);
 #ifndef OWD_RT
-	pthread_mutex_unlock(&hand_queue_mutex);
+	mutex_unlock(&hand_queue_mutex);
 #endif // ! OWD_RT
 	return OW_FAILURE;
       }
@@ -650,7 +647,7 @@ int CANbus::send_torques_rt(){
 	snprintf(last_error,200,"Error getting property %d from hand puck %d",
 		       handmsg.property, handmsg.nodeid);
 #ifndef OWD_RT
-	pthread_mutex_unlock(&hand_queue_mutex);
+	mutex_unlock(&hand_queue_mutex);
 #endif // ! OWD_RT
 	return OW_FAILURE;
       }
@@ -667,10 +664,15 @@ int CANbus::send_torques_rt(){
       }
 #else // ! OWD_RT
       hand_response_queue.push(handmsg);
-      pthread_mutex_unlock(&hand_queue_mutex);
 #endif // ! OWD_RT
     }
   }
+#ifndef OWD_RT
+  if (mutex_locked) {
+    mutex_unlock(&hand_queue_mutex);
+  }
+#endif // ! OWD_RT
+
 #endif // BH280
   
 #ifdef RT_STATS
@@ -1427,7 +1429,10 @@ int CANbus::hand_set_property(int32_t id, int32_t prop, int32_t val) {
   msg.value=val;
 
 #ifdef OWD_RT
+  // use mutex to protect against re-entry from multiple service calls
+  mutex_lock(&hand_cmd_mutex);
   ssize_t bytes = ::write(handpipe_fd,&msg,sizeof(CANmsg));
+  mutex_unlock(&hand_cmd_mutex);
   if (bytes < sizeof(CANmsg)) {
     if (bytes < 0) {
       ROS_ERROR_NAMED("can_bh280","Error writing to hand message pipe: %d",bytes);
@@ -1435,14 +1440,16 @@ int CANbus::hand_set_property(int32_t id, int32_t prop, int32_t val) {
       ROS_ERROR_NAMED("can_bh280","Incomplete write of data to hand message pipe: only %d of %d bytes written",
 		      bytes,sizeof(CANmsg));
     }
-    pthread_mutex_unlock(&hand_cmd_mutex);
     return OW_FAILURE;
   }
 #else // ! OWD_RT
 
-  if (!pthread_mutex_lock(&hand_queue_mutex)) {
+  if (!mutex_lock(&hand_queue_mutex)) {
     hand_command_queue.push(msg);
-    pthread_mutex_unlock(&hand_queue_mutex);
+    mutex_unlock(&hand_queue_mutex);
+  } else {
+    ROS_ERROR_NAMED("can_bh280","Unable to acquire hand_queue_mutex; hand_set_property Node %d Prop %d=%d failed.",id,prop,val);
+    return OW_FAILURE;
   }
 
 #endif // ! OWD_RT
@@ -1456,7 +1463,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
   msg.property=prop;
   msg.value=0;
 
-  if (pthread_mutex_lock(&hand_cmd_mutex)) {
+  if (mutex_lock(&hand_cmd_mutex)) {
     ROS_ERROR_NAMED("can_bh280","Could not lock hand command mutex");
     return OW_FAILURE;
   }
@@ -1470,42 +1477,42 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
       ROS_ERROR_NAMED("can_bh280","Incomplete write of data to hand message pipe: only %d of %d bytes written",
 		      bytes,sizeof(CANmsg));
     }
-    pthread_mutex_unlock(&hand_cmd_mutex);
+    mutex_unlock(&hand_cmd_mutex);
     return OW_FAILURE;
   }
   // now read from the pipe; the read will return as soon as the data is available
   bytes = ::read(handpipe_fd, &msg, sizeof(CANmsg));
   if (bytes < 0) {
     ROS_ERROR_NAMED("can_bh280","Error reading data from hand message pipe: %d", errno);
+    mutex_unlock(&hand_cmd_mutex);
     return OW_FAILURE;
   }
   if (bytes < sizeof(CANmsg)) {
     ROS_ERROR_NAMED("can_bh280","Incomplete read of message from hand message pipe: expected %d but got %d bytes",
 		    sizeof(CANmsg),bytes);
-    pthread_mutex_unlock(&hand_cmd_mutex);
+    mutex_unlock(&hand_cmd_mutex);
     return OW_FAILURE;
   }
 #else // ! OWD_RT
-  pthread_mutex_lock(&hand_queue_mutex);
+  mutex_lock(&hand_queue_mutex);
   hand_command_queue.push(msg);
-  pthread_mutex_unlock(&hand_queue_mutex);
+  mutex_unlock(&hand_queue_mutex);
 
   // wait for the response
   bool done=false;
   do {
     usleep(1000);
-    if (!pthread_mutex_lock(&hand_queue_mutex)) {
-      if (hand_response_queue.size() > 0) {
-        msg = hand_response_queue.front();
-	hand_response_queue.pop();
-	done=true;
-      }
-      pthread_mutex_unlock(&hand_queue_mutex);
+    mutex_lock(&hand_queue_mutex);
+    if (hand_response_queue.size() > 0) {
+      msg = hand_response_queue.front();
+      hand_response_queue.pop();
+      done=true;
     }
+    mutex_unlock(&hand_queue_mutex);
   } while (!done);
 #endif // ! OWD_RT
 
-  pthread_mutex_unlock(&hand_cmd_mutex);
+  mutex_unlock(&hand_cmd_mutex);
 
   if (msg.nodeid != id) {
     ROS_ERROR_NAMED("can_bh280","Expecting response from hand puck %d but got message from puck %d",

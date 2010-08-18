@@ -85,10 +85,7 @@ public:
 
 class CANbus{
 private:
-  //  pthread_mutex_t busmutex;
   pthread_t canthread;
-  //  pthread_mutex_t runmutex;
-  //  pthread_mutex_t statemutex;
   int bus_run;
   int32_t puck_state;
   CANstats stats;
@@ -106,10 +103,6 @@ public:
   Puck *pucks;
   int npucks;
   bool simulation;
-
-  //  pthread_mutex_t trqmutex;
-  //  pthread_mutex_t posmutex;
-
   char last_error[200];
 
 #ifndef OWDSIM
@@ -194,6 +187,42 @@ DataRecorder<canio_data> candata;
   int send_positions(double* mpos);
   int send_AP(int32_t* apval);
 
+  // mutex functions that work when compiled with or without Realtime kernel
+#ifdef OWD_RT
+  inline int mutex_init(RT_MUTEX *mutex) {
+    return rt_mutex_create(mutex,NULL);
+  }
+
+  inline int mutex_lock(RT_MUTEX *mutex) {
+    return rt_mutex_acquire(mutex,TM_INFINITE);
+  }
+
+  inline int mutex_trylock(RT_MUTEX *mutex) {
+    return rt_mutex_acquire(mutex,TM_NONBLOCK);
+  }
+
+  inline int mutex_unlock(RT_MUTEX *mutex) {
+    return rt_mutex_release(mutex);
+  }
+#else // ! OWD_RT
+  inline int mutex_init(pthread_mutex_t *mutex) {
+    return pthread_mutex_init(mutex,NULL);
+  }
+
+  inline int mutex_lock(pthread_mutex_t *mutex) {
+    return pthread_mutex_lock(mutex);
+  }
+
+  inline int mutex_trylock(pthread_mutex_t *mutex) {
+    return pthread_mutex_trylock(mutex);
+  }
+
+  inline int mutex_unlock(pthread_mutex_t *mutex) {
+    return pthread_mutex_unlock(mutex);
+  }
+#endif // ! OWD_RT
+
+
 #ifdef BH280
   enum {HANDSTATE_UNINIT=0,
     HANDSTATE_DONE,
@@ -201,8 +230,13 @@ DataRecorder<canio_data> candata;
 
 private:
   int32_t hand_positions[4+1];
+#ifdef OWD_RT
+  RT_MUTEX hand_queue_mutex;
+  RT_MUTEX hand_cmd_mutex;
+#else // ! OWD_RT
   pthread_mutex_t hand_queue_mutex;
   pthread_mutex_t hand_cmd_mutex;
+#endif // ! OWD_RT
   int32_t handstate;
   int first_moving_finger;
 

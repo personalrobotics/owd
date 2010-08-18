@@ -179,11 +179,11 @@ int ControlLoop::state_rt(){
   return s;
 }
 
-void ControlLoop::wait_rt() {
+void ControlLoop::wait_rt(int32_t usecs) {
 #ifdef OWD_RT
   rt_task_wait_period(NULL);
 #else // ! OWD_RT
-  usleep(700);
+  usleep(usecs);
 #endif // ! OWD_RT
 }
 

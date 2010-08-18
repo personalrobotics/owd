@@ -61,7 +61,7 @@ private:
 
 public:
   //static const double PERIOD = 0.002;
-  static const double PERIOD = 0.005;
+  static const double PERIOD = 0.002;
   int task_number; // must be unique on the machine
   void (*ctrl_fnc)(void*);
   void* ctrl_argv;
@@ -75,7 +75,7 @@ public:
   int start();
   int stop();
   int state_rt();
-  void wait_rt();
+  void wait_rt(int32_t usecs);
   static RTIME get_time_ns_rt();
 
 };

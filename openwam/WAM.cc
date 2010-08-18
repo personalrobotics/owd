@@ -659,12 +659,11 @@ void control_loop_rt(void* argv){
   unsigned int loopcount = 0;
   unsigned int slowcount=0;
 
-  t1 = ControlLoop::get_time_ns_rt();  // first-time initialization
+  t1 = ControlLoop::get_time_ns_rt() - ControlLoop::PERIOD * 1e9;  // first-time initialization
   ROS_DEBUG("Control loop started");
 
   // Main control loop
   while((ctrl_loop->state_rt() == CONTROLLOOP_RUN) && (ros::ok())){
-      ctrl_loop->wait_rt();         // wait for the next control iteration;
       t2 = ControlLoop::get_time_ns_rt(); // record the time
 
       // GET POSITIONS
@@ -780,6 +779,14 @@ void control_loop_rt(void* argv){
 
 
       // get ready for next pass
+      int32_t time_to_wait = (ControlLoop::PERIOD * 1e6) - (thistime * 1e3); // microseconds
+      if (time_to_wait > 0) {
+	// If we're compiled for Real Time, then wait_rt will ignore the time argument
+	// and just wait until the next period.  If we're not compiled for Real Time, then
+	// wait_rt will do a usleep for the time specified.
+	ctrl_loop->wait_rt(time_to_wait);    // wait for the next control iteration;
+      }
+
       t1 = t2;
   }
   ROS_DEBUG("Control loop finished");
