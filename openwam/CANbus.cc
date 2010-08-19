@@ -36,11 +36,11 @@ CANbus::CANbus(int32_t bus_id, int num_pucks) :
 {
 #ifdef BH280
   // hand_queue_mutex is used to manage access to the hand command/response queues
-  mutex_init(&hand_queue_mutex, NULL);
+  mutex_init(&hand_queue_mutex);
 
   // hand_cmd_queue is used to prevent trouble with multiple ROS service calls occurring at once.  it
   // makes sure that the response you get from the queue corresponds to the command you sent.
-  mutex_init(&hand_cmd_mutex, NULL);
+  mutex_init(&hand_cmd_mutex);
 
   handstate = HANDSTATE_UNINIT;
   first_moving_finger=11;
