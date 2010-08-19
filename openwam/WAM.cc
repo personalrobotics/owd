@@ -217,14 +217,14 @@ int WAM::init(){
   }    
 
   //                      Kp    Kd    Ki
-  jointsctrl[1].set_gains( 250, 5.0, 2.5);
-  jointsctrl[2].set_gains(1250, 10.0, 5.0);
-  jointsctrl[3].set_gains( 200, 5.0, 2.5);
-  jointsctrl[4].set_gains( 250,  1.25, 0.5);
+  jointsctrl[1].set_gains( 900, 10.0, 2.5);
+  jointsctrl[2].set_gains(2500, 20.0, 5.0);
+  jointsctrl[3].set_gains( 600, 10.0, 2.5);
+  jointsctrl[4].set_gains( 500,  2.5, 0.5);
   if (Joint::Jn > 4) {
   //                        Kp    Kd    Ki
-    jointsctrl[5].set_gains(  20,  0.25, 0.5);
-    jointsctrl[6].set_gains(  20,  0.25, 0.5);
+    jointsctrl[5].set_gains(  40,  0.5, 0.5);
+    jointsctrl[6].set_gains(  40,  0.5, 0.5);
     jointsctrl[7].set_gains(  8,  0.08, 0.1);
   }
   if (Joint::Jn > 7) {
