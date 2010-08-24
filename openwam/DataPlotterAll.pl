@@ -54,7 +54,7 @@ while (<>) {
     } else {
 	$linenum = $linenum+1;
     }
-    $f = sprintf("wamstats%04d.csv",$linenum);
+    $f = sprintf("wamstats41-%04d.csv",$linenum);
 #    system("scp wam:/tmp/$f .");
     print "Plotting $f\n";
     

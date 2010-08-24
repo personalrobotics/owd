@@ -1035,6 +1035,16 @@ void WAM::newcontrol_rt(double dt){
           RTIME t2 = ControlLoop::get_time_ns_rt();
           jscontroltime += (t2-t1) / 1e6;
           
+	  data_recorded=true;
+	  data.push_back(t1); // record the current time
+	  data.push_back(0);  // time factor (zero for no traj)
+	  data.push_back(0); // trajectory time (zero for no traj)
+	  for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+	    data.push_back(q_target[j]);  // record target position
+	    data.push_back(q[j]);         // record actual position
+	    data.push_back(pid_torq[j]);  // record the pid torques
+	  }
+
           if (safety_torques_exceeded(pid_torq)) {
             // NEW WAY:
 
@@ -1477,7 +1487,9 @@ void WAMstats::rosprint(int recorder_count) const {
 
 WAM::~WAM() {
   if (recorder.count > 0) {
-    recorder.dump("/tmp/wamstats_final.csv");
+    char filename[200];
+    snprintf(filename,200,"/tmp/wamstats%02d-final.csv",bus->id);
+    recorder.dump(filename);
   }
 }
 

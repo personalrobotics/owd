@@ -385,7 +385,7 @@ int CANbus::clear() {
   int32_t msgid, msglen;
   
   int count(0);
-  while (read_rt(&msgid, msg, &msglen, 0) == OW_SUCCESS) {
+  while (read_rt(&msgid, msg, &msglen, 50) == OW_SUCCESS) {
     ++count;
   }
   return count;
@@ -739,7 +739,7 @@ int CANbus::read_positions(double* positions){
 int CANbus::read_positions_rt(){
   uint8_t  msg[8];
 
-  int32_t *data=NULL;
+  static int32_t *data=NULL;
   int32_t value;
   int32_t msgid, msglen, property, nodeid;
   static double sendtime=0.0f;
@@ -784,17 +784,16 @@ int CANbus::read_positions_rt(){
 #endif // ! OWD_RT
 #endif // RT_STATS
 
-  int missed_reads(0);
+  bool missed_reads(false);
 #ifdef BH280
   for(int p=1; p<=npucks + 4; ){
 #else
   for(int p=1; p<=npucks; ){
 #endif // BH280
-    if(read_rt(&msgid, msg, &msglen, 3000) == OW_FAILURE){
+    if(read_rt(&msgid, msg, &msglen, 800) == OW_FAILURE){
       // ROS_WARN("CANbus::read_positions: read failed: %s",last_error);
-      ++missed_reads;
-      p++;
-      continue;
+      missed_reads=true;
+      break;
     }
 
     if(parse(msgid, msg, msglen, &nodeid, &property, &value) == OW_FAILURE){
@@ -813,13 +812,7 @@ int CANbus::read_positions_rt(){
     p++;
 
   }
-  if (missed_reads > 0) {
-    //    if (missed_reads > 1) {
-    //      // we're missing too many messages
-    //      ROS_WARN("Missed CANbus replies from %d pucks in a single read cycle",missed_reads);
-    //      return OW_FAILURE;
-    //    } else 
-
+  if (missed_reads) {
     if (++missing_data_cycles == 10) {
       // we went 10 cycles in a row while missing values from at
       // least 1 puck; give up!
