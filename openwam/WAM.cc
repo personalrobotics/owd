@@ -749,7 +749,8 @@ void control_loop_rt(void* argv){
         looptime=0.0f;
         loopcount=slowcount=0;
       }
-      
+
+#ifndef BH280_ONLY      
       if (!wam->bus->simulation) { // skip if running in simulation
 	int puckstate=wam->bus->get_puck_state();
 	if (puckstate != 2) {
@@ -776,6 +777,7 @@ void control_loop_rt(void* argv){
 	  wam->motor_state=WAM::MOTORS_ACTIVE;
 	}        
       }    
+#endif // BH280_ONLY
 
 
       // get ready for next pass
