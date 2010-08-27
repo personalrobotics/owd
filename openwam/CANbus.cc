@@ -231,13 +231,13 @@ int CANbus::check(){
 #ifdef BH280
   if(online_pucks < npucks + 4 ){
     ROS_INFO_NAMED("cancheck","Bus has %d pucks. We expected %d",online_pucks,npucks+4);
-    ROS_INFO_NAMED("cancheck","Attempting to reset all pucks");
-    for (int32_t node=1; node<=15; ++node) {
-      if (node != 10) {
-	// reset everything except the safety puck
-	set_property_rt(node,STAT,STATUS_RESET,false);
-      }
-    }
+    //    ROS_INFO_NAMED("cancheck","Attempting to reset all pucks");
+    //    for (int32_t node=1; node<=15; ++node) {
+    //      if (node != 10) {
+    //	// reset everything except the safety puck
+    //	set_property_rt(node,STAT,STATUS_RESET,false);
+    //      }
+    //    }
     return OW_FAILURE;
   }
 #else
