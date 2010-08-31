@@ -114,6 +114,7 @@ WamDriver::WamDriver(int canbus_number) :
   ti.end_position.resize(nJoints,0.0f);
 #endif
   ti.options = 0;
+  ti.state=pr_msgs::TrajInfo::state_done;
   wamstate.prev_trajectory = ti;
 
   // Construct the base transforms, based on the dimensions
@@ -1513,6 +1514,7 @@ pr_msgs::AddTrajectory::Response WamDriver::AddTrajectory(
   if (t->HoldOnStall) {
     ti.options |= pr_msgs::JointTraj::opt_HoldOnStall;
   }
+  ti.state = pr_msgs::TrajInfo::state_pending;
   wamstate.trajectory_queue.push_back(ti);
 
 
@@ -1555,7 +1557,11 @@ bool WamDriver::DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
     if (owam->jointstraj && (owam->jointstraj->id == delete_id)) {
       owam->unlock();
       owam->cancel_trajectory();
-      wamstate.trajectory_queue.erase(wamstate.trajectory_queue.begin());
+      if (wamstate.trajectory_queue.size() > 0) {
+	wamstate.prev_trajectory = wamstate.trajectory_queue.front();
+	wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_aborted;
+	wamstate.trajectory_queue.erase(wamstate.trajectory_queue.begin());
+      }
     } else {
       owam->unlock();
       for (tl_it = trajectory_list.begin(),
@@ -1637,9 +1643,15 @@ bool WamDriver::PauseTrajectory(pr_msgs::PauseTrajectory::Request &req,
   if (owam->jointstraj) {
     if (req.pause) {
       owam->pause_trajectory();
+      if (wamstate.trajectory_queue.size() > 0) {
+	wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_paused;
+      }
       ROS_INFO("Trajectory paused");
     } else {
       owam->resume_trajectory();
+      if (wamstate.trajectory_queue.size() > 0) {
+	wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_running;
+      }
       ROS_INFO("Trajectory resumed");
     }
     return true;
@@ -1692,7 +1704,11 @@ bool WamDriver::CancelAllTrajectories(
   if (owam->jointstraj) {
     owam->cancel_trajectory();
   }
-  wamstate.trajectory_queue.clear();
+  if (wamstate.trajectory_queue.size() > 0) {
+    wamstate.prev_trajectory = wamstate.trajectory_queue.front();
+    wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_aborted;
+    wamstate.trajectory_queue.clear();
+  }
   return true;
 }
 
@@ -1775,6 +1791,7 @@ void WamDriver::Update() {
   
   if (wamstate.trajectory_queue.size() > 0) {
     wamstate.prev_trajectory = wamstate.trajectory_queue.front();
+    wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_done;
     wamstate.trajectory_queue.erase(wamstate.trajectory_queue.begin());
   }
 
@@ -1817,6 +1834,9 @@ void WamDriver::Update() {
   // load next trajectory
   owam->run_trajectory(trajectory_list.front());
   trajectory_list.pop_front();
+  if (wamstate.trajectory_queue.size() > 0) {
+    wamstate.trajectory_queue.front().state=pr_msgs::TrajInfo::state_running;
+  }
 }
 
 void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &servo) {
