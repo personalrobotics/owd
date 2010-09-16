@@ -1,0 +1,6 @@
+string goal_station_name
+float64 goal_station_distance
+string prev_station_name
+float prev_station_distance
+string closest_station_name
+float closest_station_distance
