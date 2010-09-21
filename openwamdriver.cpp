@@ -1323,7 +1323,12 @@ bool WamDriver::Publish() {
         wamstate.state=pr_msgs::WAMState::state_fixed;
       }
     } else {
-      wamstate.state=pr_msgs::WAMState::state_moving;
+      // trajectory is still running, but we still might be hitting something
+      if (owam->safety_hold) {
+        wamstate.state=pr_msgs::WAMState::state_stalled;
+      } else {
+	wamstate.state=pr_msgs::WAMState::state_moving;
+      }
     }
   } else if (owam->holdpos) {
     wamstate.state = pr_msgs::WAMState::state_fixed;
