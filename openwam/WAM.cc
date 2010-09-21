@@ -945,6 +945,7 @@ void WAM::newcontrol_rt(double dt){
 		  data.push_back(pid_torq[j]);  // record the pid torques
 	    }
 
+#ifndef OWDSIM
             if (safety_torques_exceeded(pid_torq)) {
               // hold here with zero target velocity and acceleration,
               // and wait until the limit condition goes away.
@@ -978,6 +979,7 @@ void WAM::newcontrol_rt(double dt){
               }
               safety_hold=false;
             }
+#endif // OWDSIM
           } catch (char *error) {
             // most likely a problem evaluating the trajectory, so
             // halt it and just hold position
