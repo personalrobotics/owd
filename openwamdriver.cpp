@@ -390,7 +390,24 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
     } catch (const char *error) {
       snprintf(last_trajectory_error,200,"Error building blended traj: %s",error);
       ROS_ERROR_NAMED("BuildTrajectory","%s",last_trajectory_error);
-      return NULL;
+      for (int tt=0; tt<traj.size(); ++tt) {
+	ROS_ERROR_NAMED("BuildTrajectory","  Traj point %d: %s",tt,
+			traj[tt].sdump());
+      }
+      // this error is often happening when trying to build a blended traj
+      // from just half of a 2-arm traj when one arm doesn't move much.  we
+      // can usually still succeed with a non-blended traj
+      ROS_ERROR_NAMED("BuildTrajectory","Trying to use a ParaJointTraj instead");
+      try {
+	ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,cmdnum);
+	ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
+	ROS_DEBUG_NAMED("BuildTrajectory","Segments=%d, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
+	return paratraj;
+      } catch (const char * error) {
+	snprintf(last_trajectory_error,200,"Error building parabolic traj: %s",error);
+	ROS_ERROR_NAMED("BuildTrajectory","%s",last_trajectory_error);
+	return NULL;
+      }
     }
   }
 }

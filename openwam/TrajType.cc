@@ -1,4 +1,6 @@
 #include "TrajType.hh"
+#include <string.h>
+
 
 TrajPoint& TrajPoint::operator=(const TrajPoint &rhs) {
     *(JointPos*)this = *(const JointPos*)&rhs;
@@ -47,6 +49,19 @@ void JointPos::dump() const {
     printf("%2.3f ",this->operator[](i));
   }
   printf("]\n");
+}
+
+const char *JointPos::sdump() const {
+  static char outstring[400];
+  snprintf(outstring,400,"[ ");
+  for (unsigned int i=0; i<size(); ++i) {
+    int length=strlen(outstring);
+    snprintf(outstring+length,400-length,"%2.3f ",this->operator[](i));
+  }
+  if (strlen(outstring) < 399) {
+    strcat(outstring,"]");
+  }
+  return outstring;
 }
 
 void JointPos::SetFromArray(const unsigned int arraysize, const double *p) {

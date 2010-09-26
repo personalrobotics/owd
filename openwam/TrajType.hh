@@ -14,6 +14,7 @@ public:
   double length() const;
   void cpy(double *out) const;
   void dump() const;
+  const char* sdump() const;
   void SetFromArray(const unsigned int, const double *);
 
   inline bool operator!=(const JointPos &rhs) const {
