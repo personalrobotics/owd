@@ -80,6 +80,7 @@ WamDriver::WamDriver(int canbus_number) :
   max_joint_vel.push_back(2.0); // J6
   max_joint_vel.push_back(1.0); // J7
   max_jerk = 10.0 * 3.141592654;
+  last_trajectory_error[0]=0;
   
   for (unsigned int j=0; j<nJoints; ++j) {
     joint_vel.push_back(max_joint_vel[j]);
@@ -356,13 +357,13 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
   try {
     traj=ros2owd_traj(jt);
   } catch (char *error) {
-    ROS_ERROR_NAMED("BuildTrajectory","Could not extract valid trajectory: %s",
-                    error);
+    snprintf(last_trajectory_error,200,"Could not extract valid trajectory: %s",error);
+    ROS_ERROR_NAMED("BuildTrajectory","%s",last_trajectory_error);
     return NULL;
   }
   bool bWaitForStart=(jt.options & jt.opt_WaitForStart);
   bool bHoldOnStall=(jt.options & jt.opt_HoldOnStall);
-  
+
   if (!blended_traj) {
     ROS_WARN_NAMED("BuildTrajectory","No blends found; using ParaJointTraj");
 
@@ -373,8 +374,8 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
       
       return paratraj;
     } catch (const char * error) {
-      ROS_ERROR_NAMED("BuildTrajectory","Error building parabolic traj: %s",
-                      error);
+      snprintf(last_trajectory_error,200,"Error building parabolic traj: %s",error);
+      ROS_ERROR_NAMED("BuildTrajectory","%s",last_trajectory_error);
       return NULL;
     }
   } else {
@@ -387,8 +388,8 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
       ROS_DEBUG_NAMED("BuildTrajectory","MacFarlane blended trajectory built");
       return mactraj;
     } catch (const char *error) {
-      ROS_ERROR_NAMED("BuildTrajectory","Error building blended traj: %s",
-                      error);
+      snprintf(last_trajectory_error,200,"Error building blended traj: %s",error);
+      ROS_ERROR_NAMED("BuildTrajectory","%s",last_trajectory_error);
       return NULL;
     }
   }
@@ -1499,10 +1500,29 @@ pr_msgs::AddTrajectory::Response WamDriver::AddTrajectory(
     }
   }
 
+  // check for trajectories that don't actually go anywhere
+  bool zerodist = true;
+  for (int k=1; k<jointtraj->positions.size(); ++k) {
+    if (firstpoint != JointPos(jointtraj->positions[k].j)) {
+      zerodist=false;
+      break;
+    }
+  }
+
+  if (zerodist) {
+    // ParaJointTraj handles the zero-distance case better than
+    // MacJointTraj, so wipe out all the blend radii to force a
+    // ParaJointTraj to be used.
+    for (unsigned int k=0; k<jointtraj->blend_radius.size(); ++k) {
+      jointtraj->blend_radius[k]=0.0;
+    }
+  }
+
   // build trajectory
   Trajectory *t = BuildTrajectory(*jointtraj);
   if (!t) {
-    res.reason="BuildTrajectory failed";
+    res.reason="BuildTrajectory failed: ";
+    res.reason += std::string(last_trajectory_error);
     res.id = 0;
     res.ok=false;
     return res;

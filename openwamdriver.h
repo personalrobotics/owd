@@ -143,6 +143,7 @@ private:
     struct timeval trajstarttime;
     bool intraj;
     std::list<Trajectory *> trajectory_list;
+    char last_trajectory_error[200];
 
     // update internal structures
     void resetDesiredJointPositions(void);
