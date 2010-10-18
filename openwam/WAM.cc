@@ -111,37 +111,37 @@ WAM::WAM(CANbus* cb) :
                         Inertia(  604.1921,     0.0825,     -0.1896,
                                   269.3020,   -62.3326,    507.9036, M2_MM2) );
 */
-#else
+#else // !WRIST
 
   // NO WRIST
-#ifdef BH8
+
   // my guess is that the HAND COG is x=-.045m,y=0,z=.410m from J4
   // hand mass with camera is 1.3kg
   // new COG: X=(.01096*1.065 + .045*1.3)/(1.065+1.3) = .0297
   //          Z=(.14054*1.065 + .410*1.3)/(1.065+1.3) = .2887
-  links[Link::L4]=Link( DH(  M_PI_2,  -0.0450,   0.0000,   0.0000), 2.36513649,
-                        R3(  0.0297,0.00002567,0.2887),
-                        Inertia(0.01848577,    0.00000219,  -0.00160868,
-                                0.01891658,    -0.00000515,   0.00197517, 1) );
-
-#else
-  links[Link::L4]=Link( DH(  M_PI_2,  -0.0450,   0.0000,   0.0000), 1.06513649,
-                        R3(  0.01095471,0.00002567,0.14053900),
-                        Inertia(0.01848577,    0.00000219,  -0.00160868,
-                                0.01891658,    -0.00000515,   0.00197517, 1) );
+  Link L4_without_wrist_with_hand
+    =Link( DH(  M_PI_2,  -0.0450,   0.0000,   0.0000), 2.36513649,
+	   R3(  0.0297,0.00002567,0.2887),
+	   Inertia(0.01848577,    0.00000219,  -0.00160868,
+		   0.01891658,    -0.00000515,   0.00197517, 1) );
+  Link L4_without_wrist_without_hand
+    =Link( DH(  M_PI_2,  -0.0450,   0.0000,   0.0000), 1.06513649,
+	   R3(  0.01095471,0.00002567,0.14053900),
+	   Inertia(0.01848577,    0.00000219,  -0.00160868,
+		   0.01891658,    -0.00000515,   0.00197517, 1) );
   /* newer numbers from Barrett's Oct 2007 WAM_MassParams_AA-01.pdf 
        Lxx = 0.01848577        Lxy = 0.00000219      Lxz = ­0.00160868 
        Lyx = 0.00000219        Lyy = 0.01891658      Lyz = 0.00000515 
        Lzx = ­0.00160868       Lzy = 0.00000515      Lzz = 0.00197517 
   */
-
-#endif
-
-
-#endif // WRIST
-
 #ifdef BH8
-#warning "COMPILING HAND"
+  links[Link::L4] = L4_without_wrist_with_hand;
+#else // !BH8
+  links[Link::L4] = L4_without_wrist_without_hand;
+#endif // !BH8
+
+#endif // !WRIST
+
   //
   // FAT WARNING
   // I had the mass and the center of mass from old files from Barrett.
@@ -151,25 +151,18 @@ WAM::WAM(CANbus* cb) :
   // The kinematics remains the one of J7.
 
   //new inertias
-  links[Link::L7]=Link( DH(  0.0000,   0.0000,   0.0620,   0.0000), 1.3754270,
-                        R3(  0.0000,   0.0000,  45.0000)*0.001,
-                        Inertia(   2558.1007,   0.0000,      0.0000,
-                                   2558.1007,   0.0000,   1242.1825, M2_MM2) );
+  L7_with_hand 
+    = Link( DH(  0.0000,   0.0000,   0.0620,   0.0000), 1.3754270,
+	    R3(  0.0000,   0.0000,  45.0000)*0.001,
+	    Inertia(   2558.1007,   0.0000,      0.0000,
+		       2558.1007,   0.0000,   1242.1825, M2_MM2) );
  
 
-//                        Inertia(   2231.8750,   0.0000,      0.0000,                                   2231.8750,   0.0000,   1083.7500, M2_MM2) );
-  /*
-  links[Link::L7]=Link( DH(  0.0000,   0.0000,   0.0620,   0.0000), 1.3000,
-                        R3( -30.0000,   0.0000,  45.0000)*0.001,
-                        Inertia(   2231.8750,   0.0000,      0.0000,
-                                   2231.8750,   0.0000,   1083.7500, M2_MM2) );
-  */
-#else
-
-  links[Link::L7]=Link( DH(  0.0000,   0.0000,   0.0609,   0.0000), 0.07548270,
-                        R3( 0.00014836,0.00007252,-0.00335185),
-                        Inertia(   0.00003911,    0.00000019,      0.0000,
-                                   0.00003877,     0.00000,     0.00007614, M2_MM2) );
+  L7_without_hand 
+    = Link( DH(  0.0000,   0.0000,   0.0609,   0.0000), 0.07548270,
+	    R3( 0.00014836,0.00007252,-0.00335185),
+	    Inertia(   0.00003911,    0.00000019,      0.0000,
+		       0.00003877,     0.00000,     0.00007614, M2_MM2) );
             /*from wam7hand.conf:
             <0.00003911,0.00000019,0.00000000>,
             <0.00000019,0.00003877,0.00000000>,
@@ -183,7 +176,12 @@ WAM::WAM(CANbus* cb) :
                                    21.6157,     0.0040,     42.1975, M2_MM2) );
 */
 
-#endif
+#ifdef BH8
+#warning "COMPILING HAND"
+  links[Link::L7] = L7_with_hand;
+#else // !BH8
+  links[Link::L7] = L7_without_hand;
+#endif // !BH8
 
   for (unsigned int i=Link::L1; i<=Link::Ln; ++i) {
     sim_links[i] = links[i];
@@ -235,6 +233,24 @@ int WAM::init(){
   loadSeaParams();
 #endif
   return OW_SUCCESS;
+}
+
+void WAM::set_hand(bool h) {
+  if (Link::Ln == Link::L7) {
+    // wrist installed
+    if (h) {
+      links[Link::L7] = L7_with_hand;
+    } else {
+      links[Link::L7] = L7_without_hand;
+    }
+  } else {
+    // no wrist
+    if (h) {
+      links[Link::L4] = L4_without_wrist_with_hand;
+    } else {
+      links[Link::L4] = L4_without_wrist_without_hand;
+    }
+  }
 }
 
 bool WAM::set_gains(unsigned int joint,
@@ -1490,10 +1506,12 @@ void WAMstats::rosprint(int recorder_count) const {
 }
 
 WAM::~WAM() {
+#ifndef OWDSIM // don't log data during simulations
   if (recorder.count > 0) {
     char filename[200];
     snprintf(filename,200,"/tmp/wamstats%02d-final.csv",bus->id);
     recorder.dump(filename);
   }
+#endif // ! OWDSIM
 }
 

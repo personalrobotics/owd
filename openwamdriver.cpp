@@ -191,6 +191,10 @@ bool WamDriver::Init(const char *joint_cal_file)
     return false;
   }
   
+  ros::NodeHandle n("~");
+  bool hand;
+  n.param("hand_installed",hand,true);
+  owam->set_hand(hand);
   
   // Read our motor offsets from file (if found) and apply them
   // to the encoder values
@@ -1811,6 +1815,7 @@ void WamDriver::Pump(const ros::TimerEvent& e) {
 
 void WamDriver::Update() {
   
+#ifndef OWDSIM // don't log data if running simulation
   static int statcount = 0;
   if (++statcount == 20) {
     owam->rosprint_stats();
@@ -1826,6 +1831,7 @@ void WamDriver::Update() {
   }
     statcount=0;
   }
+#endif // ! OWDSIM
 
   if (owam->jointstraj) {
     return; // still running a trajectory

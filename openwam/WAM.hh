@@ -123,6 +123,8 @@ public:
   Motor motors[Motor::Mn+1];               // Array of motors
   Link links[Link::Ln+1];                  // Array of links
   Link sim_links[Link::Ln+1];                  // Array of links (simulated)
+  Link L7_with_hand, L7_without_hand,
+    L4_without_wrist_with_hand, L4_without_wrist_without_hand;
   double heldPositions[Joint::Jn+1];
   bool suppress_controller[Joint::Jn+1];    // flag to disable PID control
   bool check_safety_torques;
@@ -198,6 +200,7 @@ public:
   void newcontrol_rt(double dt);          // main control function
   bool safety_torques_exceeded(double t[]); // check pid torqs against thresholds
 
+  void set_hand(bool h);     // change the hand mass
   int  set_targ_jpos(double* pos);          // set the target joint positions online 
   int  set_jpos(double pos[Joint::Jn+1]);   // set the joint positions offline
   bool set_gains(unsigned int joint, pr_msgs::PIDgains &gains);
