@@ -1,3 +1,10 @@
+/***********************************************************************
+ *                                                                     *
+ * Copyright 2010 Carnegie Mellon University and Intel Labs Pittsburgh *
+ * Author: Mike Vande Weghe <vandeweg@cmu.edu>                         *
+ *                                                                     *
+ ***********************************************************************/
+
 #ifndef DATARECORDER_CC
 #define DATARECORDER_CC
 

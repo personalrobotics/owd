@@ -1,5 +1,12 @@
 #! /usr/bin/perl
 
+# ***********************************************************************
+# *                                                                     *
+# * Copyright 2010 Carnegie Mellon University and Intel Labs Pittsburgh *
+# * Author: Mike Vande Weghe <vandeweg@cmu.edu>                         *
+# *                                                                     *
+# ***********************************************************************
+
 # run this by doing a "tail -f" of the current wamdriver log and piping it
 # to this script
 

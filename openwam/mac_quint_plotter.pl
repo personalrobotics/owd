@@ -1,5 +1,12 @@
 #! /usr/bin/perl
 
+# ***********************************************************************
+# *                                                                     *
+# * Copyright 2010 Carnegie Mellon University and Intel Labs Pittsburgh *
+# * Author: Mike Vande Weghe <vandeweg@cmu.edu>                         *
+# *                                                                     *
+# ***********************************************************************
+
 use IO::Handle;
 
 $GP[0] = "GNUPLOT0";

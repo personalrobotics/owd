@@ -1,3 +1,10 @@
+/***********************************************************************
+ *                                                                     *
+ * Copyright 2010 Carnegie Mellon University and Intel Labs Pittsburgh *
+ * Author: Mike Vande Weghe <vandeweg@cmu.edu>                         *
+ *                                                                     *
+ ***********************************************************************/
+
 #include "ConstrainedForceTrajectory.hh"
 #include "Joint.hh"
 #include <stdlib.h>

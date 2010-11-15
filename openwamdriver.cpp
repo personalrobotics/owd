@@ -1,7 +1,13 @@
+/***********************************************************************
+ *                                                                     *
+ * Copyright 2010 Carnegie Mellon University and Intel Labs Pittsburgh *
+ * Author: Mike Vande Weghe <vandeweg@cmu.edu>                         *
+ *                                                                     *
+ ***********************************************************************/
+
 /*
  *  openwamdriver.cpp
  *  A ROS driver for the Barrett WAM arm.
- *  Copyright 2009, Mike Vande Weghe, Carnegie Mellon University
  *
  */
 
