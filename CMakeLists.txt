@@ -72,11 +72,6 @@ rosbuild_add_compile_flags(owdsim "-DOWDSIM")
 
 rosbuild_add_executable(owd_test test.cpp)
 
-rosbuild_add_executable(ow_util ow_util.cc)
-target_link_libraries(ow_util ${CANBUS_LIBS})
-rosbuild_add_compile_flags(ow_util "${CANBUS_DEFS}")
-rosbuild_add_link_flags(ow_util "${CANBUS_LDFLAGS}")
-
 include(detect_cpu.cmake)
 
 if (DEFINED ENV{OWD_MARCH_FLAGS})

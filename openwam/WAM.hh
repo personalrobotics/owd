@@ -23,8 +23,6 @@
       Carnegie Mellon University
 */
 
-//LLL
-//#define BUILD_FOR_SEA
 
 #include <semaphore.h>
 #include <list>
@@ -46,13 +44,6 @@
 #include "Sigmoid.hh"
 #include "JointCtrlPID.hh"
 #include <pr_msgs/PIDgains.h>
-
-//LLL
-
-#ifdef BUILD_FOR_SEA
-#include "positionInterface/SmoothArm.h"
-#include "JointCtrlSea.hh"
-#endif // BUILD_FOR_SEA
 
 #include "DataRecorder.cc"
 
@@ -148,12 +139,7 @@ public:
   double safetytorquesum[7];
 
 
-#ifdef BUILD_FOR_SEA
-  JointCtrlSea jointsctrl[Joint::Jn+1];    // joint controllers
-  void loadSeaParams();
-#else
   JointCtrlPID jointsctrl[Joint::Jn+1];    // joint controllers
-#endif
 
   bool rec;                                // Are we recording data
   bool wsdyn;                              // Is the WS dynamics turned on?
@@ -185,13 +171,6 @@ public:
 
   CANbus* bus;                             // pointer to the CAN bus
   ControlLoop ctrl_loop;            // control loop object
-
-  // LLL a beta version of joint targs
-  //JointTargets jointTargs;
-  // LLL a beta version of position smoother 
-#ifdef BUILD_FOR_SEA
-  SmoothArm posSmoother;
-#endif // BUILD_FOR_SEA
 
   WAM(CANbus* cb);
   ~WAM();

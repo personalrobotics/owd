@@ -235,9 +235,6 @@ int WAM::init(){
     // set 280 Hand gains here
   }
 
-#ifdef BUILD_FOR_SEA
-  loadSeaParams();
-#endif
   return OW_SUCCESS;
 }
 
@@ -276,183 +273,6 @@ bool WAM::get_gains(std::vector<pr_msgs::PIDgains > &gains) {
   return true;
 }
 
-#ifdef BUILD_FOR_SEA
-void WAM::loadSeaParams(){
-  // retrieve sea from ros param server, if available
-  ros::Node* node = ros::Node::instance();
-
-  assert(Joint::Jn == 7);
-
-  // assume 7 joints
-  assert(Joint::Jn == 7);
-
-  // safe settings (used when there is no torque limit)
-  // j1
-  double kpSafe, kiSafe, kdSafe;
-  node->param(std::string("owd/JointCtrlSea/j1Kp_safe"), kpSafe, 1800.0);
-  node->param(std::string("owd/JointCtrlSea/j1Ki_safe"), kiSafe, 0.0);
-  node->param(std::string("owd/JointCtrlSea/j1Kd_safe"), kdSafe, 10.0);
-  ROS_INFO("j1 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
-  jointsctrl[1].specifySafeSettings(kpSafe, kiSafe, kdSafe);
-  // j2
-  node->param(std::string("owd/JointCtrlSea/j2Kp_safe"), kpSafe, 1800.0);
-  node->param(std::string("owd/JointCtrlSea/j2Ki_safe"), kiSafe, 0.0);
-  node->param(std::string("owd/JointCtrlSea/j2Kd_safe"), kdSafe, 10.0);
-  ROS_INFO("j2 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
-  jointsctrl[2].specifySafeSettings(kpSafe, kiSafe, kdSafe);
-  // j3
-  node->param(std::string("owd/JointCtrlSea/j3Kp_safe"), kpSafe, 2000.0);
-  node->param(std::string("owd/JointCtrlSea/j3Ki_safe"), kiSafe, 0.0);
-  node->param(std::string("owd/JointCtrlSea/j3Kd_safe"), kdSafe, 20.0);
-  ROS_INFO("j3 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
-  jointsctrl[3].specifySafeSettings(kpSafe, kiSafe, kdSafe);
-  // j4
-  node->param(std::string("owd/JointCtrlSea/j4Kp_safe"), kpSafe, 1200.0);
-  node->param(std::string("owd/JointCtrlSea/j4Ki_safe"), kiSafe, 0.0);
-  node->param(std::string("owd/JointCtrlSea/j4Kd_safe"), kdSafe, 10.0);
-  ROS_INFO("j4 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
-  jointsctrl[4].specifySafeSettings(kpSafe, kiSafe, kdSafe);
-  // j5
-  node->param(std::string("owd/JointCtrlSea/j5Kp_safe"), kpSafe, 300.0);
-  node->param(std::string("owd/JointCtrlSea/j5Ki_safe"), kiSafe, 0.0);
-  node->param(std::string("owd/JointCtrlSea/j5Kd_safe"), kdSafe, 5.0);
-  ROS_INFO("j5 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
-  jointsctrl[5].specifySafeSettings(kpSafe, kiSafe, kdSafe);
-  // j6
-  node->param(std::string("owd/JointCtrlSea/j6Kp_safe"), kpSafe, 10.0);
-  node->param(std::string("owd/JointCtrlSea/j6Ki_safe"), kiSafe, 0.0);
-  node->param(std::string("owd/JointCtrlSea/j6Kd_safe"), kdSafe, 1.5);
-  ROS_INFO("j6 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
-  jointsctrl[6].specifySafeSettings(kpSafe, kiSafe, kdSafe);
-  // j7
-  node->param(std::string("owd/JointCtrlSea/j7Kp_safe"), kpSafe, 2.0);
-  node->param(std::string("owd/JointCtrlSea/j7Ki_safe"), kiSafe, 0.0);
-  node->param(std::string("owd/JointCtrlSea/j7Kd_safe"), kdSafe, 0.1);
-  ROS_INFO("j7 safe settings kp:%f, ki:%f, kd:%f", kpSafe, kiSafe, kdSafe);
-  jointsctrl[7].specifySafeSettings(kpSafe, kiSafe, kdSafe);
-
-
-  double torqLimit;
-  // J1
-  node->param(std::string("owd/JointCtrlSea/j1Limit"), torqLimit, 15.0);
-  ROS_INFO("owd/JointCtrlSea/j1Limit %f", torqLimit);
-  jointsctrl[1].setTorqLimit(torqLimit);
-  // J2
-  node->param(std::string("owd/JointCtrlSea/j2Limit"), torqLimit, 15.0);
-  ROS_INFO("owd/JointCtrlSea/j2Limit %f", torqLimit);
-  jointsctrl[2].setTorqLimit(torqLimit);
-  // J3
-  node->param(std::string("owd/JointCtrlSea/j3Limit"), torqLimit, 10.0);
-  ROS_INFO("owd/JointCtrlSea/j3Limit %f", torqLimit);
-  jointsctrl[3].setTorqLimit(torqLimit);
-  // J4
-  node->param(std::string("owd/JointCtrlSea/j4Limit"), torqLimit, 8.0);
-  ROS_INFO("owd/JointCtrlSea/j4Limit %f", torqLimit);
-  jointsctrl[4].setTorqLimit(torqLimit);
-  // J5
-  node->param(std::string("owd/JointCtrlSea/j5Limit"), torqLimit, 3.0);
-  ROS_INFO("owd/JointCtrlSea/j5Limit %f", torqLimit);
-  jointsctrl[5].setTorqLimit(torqLimit);
-  // J6
-  node->param(std::string("owd/JointCtrlSea/j6Limit"), torqLimit, 3.0);
-  ROS_INFO("owd/JointCtrlSea/j6Limit %f", torqLimit);
-  jointsctrl[6].setTorqLimit(torqLimit);
-  // J7
-  node->param(std::string("owd/JointCtrlSea/j7Limit"), torqLimit, 1.0);
-  ROS_INFO("owd/JointCtrlSea/j7Limit %f", torqLimit);
-  jointsctrl[7].setTorqLimit(torqLimit);
-
-  double kp;
-  // J1
-  node->param(std::string("owd/JointCtrlSea/j1Kp"), kp, 1800.0);
-  ROS_INFO("owd/JointCtrlSea/j1Kp %f", kp);
-  jointsctrl[1].setKp(kp);
-  // J2
-  node->param(std::string("owd/JointCtrlSea/j2Kp"), kp, 2000.0);
-  ROS_INFO("owd/JointCtrlSea/j2Kp %f", kp);
-  jointsctrl[2].setKp(kp);
-  // J3
-  node->param(std::string("owd/JointCtrlSea/j3Kp"), kp, 1200.0);
-  ROS_INFO("owd/JointCtrlSea/j3Kp %f", kp);
-  jointsctrl[3].setKp(kp);
-  // J4
-  node->param(std::string("owd/JointCtrlSea/j4Kp"), kp, 300.0);
-  ROS_INFO("owd/JointCtrlSea/j4Kp %f", kp);
-  jointsctrl[4].setKp(kp);
-  // J5
-  node->param(std::string("owd/JointCtrlSea/j5Kp"), kp, 10.0);
-  ROS_INFO("owd/JointCtrlSea/j5Kp %f", kp);
-  jointsctrl[5].setKp(kp);
-  // J6
-  node->param(std::string("owd/JointCtrlSea/j6Kp"), kp, 15.0);
-  ROS_INFO("owd/JointCtrlSea/j6Kp %f", kp);
-  jointsctrl[6].setKp(kp);
-  // J7
-  node->param(std::string("owd/JointCtrlSea/j7Kp"), kp, 2.0);
-  ROS_INFO("owd/JointCtrlSea/j7Kp %f", kp);
-  jointsctrl[7].setKp(kp);
-
-  double kd;
-  // J1
-  node->param(std::string("owd/JointCtrlSea/j1Kd"), kd, 10.0);
-  ROS_INFO("owd/JointCtrlSea/j1Kd %f", kd);
-  jointsctrl[1].setKd(kd);
-  // J2
-  node->param(std::string("owd/JointCtrlSea/j2Kd"), kd, 20.0);
-  ROS_INFO("owd/JointCtrlSea/j2Kd %f", kd);
-  jointsctrl[2].setKd(kd);
-  // J3
-  node->param(std::string("owd/JointCtrlSea/j3Kd"), kd, 10.0);
-  ROS_INFO("owd/JointCtrlSea/j3Kd %f", kd);
-  jointsctrl[3].setKd(kd);
-  // J4
-  node->param(std::string("owd/JointCtrlSea/j4Kd"), kd, 5.0);
-  ROS_INFO("owd/JointCtrlSea/j4Kd %f", kd);
-  jointsctrl[4].setKd(kd);
-  // J5
-  node->param(std::string("owd/JointCtrlSea/j5Kd"), kd, 1.5);
-  ROS_INFO("owd/JointCtrlSea/j5Kd %f", kd);
-  jointsctrl[5].setKd(kd);
-  // J6
-  node->param(std::string("owd/JointCtrlSea/j6Kd"), kd, 0.1);
-  ROS_INFO("owd/JointCtrlSea/j6Kd %f", kd);
-  jointsctrl[6].setKd(kd);
-  // J7
-  node->param(std::string("owd/JointCtrlSea/j7Kd"), kd, 0.1);
-  ROS_INFO("owd/JointCtrlSea/j7Kd %f", kd);
-  jointsctrl[7].setKd(kd);
-
-  double ki;
-  // J1
-  node->param(std::string("owd/JointCtrlSea/j1Ki"), ki, 0.0);
-  ROS_INFO("owd/JointCtrlSea/j1Ki %f", ki);
-  jointsctrl[1].setKi(ki);
-  // J2
-  node->param(std::string("owd/JointCtrlSea/j2Ki"), ki, 0.0);
-  ROS_INFO("owd/JointCtrlSea/j2Ki %f", ki);
-  jointsctrl[2].setKi(ki);
-  // J3
-  node->param(std::string("owd/JointCtrlSea/j3Ki"), ki, 0.0);
-  ROS_INFO("owd/JointCtrlSea/j3Ki %f", ki);
-  jointsctrl[3].setKi(ki);
-  // J4
-  node->param(std::string("owd/JointCtrlSea/j4Ki"), ki, 0.0);
-  ROS_INFO("owd/JointCtrlSea/j4Ki %f", ki);
-  jointsctrl[4].setKi(ki);
-  // J5
-  node->param(std::string("owd/JointCtrlSea/j5Ki"), ki, 0.0);
-  ROS_INFO("owd/JointCtrlSea/j5Ki %f", ki);
-  jointsctrl[5].setKi(ki);
-  // J6
-  node->param(std::string("owd/JointCtrlSea/j6Ki"), ki, 0.0);
-  ROS_INFO("owd/JointCtrlSea/j6Ki %f", ki);
-  jointsctrl[6].setKi(ki);
-  // J7
-  node->param(std::string("owd/JointCtrlSea/j7Ki"), ki, 0.0);
-  ROS_INFO("owd/JointCtrlSea/j7Ki %f", ki);
-  jointsctrl[7].setKi(ki);
-}
-#endif
 
 
 /*
@@ -914,9 +734,6 @@ void WAM::newcontrol_rt(double dt){
     skipped_locks=0;
 
     if(jointstraj != NULL){
-#ifdef BUILD_FOR_SEA
-      posSmoother.invalidate();
-#endif // BUILD_FOR_SEA
       try {
             RTIME t3 = ControlLoop::get_time_ns_rt();        
             jointstraj->evaluate(q_target, qd_target, qdd_target, traj_timestep * timestep_factor);
@@ -933,9 +750,6 @@ void WAM::newcontrol_rt(double dt){
               // iteration (to help deccelerate if we're still moving), but
               // the next time around we'll start holding at the endpoint
               jointstraj->endPosition().cpy(&heldPositions[Joint::J1]);
-#ifdef BUILD_FOR_SEA	      
-              posSmoother.reset(heldPositions, Joint::Jn+1);   
-#endif
               holdpos = true;  // should have been true already, but just making sure
               delete jointstraj;
               jointstraj = NULL;
@@ -1011,14 +825,6 @@ void WAM::newcontrol_rt(double dt){
             double heldPositions[Joint::Jn+1];
             hold_position(heldPositions,false);
 
-#ifdef BUILD_FOR_SEA
-            // now do the same thing that the "if (holdpos)" step does, below
-	    try {
-	      posSmoother.getSmoothedPVA(heldPositions);
-	    } catch (char *errstr) {
-	      // state was invalid; ignore and use the one held (above)
-	    }
-#endif // BUILD_FOR_SEA
 	      
             for(int i = Joint::J1; i <= Joint::Jn; i++) {
               q_target[i] = heldPositions[i];
@@ -1031,25 +837,6 @@ void WAM::newcontrol_rt(double dt){
             
           }
         } else if (holdpos) {
-
-#ifdef BUILD_FOR_SEA
-          if ( posSmoother.isValid() == false ) {
-            // reset
-            std::vector<double> startPosVec;
-            // get current joint positions
-            for(int j=0; j<=Joint::Jn; j++) {
-              startPosVec.push_back(joints[j].q);
-            }
-            posSmoother.reset(startPosVec);
-          }
-
-	  try {
-	    posSmoother.getSmoothedPVA(heldPositions);
-	  } catch (char *errstr) {
-	    // state was invalid
-	  }
-          //TODO if we want to use jsdyn, I believe we will have to set qd_target and qdd_target
-#endif // BUILD_FOR_SEA
 
           for(int i = Joint::J1; i <= Joint::Jn; i++) {
             q_target[i] = heldPositions[i];
@@ -1074,27 +861,14 @@ void WAM::newcontrol_rt(double dt){
           if (safety_torques_exceeded(pid_torq)) {
             // NEW WAY:
 
-#ifdef BUILD_FOR_SEA
-            std::vector<double> slipPosVec;
-            // reset the posSmoother at a new
-            // target pos 10% towards the current pos 
-            for(int j=0; j<=Joint::Jn; j++) {
-              slipPosVec.push_back(0.9 * heldPositions[j] + 0.1 * joints[j].q);
-            }
-            posSmoother.reset(slipPosVec);
-#else // BUILD_FOR_SEA
 	    for(int jj = Joint::J1; jj <= Joint::Jn; jj++) {
 	      double jointdiff = joints[jj].q - heldPositions[jj];
 	      // inch the target pos 10% towards the current pos
 	      heldPositions[jj] += 0.1f * jointdiff;
 	    }
-#endif // BUILD_FOR_SEA
           }
 
         } else {
-#ifdef BUILD_FOR_SEA
-          posSmoother.invalidate();
-#endif // BUILD_FOR_SEA
           for(int i = Joint::J1; i <= Joint::Jn; i++) {
             pid_torq[i]=0.0f;  // zero out the torques otherwise
           }
@@ -1294,9 +1068,6 @@ int WAM::cancel_trajectory() {
     for(int i = Joint::J1; i<=Joint::Jn; i++) {
       heldPositions[i] = joints[i].q;
     }
-#ifdef BUILD_FOR_SEA
-    posSmoother.reset(heldPositions, Joint::Jn+1);   
-#endif // BUILD_FOR_SEA     
     holdpos = true;  // should have been true already, but just making sure
     delete jointstraj;
     jointstraj = NULL;
@@ -1329,13 +1100,6 @@ int WAM::hold_position(double jval[],bool grab_lock)
 {
     if (holdpos) { // we're already holding
         if (jval != NULL) {  // but we still need to return the position if requested
-#ifdef BUILD_FOR_SEA
-	    try {
-	      posSmoother.getSmoothedPVA(heldPositions);
-	    } catch (char *errstr) {
-	      // state was invalid
-	    }
-#endif // BUILD_FOR_SEA
             for (int i = Joint::J1; i<=Joint::Jn; i++) {
                 jval[i]=heldPositions[i];
             }
@@ -1371,9 +1135,6 @@ int WAM::hold_position(double jval[],bool grab_lock)
             jval[i]=heldPositions[i];
         }
     }
-#ifdef BUILD_FOR_SEA
-    posSmoother.reset(heldPositions, Joint::Jn+1);   
-#endif // BUILD_FOR_SEA
     holdpos = true;
 
     if (grab_lock) {
@@ -1397,9 +1158,6 @@ void WAM::release_position(bool grab_lock)
         }
         holdpos = false;
 
-#ifdef BUILD_FOR_SEA
-        posSmoother.invalidate();
-#endif // BUILD_FOR_SEA
 
         if (grab_lock) {
             this->unlock("release pos");
