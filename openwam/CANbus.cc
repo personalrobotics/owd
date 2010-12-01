@@ -1889,21 +1889,21 @@ int CANbus::hand_get_state(int32_t &state) {
 double CANbus::finger_encoder_to_radians(int32_t enc) {
   // encoder range: 0 to -200,000
   // degree range: 0 to 140
-  return  ((double)enc / -200000.0) * 140.0 * 3.1416/180.0;
+  return  ((double)enc / 200000.0) * 140.0 * 3.1416/180.0;
 }
 
 int32_t CANbus::finger_radians_to_encoder(double radians) {
-  return(radians * 180.0/3.1416 / 140.0 * -200000.0);
+  return(radians * 180.0/3.1416 / 140.0 * 200000.0);
 }
 
 double CANbus::spread_encoder_to_radians(int32_t enc) {
   // encoder range: 0 to -35950
   // degree range: 0 to 180
-  return ((double)enc / -35950.0) * 180.0 * 3.1416/180.0;
+  return ((double)enc / 35950.0) * 180.0 * 3.1416/180.0;
 }
 
 int32_t CANbus::spread_radians_to_encoder(double radians) {
-  return(radians * 180.0/3.1416 / 180.0 * -35950.0);
+  return(radians * 180.0/3.1416 / 180.0 * 35950.0);
 }
 
 #endif // BH280

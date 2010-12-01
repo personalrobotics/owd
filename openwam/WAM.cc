@@ -125,7 +125,7 @@ WAM::WAM(CANbus* cb) :
   // hand mass with camera is 1.3kg
   // new COG: X=(.01096*1.065 + .045*1.3)/(1.065+1.3) = .0297
   //          Z=(.14054*1.065 + .410*1.3)/(1.065+1.3) = .2887
-  Link L4_without_wrist_with_hand
+  Link L4_without_wrist_with_260_hand
     =Link( DH(  M_PI_2,  -0.0450,   0.0000,   0.0000), 2.36513649,
 	   R3(  0.0297,0.00002567,0.2887),
 	   Inertia(0.01848577,    0.00000219,  -0.00160868,
@@ -141,7 +141,7 @@ WAM::WAM(CANbus* cb) :
        Lzx = ­0.00160868       Lzy = 0.00000515      Lzz = 0.00197517 
   */
 #ifdef BH8
-  links[Link::L4] = L4_without_wrist_with_hand;
+  links[Link::L4] = L4_without_wrist_with_260_hand;
 #else // !BH8
   links[Link::L4] = L4_without_wrist_without_hand;
 #endif // !BH8
@@ -157,8 +157,18 @@ WAM::WAM(CANbus* cb) :
   // The kinematics remains the one of J7.
 
   //new inertias
-  L7_with_hand 
+  L7_with_260_hand 
     = Link( DH(  0.0000,   0.0000,   0.0620,   0.0000), 1.3754270,
+	    R3(  0.0000,   0.0000,  45.0000)*0.001,
+	    Inertia(   2558.1007,   0.0000,      0.0000,
+		       2558.1007,   0.0000,   1242.1825, M2_MM2) );
+  L7_with_280_hand  // same as 260 but with closer CG
+    = Link( DH(  0.0000,   0.0000,   0.0530,   0.0000), 1.27548270,
+	    R3(  0.0000,   0.0000,  45.0000)*0.001,
+	    Inertia(   2558.1007,   0.0000,      0.0000,
+		       2558.1007,   0.0000,   1242.1825, M2_MM2) );
+  L7_with_280FT_hand // FT sensor adds 0.13kg more mass and 0.012m more length
+    = Link( DH(  0.0000,   0.0000,   0.0590,   0.0000), 1.40548270,
 	    R3(  0.0000,   0.0000,  45.0000)*0.001,
 	    Inertia(   2558.1007,   0.0000,      0.0000,
 		       2558.1007,   0.0000,   1242.1825, M2_MM2) );
@@ -184,7 +194,7 @@ WAM::WAM(CANbus* cb) :
 
 #ifdef BH8
 #warning "COMPILING HAND"
-  links[Link::L7] = L7_with_hand;
+  links[Link::L7] = L7_with_280FT_hand;
 #else // !BH8
   links[Link::L7] = L7_without_hand;
 #endif // !BH8
@@ -238,20 +248,32 @@ int WAM::init(){
   return OW_SUCCESS;
 }
 
-void WAM::set_hand(bool h) {
+void WAM::set_hand(std::string hand_type) {
+  // This function adjusts the mass values of the arm links
+  // based on which hand is mounted to L7.
+  // hand_type can be one of:
+  //   "260" for the model 260 hand (gold body, serial control)
+  //   "280" for the model 280 hand (blue body, CANbus control)
+  //   "280FT" for the model 280 hand with the Force/Torque sensor
+  //   "none" for no hand
+
   if (Link::Ln == Link::L7) {
     // wrist installed
-    if (h) {
-      links[Link::L7] = L7_with_hand;
+    if (! hand_type.compare("260")) {
+      links[Link::L7] = L7_with_260_hand;
+    } else if (! hand_type.compare("280")) {
+      links[Link::L7] = L7_with_280_hand;
+    } else if (! hand_type.compare("280FT")) {
+      links[Link::L7] = L7_with_280FT_hand;
     } else {
       links[Link::L7] = L7_without_hand;
     }
   } else {
     // no wrist
-    if (h) {
-      links[Link::L4] = L4_without_wrist_with_hand;
-    } else {
+    if (! hand_type.compare("none")) {
       links[Link::L4] = L4_without_wrist_without_hand;
+    } else {
+      links[Link::L4] = L4_without_wrist_with_260_hand;
     }
   }
 }

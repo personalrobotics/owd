@@ -198,9 +198,9 @@ bool WamDriver::Init(const char *joint_cal_file)
   }
   
   ros::NodeHandle n("~");
-  bool hand;
-  n.param("hand_installed",hand,true);
-  owam->set_hand(hand);
+  std::string hand_type;
+  n.param("hand_type",hand_type,std::string("280FT"));
+  owam->set_hand(hand_type);
   
   // Read our motor offsets from file (if found) and apply them
   // to the encoder values
