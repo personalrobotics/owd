@@ -1,0 +1,99 @@
+/**
+\mainpage
+\htmlinclude manifest.html
+
+\b OWD
+ is a ROS driver for controlling a Barrett WAM Arm and/or model 280 Hand.
+
+<!--
+\section features Features
+It can do some stuff.
+-->
+
+\section downloading Downloading
+The OWD ROS package, and its pr_msgs dependency, can be obtained via svn from
+\verbatim
+http://svn.pittsburgh.intel-research.net/repos/pr/public/trunk/src/owd
+http://svn.pittsburgh.intel-research.net/repos/pr/public/trunk/src/pr_msgs
+\endverbatim
+
+\section dependencies Dependencies
+OWD requires either a Peak or an ESD CanBUS card.  The Peak IPEH-002066 (single channel) or IPEH-002067 (dual channel) card is recommended for desktop systems running Xenomai, while the Peak IPEH-002093 performs well on laptops if Xenomai is not required.
+
+The Peak Linux driver can be obtained from
+  \b http://www.peak-system.com/fileadmin/media/linux/files/peak-linux-driver.6.20.tar.gz
+
+Build it as follows:
+\verbatim
+  make NET=NO RT=XENOMAI
+  sudo make install
+\endverbatim
+
+The remaining system dependencies can be installed using rosdep once
+you have owd in your ROS_PACKAGE_PATH:
+\verbatim
+rosdep install owd
+\endverbatim
+
+\section building Building
+Make sure you have both the owd and pr_msgs directories in your ROS_PACKAGE_PATH, and then build owd using rosmake:
+\verbatim
+rosmake owd
+\endverbatim
+
+Six executables will be created:
+ - \b owd Driver for arm only
+ - \b owdrt Driver for arm running under Xenomai RT
+ - \b owdbhd Driver for arm plus 280 Hand
+ - \b owdbhdrt Driver for arm plus 280 Hand (Xenomai)
+ - \b canbhd Driver for 280 Hand only
+ - \b canbhdrt Driver for 280 Hand only (Xenomai)
+
+\section configuration Configuring
+\b owd.launch is a sample launch file for staring owd using \b roslaunch.  The following parameters are supported:
+
+ - \b ~/canbus_number Numeric id of the canbus device, appended to "/dev/pcan" for Peak cards or "/dev/can" for ESD cards.
+ - \b ~/hand_type Type of hand installed.  Should be one of:
+   - \b 260 For a BH260 Hand (serial communication)
+   - \b 280 For a BH280 Hand (CANbus communication)
+   - \b 280FT For a BH280 Hand with the Force/Torque sensor added
+   - \b none For no hand installed
+ - \b ~/calibration_file A string specifying a file to keep on disk of the joint calibration values (see the \b Calibration section below)
+
+\section running Running
+
+At this time OWD should be launched on the same machine it will run on, since it requires stdio for startup prompts.
+
+\verbatim
+roslaunch owd.launch
+\endverbatim
+
+No more than one OWD should be started from a single roslaunch file so that the stdio from each remains independent.
+
+\section controlling Controlling
+
+OWD is primarily controlled through ROS Service Calls.  The following service calls are currently supported (most services are defined in the pr_msgs package; the remainder are in owd):
+ - \b AddTrajectory: Adds a new joint trajectory to the queue
+ - \b SetStiffness: Controls how firmly OWD will try to hold the current position, on a scale from 0 (no holding at all) to 1 (firmly holding).
+ - \b PauseTrajectory: Pauses the currently-running trajectory
+ - \b DeleteTrajectory: Deletes the specified trajectory from the queue.  If the current trajectory is deleted then the arm will stop where it is.  Any queued trajectories following the deleted one will also be deleted if their start position does not match the current position (if the current trajectory was deleted) or the end position of the previous trajectory (if a queued trajectory was deleted)
+ - \b CancelAllTrajectories: Always brings the arm to an immediate stop by deleting the current trajectory and all queued trajectories.
+ - \b ReplaceTrajectory: Replaces a queued trajectory with a new one.  If the end position changes, then any subsequent trajectories already in the queue will be deleted.
+ - \b SetSpeed: Sets the max speed of each joint.  Note that there are compiled-in joint velocity limits which prevent the speed from being set to an unsafe value.
+ - \b GetArmDOF: Returns the number of joints
+ - \b CalibrateJoints: Puts the arm into <b>Calibration Mode</b>, so that the joints can be calibrated using the text interface on stdin/stdout.
+
+OWD can also be controlled by publishing messages to ROS topics:
+ - \b wamservo: A vector of one or more joint indices and corresponding velocities for moving the arm in velocity mode
+
+OWD provides feedback through the following ROS topics:
+ - \b wamstate: Joint positions, velocities, estimated torques due to external forces, and the state of the trajectory queue
+ - \b waminternals: Joint positions, total joint torques, feedforward torques from the dynamic simulators, and controller PID gain values
+
+Additionally, OWD publishes a TF frame for every link, defining \b wam1 in terms of \b wam0, \b wam2 in terms of \b wam1, etc, all the way up to \b wam7 in terms of \b wam6.
+
+\section calibration Calibration
+
+more info coming soon
+
+*/

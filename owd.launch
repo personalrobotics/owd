@@ -1,0 +1,13 @@
+<launch>
+
+  <param name="owd/calibration_file" type="string"
+    value="wam_joint_calibrations" />
+  <param name="owd/canbus_number" type="int" value="40" />
+  <param name="owd/hand_type" type="string" value="280FT" />
+
+  <node pkg="owd" type="owdbhd" output="screen" respawn="false"
+        cwd="node" name="owd">
+  </node>
+
+</launch>
+
