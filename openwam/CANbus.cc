@@ -310,7 +310,7 @@ int CANbus::check(){
       usleep(10000);
       
       ROS_DEBUG_NAMED("cancheck","Setting PID values");
-      if(set_property_rt(pucks[p].id(),PIDX, pucks[p].order(),true,15000)==OW_FAILURE){
+      if(set_property_rt(pucks[p].id(),PIDX, pucks[p].order(),false,15000)==OW_FAILURE){
 	ROS_WARN_NAMED("cancheck","set_property failed (PID)");
 	return OW_FAILURE;
       }
@@ -331,7 +331,7 @@ int CANbus::check(){
 	throw -1;  // unknown puck id
       }
           
-      if(set_property_rt(pucks[p].id(), MT, max_torque, true,15000) == OW_FAILURE){
+      if(set_property_rt(pucks[p].id(), MT, max_torque, false,15000) == OW_FAILURE){
 	ROS_WARN_NAMED("cancheck","set_property failed (max torque)");
 	return OW_FAILURE;
       }
@@ -340,7 +340,7 @@ int CANbus::check(){
     else{
       ROS_DEBUG_NAMED("cancheck"," (running)");
       ROS_DEBUG_NAMED("cancheck","setting idle mode...");
-      if(set_property_rt(pucks[p].id(), MODE, PUCK_IDLE, true, 10000) == OW_FAILURE){
+      if(set_property_rt(pucks[p].id(), MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
 	ROS_WARN_NAMED("cancheck","set_property failed (MODE)");
 	return OW_FAILURE;
       }
@@ -899,7 +899,7 @@ int CANbus::send_positions(double* mpos){
 
 int CANbus::send_AP(int32_t* apval){
 
-  if(set_property_rt(SAFETY_MODULE, IFAULT, 8, true,15000) == OW_FAILURE){
+  if(set_property_rt(SAFETY_MODULE, IFAULT, 8, false ,15000) == OW_FAILURE){
     ROS_WARN("CANbus::send_AP: set_property IFAULT=8 failed.");
     return OW_FAILURE;
   }
@@ -915,7 +915,7 @@ int CANbus::send_AP(int32_t* apval){
   read_positions_rt();
    
   // start monitoring tip velocity again
-  if(set_property_rt(SAFETY_MODULE, ZERO, 1, true,15000) == OW_FAILURE){
+  if(set_property_rt(SAFETY_MODULE, ZERO, 1,false,15000) == OW_FAILURE){
     ROS_WARN("CANbus::send_AP: set_property ZERO=1 failed.");
     return OW_FAILURE;
   }
@@ -1331,10 +1331,10 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
   int32_t conversion;
    
   // MVW 04-29-08
-  if ((set_property_rt(SAFETY_MODULE,TL1,6000,true,15000) == OW_FAILURE) ||
-      (set_property_rt(SAFETY_MODULE,TL2,9000,true,15000) == OW_FAILURE) ||
-      (set_property_rt(SAFETY_MODULE,VL1,(int32_t)(2*0x1000),true,15000) == OW_FAILURE) ||
-      (set_property_rt(SAFETY_MODULE,VL2,(int32_t)(3*0x1000),true,15000) == OW_FAILURE)) {
+  if ((set_property_rt(SAFETY_MODULE,TL1,6000,false,15000) == OW_FAILURE) ||
+      (set_property_rt(SAFETY_MODULE,TL2,9000,false,15000) == OW_FAILURE) ||
+      (set_property_rt(SAFETY_MODULE,VL1,(int32_t)(2*0x1000),false,15000) == OW_FAILURE) ||
+      (set_property_rt(SAFETY_MODULE,VL2,(int32_t)(3*0x1000),false,15000) == OW_FAILURE)) {
       return OW_FAILURE;
   }
 
@@ -1346,7 +1346,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
       return OW_FAILURE;
   }
   ROS_DEBUG_NAMED("canlimits","VOLTH1 was %d, changing to 54",voltlevel);
-  if (set_property_rt(SAFETY_MODULE,VOLTH1,54,true,15000) == OW_FAILURE) {
+  if (set_property_rt(SAFETY_MODULE,VOLTH1,54,false,15000) == OW_FAILURE) {
       ROS_ERROR("CANbus::limits: set_prop failed");
       return OW_FAILURE;
   }
@@ -1356,7 +1356,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
       return OW_FAILURE;
   }
   ROS_DEBUG_NAMED("canlimits","VOLTH1 was %d, changing to 57",voltlevel);
-  if (set_property_rt(SAFETY_MODULE,VOLTH2,57,true,15000) == OW_FAILURE) {
+  if (set_property_rt(SAFETY_MODULE,VOLTH2,57,false,15000) == OW_FAILURE) {
       ROS_ERROR("CANbus::limits: set_prop failed");
       return OW_FAILURE;
   }
@@ -1367,7 +1367,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
 #ifdef OLD_VEL_LIMITS
   if(0<jointVel && jointVel<7){           // If the vel (rad/s) is reasonable
     conversion = (int32_t)(jointVel*0x1000); // Convert to Q4.12 rad/s
-    if(set_property_rt(SAFETY_MODULE, VL2, conversion, true,15000) == OW_FAILURE){
+    if(set_property_rt(SAFETY_MODULE, VL2, conversion, false,15000) == OW_FAILURE){
       ROS_ERROR("WAM::set_limits: set_prop failed.");
       return OW_FAILURE;
     }
@@ -1375,7 +1375,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
    
   if(0<tipVel && tipVel<7){               // If the vel (m/s) is reasonable
     conversion = (int32_t)(tipVel*0x1000);   // Convert to Q4.12 rad/s
-    if(set_property_rt(SAFETY_MODULE, VL2, conversion, true,15000) == OW_FAILURE){
+    if(set_property_rt(SAFETY_MODULE, VL2, conversion, false,15000) == OW_FAILURE){
       ROS_ERROR("WAM::set_limits: set_prop failed.");
       return OW_FAILURE;
     }
@@ -1383,7 +1383,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
    
   if(0<elbowVel && elbowVel<7){           // If the vel (m/s) is reasonable
     conversion = (int32_t)(elbowVel*0x1000); // Convert to Q4.12 rad/s
-    if(set_property_rt(SAFETY_MODULE, VL2, conversion, true,15000) == OW_FAILURE){
+    if(set_property_rt(SAFETY_MODULE, VL2, conversion, false,15000) == OW_FAILURE){
       ROS_ERROR("WAM::set_limits: set_prop failed.");
       return OW_FAILURE;
     }
@@ -1557,7 +1557,7 @@ int CANbus::hand_activate(int32_t *nodes) {
     } else {
       ROS_DEBUG_NAMED("can_bh280","setting puck %d to idle mode...",nodeid);
       // this was set to CONTROLLER_IDLE originally
-      if(set_property_rt(nodeid, MODE, PUCK_IDLE, true, 10000) == OW_FAILURE){
+      if(set_property_rt(nodeid, MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
 	ROS_WARN_NAMED("cancheck","Failed to set MODE=PUCK_IDLE on puck %d",nodeid);
 	return OW_FAILURE;
       }
