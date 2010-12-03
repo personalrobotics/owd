@@ -2,7 +2,7 @@
 
 # ***********************************************************************
 # *                                                                     *
-# * Copyright 2010 Carnegie Mellon University and Intel Labs Pittsburgh *
+# * Copyright 2010 Carnegie Mellon University and Intel Corporation *
 # * Author: Mike Vande Weghe <vandeweg@cmu.edu>                         *
 # *                                                                     *
 # ***********************************************************************
