@@ -441,9 +441,6 @@ void WSdynamics(double trq[Link::Ln+1],
 	   &trq[Joint::J1], &INC);
 
 
-    //    for(int i = Joint::J1; i <= Joint::Jn; i++)
-      //        ScreenBuf::ws_torqs[i-1] = trq[i];
-
     /*
 
     // Ac*h
@@ -517,7 +514,5 @@ void JSdynamics(double trq[Link::Ln+1],
   Friction(qd,F);        // calculate friction torques based on velocities
   for(int j=Joint::J1; j<=Joint::Jn; j++) {
       trq[j] += ccg[j] + F[j];  
-      //      ScreenBuf::dyn_torqs[j-1] = ccg[j];
-      //      ScreenBuf::friction_torq[j-1] = F[j];
   }
 }

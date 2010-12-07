@@ -42,13 +42,13 @@ add_definitions("-ggdb3 -DWRIST -DBH8 -DRT_STATS -DCAN_RECORD")
 
 add_library(openwam STATIC  Joint.cc Motor.cc Puck.cc Group.cc
                             Sigmoid.cc Kinematics.cc Dynamics.cc
-			    TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc
+			    TrajType.cc PulseTraj.cc Trajectory.cc ParabolicSegment.cc
                             ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc
                             ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc)
 
 add_library(openwamsim STATIC  Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc
                                ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc
-                               TrajType.cc PulseTraj.cc screenbuf.cc Trajectory.cc ParabolicSegment.cc
+                               TrajType.cc PulseTraj.cc Trajectory.cc ParabolicSegment.cc
                                ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc
                                ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc)
 rosbuild_add_compile_flags(openwamsim "-DOWDSIM")
