@@ -130,6 +130,7 @@ private:
     pr_msgs::Servo servocmd;
     double gravity_comp_value;
     vector<double> max_joint_vel;
+    double wamhome[8];
     double min_accel_time;
     double max_jerk;
     vector<double> joint_vel, joint_accel;

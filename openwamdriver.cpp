@@ -31,9 +31,13 @@
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <syslog.h>
 #include <sys/time.h>
 #include <sys/timeb.h>
+#include <string>
+#include <iostream>
+
 
 #include <PulseTraj.hh>
 #include <ServoTraj.hh>
@@ -76,6 +80,7 @@ WamDriver::WamDriver(int canbus_number) :
   cmdnum(0), nJoints(Joint::Jn), bus(canbus_number, 0)
 #endif // BH280_ONLY
 {
+  // motion limits
   gravity_comp_value=1.0;
   min_accel_time=1.0;
   max_joint_vel.push_back(1.0); // J1
@@ -201,14 +206,31 @@ bool WamDriver::Init(const char *joint_cal_file)
   std::string hand_type;
   n.param("hand_type",hand_type,std::string("280FT"));
   owam->set_hand(hand_type);
+
+  std::string wamhome_list;
+  // default value is the one used for Herb
+  n.param("home_position",
+	  wamhome_list,
+	  std::string ("3.14, -1.97, 0, -0.83, 1.309, 0, 3.02"));
+
+  std::stringstream ss(wamhome_list);
+  std::string jval;
+  int j=0;
+  while (std::getline(ss,jval,',')) {
+    wamhome[++j]=strtod(jval.c_str(),NULL);
+  }
+  if (j < nJoints) {
+    ROS_FATAL("Could not extract %d joint values from ROS parameter \"home_position\"",nJoints);
+    ROS_FATAL("home_position value is \"%s\"",wamhome_list);
+    throw -1;
+  }
+  if (j > nJoints) {
+    ROS_WARN("Warning: OWD configured for only %d joints; extra values in parameter \"home_position\" ignored",nJoints);
+  }
   
   // Read our motor offsets from file (if found) and apply them
   // to the encoder values
   if (bus.simulation) {
-    // start the simulated wam with all joints set to zero
-    double wamhome[8] = {9999,  // dummy value in zero position
-			 0, 0, 0, 0, 0, 0, 0}; // J1-J7
-    // ROS_DEBUG("Starting at configuration [0,0,0,0,0,0,0]");
     
     if (owam->set_jpos(wamhome) == OW_FAILURE) {
       ROS_FATAL("Unable to define WAM home position");
@@ -1018,8 +1040,6 @@ void WamDriver::set_home_position() {
     NOCALIB:
         ROS_ERROR("Could not read WAM calibration file \"%s\";",joint_calibration_file);
         ROS_ERROR("using home position values instead.");
-        double wamhome[8] = {9999,  // dummy value in zero position
-                             3.14, -1.97, 0, -0.83, 1.309, 0, 3.02}; // J1-J7
         
         if (owam->set_jpos(wamhome) == OW_FAILURE) {
             ROS_FATAL("Unable to define WAM home position");

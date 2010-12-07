@@ -59,6 +59,7 @@ Six executables will be created:
    - \b 280FT For a BH280 Hand with the Force/Torque sensor added
    - \b none For no hand installed
  - \b ~/calibration_file A string specifying a file to keep on disk of the joint calibration values (see the \b Calibration section below)
+ - \b ~/home_position A comma-separated list of joint values, in radians, of the configuration of the arm when the encoder values have been lost and the home position needs to be reset.
 
 \section running Running
 
