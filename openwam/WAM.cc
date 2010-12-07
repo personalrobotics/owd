@@ -914,7 +914,7 @@ void WAM::newcontrol_rt(double dt){
 	JSdynamics(sim_torq, sim_links, qd_target, qdd_target); 
 	if (data_recorded) {
 	  for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
-	    data.push_back(dyn_torq[j]); // torques from sim model
+	    data.push_back(sim_torq[j]); // torques from sim model
 	  }
 	}
         if(jsdyn){
