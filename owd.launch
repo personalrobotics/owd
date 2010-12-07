@@ -4,6 +4,7 @@
     value="wam_joint_calibrations" />
   <param name="owd/canbus_number" type="int" value="40" />
   <param name="owd/hand_type" type="string" value="280FT" />
+  <param name="owd/home_position" type="string" value="3.14, -1.97, 0, -0.83, 1.309, 0, 3.02" />
 
   <node pkg="owd" type="owdbhd" output="screen" respawn="false"
         cwd="node" name="owd">
