@@ -283,7 +283,7 @@ public:
   int hand_get_state(int32_t &state);
 #endif // BH280
 
-  
+  int ft_get_data(double *values);
   int limits(double jointVel, double tipVel, double elbowVel);
   friend void* canbus_handler(void* argv);
 };

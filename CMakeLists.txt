@@ -42,7 +42,7 @@ target_link_libraries(owdrt wamcanrt openwam openmath lapack blas
 rosbuild_add_compile_flags(owdrt "${CANBUS_DEFS} ${RT_DEFS}")
 rosbuild_add_link_flags(owdrt "${CANBUS_LDFLAGS}")
 
-rosbuild_add_executable(owdbhd owd.cpp openwamdriver.cpp bhd280.cc)
+rosbuild_add_executable(owdbhd owd.cpp openwamdriver.cpp bhd280.cc ft.cc)
 target_link_libraries(owdbhd wambhdcan openwam openmath lapack blas
 			     gfortran ${CANBUS_LIBS})
 rosbuild_add_compile_flags(owdbhd "-DBH280 ${CANBUS_DEFS}")

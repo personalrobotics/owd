@@ -56,7 +56,7 @@ public:
 
 private:
   int DOF;
-  JointPos starting_force;
+  JointPos initial_force_vector, current_force_vector;
   EndCondition end_cond;
   double max_vel;
   double *old_y;

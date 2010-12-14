@@ -36,7 +36,8 @@ ConstrainedForceTrajectory::ConstrainedForceTrajectory(
       Link wam_links[],
       double max_velocity,
       int trajid) :
-  starting_force(starting_force_vector),
+  initial_force_vector(starting_force_vector),
+  current_force_vector(starting_force_vector),
   end_cond(end_condition),
   links(wam_links),
   distance_moved(0)
@@ -84,19 +85,19 @@ void ConstrainedForceTrajectory::evaluate(double y[], double yd[], double ydd[],
 	   ws_diff, &INC);
   JointPos WSdiff;
   WSdiff.SetFromArray(DOF,ws_diff);
-  
 
-  // compare against velocity limits???
-
-
-
-  // check for ending condition
+  // calculate motion since last call
   distance_moved += sqrt(pow(ws_diff[0],2)
 			 +pow(ws_diff[1],2)
 			 +pow(ws_diff[2],2));
-  double total_angle = acos((starting_force*WSdiff)
-			    / starting_force.length()
+  double total_angle = acos((initial_force_vector*WSdiff)
+			    / initial_force_vector.length()
 			    / WSdiff.length());
+
+  // compare against velocity limits
+  double ws_velocity = distance_moved / dt;
+
+  // check for ending condition
   if (((end_cond.type == EndCondition::ANGLE)
        && (total_angle > end_cond.value)) 
       || ((end_cond.type == EndCondition::DISTANCE)

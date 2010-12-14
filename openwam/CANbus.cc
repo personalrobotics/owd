@@ -1436,6 +1436,8 @@ int CANbus::set_puck_state_rt() {
   return OW_SUCCESS;
 }
 
+int CANbus::ft_get_data(double *values) {
+}
 
 #ifdef BH280
 
