@@ -61,20 +61,12 @@ add_library(wamcanrt STATIC      ControlLoop.cc CANbus.cc WAM.cc)
 rosbuild_add_compile_flags(wamcanrt "${CANBUS_DEFS} ${RT_DEFS}")
 rosbuild_add_link_flags(wamcanrt "${CANBUS_LIBS} ${RT_LIBS}")
 
-add_library(wambhdcan STATIC      ControlLoop.cc CANbus.cc WAM.cc)
-rosbuild_add_compile_flags(wambhdcan "${CANBUS_DEFS} -DBH280")
-rosbuild_add_link_flags(wambhdcan "${CANBUS_LIBS}")
-
-add_library(wambhdcanrt STATIC      ControlLoop.cc CANbus.cc WAM.cc)
-rosbuild_add_compile_flags(wambhdcanrt "${CANBUS_DEFS} ${RT_DEFS} -DBH280")
-rosbuild_add_link_flags(wambhdcanrt "${CANBUS_LIBS} ${RT_LIBS}")
-
 add_library(bhdcan STATIC      ControlLoop.cc CANbus.cc WAM.cc)
-rosbuild_add_compile_flags(bhdcan "${CANBUS_DEFS} -DBH280 -DBH280_ONLY")
+rosbuild_add_compile_flags(bhdcan "${CANBUS_DEFS} -DBH280_ONLY")
 rosbuild_add_link_flags(bhdcan "${CANBUS_LIBS}")
 
 add_library(bhdcanrt STATIC      ControlLoop.cc CANbus.cc WAM.cc)
-rosbuild_add_compile_flags(bhdcanrt "${CANBUS_DEFS} ${RT_DEFS} -DBH280 -DBH280_ONLY")
+rosbuild_add_compile_flags(bhdcanrt "${CANBUS_DEFS} ${RT_DEFS} -DBH280_ONLY")
 rosbuild_add_link_flags(bhdcanrt "${CANBUS_LIBS} ${RT_LIBS}")
 
 # target_link_libraries(openwam positionInterface)

@@ -96,7 +96,6 @@ public:
     
 };
 
-#ifdef BH280
 class CANmsg {
 public:
   int32_t nodeid;
@@ -104,7 +103,6 @@ public:
   int32_t value;
 
 };
-#endif // BH280
 
 
 class CANbus{
@@ -118,6 +116,8 @@ private:
   int32_t can_accept[MAX_FILTERS];
   int32_t mask[MAX_FILTERS];
 #endif // PEAK_CAN
+  bool BH280_installed;
+  bool FT_installed;
 
 public:
   int32_t id;
@@ -125,7 +125,7 @@ public:
   int32_t* trq;
   double* pos;
   Puck *pucks;
-  int npucks;
+  int n_arm_pucks;
   bool simulation;
   char last_error[200];
 
@@ -151,7 +151,6 @@ DataRecorder<canio_data> candata;
 
 #endif // ! OWDSIM
 
-#ifdef BH280
 #ifdef OWD_RT
   RT_PIPE handpipe;
   int handpipe_fd;
@@ -159,7 +158,6 @@ DataRecorder<canio_data> candata;
   std::queue<CANmsg> hand_command_queue;
   std::queue<CANmsg> hand_response_queue;
 #endif // ! OWD_RT
-#endif // BH280
 
   int load();
   int open();
@@ -195,7 +193,18 @@ DataRecorder<canio_data> candata;
   }
 
 
-  CANbus(int32_t bus_id, int num_pucks);
+  /// Constructor
+  /// \param bus_id numeric identifier of the CANbus device (/dev/can# for
+  ///               ESD cards and /dev/pcan# for PEAK cards)
+  /// \param number_of_arm_pucks 4 for arm only or 7 for arm + wrist
+  ///                            (don't count hand)
+  /// \param bh280 set to true if the CANbus hand (model BH280) is installed
+  /// \param ft set to true if the CANbus force/torque sensor is installed
+  CANbus(int32_t bus_id,
+	 int number_of_arm_pucks,
+	 bool bh280=false,
+	 bool ft=false);
+
   ~CANbus();
 
   int init();
@@ -247,7 +256,6 @@ DataRecorder<canio_data> candata;
 #endif // ! OWD_RT
 
 
-#ifdef BH280
   enum {HANDSTATE_UNINIT=0,
     HANDSTATE_DONE,
     HANDSTATE_MOVING };
@@ -281,7 +289,6 @@ public:
   int hand_relax();
   int hand_get_positions(double &p1, double &p2, double &p3, double &p4);
   int hand_get_state(int32_t &state);
-#endif // BH280
 
   int ft_get_data(double *values);
   int limits(double jointVel, double tipVel, double elbowVel);

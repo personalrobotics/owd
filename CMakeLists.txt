@@ -30,37 +30,25 @@ set (CANBUS_DEFS "")
 set (CANBUS_LIBS "")
 endif (CANBUS_TYPE STREQUAL "ESD")
 
-rosbuild_add_executable(owd owd.cpp openwamdriver.cpp)
+rosbuild_add_executable(owd owd.cpp openwamdriver.cpp bhd280.cc ft.cc)
 target_link_libraries(owd wamcan openwam openmath lapack blas
 			  gfortran ${CANBUS_LIBS})
 rosbuild_add_compile_flags(owd "${CANBUS_DEFS}")
 rosbuild_add_link_flags(owd "${CANBUS_LDFLAGS}")
 
-rosbuild_add_executable(owdrt owd.cpp openwamdriver.cpp)
+rosbuild_add_executable(owdrt owd.cpp openwamdriver.cpp bhd280.cc ft.cc)
 target_link_libraries(owdrt wamcanrt openwam openmath lapack blas
 			  gfortran ${CANBUS_LIBS} ${RT_LIBS})
 rosbuild_add_compile_flags(owdrt "${CANBUS_DEFS} ${RT_DEFS}")
 rosbuild_add_link_flags(owdrt "${CANBUS_LDFLAGS}")
 
-rosbuild_add_executable(owdbhd owd.cpp openwamdriver.cpp bhd280.cc ft.cc)
-target_link_libraries(owdbhd wambhdcan openwam openmath lapack blas
-			     gfortran ${CANBUS_LIBS})
-rosbuild_add_compile_flags(owdbhd "-DBH280 ${CANBUS_DEFS}")
-rosbuild_add_link_flags(owdbhd "${CANBUS_LDFLAGS}")
-
-rosbuild_add_executable(owdbhdrt owd.cpp openwamdriver.cpp bhd280.cc)
-target_link_libraries(owdbhdrt wambhdcanrt openwam openmath lapack blas
-			     gfortran ${CANBUS_LIBS} ${RT_LIBS})
-rosbuild_add_compile_flags(owdbhdrt "-DBH280 ${CANBUS_DEFS} ${RT_DEFS}")
-rosbuild_add_link_flags(owdbhdrt "${CANBUS_LDFLAGS}")
-
-rosbuild_add_executable(canbhd owd.cpp openwamdriver.cpp bhd280.cc)
+rosbuild_add_executable(canbhd owd.cpp openwamdriver.cpp bhd280.cc ft.cc)
 target_link_libraries(canbhd bhdcan openwam openmath lapack blas
 			     gfortran ${CANBUS_LIBS})
 rosbuild_add_compile_flags(canbhd "-DBH280 -DBH280_ONLY ${CANBUS_DEFS}")
 rosbuild_add_link_flags(canbhd "${CANBUS_LDFLAGS}")
 
-rosbuild_add_executable(canbhdrt owd.cpp openwamdriver.cpp bhd280.cc)
+rosbuild_add_executable(canbhdrt owd.cpp openwamdriver.cpp bhd280.cc ft.cc)
 target_link_libraries(canbhdrt bhdcanrt openwam openmath lapack blas
 			     gfortran ${CANBUS_LIBS} ${RT_LIBS})
 rosbuild_add_compile_flags(canbhdrt "-DBH280 -DBH280_ONLY ${CANBUS_DEFS} ${RT_DEFS}")

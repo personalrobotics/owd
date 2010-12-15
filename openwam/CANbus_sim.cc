@@ -29,20 +29,20 @@
 
 #define PUCK_IDLE 0 
 
-CANbus::CANbus(int32_t bus_id, int num_pucks) : 
-  puck_state(2),id(bus_id),
+CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280, bool ft) : 
+  puck_state(2),BH280_installed(bh280),FT_installed(ft),id(bus_id),
   trq(NULL),pos(NULL),
-  pucks(NULL),npucks(num_pucks),simulation(true)
+  pucks(NULL),n_arm_pucks(num_pucks),simulation(true)
 {
   //  pthread_mutex_init(&trqmutex, NULL);
   //  pthread_mutex_init(&posmutex, NULL);
   //  pthread_mutex_init(&runmutex, NULL);
   //  pthread_mutex_init(&statemutex, NULL);
 
-  pucks = new Puck[npucks+1];
-  trq = new int32_t[npucks+1];
-  pos = new double[npucks+1];
-  for(int p=1; p<=npucks; p++){
+  pucks = new Puck[n_arm_pucks+1];
+  trq = new int32_t[n_arm_pucks+1];
+  pos = new double[n_arm_pucks+1];
+  for(int p=1; p<=n_arm_pucks; p++){
     pos[p] = 0.0;
     trq[p] = 0;
     pucks[p].ID = p;
@@ -60,7 +60,7 @@ CANbus::CANbus(int32_t bus_id, int num_pucks) :
     pucks[p].cpr = 4096;
   }
 
-  for(int p=1; p<=npucks; p++){
+  for(int p=1; p<=n_arm_pucks; p++){
     if(groups[ pucks[p].group() ].insert(&pucks[p]) == OW_FAILURE){
       ROS_ERROR("CANbus::load: insert failed.");
       throw OW_FAILURE;
@@ -133,7 +133,7 @@ int CANbus::read_torques(int32_t* mtrq){
 #endif
 
 int CANbus::read_positions(double* positions){
-  for(int p=1; p<=npucks; p++) {
+  for(int p=1; p<=n_arm_pucks; p++) {
     positions[p] = 0;
   }
   return OW_SUCCESS;
@@ -185,7 +185,7 @@ int CANbus::run(){
 
 
 void CANbus::printpos(){
-  for(int p=1; p<=npucks; p++)
+  for(int p=1; p<=n_arm_pucks; p++)
     ROS_DEBUG("%f",pos[p]);
 }
 

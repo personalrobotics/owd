@@ -1015,8 +1015,8 @@ void WamDriver::set_home_position() {
                 ROS_ERROR("Unrecognized format in joint calibration file \"%s\"",joint_calibration_file);
                 goto NOCALIB;
             }
-            int32_t apvals[bus.npucks+1];
-            for (puck_id = 1; puck_id<=bus.npucks; ++puck_id) {
+            int32_t apvals[bus.n_arm_pucks+1];
+            for (puck_id = 1; puck_id<=bus.n_arm_pucks; ++puck_id) {
 	      int32_t mech;
 	      int32_t old_AP;
                 
@@ -1043,7 +1043,7 @@ void WamDriver::set_home_position() {
                 throw -1;
             }
             ROS_DEBUG("Positions set");
-            for (puck_id = 1; puck_id<=bus.npucks; ++puck_id) {
+            for (puck_id = 1; puck_id<=bus.n_arm_pucks; ++puck_id) {
                 int32_t mech;
                 int32_t old_AP;
                 get_puck_offset(bus.pucks[puck_id].id(),&mech,&old_AP);
