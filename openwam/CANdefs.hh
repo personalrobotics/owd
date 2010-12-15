@@ -94,23 +94,6 @@ int X4=-10;
 int X5=-10;
 int X6=-10;
 int X7=-10;
-int COMMON_END=-10;
-int ZERO=-10;
-int PEN=-10;
-int SAFE=-10;
-int VL1=-10;
-int VL2=-10;
-int TL1=-10;
-int TL2=-10;
-int VOLTL1=-10;
-int VOLTL2=-10;
-int VOLTH1=-10;
-int VOLTH2=-10;
-int PWR=-10;
-int MAXPWR=-10;
-int IFAULT=-10;
-int VNOM=-10;
-int SAFETY_END=-10;
 int T=-10;
 int MT=-10;
 int V=-10;
@@ -180,6 +163,27 @@ int TACTID=-10;
 int PROP_END=-10;
 int AP=-10;
 int TENSION=-10;
+int BRAKE=-10;
+
+/* Safety puck properties */
+int ZERO=-10;
+int PEN=-10;
+int SAFE=-10;
+int VL1=-10;
+int VL2=-10;
+int TL1=-10;
+int TL2=-10;
+int VOLTL1=-10;
+int VOLTL2=-10;
+int VOLTH1=-10;
+int VOLTH2=-10;
+int PWR=-10;
+int MAXPWR=-10;
+int IFAULT=-10;
+int VNOM=-10;
+
+/* Force/Torque properties */
+int FT=-10;
 
 // older properties (firmware < 40)
 int D=-10;
