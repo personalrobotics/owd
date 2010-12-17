@@ -35,11 +35,12 @@ extern int MODE;  // puck parameter
  * Create a new WAM that uses the CAN bus cb;
  */
 
-WAM::WAM(CANbus* cb) :
+WAM::WAM(CANbus* cb, int bh_model, bool forcetorque) :
     check_safety_torques(true),rec(false),wsdyn(false),jsdyn(false),
     holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
     pid_count(0),safety_hold(false),bus(cb),ctrl_loop(cb->id, &control_loop_rt, this),
-    motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000)
+    motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000),
+    BH_model(bh_model), ForceTorque(forcetorque)
 {
 
 #ifdef OWD_RT
@@ -77,7 +78,6 @@ WAM::WAM(CANbus* cb) :
                                    3158.0509,   -16.6307,  56806.6024, M2_MM2) );
 
 #ifdef WRIST
-#warning "COMPILING WRIST"
 
   /* newer numbers from Barrett's Oct 2007 WAM_MassParams_AA-01.pdf */
   links[Link::L4]=Link( DH(  M_PI_2,  -0.0450,   0.0000,   0.0000), 2.40016804,
@@ -193,7 +193,6 @@ WAM::WAM(CANbus* cb) :
 */
 
 #ifdef BH8
-#warning "COMPILING HAND"
   links[Link::L7] = L7_with_280FT_hand;
 #else // !BH8
   links[Link::L7] = L7_without_hand;
@@ -207,6 +206,29 @@ WAM::WAM(CANbus* cb) :
     safetytorquecount[i]=safetytorquesum[i]=0;
   }
     
+  if (Link::Ln == Link::L7) {
+    // wrist installed
+    if (BH_model == 260) {
+      links[Link::L7] = L7_with_260_hand;
+    } else if (BH_model == 280) {
+      if (forcetorque) {
+	links[Link::L7] = L7_with_280FT_hand;
+      } else {
+	links[Link::L7] = L7_with_280_hand;
+      }
+    } else {
+      links[Link::L7] = L7_without_hand;
+    }
+  } else {
+    // no wrist
+    if (BH_model == 0) {
+      links[Link::L4] = L4_without_wrist_without_hand;
+    } else {
+      // we don't have a separate mass model for L4 with the 280 hand,
+      // so use the same model for both hand types
+      links[Link::L4] = L4_without_wrist_with_260_hand;
+    }
+  }
 }
 
 int WAM::init(){
@@ -248,35 +270,6 @@ int WAM::init(){
   return OW_SUCCESS;
 }
 
-void WAM::set_hand(std::string hand_type) {
-  // This function adjusts the mass values of the arm links
-  // based on which hand is mounted to L7.
-  // hand_type can be one of:
-  //   "260" for the model 260 hand (gold body, serial control)
-  //   "280" for the model 280 hand (blue body, CANbus control)
-  //   "280FT" for the model 280 hand with the Force/Torque sensor
-  //   "none" for no hand
-
-  if (Link::Ln == Link::L7) {
-    // wrist installed
-    if (! hand_type.compare("260")) {
-      links[Link::L7] = L7_with_260_hand;
-    } else if (! hand_type.compare("280")) {
-      links[Link::L7] = L7_with_280_hand;
-    } else if (! hand_type.compare("280FT")) {
-      links[Link::L7] = L7_with_280FT_hand;
-    } else {
-      links[Link::L7] = L7_without_hand;
-    }
-  } else {
-    // no wrist
-    if (! hand_type.compare("none")) {
-      links[Link::L4] = L4_without_wrist_without_hand;
-    } else {
-      links[Link::L4] = L4_without_wrist_with_260_hand;
-    }
-  }
-}
 
 bool WAM::set_gains(unsigned int joint,
 		    pr_msgs::PIDgains &gains) {
@@ -571,14 +564,24 @@ void control_loop_rt(void* argv){
       }
 #endif // BH280_ONLY
 
-#ifdef BH280
-      // Hand moving?
-      static int handstateperiod=25; // start offset from motor state
-      if (++handstateperiod == 50) { // every 0.1 seconds
-	wam->bus->hand_set_state_rt();
-	handstateperiod=0;
+#ifndef OWDSIM
+      if (wam->BH_model == 280) {
+	// Hand moving?
+	static int handstateperiod=16; // start offset from motor state
+	if (++handstateperiod == 50) { // every 0.1 seconds
+	  wam->bus->hand_set_state_rt();
+	  handstateperiod=0;
+	}
       }
-#endif // BH280
+
+      if (wam->ForceTorque) {
+	static int forcetorqueperiod=33;  // offset from hand state
+	if (++forcetorqueperiod == 50) { // also every 0.1 seconds
+	  wam->bus->read_forcetorque_rt();
+	  forcetorqueperiod=0;
+	}
+      }
+#endif // ! OWDSIM
 
       // check for slow loops
       double thistime = (t2-t1)* 1e-6;  // milliseconds

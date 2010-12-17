@@ -67,7 +67,7 @@ void BHD_280::Unadvertise() {
   ss_relaxhand.shutdown();
 }
 
-void BHD_280::Pump(const ros::TimerEvent& e) {
+void BHD_280::Pump(ros::TimerEvent const& e) {
   // publish our state info
   this->Publish();
 
@@ -205,7 +205,7 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
   }
 
   if (req.positions.size() != 4) {
-    ROS_ERROR_NAMED("bhd280","Expected 4 joints for MoveHand; received %d",
+    ROS_ERROR_NAMED("bhd280","Expected 4 joints for MoveHand; received %zd",
 	      req.positions.size());
     return false;
   }

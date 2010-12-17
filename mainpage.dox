@@ -56,8 +56,9 @@ Six executables will be created:
  - \b ~/hand_type Type of hand installed.  Should be one of:
    - \b 260 For a BH260 Hand (serial communication)
    - \b 280 For a BH280 Hand (CANbus communication)
-   - \b 280FT For a BH280 Hand with the Force/Torque sensor added
+   - \b 280+TACT For a BH280 Hand with the fingertip tactile arrays installed
    - \b none For no hand installed
+ - \b ~/forcetorque_sensor Whether the Barrett Force/Torque sensor is installed (true/false)
  - \b ~/calibration_file A string specifying a file to keep on disk of the joint calibration values (see the \b Calibration section below)
  - \b ~/home_position A comma-separated list of joint values, in radians, of the configuration of the arm when the encoder values have been lost and the home position needs to be reset.
 
@@ -90,6 +91,7 @@ OWD can also be controlled by publishing messages to ROS topics:
 OWD provides feedback through the following ROS topics:
  - \b wamstate: Joint positions, velocities, estimated torques due to external forces, and the state of the trajectory queue
  - \b waminternals: Joint positions, total joint torques, feedforward torques from the dynamic simulators, and controller PID gain values
+ - \b forcetorque: A geometry_msgs/Wrench message containing the values from the force/torque sensor (only published if installed)
 
 Additionally, OWD publishes a TF frame for every link, defining \b wam1 in terms of \b wam0, \b wam2 in terms of \b wam1, etc, all the way up to \b wam7 in terms of \b wam6.
 

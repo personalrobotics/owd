@@ -56,7 +56,7 @@ ControlLoop::ControlLoop(int tasknum, void (*fnc)(void*), void* argv) :
     }
   }
   
-#ifdef NOT_NECESSARY ( causes an error)
+#ifdef NOT_NECESSARY // ( causes an error)
   retval = rt_task_set_mode(0, T_PRIMARY, NULL);
   if (retval) {
     ROS_FATAL("Unable to run task %s in Primary mode: return=%d",taskname,retval);

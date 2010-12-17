@@ -78,7 +78,7 @@ public:
   
   virtual void reset(double t) {time=t;}
 
-  inline virtual const double curtime() const {return time;}
+  inline virtual double curtime() const {return time;}
 
   virtual void update_torques(double t[]) {}
 

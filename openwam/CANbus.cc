@@ -49,7 +49,7 @@
 
 CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft) : 
   puck_state(-1),BH280_installed(bh280),FT_installed(ft),id(bus_id),trq(NULL),
-  pos(NULL), pucks(NULL),n_arm_pucks(number_of_arm_pucks),
+  pos(NULL), forcetorque(NULL), pucks(NULL),n_arm_pucks(number_of_arm_pucks),
   simulation(false),
 #ifdef CAN_RECORD
   candata(100000),
@@ -82,6 +82,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft) :
   pucks = new Puck[n_arm_pucks+1];
   trq = new int32_t[n_arm_pucks+1];
   pos = new double[n_arm_pucks+1];
+  forcetorque = new double[6];
   for(int p=1; p<=n_arm_pucks; p++){
     pos[p] = 0.0;
     trq[p] = 0;
@@ -106,10 +107,17 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft) :
       throw OW_FAILURE;
     }
   }
+  
+  for(unsigned int k=0; k<6; ++k) {
+    forcetorque[k]=0.0;
+  }
+
 #ifdef PEAK_CAN
   can_accept[0] = 0x0000;  mask[0] = 0x03E0;
   can_accept[1] = 0x0403;  mask[1] = 0x03E0;
   can_accept[2] = 0x0406;  mask[2] = 0x03E0;
+  can_accept[3] = 0x040A;  mask[2] = 0x03E0;
+  can_accept[4] = 0x040B;  mask[2] = 0x03E0;
 #endif // PEAK_CAN
 
   snprintf(last_error,200,"");
@@ -208,6 +216,16 @@ int CANbus::open(){
   }
   // Group 6 messages
   if(allow_message(0x0406, 0x03E0) == OW_FAILURE){
+    ROS_ERROR("CANbus::open: allow_message failed.");
+    return OW_FAILURE;
+  }
+  // Group 10 messages
+  if(allow_message(0x040A, 0x03E0) == OW_FAILURE){
+    ROS_ERROR("CANbus::open: allow_message failed.");
+    return OW_FAILURE;
+  }
+  // Group 11 messages
+  if(allow_message(0x040B, 0x03E0) == OW_FAILURE){
     ROS_ERROR("CANbus::open: allow_message failed.");
     return OW_FAILURE;
   }
@@ -347,6 +365,15 @@ int CANbus::check(){
       return OW_FAILURE;
     }
     ROS_INFO_NAMED("can_bh280","done.");
+  }
+
+  if (FT_installed) {
+    ROS_INFO_NAMED("can_ft","  Initializing force/torque sensor...");
+    if(wake_puck(8) == OW_FAILURE){
+      ROS_WARN_NAMED("can_ft","wake_puck failed.");
+      return OW_FAILURE;
+    }
+    ROS_INFO_NAMED("can_ft","done.");
   }
 
   return OW_SUCCESS;
@@ -550,7 +577,8 @@ int CANbus::status(int32_t* nodes){
       goto REREAD;
     }
     return OW_FAILURE;
-  }   
+  }
+
   return OW_SUCCESS;
 }
 
@@ -670,9 +698,9 @@ int CANbus::send_torques_rt(){
 	bytecount = rt_pipe_write(&handpipe,&handmsg,sizeof(CANmsg),P_NORMAL);
 	if (bytecount < sizeof(CANmsg)) {
 	  if (bytecount < 0) {
-	    snprintf(last_error,200,"Error writing to hand message pipe: %d",bytecount);
+	    snprintf(last_error,200,"Error writing to hand message pipe: %zd",bytecount);
 	  } else {
-	    snprintf(last_error,200,"Incomplete write to hand message pipe: only %d of %d bytes were written",
+	    snprintf(last_error,200,"Incomplete write to hand message pipe: only %zd of %ld bytes were written",
 		     bytecount,sizeof(CANmsg));
 	  }
 	  return OW_FAILURE;
@@ -878,6 +906,58 @@ int CANbus::read_positions_rt(){
   return OW_SUCCESS;
 }
 
+int CANbus::ft_combine(unsigned char lsb, unsigned char msb) {
+  int value = ((int) msb << 8) | lsb;
+  if (value & 0x00008000) {
+    value |= 0xffff0000;
+  }
+  return value;
+}
+
+int CANbus::read_forcetorque_rt(){
+  uint8_t  msg[8];
+
+  int32_t value;
+  int32_t msgid, msglen, property, nodeid;
+
+  // Compile the packet
+  msg[0] = (uint8_t)FT;
+
+
+  if(send_rt(8, msg, 1, 100) == OW_FAILURE){
+    ROS_WARN("CANbus::get_positions: send failed: %s",last_error);
+    return OW_FAILURE;
+  }
+
+  bool missed_reads(false);
+
+  for (unsigned int k=0; k<2;) {
+    if(read_rt(&msgid, msg, &msglen, 800) == OW_FAILURE){
+      // ROS_WARN("CANbus::read_positions: read failed: %s",last_error);
+      missed_reads=true;
+      break;
+    }
+    
+    if ((msgid & 0x41F) == 0x40A) {
+      // Group 10 is Force
+      forcetorque[0]=ft_combine(msg[0], msg[1]) / 256.0;
+      forcetorque[1]=ft_combine(msg[2], msg[3]) / 256.0;
+      forcetorque[2]=ft_combine(msg[4], msg[5]) / 256.0;
+      ++k;
+    } else if ((msgid & 0x41F) == 0x40B) {
+      // Group 11 is Torque
+      forcetorque[3]=ft_combine(msg[0], msg[1]) / 4096.0;
+      forcetorque[4]=ft_combine(msg[2], msg[3]) / 4096.0;
+      forcetorque[5]=ft_combine(msg[4], msg[5]) / 4096.0;
+      ++k;
+    }
+    
+  }
+
+  return OW_SUCCESS;
+}
+
+
 int CANbus::send_positions(double* mpos){
   int32_t position[n_arm_pucks+1];
 
@@ -942,30 +1022,30 @@ int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
     *property = AP;
 
 #ifdef JOINT_ENCODERS
-      jointPosition[*nodeid] = 0;
-      jointPosition[*nodeid] |= ( (int32_t)messageData[3] << 16) & 0x003F0000;
-      jointPosition[*nodeid] |= ( (int32_t)messageData[4] << 8 ) & 0x0000FF00;
-      jointPosition[*nodeid] |= ( (int32_t)messageData[5] ) & 0x000000FF;
+    jointPosition[*nodeid] = 0;
+    jointPosition[*nodeid] |= ( (int32_t)messageData[3] << 16) & 0x003F0000;
+    jointPosition[*nodeid] |= ( (int32_t)messageData[4] << 8 ) & 0x0000FF00;
+    jointPosition[*nodeid] |= ( (int32_t)messageData[5] ) & 0x000000FF;
       
-      if (jointPosition[*nodeid] & 0x00200000) /* If negative */
-         jointPosition[*nodeid] |= 0xFFC00000; /* Sign-extend */
+    if (jointPosition[*nodeid] & 0x00200000) /* If negative */
+      jointPosition[*nodeid] |= 0xFFC00000; /* Sign-extend */
 #endif // JOINT_ENCODERS
 
     break;
 
   case 2:  // Data is normal, SET 
 
-     /***************************************
-      ***   UPDATED CODE FROM BARRETT     ***
-      *** Need to switch to this as       ***
-      *** soon as I have time for testing ***
-      *** Mike Vande Weghe 9/19/2009      ***
-      ***************************************
+    /***************************************
+     ***   UPDATED CODE FROM BARRETT     ***
+     *** Need to switch to this as       ***
+     *** soon as I have time for testing ***
+     *** Mike Vande Weghe 9/19/2009      ***
+     ***************************************
 
-      *property = messageData[0] & 0x7F;
-      *value = messageData[len-1] & 0x80 ? -1L : 0;
+     *property = messageData[0] & 0x7F;
+     *value = messageData[len-1] & 0x80 ? -1L : 0;
       for (i = len-1; i >= 2; i--)
-         *value = *value << 8 | messageData[i];
+      *value = *value << 8 | messageData[i];
       break;
 
       ***  End updateded code (replaces entire case) ***/
@@ -1326,30 +1406,30 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
       (set_property_rt(SAFETY_MODULE,TL2,9000,false,15000) == OW_FAILURE) ||
       (set_property_rt(SAFETY_MODULE,VL1,(int32_t)(2*0x1000),false,15000) == OW_FAILURE) ||
       (set_property_rt(SAFETY_MODULE,VL2,(int32_t)(3*0x1000),false,15000) == OW_FAILURE)) {
-      return OW_FAILURE;
+    return OW_FAILURE;
   }
 
   int32_t voltlevel;
 #ifdef SET_VOLTAGE_LIMITS
   // set appropriate high-voltage levels for battery operation
   if (get_property_rt(SAFETY_MODULE,VOLTH1,&voltlevel) == OW_FAILURE) {
-      ROS_ERROR("CANbus::limits failed to get previous high voltage warning level.");
-      return OW_FAILURE;
+    ROS_ERROR("CANbus::limits failed to get previous high voltage warning level.");
+    return OW_FAILURE;
   }
   ROS_DEBUG_NAMED("canlimits","VOLTH1 was %d, changing to 54",voltlevel);
   if (set_property_rt(SAFETY_MODULE,VOLTH1,54,false,15000) == OW_FAILURE) {
-      ROS_ERROR("CANbus::limits: set_prop failed");
-      return OW_FAILURE;
+    ROS_ERROR("CANbus::limits: set_prop failed");
+    return OW_FAILURE;
   }
 
   if (get_property_rt(SAFETY_MODULE,VOLTH2,&voltlevel) == OW_FAILURE) {
-      ROS_ERROR("CANbus::limits failed to get previous high voltage warning level.");
-      return OW_FAILURE;
+    ROS_ERROR("CANbus::limits failed to get previous high voltage warning level.");
+    return OW_FAILURE;
   }
   ROS_DEBUG_NAMED("canlimits","VOLTH1 was %d, changing to 57",voltlevel);
   if (set_property_rt(SAFETY_MODULE,VOLTH2,57,false,15000) == OW_FAILURE) {
-      ROS_ERROR("CANbus::limits: set_prop failed");
-      return OW_FAILURE;
+    ROS_ERROR("CANbus::limits: set_prop failed");
+    return OW_FAILURE;
   }
 #endif
 
@@ -1428,8 +1508,15 @@ int CANbus::set_puck_state_rt() {
 }
 
 int CANbus::ft_get_data(double *values) {
+  for (unsigned int k=0; k<6; ++k) {
+    values[k] = forcetorque[k];
+  }
+  return OW_SUCCESS;
 }
 
+int CANbus::ft_tare() {
+  return hand_set_property(8,FT,0);
+}
 
 int CANbus::hand_set_property(int32_t id, int32_t prop, int32_t val) {
   CANmsg msg;
@@ -1444,9 +1531,9 @@ int CANbus::hand_set_property(int32_t id, int32_t prop, int32_t val) {
   mutex_unlock(&hand_cmd_mutex);
   if (bytes < sizeof(CANmsg)) {
     if (bytes < 0) {
-      ROS_ERROR_NAMED("can_bh280","Error writing to hand message pipe: %d",bytes);
+      ROS_ERROR_NAMED("can_bh280","Error writing to hand message pipe: %zd",bytes);
     } else {
-      ROS_ERROR_NAMED("can_bh280","Incomplete write of data to hand message pipe: only %d of %d bytes written",
+      ROS_ERROR_NAMED("can_bh280","Incomplete write of data to hand message pipe: only %zd of %ld bytes written",
 		      bytes,sizeof(CANmsg));
     }
     return OW_FAILURE;
@@ -1483,7 +1570,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
     if (bytes < 0) {
       ROS_ERROR_NAMED("can_bh280","Error writing to hand message pipe: %d", bytes);
     } else {
-      ROS_ERROR_NAMED("can_bh280","Incomplete write of data to hand message pipe: only %d of %d bytes written",
+      ROS_ERROR_NAMED("can_bh280","Incomplete write of data to hand message pipe: only %d of %ld bytes written",
 		      bytes,sizeof(CANmsg));
     }
     mutex_unlock(&hand_cmd_mutex);
@@ -1497,7 +1584,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
     return OW_FAILURE;
   }
   if (bytes < sizeof(CANmsg)) {
-    ROS_ERROR_NAMED("can_bh280","Incomplete read of message from hand message pipe: expected %d but got %d bytes",
+    ROS_ERROR_NAMED("can_bh280","Incomplete read of message from hand message pipe: expected %ld but got %d bytes",
 		    sizeof(CANmsg),bytes);
     mutex_unlock(&hand_cmd_mutex);
     return OW_FAILURE;
@@ -1687,7 +1774,7 @@ int CANbus::hand_reset() {
   ROS_FATAL("Please move the hand to a safe position and hit <RETURN> to reset the hand");
   char *line=NULL;
   size_t linelen = 0;
-  getline(&line,&linelen,stdin);
+  linelen = getline(&line,&linelen,stdin);
   free(line);
   
   for (unsigned int attempts =0; attempts < 3; ++attempts) {
@@ -2036,7 +2123,7 @@ void CANbus::initPropertyDefs(int firmwareVersion){
     JIDX = 107;
     IPNM = 108;
     
-    PROP_END = 109;
+    PROP_END = 108;
     
 
   } else { // (firmwareVersion >= 40)
@@ -2153,22 +2240,24 @@ void CANbus::initPropertyDefs(int firmwareVersion){
     TACT = 106;
     TACTID=107;
     
+    PROP_END=107;
+
     /* Safety puck */
-    ZERO = 43;
-    PEN  = 44;
-    SAFE = 45;
-    VL1  = 46;
-    VL2  = 47;
-    TL1  = 48;
-    TL2  = 49;
-    VOLTL1=50;
-    VOLTL2=51;
-    VOLTH1=52;
-    VOLTH2=53;
-    PWR  = 54;
-    MAXPWR=55;
-    IFAULT=56;
-    VNOM = 57;
+    ZERO = 42;
+    PEN  = 43;
+    SAFE = 44;
+    VL1  = 45;
+    VL2  = 46;
+    TL1  = 47;
+    TL2  = 48;
+    VOLTL1=49;
+    VOLTL2=50;
+    VOLTH1=51;
+    VOLTH2=52;
+    PWR  = 53;
+    MAXPWR=54;
+    IFAULT=55;
+    VNOM = 56;
     
     /* Force/Torque sensor */
     FT   = 54;
@@ -2204,7 +2293,21 @@ void CANbus::initPropertyDefs(int firmwareVersion){
       } else {
 	fprintf(csv," %02d ",recv_id);
       }
-      if (cdata.msgdata[0] & 0x80) {
+      if ((cdata.msgid & 0x41F) == 0x40A) {
+	// group 10 messages are 3-axis Force from the F/T sensor
+	double X,Y,Z;
+	X=CANbus::ft_combine(cdata.msgdata[0],cdata.msgdata[1]) / 256.0;
+	Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 256.0;
+	Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 256.0;
+	fprintf(csv,"SET FORCE X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
+      } else if ((cdata.msgid & 0x41F) == 0x40B) {
+	// group 11 messages are 3-axis Torque from the F/T sensor
+	double X,Y,Z;
+	X=CANbus::ft_combine(cdata.msgdata[0],cdata.msgdata[1]) / 4096.0;
+	Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 4096.0;
+	Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 4096.0;
+	fprintf(csv,"SET TORQUE X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
+      } else if (cdata.msgdata[0] & 0x80) {
 	if (cdata.msgdata[0] == (42 | 0x80)) {
 	  // Packed Torque message
 	  int32_t tq1 = (cdata.msgdata[1] << 6) +

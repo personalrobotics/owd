@@ -42,9 +42,9 @@ public:
     ss_sethandprop,
     ss_gethandprop,
     ss_relaxhand;
-  CANbus *bus;
 
   ros::NodeHandle node;
+  CANbus *bus;
   tf::TransformBroadcaster *tf_broadcaster;
   btTransform baseShift;  
 
@@ -53,7 +53,7 @@ public:
 
   BHD_280(CANbus *cb);
   ~BHD_280();
-  void Pump(const ros::TimerEvent& e);
+  void Pump(ros::TimerEvent const& e);
   bool Publish();
   bool GetDOF(pr_msgs::GetDOF::Request &req,
 	      pr_msgs::GetDOF::Response &res);

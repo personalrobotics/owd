@@ -39,11 +39,8 @@ void FT::Unadvertise() {
 }
 
 void FT::Pump(const ros::TimerEvent& e) {
-  // publish our state info
+  // publish our data
   this->Publish();
-
-  // let the driver update
-  // this->Update();
 }
 
 bool FT::Publish() {

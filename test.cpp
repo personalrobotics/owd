@@ -41,14 +41,14 @@ public:
   pr_msgs::Joints p1, p2;
   bool running;
   int point;
-  int last_traj_id;
+  unsigned int last_traj_id;
 
   boost::mutex cb_mutex;
 
   void wamstate_callback(const boost::shared_ptr<const pr_msgs::WAMState> &ws) {
     wamstate = *ws;
     if (running) {
-      if ((last_traj_id == -1) // first time
+      if ((last_traj_id == 0) // first time
 	  || (wamstate.prev_trajectory.id == last_traj_id)) {
 	if (++point > 2) {
 	  point = 1;
@@ -65,7 +65,7 @@ public:
   }
 
   Test(ros::NodeHandle &n) : node(n), running(false),
-		       point(0), last_traj_id(-1)
+		       point(0), last_traj_id(0)
   {
     p1.j.resize(7);
     p2.j.resize(7);

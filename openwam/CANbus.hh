@@ -112,7 +112,7 @@ private:
   int32_t puck_state;
   CANstats stats;
 #ifdef PEAK_CAN
-#define MAX_FILTERS (3)
+#define MAX_FILTERS (5)
   int32_t can_accept[MAX_FILTERS];
   int32_t mask[MAX_FILTERS];
 #endif // PEAK_CAN
@@ -124,6 +124,7 @@ public:
   Group groups[NUM_GROUPS+1];
   int32_t* trq;
   double* pos;
+  double* forcetorque;
   Puck *pucks;
   int n_arm_pucks;
   bool simulation;
@@ -183,6 +184,9 @@ DataRecorder<canio_data> candata;
 
   int send_torques_rt();
   int read_positions_rt();
+
+  int read_forcetorque_rt();
+  static int ft_combine(unsigned char msb, unsigned char lsb);
 
   void initPropertyDefs(int firmwareVersion);
   RTIME time_now_ns();
@@ -291,6 +295,7 @@ public:
   int hand_get_state(int32_t &state);
 
   int ft_get_data(double *values);
+  int ft_tare();
   int limits(double jointVel, double tipVel, double elbowVel);
   friend void* canbus_handler(void* argv);
 };

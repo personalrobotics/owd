@@ -176,7 +176,7 @@ public:
   CANbus* bus;                             // pointer to the CAN bus
   ControlLoop ctrl_loop;            // control loop object
 
-  WAM(CANbus* cb);
+  WAM(CANbus* cb, int BH_model, bool forcetorque);
   ~WAM();
  
   int init();                       // initialise the WAM
@@ -190,7 +190,6 @@ public:
   void newcontrol_rt(double dt);          // main control function
   bool safety_torques_exceeded(double t[]); // check pid torqs against thresholds
 
-  void set_hand(std::string hand_type);     // set the type of hand installed
   int  set_targ_jpos(double* pos);          // set the target joint positions online 
   int  set_jpos(double pos[Joint::Jn+1]);   // set the joint positions offline
   bool set_gains(unsigned int joint, pr_msgs::PIDgains &gains);
@@ -232,6 +231,8 @@ public:
   float stiffness;
   DataRecorder<double> recorder;
 
+  int BH_model;
+  bool ForceTorque;
 };
 
 #endif

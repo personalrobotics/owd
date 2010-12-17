@@ -27,6 +27,7 @@
 #include <pr_msgs/WamSetupSeaCtrl.h>
 #include "openwamdriver.h"
 #include "bhd280.hh"
+#include "ft.hh"
 #include <sys/mman.h>
 
 int main(int argc, char** argv)
@@ -46,11 +47,27 @@ int main(int argc, char** argv)
   ros::NodeHandle n("~");
   std::string calibration_filename;
   int canbus_number;
+  std::string hand_type;
+  bool forcetorque;
   n.param("calibration_file",calibration_filename,std::string("wam_joint_calibrations"));
   n.param("canbus_number",canbus_number,0);
+  n.param("hand_type",hand_type,std::string("none"));
+  n.param("forcetorque_sensor",forcetorque,false);
+
   ROS_DEBUG("Using CANbus number %d",canbus_number);
 
-  WamDriver wam(canbus_number);
+  int BH_model(0);
+  bool tactile(false);
+  if (! hand_type.compare(0,3,"280")) {
+    BH_model=280;
+    if (! hand_type.compare("280+TACT")) {
+      tactile=true;
+    }
+  } else if (! hand_type.compare(0,3,"260")) {
+    BH_model=260;
+  }
+
+  WamDriver wam(canbus_number,BH_model,forcetorque,tactile);
   try {
     if (! wam.Init(calibration_filename.c_str())) {
       ROS_FATAL("WamDriver::Init() returned false; exiting.");
@@ -85,10 +102,19 @@ int main(int argc, char** argv)
 #endif
     exit(1);
   }
+  
+#ifndef OWDSIM
+  BHD_280 *bhd(NULL);
+  if (BH_model == 280) {
+    bhd= new BHD_280(&(wam.bus));
+  }
 
-#ifdef BH280
-  BHD_280 bhd(&(wam.bus));
-#endif // BH280
+  FT *ft(NULL);
+  if (forcetorque) {
+    ft = new FT(&(wam.bus));
+  }
+#endif // OWDSIM
+
 
 #ifdef BUILD_FOR_SEA
   usleep(100000);
@@ -97,9 +123,16 @@ int main(int argc, char** argv)
 
   ROS_DEBUG("Creating timer and spinner threads");
   ros::Timer wam_timer = n.createTimer(ros::Duration(0.1), &WamDriver::Pump, &wam);
-#ifdef BH280
-  ros::Timer bhd_timer = n.createTimer(ros::Duration(0.1), &BHD_280::Pump, &bhd);
-#endif
+#ifndef OWDSIM
+  ros::Timer bhd_timer;
+  if (bhd) {
+    bhd_timer = n.createTimer(ros::Duration(0.1), &BHD_280::Pump, bhd);
+  }
+  ros::Timer ft_timer;
+  if (ft) {
+    ft_timer = n.createTimer(ros::Duration(0.1), &FT::Pump, ft);
+  }
+#endif // OWDSIM
   ros::MultiThreadedSpinner s(3);
   ROS_DEBUG("Spinning");
   ros::spin(s);

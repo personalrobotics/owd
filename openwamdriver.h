@@ -61,8 +61,15 @@
 class WamDriver
 {
 public:
-    
-  WamDriver(int canbus_number);
+  /// Constructor
+  /// \param canbus_number numeric suffix for CAN bus device (/dev/can# for
+  ///                      ESD cards or /dev/pcan# for PEAK cards)
+  /// \param bh_model 260 for the serial hand, 280 for the CANbus hand,
+  ///                 or 0 for no hand
+  /// \param forcetorque true if the force/torque sensor is installed
+  /// \param tactile true if the tactile sensors are installed
+  ///                (BH model 280 only)
+  WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tactile);
 
     ~WamDriver();
 
@@ -167,6 +174,9 @@ private:
     bool intraj;
     std::list<Trajectory *> trajectory_list;
     char last_trajectory_error[200];
+    int BH_model; /// model number of the hand, either 260, 280, or 0 (no hand)
+    bool ForceTorque; /// whether the Force/Torque sensor is installed
+    bool Tactile;  /// whether the Tactile sensors are installed (280 hand only)
 
     // update internal structures
     void resetDesiredJointPositions(void);

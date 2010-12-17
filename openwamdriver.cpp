@@ -66,12 +66,6 @@
 
 #define SAFETY_MODULE 10
 
-#ifdef BT_USE_DOUBLE_PRECISION
-#warning DOUBLE PRECISION
-#else
-#warning NOT DOUBLE PRECISION
-#endif
-
 extern int MECH,AP,ZERO,IFAULT;
 extern int ADDR, VALUE, MODE;
 extern int dyn_active_link;
@@ -88,11 +82,15 @@ extern double fs[8];  // static friction from Dynamics.cc
 #include "ParabolicSegment.hh"
 
 
-WamDriver::WamDriver(int canbus_number) :
+WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tactile) :
 #ifndef BH280_ONLY
-  cmdnum(0), nJoints(Joint::Jn), bus(canbus_number, Joint::Jn)
+  cmdnum(0), nJoints(Joint::Jn),
+  BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
+  bus(canbus_number, Joint::Jn, bh_model==280, forcetorque)
 #else
-  cmdnum(0), nJoints(Joint::Jn), bus(canbus_number, 0)
+  cmdnum(0), nJoints(Joint::Jn), 
+  BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
+  bus(canbus_number, 0, bh_model==280, forcetorque)
 #endif // BH280_ONLY
 {
   // motion limits
@@ -147,13 +145,16 @@ WamDriver::WamDriver(int canbus_number) :
   // Construct the base transforms, based on the dimensions
   // from the WAM manual.
   static double PI=3.141592654;
+  btQuaternion HALFPI_ROLL, NEG_HALFPI_ROLL;
+  HALFPI_ROLL.setEuler(0,0,PI/2.0);
+  NEG_HALFPI_ROLL.setEuler(0,0,-PI/2.0);
   wam_tf_base[0] = btTransform::getIdentity();
-  wam_tf_base[1] = btTransform(btQuaternion(0,0,-PI/2.0));
-  wam_tf_base[2] = btTransform(btQuaternion(0,0, PI/2.0));
-  wam_tf_base[3] = btTransform(btQuaternion(0,0,-PI/2.0),btVector3(0.045,0,0.55));
-  wam_tf_base[4] = btTransform(btQuaternion(0,0, PI/2.0),btVector3(-0.045,0,0));
-  wam_tf_base[5] = btTransform(btQuaternion(0,0,-PI/2.0),btVector3(0,0,0.30));
-  wam_tf_base[6] = btTransform(btQuaternion(0,0, PI/2.0));
+  wam_tf_base[1] = btTransform(NEG_HALFPI_ROLL);
+  wam_tf_base[2] = btTransform(HALFPI_ROLL);
+  wam_tf_base[3] = btTransform(NEG_HALFPI_ROLL,btVector3(0.045,0,0.55));
+  wam_tf_base[4] = btTransform(HALFPI_ROLL,btVector3(-0.045,0,0));
+  wam_tf_base[5] = btTransform(NEG_HALFPI_ROLL,btVector3(0,0,0.30));
+  wam_tf_base[6] = btTransform(HALFPI_ROLL);
 }
 
 bool WamDriver::Init(const char *joint_cal_file)
@@ -195,11 +196,13 @@ bool WamDriver::Init(const char *joint_cal_file)
     return false;
   }
 
-#ifdef BH280
-  if (bus.hand_reset() != OW_SUCCESS) {
-    return false;
+#ifndef OWDSIM
+  if (BH_model == 280) {
+    if (bus.hand_reset() != OW_SUCCESS) {
+      return false;
+    }
   }
-#endif // BH280
+#endif // OWDSIM
 
 #ifndef BH280_ONLY
   int32_t WamWasZeroed = 0;
@@ -211,16 +214,13 @@ bool WamDriver::Init(const char *joint_cal_file)
   int32_t WamWasZeroed=1;
 #endif // BH280_ONLY
   
-  owam = new WAM(&bus);
+  owam = new WAM(&bus, BH_model, ForceTorque);
   if (owam->init() == OW_FAILURE) {
     ROS_FATAL("Failed to initialize WAM instance");
     return false;
   }
   
   ros::NodeHandle n("~");
-  std::string hand_type;
-  n.param("hand_type",hand_type,std::string("280FT"));
-  owam->set_hand(hand_type);
 
   std::string wamhome_list;
   // default value is the one used for Herb
@@ -230,13 +230,13 @@ bool WamDriver::Init(const char *joint_cal_file)
 
   std::stringstream ss(wamhome_list);
   std::string jval;
-  int j=0;
+  unsigned int j=0;
   while (std::getline(ss,jval,',')) {
     wamhome[++j]=strtod(jval.c_str(),NULL);
   }
   if (j < nJoints) {
     ROS_FATAL("Could not extract %d joint values from ROS parameter \"home_position\"",nJoints);
-    ROS_FATAL("home_position value is \"%s\"",wamhome_list);
+    ROS_FATAL("home_position value is \"%s\"",wamhome_list.c_str());
     throw -1;
   }
   if (j > nJoints) {
@@ -417,7 +417,7 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
     try {
       ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,cmdnum);
       ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
-      ROS_DEBUG_NAMED("BuildTrajectory","Segments=%d, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
+      ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
       
       return paratraj;
     } catch (const char * error) {
@@ -437,7 +437,7 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
     } catch (const char *error) {
       snprintf(last_trajectory_error,200,"Error building blended traj: %s",error);
       ROS_ERROR_NAMED("BuildTrajectory","%s",last_trajectory_error);
-      for (int tt=0; tt<traj.size(); ++tt) {
+      for (unsigned int tt=0; tt<traj.size(); ++tt) {
 	ROS_ERROR_NAMED("BuildTrajectory","  Traj point %d: %s",tt,
 			traj[tt].sdump());
       }
@@ -448,7 +448,7 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
       try {
 	ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,cmdnum);
 	ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
-	ROS_DEBUG_NAMED("BuildTrajectory","Segments=%d, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
+	ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
 	return paratraj;
       } catch (const char * error) {
 	snprintf(last_trajectory_error,200,"Error building parabolic traj: %s",error);
@@ -464,7 +464,7 @@ TrajType WamDriver::ros2owd_traj (pr_msgs::JointTraj &jt) {
   if (jt.positions.size() != jt.blend_radius.size()) {
     throw "Bad ROS trajectory: mismatched number of points";
   }
-  ROS_DEBUG_NAMED("trajectory","Converting trajectory of %d points",jt.positions.size());
+  ROS_DEBUG_NAMED("trajectory","Converting trajectory of %zd points",jt.positions.size());
   for (unsigned int i=0; i<jt.positions.size(); ++i) {
     JointPos jp = jt.positions[i].j;
     TrajPoint tp(jp,jt.blend_radius[i]);
@@ -982,10 +982,10 @@ void WamDriver::set_home_position() {
   ROS_ERROR("\007When ready, type HOME<return>\007");
   char *line=NULL;
   size_t linelen = 0;
-  getline(&line,&linelen,stdin);
-  while (strncmp(line,"HOME",4)) {
+  linelen = getline(&line,&linelen,stdin);
+  while ((linelen < 4) || strncmp(line,"HOME",4)) {
     ROS_ERROR("\007\nYou must type the word HOME and press <return>\007");
-    getline(&line,&linelen,stdin);
+    linelen = getline(&line,&linelen,stdin);
   }
   free(line);
     
@@ -997,7 +997,7 @@ void WamDriver::set_home_position() {
         }
         char *jvalstr = NULL;
         size_t jsize = 0;
-        getline(&jvalstr,&jsize,moff_file); // getline will do the malloc
+        linelen = getline(&jvalstr,&jsize,moff_file); // getline will do the malloc
         if (strncmp(jvalstr,"WAM encoder offset values",strlen("WAM encoder offset values"))) {
             ROS_ERROR("Unrecognized format in joint calibration file \"%s\"",joint_calibration_file);
             goto NOCALIB;
@@ -1367,8 +1367,10 @@ bool WamDriver::Publish() {
     snprintf(jname,50,"wam%d",i+1);
     std::string jrefstring(jref);
     std::string jnamestring(jname);
+    btQuaternion YAW;
+    YAW.setEuler(jointpos[i+1],0,0);
     btTransform wam_tf = wam_tf_base[i] *
-      btTransform(btQuaternion(jointpos[i+1],0,0));
+      btTransform(YAW);
     // instead:
     // wam_tf *= wam_tf_base[i] * btTransform(btQuaternion(jointpos[i+1],0,0));
     // jref="wam0";
@@ -1564,7 +1566,7 @@ pr_msgs::AddTrajectory::Response WamDriver::AddTrajectory(
 
   // check for trajectories that don't actually go anywhere
   bool zerodist = true;
-  for (int k=1; k<jointtraj->positions.size(); ++k) {
+  for (unsigned int k=1; k<jointtraj->positions.size(); ++k) {
     if (firstpoint != JointPos(jointtraj->positions[k].j)) {
       zerodist=false;
       break;
@@ -1690,7 +1692,7 @@ bool WamDriver::DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
       ++tl_it; ++ws_it;
     }
   }
-  ROS_INFO("DeleteTrajectory processed: new queue size %d",
+  ROS_INFO("DeleteTrajectory processed: new queue size %zd",
            trajectory_list.size());
   return false;
 }

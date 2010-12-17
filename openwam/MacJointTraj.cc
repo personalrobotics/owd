@@ -309,7 +309,7 @@ void MacJointTraj::log(char *trajname) {
 }
 
 void MacJointTraj::dump() {
-  printf("MacJointTraj: %d pieces, %2.3fs total duration\n",
+  printf("MacJointTraj: %zd pieces, %2.3fs total duration\n",
 	 macpieces.size(), traj_duration);
   for (unsigned int i=0; i<macpieces.size(); ++i) {
     macpieces[i]->dump();
