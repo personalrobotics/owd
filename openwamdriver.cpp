@@ -145,6 +145,7 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   // Construct the base transforms, based on the dimensions
   // from the WAM manual.
   static double PI=3.141592654;
+  /*
   btQuaternion HALFPI_ROLL, NEG_HALFPI_ROLL;
   HALFPI_ROLL.setEuler(0,0,PI/2.0);
   NEG_HALFPI_ROLL.setEuler(0,0,-PI/2.0);
@@ -155,6 +156,14 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   wam_tf_base[4] = btTransform(HALFPI_ROLL,btVector3(-0.045,0,0));
   wam_tf_base[5] = btTransform(NEG_HALFPI_ROLL,btVector3(0,0,0.30));
   wam_tf_base[6] = btTransform(HALFPI_ROLL);
+  */
+  wam_tf_base[0] = btTransform::getIdentity();
+  wam_tf_base[1] = btTransform(btQuaternion(0,0,-PI/2.0));
+  wam_tf_base[2] = btTransform(btQuaternion(0,0, PI/2.0));
+  wam_tf_base[3] = btTransform(btQuaternion(0,0,-PI/2.0),btVector3(0.045,0,0.55));
+  wam_tf_base[4] = btTransform(btQuaternion(0,0, PI/2.0),btVector3(-0.045,0,0));
+  wam_tf_base[5] = btTransform(btQuaternion(0,0,-PI/2.0),btVector3(0,0,0.30));
+  wam_tf_base[6] = btTransform(btQuaternion(0,0, PI/2.0));
 }
 
 bool WamDriver::Init(const char *joint_cal_file)
@@ -1367,10 +1376,10 @@ bool WamDriver::Publish() {
     snprintf(jname,50,"wam%d",i+1);
     std::string jrefstring(jref);
     std::string jnamestring(jname);
-    btQuaternion YAW;
-    YAW.setEuler(jointpos[i+1],0,0);
+    //btQuaternion YAW;
+    //YAW.setEuler(jointpos[i+1],0,0);
     btTransform wam_tf = wam_tf_base[i] *
-      btTransform(YAW);
+      btTransform(btQuaternion(jointpos[i+1],0,0));
     // instead:
     // wam_tf *= wam_tf_base[i] * btTransform(btQuaternion(jointpos[i+1],0,0));
     // jref="wam0";
