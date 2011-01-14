@@ -32,10 +32,12 @@ FT::~FT() {
 
 void FT::AdvertiseAndSubscribe(ros::NodeHandle &n) {
   pub_ft = n.advertise<geometry_msgs::Wrench>("forcetorque", 10);
+  ss_tare = n.advertiseService("ft_tare",&FT::Tare,this);
 }
 
 void FT::Unadvertise() {
   pub_ft.shutdown();
+  ss_tare.shutdown();
 }
 
 void FT::Pump(const ros::TimerEvent& e) {
@@ -61,3 +63,11 @@ bool FT::Publish() {
   return true;
 }
   
+bool FT::Tare(pr_msgs::Reset::Request &req,
+	      pr_msgs::Reset::Response &res) {
+  if (bus->ft_tare() != OW_SUCCESS) {
+    ROS_WARN_NAMED("ft","Unable to tare the sensor");
+  }
+  return true; // the service call still succeeded, even though action did not
+}
+

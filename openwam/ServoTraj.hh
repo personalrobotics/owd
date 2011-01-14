@@ -38,10 +38,13 @@ private:
   const float accel;
   double jlimit_buffer;
   JointPos current_position;
+  double lower_jlimit[7], upper_jlimit[7];
 
 public:
 
-  ServoTraj(int DOF, int id, double *start_pos);
+  ServoTraj(int DOF, int id, double *start_pos,
+	    double *lower_joint_limits = NULL,
+	    double *upper_joint_limits = NULL);
   virtual ~ServoTraj();
 
   bool SetVelocity(int j, float v, float duration = 0.5);

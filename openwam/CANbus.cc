@@ -957,7 +957,6 @@ int CANbus::read_forcetorque_rt(){
   return OW_SUCCESS;
 }
 
-
 int CANbus::send_positions(double* mpos){
   int32_t position[n_arm_pucks+1];
 

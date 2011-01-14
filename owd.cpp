@@ -49,10 +49,12 @@ int main(int argc, char** argv)
   int canbus_number;
   std::string hand_type;
   bool forcetorque;
+  bool modified_j1;
   n.param("calibration_file",calibration_filename,std::string("wam_joint_calibrations"));
   n.param("canbus_number",canbus_number,0);
   n.param("hand_type",hand_type,std::string("none"));
   n.param("forcetorque_sensor",forcetorque,false);
+  n.param("modified_j1",modified_j1,false);
 
   ROS_DEBUG("Using CANbus number %d",canbus_number);
 
@@ -68,6 +70,9 @@ int main(int argc, char** argv)
   }
 
   WamDriver wam(canbus_number,BH_model,forcetorque,tactile);
+  if (modified_j1) {
+    wam.SetModifiedJ1(true);
+  }
   try {
     if (! wam.Init(calibration_filename.c_str())) {
       ROS_FATAL("WamDriver::Init() returned false; exiting.");

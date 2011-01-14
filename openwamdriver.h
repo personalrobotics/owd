@@ -115,6 +115,8 @@ public:
     void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &message);
     void MassProperties_callback(const boost::shared_ptr<const pr_msgs::MassProperties> &message);
 
+    inline void SetModifiedJ1(bool mj1) {modified_j1 = mj1;}
+
 #ifdef BUILD_FOR_SEA
     void wamjointtargets_callback(const boost::shared_ptr<const pr_msgs::IndexedJointValues> &message);
 
@@ -156,10 +158,7 @@ private:
     double min_accel_time;
     double max_jerk;
     vector<double> joint_vel, joint_accel;
-    //    static const float lowerjointlimit_deg[] 
-    //          = {-150,-113,-157, -50,-275,-90,-172};
-    //    static const float upperjointlimit_deg[] 
-    //          = { 150, 113, 157, 180,  75, 90, 172};
+    double lower_jlimit[7], upper_jlimit[7];
 
     bool discard_movements;
 
@@ -208,6 +207,7 @@ private:
     WAM *owam;
     boost::mutex queue_mutex;
     boost::mutex wscb_mutex;
+    bool modified_j1;
 
     ros::Publisher
       pub_wamstate,

@@ -23,10 +23,12 @@
 #include <ros/ros.h>
 #include <CANbus.hh>
 #include <geometry_msgs/Wrench.h>
+#include <pr_msgs/Reset.h>
 
 class FT {
 public:
   ros::Publisher pub_ft;
+  ros::ServiceServer ss_tare;
   CANbus *bus;
 
   ros::NodeHandle node;
@@ -37,6 +39,8 @@ public:
   ~FT();
   void Pump(const ros::TimerEvent& e);
   bool Publish();
+  bool Tare(pr_msgs::Reset::Request &req,
+	    pr_msgs::Reset::Response &res);
   
 private:
   void AdvertiseAndSubscribe(ros::NodeHandle &n);

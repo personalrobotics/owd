@@ -21,9 +21,11 @@
  ***********************************************************************/
 
 #include "ServoTraj.hh"
+#include <string.h>
 
-
-ServoTraj::ServoTraj(int dof, int id_num, double *start_pos) 
+ServoTraj::ServoTraj(int dof, int id_num, double *start_pos,
+		     double *lower_joint_limits,
+		     double *upper_joint_limits)
   : nDOF(dof),
     vlimit(0.5),
     accel(2.5)
@@ -35,6 +37,19 @@ ServoTraj::ServoTraj(int dof, int id_num, double *start_pos)
   start_position.SetFromArray(nDOF,start_pos);
   current_position = start_position;
   end_position.resize(nDOF);
+
+  if (lower_joint_limits) {
+    memcpy(lower_jlimit,lower_joint_limits,7*sizeof(double));
+  } else {
+    // WAM default
+    lower_jlimit = {-2.60, -1.96, -2.73, -0.86, -4.79, -1.56, -2.99};
+  }
+  if (upper_joint_limits) {
+    memcpy(upper_jlimit,upper_joint_limits,7*sizeof(double));
+  } else {
+    // WAM default
+    upper_jlimit ={ 2.60,  1.96,  2.73,  3.13,  1.30,  1.56,  2.99};
+  }
  // space to leave near joint limits to allow for deceleration 
   jlimit_buffer = 0.5*vlimit*vlimit/accel * 1.3;
 }
@@ -62,11 +77,6 @@ void ServoTraj::stop() {
 }
 
 void ServoTraj::evaluate(double y[], double yd[], double ydd[], double dt) {
-  const static double lower_jlimit[7]
-    ={-2.60, -1.96, -2.73, -0.86, -4.79, -1.56, -2.99};
-  const static double upper_jlimit[7]
-    ={ 2.60,  1.96,  2.73,  3.13,  1.30,  1.56,  2.99};
-
   time += dt;
   bool active = false;
   for (unsigned int i = 0; i<nDOF; ++i) {
