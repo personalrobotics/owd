@@ -1796,9 +1796,11 @@ int CANbus::hand_reset() {
     return OW_FAILURE;
   }
 
-  // Set the torque stop value to 50 to reduce heating on stall
+  // Set the torque stop value to 150 to reduce heating on stall
+  // (tried 50 for a while but it wouldn't get out of jams, so
+  //  increased to 150 on 2/1/2011.  MVW)
   for (int32_t nodeid=11; nodeid<=13; ++nodeid) {
-    if (set_property_rt(nodeid,TSTOP,50) != OW_SUCCESS) {
+    if (set_property_rt(nodeid,TSTOP,150) != OW_SUCCESS) {
       return OW_FAILURE;
     }
     usleep(100);
@@ -1817,22 +1819,15 @@ int CANbus::hand_reset() {
     return OW_FAILURE;
   }
   usleep(100);
-  // F3 needs the gains reduced to prevent chatter
-  //
-  /*
-    Commented out until we get our CANbus hand back for testing.
-    We want KP and KD to be half of what they are for F1 and F2.
-    Once we get the hand back, look up the KP and KD values and
-    then adjust them below.    Mike V. 11/12/2010
-   
-    if (set_property_rt(13,KP,250) != OW_SUCCESS) {
+  // Reduce the gains on the fingers for smoother operation
+  for (int32_t nodeid=11; nodeid<=13; ++nodeid) {
+    if (set_property_rt(nodeid,KP,125) != OW_SUCCESS) {
       return OW_FAILURE;
     }
-    if (set_property_rt(13,KD,2500) != OW_SUCCESS) {
+    if (set_property_rt(nodeid,KD,1250) != OW_SUCCESS) {
       return OW_FAILURE;
     }
-    usleep(100);
-  */
+  }
   for (int32_t nodeid=11; nodeid<=14; ++nodeid) {
     int32_t value;
     if (get_property_rt(nodeid,HOLD,&value,20000) != OW_SUCCESS) {
@@ -1857,14 +1852,6 @@ int CANbus::hand_reset() {
 }
 
 int CANbus::hand_move(double p1, double p2, double p3, double p4) {
-  /*  set_property(11,DP,finger_radians_to_encoder(p1));
-  set_property(12,DP,finger_radians_to_encoder(p2));
-  set_property(13,DP,finger_radians_to_encoder(p3));
-  set_property(14,DP,spread_radians_to_encoder(p4));
-  set_property(11,CMD,CMD_M);
-  set_property(12,CMD,CMD_M);
-  set_property(13,CMD,CMD_M);
-  set_property(14,CMD,CMD_M); */
   ROS_INFO_NAMED("bhd280", "executing hand_move");
 
   if (hand_set_property(11,E,finger_radians_to_encoder(p1)) != OW_SUCCESS) {

@@ -56,7 +56,7 @@ void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 }
 
 void BHD_280::GetParameters(ros::NodeHandle &n) {
-  n.param("max_velocity",max_velocity,2.4);
+  n.param("max_velocity",max_velocity,6.0);
 }
   
 void BHD_280::Unadvertise() {
