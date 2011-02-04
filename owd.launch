@@ -2,12 +2,12 @@
 
   <param name="owd/calibration_file" type="string"
     value="wam_joint_calibrations" />
-  <param name="owd/canbus_number" type="int" value="40" />
+  <param name="owd/canbus_number" type="int" value="0" />
   <param name="owd/hand_type" type="string" value="280+TACT" />
   <param name="owd/home_position" type="string" value="3.14, -1.97, 0, -0.83, 1.309, 0, 3.02" />
   <param name="owd/forcetorque_sensor" type="bool" value="true" />
 
-  <node pkg="owd" type="owdbhd" output="screen" respawn="false"
+  <node pkg="owd" type="owd" output="screen" respawn="false"
         cwd="node" name="owd">
   </node>
 
