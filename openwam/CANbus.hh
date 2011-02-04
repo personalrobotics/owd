@@ -173,7 +173,7 @@ DataRecorder<canio_data> candata;
   int compile(int32_t property, int32_t value, uint8_t *msg, int32_t *msglen);
   
   int set_property_rt(int32_t nid, int32_t property, int32_t value, bool check=false, int32_t usecs=200);
-  int get_property_rt(int32_t nid, int32_t property, int32_t* value, int32_t usecs=2000);
+  int get_property_rt(int32_t nid, int32_t property, int32_t* value, int32_t usecs=2000, int retries=0);
   
   int read_rt(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs);
   int send_rt(int32_t  msgid, uint8_t* msg, int32_t  msglen, int32_t usecs);

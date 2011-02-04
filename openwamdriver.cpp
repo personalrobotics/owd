@@ -574,9 +574,15 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
         new_joint_angles[j]=jointpos[j]-joint_offsets[j];
     }
 
-    if (owam->set_jpos(new_joint_angles) == OW_FAILURE) {
-        ROS_ERROR("Failed to set new joint angles");
+    unsigned int retries=4;
+    int result = owam->set_jpos(new_joint_angles);
+    while (owam->set_jpos(new_joint_angles) == OW_FAILURE) {
+      if (retries-- > 0) {
+        ROS_WARN("Failed to set new joint angles; trying again");
+      } else {
+        ROS_ERROR("Unable to set new joint angles.");
         throw -1;
+      }
     }
 
     // record the AP to MECH offsets for each motor
@@ -602,7 +608,7 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
 
 int WamDriver::get_puck_offset(int puckid, int32_t *mechout, int32_t *apout) {
     int32_t p,mech;
-    if (bus.get_property_rt(bus.pucks[puckid].id(), AP, &p, 10000) == OW_FAILURE){
+    if (bus.get_property_rt(bus.pucks[puckid].id(), AP, &p, 10000,4) == OW_FAILURE){
         cerr << "Failed to get AP" << endl;
         throw -1;
     }
@@ -610,7 +616,7 @@ int WamDriver::get_puck_offset(int puckid, int32_t *mechout, int32_t *apout) {
         cerr << "Failed to set address of MECH" << endl;
         throw -1;
     }
-    if(bus.get_property_rt(bus.pucks[puckid].id(), VALUE, &mech, 10000) == OW_FAILURE) {
+    if(bus.get_property_rt(bus.pucks[puckid].id(), VALUE, &mech, 10000,4) == OW_FAILURE) {
         cerr << "Failed to get MECH" << endl;
         throw -1;
     }
@@ -675,7 +681,7 @@ void WamDriver::calibrate_joint_angles() {
     ROS_ERROR("move it to be parallel or square to the previous");
     ROS_ERROR("joint, then press key 1-7 corresponding to the joint");
     ROS_ERROR("number.");
-    ROS_ERROR("'H' will hold a joint angle, 'h' will release it.");
+    ROS_ERROR("'h' will hold a joint angle, 'u' will unhold it.");
     ROS_ERROR("Hit 'd' when done, or 'q' to quit.");
     double joint_offsets[nJoints+1];
     for (unsigned int j = 1; j <=nJoints; ++j) {

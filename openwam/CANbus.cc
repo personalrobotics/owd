@@ -527,7 +527,7 @@ int CANbus::status(int32_t* nodes){
   return OW_SUCCESS;
 }
 
- int CANbus::get_property_rt(int32_t nid, int32_t property, int32_t* value, int32_t usecs){
+int CANbus::get_property_rt(int32_t nid, int32_t property, int32_t* value, int32_t usecs, int32_t retries){
   uint8_t msg[8];
   int32_t msgid, msglen, nodeid, prop;
   *value=0;
@@ -539,47 +539,52 @@ int CANbus::status(int32_t* nodes){
 
   msg[0] = (uint8_t)property;   
 
-  if(send_rt(NODE2ADDR(nid), msg, 1, usecs) == OW_FAILURE){
-    ROS_WARN("CANbus::get_property: send failed: %s",last_error);
-    return OW_FAILURE;
-  }
- REREAD:
-  if(read_rt(&msgid, msg, &msglen, usecs) == OW_FAILURE){
-    ROS_WARN("CANbus::get_property: read failed: %s",last_error);
-    ++unread_packets;
-    return OW_FAILURE;
-  }
-   
-  // Parse the reply
-  if(parse(msgid, msg, msglen, &nodeid, &prop, value) == OW_FAILURE){
-    ROS_WARN("CANbus::get_property: parse failed: %s",last_error);
-    return OW_FAILURE;
-  }
+  do {
+    
+    if (send_rt(NODE2ADDR(nid), msg, 1, usecs) == OW_FAILURE) {
       
-  // Check that the ids and properties match
-  if(nodeid!=nid) {
-    ROS_WARN("Asked for property %d from node %d but got answer from node %d, %d previously missed messages",
-    	     property, nid, nodeid, unread_packets);
-    if (unread_packets > 0) {
-      ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)", unread_packets);
+      ROS_WARN("CANbus::get_property: send failed: %s",last_error);
+      continue;
+    }
+  REREAD:
+    if(read_rt(&msgid, msg, &msglen, usecs) == OW_FAILURE){
+      ROS_WARN("CANbus::get_property: read failed: %s",last_error);
+      ++unread_packets;
+      continue;
+    }
+    
+    // Parse the reply
+    if(parse(msgid, msg, msglen, &nodeid, &prop, value) == OW_FAILURE){
+      ROS_WARN("CANbus::get_property: parse failed: %s",last_error);
+      continue;
+    }
+    
+    // Check that the ids and properties match
+    if(nodeid!=nid) {
+      ROS_WARN("Asked for property %d from node %d but got answer from node %d, %d previously missed messages",
+	       property, nid, nodeid, unread_packets);
+      if (unread_packets > 0) {
+	ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)", unread_packets);
       --unread_packets;
       goto REREAD;
+      }
+      continue;
     }
-    return OW_FAILURE;
-  }
-  else if (prop!=property) {
-    ROS_WARN("Asked node %d for property %d but got property %d",
-    	     nid, property, prop);
-    if (unread_packets > 0) {
-      ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)",
-	       unread_packets);
-      --unread_packets;
-      goto REREAD;
+    else if (prop!=property) {
+      ROS_WARN("Asked node %d for property %d but got property %d",
+	       nid, property, prop);
+      if (unread_packets > 0) {
+	ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)",
+		 unread_packets);
+	--unread_packets;
+	goto REREAD;
+      }
+      continue;
     }
-    return OW_FAILURE;
-  }
-
-  return OW_SUCCESS;
+    
+    return OW_SUCCESS;
+  } while (retries-->0);
+  return OW_FAILURE;
 }
 
 int CANbus::send_torques(int32_t* torques){
@@ -833,8 +838,8 @@ int CANbus::read_positions_rt(){
     total_pucks += 4;
   }
   for(int p=1; p<=total_pucks; ) {
-    if(read_rt(&msgid, msg, &msglen, 800) == OW_FAILURE){
-      // ROS_WARN("CANbus::read_positions: read failed: %s",last_error);
+    if(read_rt(&msgid, msg, &msglen, 2000) == OW_FAILURE){
+      ROS_WARN("CANbus::read_positions: read failed: %s",last_error);
       missed_reads=true;
       break;
     }

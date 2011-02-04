@@ -112,7 +112,7 @@ int CANbus::set_property_rt(int32_t nid, int32_t property, int32_t value,bool ch
   return OW_SUCCESS;
 }
 
-int CANbus::get_property_rt(int32_t nid, int32_t property, int32_t* value, int32_t usecs){
+int CANbus::get_property_rt(int32_t nid, int32_t property, int32_t* value, int32_t usecs, int32_t retries){
   return OW_SUCCESS;
 }
 
