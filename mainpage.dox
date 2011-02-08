@@ -99,6 +99,10 @@ Additionally, OWD publishes a TF frame for every link, defining \b wam1 in terms
 
 more info coming soon
 
+\section develoment Development
+
+Development of OWD is handled by the collaboration of its users.  See the \subpage development page for the current task list and schedule.
+
 \verbatim
 Copyright 2010 Carnegie Mellon University and Intel Corporation
 \endverbatim
