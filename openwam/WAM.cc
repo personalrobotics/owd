@@ -17,7 +17,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* Modified 2007-2010 by:
+/* Modified 2007-2011 by:
       Mike Vande Weghe <vandeweg@cmu.edu>
       Robotics Institute
       Carnegie Mellon University
@@ -578,6 +578,11 @@ void control_loop_rt(void* argv){
 	static int forcetorqueperiod=33;  // offset from hand state
 	if (++forcetorqueperiod == 50) { // also every 0.1 seconds
 	  wam->bus->read_forcetorque_rt();
+	  // If we are running a trajectory, pass it the new force/torque
+	  // values so that it can servo and/or stop in response
+	  if (wam->jointstraj) {
+	    wam->jointstraj->ForceFeedback(wam->bus->forcetorque);
+	  }
 	  forcetorqueperiod=0;
 	}
       }
@@ -810,8 +815,11 @@ void WAM::newcontrol_rt(double dt){
             if (safety_torques_exceeded(pid_torq)) {
               // hold here with zero target velocity and acceleration,
               // and wait until the limit condition goes away.
-              if (jointstraj) { // might have ended and been cleared (above)
-                // March 2009: something to try
+              if (jointstraj  // might have ended and been cleared (above)
+		  && (jointstraj->state()
+		      == Trajectory::RUN)) { // only mess with the traj if
+		//                              we are still running
+
                 // just slow down the time, and take a smaller step.
                 // as long as we keep exceeding, keep trying smaller steps.
                 // as we free up, we can start taking bigger steps again.

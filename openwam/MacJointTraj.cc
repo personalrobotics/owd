@@ -1,6 +1,6 @@
 /***********************************************************************
 
-  Copyright 2007-2010 Carnegie Mellon University and Intel Corporation
+  Copyright 2007-2011 Carnegie Mellon University and Intel Corporation
   Author: Mike Vande Weghe <vandeweg@cmu.edu>
 
   This file is part of owd.
@@ -39,6 +39,7 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
 			   double max_jerk,
 			   bool bWaitForStart,
 			   bool bHoldOnStall,
+			   bool bHoldOnForceInput,
 			   int trajid) :
   max_joint_vel(mjv), max_joint_accel(mja)
 {
@@ -46,6 +47,7 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
   id = trajid;
   WaitForStart=bWaitForStart;
   HoldOnStall=bHoldOnStall;
+  HoldOnForceInput=bHoldOnForceInput;
 
   // unlike previous trajectory code, this package assumes that
   // extraneous co-linear points have already been removed, so that
@@ -320,3 +322,4 @@ void MacJointTraj::reset(double t) {
   time=t;
   current_piece=macpieces.begin();
 }
+

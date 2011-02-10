@@ -46,10 +46,13 @@ public:
   static const int DONE=2;
   static const int LOG  = 3;
   int id;
-  bool HoldOnStall, WaitForStart;
+  bool HoldOnStall, WaitForStart, HoldOnForceInput;
+  double forcetorque[6];
+  bool valid_ft;
   
   Trajectory():runstate(STOP),time(0.0),id(0),
-	       HoldOnStall(false),WaitForStart(false) {
+	       HoldOnStall(false),WaitForStart(false),
+	       HoldOnForceInput(false),valid_ft(false) {
     pthread_mutex_init(&mutex, NULL);
   }
 
@@ -81,6 +84,8 @@ public:
   inline virtual double curtime() const {return time;}
 
   virtual void update_torques(double t[]) {}
+
+  virtual void ForceFeedback(double ft[]);
 
   friend class WamDriver;
 };

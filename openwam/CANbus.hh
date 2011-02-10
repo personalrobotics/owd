@@ -296,6 +296,9 @@ public:
 
   int ft_get_data(double *values);
   int ft_tare();
+
+  int tactile_get_data(unsigned int id, double *values);
+
   int limits(double jointVel, double tipVel, double elbowVel);
   friend void* canbus_handler(void* argv);
 };

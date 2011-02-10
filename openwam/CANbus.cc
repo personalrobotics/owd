@@ -1522,6 +1522,11 @@ int CANbus::ft_tare() {
   return hand_set_property(8,FT,0);
 }
 
+int CANbus::tactile_get_data(unsigned int id, double *values) {
+  return OW_SUCCESS;
+}
+
+
 int CANbus::hand_set_property(int32_t id, int32_t prop, int32_t val) {
   CANmsg msg;
   msg.nodeid=id;
@@ -1762,7 +1767,7 @@ int CANbus::hand_reset() {
 		nodeid);
       return OW_FAILURE;
     }
-    if (((nodeid < 14) && (tstop != 50)) 
+    if (((nodeid < 14) && (tstop != 150)) 
 	|| ((nodeid == 14) && (tstop != 200))) {
       ready=false;
       break;

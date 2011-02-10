@@ -1,6 +1,6 @@
 /***********************************************************************
 
-  Copyright 2007-2010 Carnegie Mellon University and Intel Corporation
+  Copyright 2007-2011 Carnegie Mellon University and Intel Corporation
   Author: Mike Vande Weghe <vandeweg@cmu.edu>
 
   This file is part of owd.
@@ -67,11 +67,13 @@ ParaJointTraj::ParaJointTraj(TrajType &vtraj,
                              const vector<double> &mja,
                              bool bWaitForStart,
                              bool bHoldOnStall,
+			     bool bHoldOnForceInput,
                              int trajid) :
-   max_joint_vel(mjv), max_joint_accel(mja), restart(false)
+  max_joint_vel(mjv), max_joint_accel(mja), restart(false)
 {
-    WaitForStart=bWaitForStart;
-    HoldOnStall=bHoldOnStall;
+  WaitForStart=bWaitForStart;
+  HoldOnStall=bHoldOnStall;
+  HoldOnForceInput=bHoldOnForceInput;
     pthread_mutex_init(&mutex, NULL);
     runstate=STOP;
     time=0.0;

@@ -423,12 +423,13 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
   }
   bool bWaitForStart=(jt.options & jt.opt_WaitForStart);
   bool bHoldOnStall=(jt.options & jt.opt_HoldOnStall);
+  bool bHoldOnForceInput=(jt.options & jt.opt_HoldOnForceInput);
 
   if (!blended_traj) {
     ROS_WARN_NAMED("BuildTrajectory","No blends found; using ParaJointTraj");
 
     try {
-      ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,cmdnum);
+      ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,bHoldOnForceInput,cmdnum);
       ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
       ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
       
@@ -443,7 +444,9 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
     try {
       MacJointTraj *mactraj = new MacJointTraj(traj,joint_vel, joint_accel,
 					       max_jerk,
-					       bWaitForStart,bHoldOnStall,
+					       bWaitForStart,
+					       bHoldOnStall,
+					       bHoldOnForceInput,
 					       cmdnum);
       ROS_DEBUG_NAMED("BuildTrajectory","MacFarlane blended trajectory built");
       return mactraj;
@@ -459,7 +462,7 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
       // can usually still succeed with a non-blended traj
       ROS_ERROR_NAMED("BuildTrajectory","Trying to use a ParaJointTraj instead");
       try {
-	ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,cmdnum);
+	ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,bHoldOnForceInput,cmdnum);
 	ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
 	ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
 	return paratraj;
@@ -1170,7 +1173,7 @@ bool WamDriver::move_until_stop(int joint, double stop, double limit, double vel
     std::vector<double> modified_joint_accel(joint_accel);
     // rescale the acceleration to match the new velocity
     modified_joint_accel[joint-1]=joint_accel[joint-1]*velocity/joint_vel[joint-1];
-    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,true,0);
+    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,true,false,0);
     ROS_DEBUG_NAMED("calibration",
 		    "Moving joint %d from %2.2f to %2.2f",
 		    joint,original_joint_pos,limit);
@@ -1233,7 +1236,7 @@ bool WamDriver::move_joint(int joint, double newpos, double velocity) {
     std::vector<double> modified_joint_accel(joint_accel);
     // rescale the acceleration to match the new velocity
     modified_joint_accel[joint-1]=joint_accel[joint-1]*velocity/joint_vel[joint-1];
-    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,false,0);
+    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,false,false,0);
     if (owam->run_trajectory(paratraj) == OW_FAILURE) {
       ROS_ERROR_NAMED("calibration",
 		      "Error starting joint %d trajectory",joint);
@@ -1369,9 +1372,6 @@ bool WamDriver::Publish() {
   owam->get_current_data(jointpos,totaltorqs,jointtorqs,simtorqs);
   owam->get_gains(waminternals.gains);
 
-  // more efficient for most users:
-  // btTransform wam_tf = btTransform::getIdentity();
-
   for (unsigned int i=0; i<nJoints; ++i) {
     wamstate.positions[i] = waminternals.positions[i] = jointpos[i+1];
     wamstate.torques[i] = jointtorqs[i+1];
@@ -1395,11 +1395,14 @@ bool WamDriver::Publish() {
 
   owam->lock();
   if (owam->jointstraj) {
-    if (owam->jointstraj->state() == ParaJointTraj::STOP) {
+    if (owam->jointstraj->state() == Trajectory::STOP) {
       if (owam->safety_hold) {
         wamstate.state=pr_msgs::WAMState::state_stalled;
       } else {
         wamstate.state=pr_msgs::WAMState::state_fixed;
+      }
+      if (wamstate.trajectory_queue.size() > 0) {
+	wamstate.trajectory_queue[0].state=pr_msgs::TrajInfo::state_paused;
       }
     } else {
       // trajectory is still running, but we still might be hitting something
@@ -1407,6 +1410,9 @@ bool WamDriver::Publish() {
         wamstate.state=pr_msgs::WAMState::state_stalled;
       } else {
 	wamstate.state=pr_msgs::WAMState::state_moving;
+      }
+      if (wamstate.trajectory_queue.size() > 0) {
+	wamstate.trajectory_queue[0].state=pr_msgs::TrajInfo::state_running;
       }
     }
   } else if (owam->holdpos) {
@@ -1484,8 +1490,11 @@ pr_msgs::AddTrajectory::Response WamDriver::AddTrajectory(
   if (at_req) {
     jointtraj = &(at_req->traj);
   } else {
+    /// \warning Incomplete implementation of pre-computed trajectories.
+    /// jointtraj is used later without checking for NULL.
     jointtraj = NULL;
   }
+
   // get trajectory start point
   JointPos firstpoint;
   if (jointtraj) {
@@ -1611,15 +1620,9 @@ pr_msgs::AddTrajectory::Response WamDriver::AddTrajectory(
 #ifdef FAKE7
   ti.end_position.resize(7);
 #endif
-  if (t->WaitForStart) {
-    ti.options = pr_msgs::JointTraj::opt_WaitForStart;
-  }
-  if (t->HoldOnStall) {
-    ti.options |= pr_msgs::JointTraj::opt_HoldOnStall;
-  }
+  ti.options = jointtraj->options;  // copy over from request
   ti.state = pr_msgs::TrajInfo::state_pending;
   wamstate.trajectory_queue.push_back(ti);
-
 
   // if there are already running / queued trajectories, just add ours.
   // note: the order of these conditional checks is important.  only want to
@@ -1637,6 +1640,7 @@ pr_msgs::AddTrajectory::Response WamDriver::AddTrajectory(
 
   // run the trajectory
   owam->run_trajectory(t);
+  wamstate.trajectory_queue[0].state=pr_msgs::TrajInfo::state_running;
   ROS_INFO("Added trajectory #%d",t->id);
   res.reason="Trajectory started";
   res.id = t->id;
@@ -1747,13 +1751,13 @@ bool WamDriver::PauseTrajectory(pr_msgs::PauseTrajectory::Request &req,
     if (req.pause) {
       owam->pause_trajectory();
       if (wamstate.trajectory_queue.size() > 0) {
-	wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_paused;
+	wamstate.trajectory_queue[0].state = pr_msgs::TrajInfo::state_paused;
       }
       ROS_INFO("Trajectory paused");
     } else {
       owam->resume_trajectory();
       if (wamstate.trajectory_queue.size() > 0) {
-	wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_running;
+	wamstate.trajectory_queue[0].state = pr_msgs::TrajInfo::state_running;
       }
       ROS_INFO("Trajectory resumed");
     }

@@ -62,3 +62,14 @@ bool Trajectory::log(const char *trajname) {
     free(simfname);
     return true;
 }
+
+void Trajectory::ForceFeedback(double ft[]) {
+  memcpy(forcetorque,ft,6*sizeof(double));
+  valid_ft=true;
+  // simplistic check to see if greater than 3N of force towards palm
+  if ((runstate==RUN) &&
+      HoldOnForceInput &&
+      (ft[2] < -3.0)) {
+    stop();
+  }
+}

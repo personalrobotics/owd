@@ -1,6 +1,6 @@
 /***********************************************************************
 
-  Copyright 2007-2010 Carnegie Mellon University and Intel Corporation
+  Copyright 2007-2011 Carnegie Mellon University and Intel Corporation
   Author: Mike Vande Weghe <vandeweg@cmu.edu>
 
   This file is part of owd.
@@ -54,7 +54,8 @@ public:
                   const vector<double> &max_joint_vel, 
                   const vector<double> &max_joint_accel,
                   bool bWaitForStart,
-                  bool bAutoBrakeOnStall,
+                  bool bHoldOnStall,
+		  bool bHoldOnForceInput,
                   int trajid);
     virtual ~ParaJointTraj();
     
