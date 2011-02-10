@@ -1,6 +1,6 @@
 /***********************************************************************
 
-  Copyright 2010 Carnegie Mellon University and Intel Corporation
+  Copyright 2011 Carnegie Mellon University and Intel Corporation
   Author: Mike Vande Weghe <vandeweg@cmu.edu>
 
   This file is part of owd.
