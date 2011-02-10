@@ -29,6 +29,7 @@
 #include <pr_msgs/DeleteTrajectory.h>
 #include <pr_msgs/JointTraj.h>
 #include <pr_msgs/Joints.h>
+#include <pr_msgs/TrajInfo.h>
 #include <iostream>
 #include <boost/thread/mutex.hpp>
 #include <pthread.h>
@@ -48,15 +49,21 @@ public:
   void wamstate_callback(const boost::shared_ptr<const pr_msgs::WAMState> &ws) {
     wamstate = *ws;
     if (running) {
+      if ((wamstate.trajectory_queue.size() > 0) &&
+	  (wamstate.trajectory_queue[0].state == pr_msgs::TrajInfo::state_paused)) {
+	// reverse direction shortly after it stalls
+	DeleteTrajectory(wamstate.trajectory_queue[0].id);
+	return;
+      }
       if ((last_traj_id == 0) // first time
 	  || (wamstate.prev_trajectory.id == last_traj_id)) {
 	if (++point > 2) {
 	  point = 1;
 	}
 	if (point == 1) {
-	  last_traj_id = MoveTo(p1);
+	  last_traj_id = MoveTo(p1,false);
 	} else {
-	  last_traj_id = MoveTo(p2);
+	  last_traj_id = MoveTo(p2,true);
 	}
       }
       ROS_DEBUG("Moving to point %d",point);
@@ -70,6 +77,7 @@ public:
     p1.j.resize(7);
     p2.j.resize(7);
     static const double PI=3.141592654;
+    /*
     p1.j[0]=PI/2.0;      p2.j[0]=-PI/2;
     p1.j[1]=0.62;        p2.j[1]=-1.6;
     p1.j[2]=0;           p2.j[2]=0;
@@ -77,12 +85,20 @@ public:
     p1.j[4]=0.0;         p2.j[4]=0;
     p1.j[5]=0.4;         p2.j[5]=-1;
     p1.j[6]=0.0;         p2.j[6]=PI/2;
+*/
+    p1.j[0]=4.76;      p2.j[0]=4.76;
+    p1.j[1]=-1.93;        p2.j[1]=-1.16;
+    p1.j[2]=0;           p2.j[2]=0;
+    p1.j[3]=2.16;         p2.j[3]=1.76;
+    p1.j[4]=1.25;         p2.j[4]=1.25;
+    p1.j[5]=0.0;         p2.j[5]=0.0;
+    p1.j[6]=0;         p2.j[6]=0;
     
   }
 
   void Subscribe() {
     sub_wamstate =
-      node.subscribe("/owd/wamstate", 5, &Test::wamstate_callback,this);
+      node.subscribe("/right/owd/wamstate", 5, &Test::wamstate_callback,this);
   }
 
 
@@ -92,7 +108,7 @@ public:
     
     req.stiffness = s;
 
-    if(ros::service::call("/owd/SetStiffness", req, res)) {
+    if(ros::service::call("/right/owd/SetStiffness", req, res)) {
       ROS_DEBUG("SetStiffness %1.1f",req.stiffness);
     } else {
       ROS_WARN("Could not call SetStiffness");
@@ -103,7 +119,7 @@ public:
     pr_msgs::DeleteTrajectory::Request delete_req;
     pr_msgs::DeleteTrajectory::Response delete_res;
     delete_req.ids.push_back(id);
-    ros::service::call("/owd/DeleteTrajectory",delete_req,delete_res);
+    ros::service::call("/right/owd/DeleteTrajectory",delete_req,delete_res);
     return;
   }
 
@@ -139,11 +155,11 @@ public:
     SetStiffness(1.0);
     usleep(300000);  // get a joint update
 
-    last_traj_id = MoveTo(p1);
+    last_traj_id = MoveTo(p1,false);
     return true;
   }
 
-  int MoveTo(pr_msgs::Joints p) {
+  int MoveTo(pr_msgs::Joints p, bool StopOnForce) {
     // build trajectory to move from current pos to preferred pos
     pr_msgs::AddTrajectory::Request traj_req;
     pr_msgs::AddTrajectory::Response traj_res;
@@ -155,7 +171,10 @@ public:
     traj_req.traj.positions.push_back(p);
     traj_req.traj.blend_radius.push_back(0.0);
     
-    if (ros::service::call("/owd/AddTrajectory",traj_req,traj_res)) {
+    if (StopOnForce) {
+            traj_req.traj.options = traj_req.traj.opt_HoldOnForceInput;
+    }
+    if (ros::service::call("/right/owd/AddTrajectory",traj_req,traj_res)) {
       ROS_DEBUG("Added Trajectory %d",traj_res.id);
       if (traj_res.id == 0) {
 	ROS_WARN("Adding trajectory failed");
