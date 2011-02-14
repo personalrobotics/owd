@@ -1,9 +1,12 @@
 <launch>
 
   <param name="owd/calibration_file" type="string"
-    value="wam_joint_calibrations" />
-  <param name="owd/canbus_number" type="int" value="0" />
+    value="/homes/prdemo/wam_joint_calibrations" />
+  <param name="owd/canbus_number" type="int" value="41" />
   <param name="owd/hand_type" type="string" value="280+TACT" />
+  <!--  home position for DARPA arm 
+         param name="owd/home_position" type="string" value="0, -1.57, 0, 0, 1.309, 0, 3.02" />
+  -->
   <param name="owd/home_position" type="string" value="3.14, -1.97, 0, -0.83, 1.309, 0, 3.02" />
   <param name="owd/forcetorque_sensor" type="bool" value="true" />
 
