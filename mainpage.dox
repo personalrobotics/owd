@@ -97,7 +97,52 @@ Additionally, OWD publishes a TF frame for every link, defining \b wam1 in terms
 
 \section calibration Calibration
 
-more info coming soon
+Calibration using OWD:
+
+Make a local copy of owd.launch from the owd folder:
+A) Specify fields inside owd.launch:
+1. for saving the calibration file.
+2. specify the can bus number:
+2.a) ls /dev/pcan* 
+3. Specify the home position, for the right WAM, just specify the joint values inside the owd.launch file. 
+
+B) e-stop the WAM -> this cuts the power to the pucks and makes them lose their values.
+1) You can see the errors on the pendant LEDs.
+
+C) Shift idle the WAM.
+
+D) roslaunch owd.launch
+
+E) OWD homes the hand, lift it up to a safe config., while doing this.
+
+F) Move the WAM to its home position.
+
+G) Type HOME and press enter on console.
+    -> OWD initializes the position of the motor encoders and AP in its datastructures based on the values specified in the launch file.
+
+I) Shift+Activate the WAM.
+
+J) Now, we need to work on using the level to finely calibrate the wam.
+
+K) 
+1)Do "rosservice list" to find the name of appropriate calibration service, 
+2)then "rosservice call /owd/CalibrateJoints", replace /owd/CalibrateJoints with the correct service name from step K.1)
+
+L)Use a level to set the joint values (AP value in the virtual encoder limit).
+1) Move the joint "i" (i is a number from 1 to 7) to a multiple of 90 degrees (because then you can use a level set to ascertain when the joint is "really" at the multiple of 90 degrees.
+2) When you are sure, from the level reading, that the joint is at the value you expect it to be (i.e. some multiple of 90), press "i" (where i is the joint number) and then "y" (without the double quotes). Before pressing "y", and after pressing "i", owd will display in red, what value it will set for the joint position you are currently holding the joint "i" at.
+3) Repeat this for all the other joints, using points 4 and 5 below to help in the process.
+4) To hold a joint at a certain position (preferrably a multiple of 90 degrees, so it helps with level based calibration of joints that are distal to this joint):
+"h" + "joint number" to hold a joint (if the join position is within 1 or 2 degrees of a multiple of 90, owd will snap the joint to that multiple of 90).
+5) To unhold that joint, "u" + "joint number".
+6) When you are done with this process press "d" or "q" to abort this process.
+7) Move the WAM to its home position, then press shift+idle.
+8) The home position calibration is now done.
+10) Hit shift+activate to resume controlling the robot.
+
+To shut down robot, always do the following steps in the same order:
+1) Shift+Idle the robot.
+2) Ctrl+c on owd console.
 
 \section develoment Development
 
