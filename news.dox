@@ -1,0 +1,22 @@
+/**
+\page news OWD News
+
+<b>Faster stops when palm touches goal</b><br>
+Trajectories can now be automatically paused by inputs sensed by the wrist-mounted force/torque sensor.  The result is a much faster stop with less force applied than when relying on the error torques.  Currently the stop condition is a Z-force of less than -3N, but in the future this will be configurable by ROS parameters for both the hand frame and the workspace frame.  To use this functionality, tare the sensor before the beginning of the trajectory, and then call the AddTrajectory service with a trajectory that has the HoldOnForceInput flag set to true.  [11-Feb-2011]
+
+<b>More robust CANbus communication</b><br>
+In light of ongoing difficulties with the Peak CANbus card, some critical startup parts of the code are now wrapped in retry blocks, and timeout thresholds have been extended. [04-Feb-2011]
+
+<b>Better finger movements</b><br>
+Finger gains have been tuned for better performance. [03-Feb-2011]
+
+<b>Force/Torque sensor support</b><br>
+Data from the force/torque sensor is now read by owd and published as type geometry_msgs/Wrench on topic owd/forcetorque.  The sensor can be tared by calling the service owd/ft_tare. [17-Dec-2010]
+
+
+\verbatim
+Copyright 2011 Carnegie Mellon University and Intel Corporation
+\endverbatim
+
+*/
+

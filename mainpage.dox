@@ -2,8 +2,7 @@
 \mainpage
 \htmlinclude manifest.html
 
-\b OWD
- is a ROS driver for controlling a Barrett WAM Arm and/or model 280 Hand.
+<b>OWD</b> is a ROS driver for controlling a Barrett WAM Arm and/or model 280 Hand.
 
 <!--
 \section features Features
@@ -59,7 +58,7 @@ Six executables will be created:
    - \b 280+TACT For a BH280 Hand with the fingertip tactile arrays installed
    - \b none For no hand installed
  - \b ~/forcetorque_sensor Whether the Barrett Force/Torque sensor is installed (true/false)
- - \b ~/calibration_file A string specifying a file to keep on disk of the joint calibration values (see the \b Calibration section below)
+ - \b ~/calibration_file A string specifying a file to keep on disk of the joint calibration values (see the \ref Calibration section below)
  - \b ~/home_position A comma-separated list of joint values, in radians, of the configuration of the arm when the encoder values have been lost and the home position needs to be reset.
 
 \section running Running
@@ -71,6 +70,8 @@ roslaunch owd.launch
 \endverbatim
 
 No more than one OWD should be started from a single roslaunch file so that the stdio from each remains independent.
+
+If the motor encoder values have not been preserved from a previous run, owd will ask you to first move the hand to a safe space for initialization, and then to move the arm to its home position.  You can choose the home position to be something convenient based on how your WAM is mounted, but in general it's good to have as many joints as possible against one of their stops for repeatability.  As long as you match the joint angles specified in the <em>home_position</em> ROS parameter, owd be able to successfully set the correct joint angles.  For more accurate joint angle calibration, see the \ref Calibration section for details on preserving calibration values in a file.
 
 \section controlling Controlling
 
@@ -97,37 +98,13 @@ Additionally, OWD publishes a TF frame for every link, defining \b wam1 in terms
 
 \section calibration Calibration
 
-Calibration using OWD:
+Saving calibration values to disk:
 
-Make a local copy of owd.launch from the owd folder:
-A) Specify fields inside owd.launch:
-1. for saving the calibration file.
-2. specify the can bus number:
-2.a) ls /dev/pcan* 
-3. Specify the home position, for the right WAM, just specify the joint values inside the owd.launch file. 
+- launch owd
 
-B) e-stop the WAM -> this cuts the power to the pucks and makes them lose their values.
-1) You can see the errors on the pendant LEDs.
+- make a call to the service \b /owd/CalibrateJoints to put the driver into calibration mode
 
-C) Shift idle the WAM.
-
-D) roslaunch owd.launch
-
-E) OWD homes the hand, lift it up to a safe config., while doing this.
-
-F) Move the WAM to its home position.
-
-G) Type HOME and press enter on console.
-    -> OWD initializes the position of the motor encoders and AP in its datastructures based on the values specified in the launch file.
-
-I) Shift+Activate the WAM.
-
-J) Now, we need to work on using the level to finely calibrate the wam.
-
-K) 
-1)Do "rosservice list" to find the name of appropriate calibration service, 
-2)then "rosservice call /owd/CalibrateJoints", replace /owd/CalibrateJoints with the correct service name from step K.1)
-
+- Use a level on the WAM links to align each joint, and then hit the joint number to set it to the 
 L)Use a level to set the joint values (AP value in the virtual encoder limit).
 1) Move the joint "i" (i is a number from 1 to 7) to a multiple of 90 degrees (because then you can use a level set to ascertain when the joint is "really" at the multiple of 90 degrees.
 2) When you are sure, from the level reading, that the joint is at the value you expect it to be (i.e. some multiple of 90), press "i" (where i is the joint number) and then "y" (without the double quotes). Before pressing "y", and after pressing "i", owd will display in red, what value it will set for the joint position you are currently holding the joint "i" at.
@@ -147,6 +124,10 @@ To shut down robot, always do the following steps in the same order:
 \section develoment Development
 
 Development of OWD is handled by the collaboration of its users.  See the \subpage development page for the current task list and schedule.
+
+\section owdnews New Features
+
+Announcements of new features and bug fixes are listed on the \subpage news page.
 
 \verbatim
 Copyright 2010-2011 Carnegie Mellon University and Intel Corporation

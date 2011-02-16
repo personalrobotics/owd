@@ -14,7 +14,4 @@
   <rosdep name="lapack"/>
   <rosdep name="gfortran"/>
   <rosdep name="xenomai"/>
-<export>
-  <cpp cflags="-I${prefix}/srv/cpp -I${prefix}/msg/cpp"/>
-</export>
 </package>

@@ -2,6 +2,8 @@
 \page development
 
 \section schedule Development Schedule
+<em>Recently completed tasks are announced on the \subpage news page.</em>
+
 Currently scheduled tasks:
   <table border="0" cellpadding="2" cellspacing="3">
     <tr>
@@ -10,18 +12,7 @@ Currently scheduled tasks:
       <th align="left">Description and estimate</th>
     </tr>
     <tr>
-      <td>11-Feb-2011</td>
-      <td>vandeweg</td>
-
-      <td><b>stop trajectories on force input</b> [1-2 days] See how
-          fast we can cancel a trajectory outside of owd based on F/T
-          values, then add functionality inside of OWD if we need it
-          faster.  Requires quick python testing plus possibly
-          modifying the trajectory class(es) in OWD.</td>
-
-    </tr>
-    <tr>
-      <td>11-Feb-2011</td>
+      <td>18-Feb-2011</td>
       <td>vandeweg</td>
 
       <td><b>tactile sensors</b> [1-2 days] Get data from tactile
@@ -31,16 +22,12 @@ Currently scheduled tasks:
 
     </tr>
     <tr>
-      <td>18-Feb-2011</td>
+      <td>25-Feb-2011</td>
       <td>vandeweg</td>
 
-      <td><b>absolute joint encoders</b> [3 days] Switch over to using the
-          joint encoders to avoid calibration and achieve better
-          endpoint accuracy.  Requires getting additional puck values
-          and tuning the control gains based on new error scales.
-          Also need to see whether it's necessary to use the motor
-          encoders for interpolation in between joint encoder
-          ticks.</td>
+      <td><b>transmission ratio parameterization</b> [1 day] Allow the
+          transmission ratios to be set via ROS parameters or from a file
+          so that they can be calibrated for each individual WAM.</td>
 
     </tr>
     <tr>
@@ -74,6 +61,19 @@ Additional unscheduled tasks:
       <th width="120" align="left">Date</th>
       <th width="120" align="left">Assigned to</th>
       <th align="left">Description and estimate</th>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+
+      <td><b>absolute joint encoders</b> [3 days] Switch over to using the
+          joint encoders to avoid calibration and achieve better
+          endpoint accuracy.  Requires getting additional puck values
+          and tuning the control gains based on new error scales.
+          Also need to see whether it's necessary to use the motor
+          encoders for interpolation in between joint encoder
+          ticks.</td>
+
     </tr>
     <tr>
       <td></td>
@@ -150,7 +150,7 @@ Additional unscheduled tasks:
 \note This page was automatically generated from the file owd/develoment.dox.
 
 \verbatim
-Copyright 2010-2011 Carnegie Mellon University and Intel Corporation
+Copyright 2011 Carnegie Mellon University and Intel Corporation
 \endverbatim
 
 */
