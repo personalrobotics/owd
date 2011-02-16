@@ -96,30 +96,40 @@ OWD provides feedback through the following ROS topics:
 
 Additionally, OWD publishes a TF frame for every link, defining \b wam1 in terms of \b wam0, \b wam2 in terms of \b wam1, etc, all the way up to \b wam7 in terms of \b wam6.
 
+\section shutdown Shutting down
+
+To shut down OWD and still preserve the encoder values, first press shift-idle on the pendant, then kill OWD with ctrl-c.  As long as the yellow Idle button stays lit, OWD can be restarted without having to return the WAM to the home position.
+
+If the safety board ever shuts down the WAM due to a torque or velocity fault (red error light), the yellow idle button stays lit, meaning the encoder values are still valid.  You can resume operation by killing OWD with ctrl-c, pressing shift-idle again to clear the error, and restarting OWD.
+
 \section calibration Calibration
 
-Saving calibration values to disk:
+To accurately calibrate each of the joints so that their positions can be recalled for future runs, do the following:
 
 - launch owd
 
 - make a call to the service \b /owd/CalibrateJoints to put the driver into calibration mode
 
-- Use a level on the WAM links to align each joint, and then hit the joint number to set it to the 
-L)Use a level to set the joint values (AP value in the virtual encoder limit).
-1) Move the joint "i" (i is a number from 1 to 7) to a multiple of 90 degrees (because then you can use a level set to ascertain when the joint is "really" at the multiple of 90 degrees.
-2) When you are sure, from the level reading, that the joint is at the value you expect it to be (i.e. some multiple of 90), press "i" (where i is the joint number) and then "y" (without the double quotes). Before pressing "y", and after pressing "i", owd will display in red, what value it will set for the joint position you are currently holding the joint "i" at.
-3) Repeat this for all the other joints, using points 4 and 5 below to help in the process.
-4) To hold a joint at a certain position (preferrably a multiple of 90 degrees, so it helps with level based calibration of joints that are distal to this joint):
-"h" + "joint number" to hold a joint (if the join position is within 1 or 2 degrees of a multiple of 90, owd will snap the joint to that multiple of 90).
-5) To unhold that joint, "u" + "joint number".
-6) When you are done with this process press "d" or "q" to abort this process.
-7) Move the WAM to its home position, then press shift+idle.
-8) The home position calibration is now done.
-10) Hit shift+activate to resume controlling the robot.
+- OWD will print keyboard instructions and then start a display of joint angles.
 
-To shut down robot, always do the following steps in the same order:
-1) Shift+Idle the robot.
-2) Ctrl+c on owd console.
+- Use a bubble level on the WAM links to align each joint
+  -# Start by aligning J1 to be a multiple of 90 degrees.
+    - If your WAM is mounted with the baseplate horizontal, you'll have to pick where you want the J1 zero orientation.  A good location is where the alignment marks line up with one another.
+    - If your WAM is mounted with the baseplate vertical, use a level on the upper arm link, and rotate J1 until the link is either out to one side and level, or straight up and plumb.
+  -# When it's in position, press "1" on the keyboard.  OWD will suggest the nearest 90-deg multiple to set it to, and ask you to confirm with "y".
+  -# Repeat with the remaining joints, starting with 2 and continuing up to 7.
+  -# To aid in aligning the latter joints, OWD allows you to "hold" a joint at a particular angle by pressing "h" and the joint number.
+     - For example, to align joint 4, first hold joint 2 so that it's horizontal, then put the level on the lower arm and move J4 until it's horizontal, too.
+     - If the joint is with 2 degrees of a multiple of 90, the joint will "snap" to the neared 90 degrees; otherwise, it will be held exactly where it is.
+  -# Joints may be unheld by pressing "u" and the joint number.
+  -# Because of possible inaccuracies in the transmission ratios, it is recommended that you set each joint near the center of its range, so that any error near the two joint stops is approximately equal.
+
+- When you are satisfied with your new calibration values, press "d" (for "done")
+  -# OWD will ask you to return the WAM to its home position so that the calibration offsets can be recorded.  Move it to home, hold it steady, and press shift-idle.
+  -# OWD will wait briefly for the position to stabilize, then measure the calibration offsets and write them to the file specified in the launch file.
+  -# Once it is done, you can press shift-activate to resume OWD.
+
+- If you want to abort the calibration, press "q" (for "quit") and the calibration routine will exit.
 
 \section develoment Development
 
