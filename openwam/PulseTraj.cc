@@ -79,7 +79,7 @@ PulseTraj::PulseTraj(double pulse_accel_in, int pulse_duration_ticks_in, int pul
 }
 
 
-bool PulseTraj::GetMotion(double qd[Joint::Jn+1], double qdd[Joint::Jn+1])
+bool PulseTraj::GetMotion(double qd[], double qdd[])
 {
     if(!PulseOk()){
       ROS_WARN("PulseTraj Error - Pulse not initialized, cannot give accelerations");
@@ -125,7 +125,7 @@ bool PulseTraj::GetMotion(double qd[Joint::Jn+1], double qdd[Joint::Jn+1])
 
 }
 
-bool PulseTraj::RecordPositions(double q[Joint::Jn+1])
+bool PulseTraj::RecordPositions(double q[])
 {
     static double old_vel[7]={0.0,0.0,0.0,0.0,0.0,0.0,0.0};
     static double old_accel[7]={0.0,0.0,0.0,0.0,0.0,0.0,0.0};
@@ -162,7 +162,7 @@ bool PulseTraj::RecordPositions(double q[Joint::Jn+1])
     return true;
 }
 
-bool PulseTraj::RecordTorques(double trq[Joint::Jn+1])
+bool PulseTraj::RecordTorques(double trq[])
 {
     if(!PulseOk()){
       ROS_WARN("PulseTraj Error - Pulse not initialized, cannot record torques");
