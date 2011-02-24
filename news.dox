@@ -1,6 +1,16 @@
 /**
 \page news OWD News
 
+<b>Support for 280 Tactile Sensors</b>
+Can now read the full 96-cell Tactile data from a model 280 Hand.
+Along the way made many improvements in the CANbus communication code
+in order to handle multiple simultaneous requests on the bus. [23-Feb-2011]
+
+<b>Method to lock individual joints</b>
+The joint hold functionality present in calibration mode has been
+extended to regular operating mode, and can be utilized with the
+SetJointStiffness service call. [23-Feb-2011]
+
 <b>Faster stops when palm touches goal</b><br>
 Trajectories can now be automatically paused by inputs sensed by the wrist-mounted force/torque sensor.  The result is a much faster stop with less force applied than when relying on the error torques.  Currently the stop condition is a Z-force of less than -3N, but in the future this will be configurable by ROS parameters for both the hand frame and the workspace frame.  To use this functionality, tare the sensor before the beginning of the trajectory, and then call the AddTrajectory service with a trajectory that has the HoldOnForceInput flag set to true.  [11-Feb-2011]
 
