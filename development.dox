@@ -12,16 +12,6 @@ Currently scheduled tasks:
       <th align="left">Description and estimate</th>
     </tr>
     <tr>
-      <td>18-Feb-2011</td>
-      <td>vandeweg</td>
-
-      <td><b>tactile sensors</b> [1-2 days] Get data from tactile
-          sensors published as ROS messages.  Requires sending and
-          receiving the right CANbus messages inside OWD.  Mike has
-          already started this.</td>
-
-    </tr>
-    <tr>
       <td>25-Feb-2011</td>
       <td>vandeweg</td>
 
