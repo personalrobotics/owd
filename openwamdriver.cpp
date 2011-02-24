@@ -216,7 +216,8 @@ bool WamDriver::Init(const char *joint_cal_file)
   n.param("home_position",
 	  wamhome_list,
 	  std::string ("3.14, -1.97, 0, -0.83, 1.309, 0, 3.02"));
-  n.param("tactile_hires",bus.tactile_hires,false);
+  // if true will only report the top 10 values in each array
+  n.param("tactile_top10",bus.tactile_top10,false);
 
 #ifndef OWDSIM
   if (BH_model == 280) {

@@ -60,6 +60,7 @@ Six executables will be created:
  - \b ~/forcetorque_sensor Whether the Barrett Force/Torque sensor is installed (true/false)
  - \b ~/calibration_file A string specifying a file to keep on disk of the joint calibration values (see the \ref Calibration section below)
  - \b ~/home_position A comma-separated list of joint values, in radians, of the configuration of the arm when the encoder values have been lost and the home position needs to be reset.
+ - \b ~/tactile_top10 If set to True will only report 4-bit values for the 10 ten pressures in each tactile array.  Default is false (all values are reported as 12-bit numbers).  Setting to true reduces the communication demands on the CAN bus.
 
 \section running Running
 

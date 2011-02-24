@@ -677,12 +677,13 @@ void control_loop_rt(void* argv){
 	  }
 	  // remember time for next cycle
 	  last_sendtorque_time = sendtorque_end_time;
+
+	  readtime += (control_start_time-read_start_time ) * 1e-6; // ns to ms
+	  controltime += (sendtorque_start_time-control_start_time) * 1e-6;
+	  sendtime += (sendtorque_end_time-sendtorque_start_time) * 1e-6;
 	}
 #endif // ! BH280_ONLY
 
-	readtime += (control_start_time-read_start_time ) * 1e-6; // ns to ms
-	controltime += (sendtorque_start_time-control_start_time) * 1e-6;
-	sendtime += (sendtorque_end_time-sendtorque_start_time) * 1e-6;
 
 	time_to_wait = ControlLoop::PERIOD * 1e6  // sec to usecs
 	  - (ControlLoop::get_time_ns_rt() - loopstart_time) * 1e-3;  // nsecs to usecs

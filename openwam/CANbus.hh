@@ -125,7 +125,7 @@ public:
   float* tactile_data;
   bool valid_forcetorque_data;
   bool valid_tactile_data;
-  bool tactile_hires;
+  bool tactile_top10;
   Puck *pucks;
   int n_arm_pucks;
   bool simulation;

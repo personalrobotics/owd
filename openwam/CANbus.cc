@@ -50,7 +50,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   puck_state(-1),BH280_installed(bh280),id(bus_id),trq(NULL),
   pos(NULL), forcetorque_data(NULL), tactile_data(NULL),
   valid_forcetorque_data(false), valid_tactile_data(false),
-  tactile_hires(false), pucks(NULL),n_arm_pucks(number_of_arm_pucks),
+  tactile_top10(false), pucks(NULL),n_arm_pucks(number_of_arm_pucks),
   simulation(false), received_position_flags(0), received_state_flags(0),
 #ifdef CAN_RECORD
   candata(100000),
@@ -2130,12 +2130,12 @@ int CANbus::hand_reset() {
 
 int CANbus::configure_tactile_sensors() {
   for (int32_t nodeid=11; nodeid<=14; ++nodeid) {
-    if (tactile_hires) {
-      if (set_property_rt(nodeid,TACT,2) != OW_SUCCESS) {
+    if (tactile_top10) {
+      if (set_property_rt(nodeid,TACT,1) != OW_SUCCESS) {
 	return OW_FAILURE;
       }
     } else {
-      if (set_property_rt(nodeid,TACT,1) != OW_SUCCESS) {
+      if (set_property_rt(nodeid,TACT,2) != OW_SUCCESS) {
 	return OW_FAILURE;
       }
     }
@@ -2149,10 +2149,10 @@ int CANbus::configure_tactile_sensors() {
   // first, wait for pucks to process the request
   usleep(20000);
   int tactile_responses;
-  if (tactile_hires) {
-    tactile_responses=20;
-  } else {
+  if (tactile_top10) {
     tactile_responses=4;
+  } else {
+    tactile_responses=20;
   }
   // now, try to read the responses
   for (int i=0; i<tactile_responses; ++i) {
