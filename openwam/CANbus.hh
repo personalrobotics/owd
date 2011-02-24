@@ -75,20 +75,18 @@ using namespace std;
 // it looks like NUM_NODES is 1 too many, since +1 seems to be added elsewhere.
 #define NUM_NODES (NODE_MAX - NODE_MIN + 2)
 
+#define PUCK_IDLE 0 
+
 class CANstats{
 public:
   double cansend_time;
   double canread_sendtime;
   double canread_readtime;
-  double cansetpuckstate_time;
-  double cansethandstate_time;
   int    canread_badpackets;
 
   CANstats() : cansend_time(0.0f),
 	       canread_sendtime(0.0f),
 	       canread_readtime(0.0f),
-	       cansetpuckstate_time(0.0f),
-	       cansethandstate_time(0.0f),
 	       canread_badpackets(0)
   {}
 
@@ -110,25 +108,30 @@ private:
   pthread_t canthread;
   int bus_run;
   int32_t puck_state;
-  CANstats stats;
 #ifdef PEAK_CAN
 #define MAX_FILTERS (5)
   int32_t can_accept[MAX_FILTERS];
   int32_t mask[MAX_FILTERS];
 #endif // PEAK_CAN
-  bool BH280_installed;
-  bool FT_installed;
 
 public:
+  CANstats stats;
+  bool BH280_installed;
   int32_t id;
   Group groups[NUM_GROUPS+1];
   int32_t* trq;
   double* pos;
-  double* forcetorque;
+  double* forcetorque_data;
+  float* tactile_data;
+  bool valid_forcetorque_data;
+  bool valid_tactile_data;
+  bool tactile_hires;
   Puck *pucks;
   int n_arm_pucks;
   bool simulation;
   char last_error[200];
+  int32_t received_position_flags;
+  int32_t received_state_flags;
 
 #ifndef OWDSIM
 #ifdef CAN_RECORD
@@ -172,8 +175,17 @@ DataRecorder<canio_data> candata;
 	    int32_t* nodeid, int32_t* property, int32_t* value);
   int compile(int32_t property, int32_t value, uint8_t *msg, int32_t *msglen);
   
-  int set_property_rt(int32_t nid, int32_t property, int32_t value, bool check=false, int32_t usecs=200);
-  int get_property_rt(int32_t nid, int32_t property, int32_t* value, int32_t usecs=2000, int retries=0);
+  int set_property_rt(int32_t nid, int32_t property, int32_t value, bool check =false, int32_t usecs=200);
+
+  /// Get a property from a puck (call only from control loop)
+  /// \param nid Node number
+  /// \param property Property number
+  /// \param value Pointer to a place to store the value
+  /// \param usecs Time to wait for response (defaults to 2000
+  ///              if not specified)
+  /// \param retries Number of times to resend the request after a timeout
+  int request_property_rt(int32_t id, int32_t property);
+  int get_property_rt(int32_t nid, int32_t property, int32_t* value, int32_t usecs=2000, int32_t retries=0);
   
   int read_rt(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs);
   int send_rt(int32_t  msgid, uint8_t* msg, int32_t  msglen, int32_t usecs);
@@ -181,16 +193,32 @@ DataRecorder<canio_data> candata;
   int clear();
   int32_t get_puck_state();
   int set_puck_state_rt();
+  int set_puck_group_id(int32_t nid);
 
   int send_torques_rt();
   int read_positions_rt();
 
+  int request_positions_rt(int32_t groupid);
+  int request_puck_state_rt(int32_t nodeid);
+  int request_hand_state_rt();
+  int request_tactile_rt();
+  int request_strain_rt();
+  int request_forcetorque_rt();
+
+  int process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen);
+  int process_arm_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen);
+  int process_safety_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen);
+  int process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen);
+  int process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen);
+  
   int read_forcetorque_rt();
   static int ft_combine(unsigned char msb, unsigned char lsb);
 
-  void initPropertyDefs(int firmwareVersion);
-  RTIME time_now_ns();
+  int read_tactile_rt();
+  int configure_tactile_sensors();
 
+  void initPropertyDefs(int32_t firmwareVersion);
+  RTIME time_now_ns();
 
   inline void rosprint_stats() {
     stats.rosprint();
@@ -204,10 +232,12 @@ DataRecorder<canio_data> candata;
   ///                            (don't count hand)
   /// \param bh280 set to true if the CANbus hand (model BH280) is installed
   /// \param ft set to true if the CANbus force/torque sensor is installed
+  /// \param tactile set to true if the hand has tactile sensors installed
   CANbus(int32_t bus_id,
 	 int number_of_arm_pucks,
 	 bool bh280=false,
-	 bool ft=false);
+	 bool ft=false,
+	 bool tactile=false);
 
   ~CANbus();
 
@@ -297,7 +327,8 @@ public:
   int ft_get_data(double *values);
   int ft_tare();
 
-  int tactile_get_data(unsigned int id, double *values);
+  int tactile_get_data(float *values);
+  int tactile_set_hires(bool hires);
 
   int limits(double jointVel, double tipVel, double elbowVel);
   friend void* canbus_handler(void* argv);

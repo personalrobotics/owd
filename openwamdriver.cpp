@@ -1,6 +1,6 @@
 /***********************************************************************
 
-  Copyright 2007-2010 Carnegie Mellon University and Intel Corporation
+  Copyright 2007-2011 Carnegie Mellon University and Intel Corporation
   Author: Mike Vande Weghe <vandeweg@cmu.edu>
 
   This file is part of owd.
@@ -86,12 +86,12 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
 #ifndef BH280_ONLY
   cmdnum(0), nJoints(Joint::Jn),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
-  bus(canbus_number, Joint::Jn, bh_model==280, forcetorque),
+  bus(canbus_number, Joint::Jn, bh_model==280, forcetorque, tactile),
   modified_j1(false)
 #else
   cmdnum(0), nJoints(Joint::Jn), 
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
-  bus(canbus_number, 0, bh_model==280, forcetorque),
+  bus(canbus_number, 0, bh_model==280, forcetorque, tactile),
   modified_j1(false)
 #endif // BH280_ONLY
 {
@@ -209,6 +209,15 @@ bool WamDriver::Init(const char *joint_cal_file)
     return false;
   }
 
+  ros::NodeHandle n("~");
+
+  std::string wamhome_list;
+  // default value is the one used for Herb
+  n.param("home_position",
+	  wamhome_list,
+	  std::string ("3.14, -1.97, 0, -0.83, 1.309, 0, 3.02"));
+  n.param("tactile_hires",bus.tactile_hires,false);
+
 #ifndef OWDSIM
   if (BH_model == 280) {
     if (bus.hand_reset() != OW_SUCCESS) {
@@ -227,20 +236,12 @@ bool WamDriver::Init(const char *joint_cal_file)
   int32_t WamWasZeroed=1;
 #endif // BH280_ONLY
   
-  owam = new WAM(&bus, BH_model, ForceTorque);
+  owam = new WAM(&bus, BH_model, ForceTorque, Tactile);
   if (owam->init() == OW_FAILURE) {
     ROS_FATAL("Failed to initialize WAM instance");
     return false;
   }
   
-  ros::NodeHandle n("~");
-
-  std::string wamhome_list;
-  // default value is the one used for Herb
-  n.param("home_position",
-	  wamhome_list,
-	  std::string ("3.14, -1.97, 0, -0.83, 1.309, 0, 3.02"));
-
   std::stringstream ss(wamhome_list);
   std::string jval;
   unsigned int j=0;
@@ -319,6 +320,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("AddPrecomputedTrajectory",&WamDriver::AddPrecomputedTrajectory,this);
   ss_SetStiffness =
     n.advertiseService("SetStiffness",&WamDriver::SetStiffness,this);
+  ss_SetJointStiffness =
+    n.advertiseService("SetJointStiffness",&WamDriver::SetJointStiffness,this);
   ss_DeleteTrajectory = 
     n.advertiseService("DeleteTrajectory",&WamDriver::DeleteTrajectory,this);
   ss_CancelAllTrajectories = 
@@ -579,9 +582,10 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
 
     unsigned int retries=4;
     int result = owam->set_jpos(new_joint_angles);
-    while (owam->set_jpos(new_joint_angles) == OW_FAILURE) {
+    while (result == OW_FAILURE) {
       if (retries-- > 0) {
         ROS_WARN("Failed to set new joint angles; trying again");
+	result = owam->set_jpos(new_joint_angles);
       } else {
         ROS_ERROR("Unable to set new joint angles.");
         throw -1;
@@ -1135,7 +1139,7 @@ void WamDriver::start_control_loop() {
     }
 #endif // AUTO_ACTIVATE
     
-    // check the mode of puck 1 to detect when active was pressed
+    // check the mode of puck 1 to detect when activate is pressed
     while ((bus.get_puck_state() != 2) && (ros::ok())) {
       usleep(50000);
       static int statcount=0;
@@ -1713,6 +1717,37 @@ bool WamDriver::DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
   ROS_INFO("DeleteTrajectory processed: new queue size %zd",
            trajectory_list.size());
   return false;
+}
+
+bool WamDriver::SetJointStiffness(pr_msgs::SetJointStiffness::Request &req,
+                             pr_msgs::SetJointStiffness::Response &res) {
+  if (req.stiffness.size() != nJoints) {
+    char errmsg[200];
+    sprintf(errmsg,"SetJointStiffness expects a vector of %d stiffness values, but %d were sent",nJoints,req.stiffness.size());
+    ROS_WARN(errmsg);
+    res.reason=errmsg;
+    res.result=false;
+  }
+  if (owam->jointstraj) {
+    pr_msgs::CancelAllTrajectories::Request cancel_req;
+    pr_msgs::CancelAllTrajectories::Response cancel_res;
+    CancelAllTrajectories(cancel_req,cancel_res);
+    ROS_WARN("Trajectory cancelled by SetJointStiffness command");
+  }
+  double current_pos[8];
+  owam->hold_position(current_pos);
+  for (int i=0; i<nJoints; ++i) {
+    if (req.stiffness[i] != 0) {
+      owam->jointsctrl[i+1].reset();
+      owam->jointsctrl[i+1].set(current_pos[i+1]);
+      owam->jointsctrl[i+1].run();
+      owam->suppress_controller[i+1]=false;
+    } else {
+      owam->suppress_controller[i+1]=true;
+    }
+  }
+  res.result=true;
+  return true;
 }
 
 bool WamDriver::SetStiffness(pr_msgs::SetStiffness::Request &req,

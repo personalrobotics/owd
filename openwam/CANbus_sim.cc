@@ -29,8 +29,9 @@
 
 #define PUCK_IDLE 0 
 
-CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280, bool ft) : 
-  puck_state(2),BH280_installed(bh280),FT_installed(ft),id(bus_id),
+CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
+	       bool ft, bool tactile) : 
+  puck_state(2),BH280_installed(bh280),id(bus_id),
   trq(NULL),pos(NULL),
   pucks(NULL),n_arm_pucks(num_pucks),simulation(true)
 {
@@ -201,20 +202,35 @@ int CANbus::set_puck_state_rt() {
   return OW_SUCCESS;
 }
 
+int CANbus::set_puck_group_id(int32_t nid) {
+  return OW_SUCCESS;
+}
+
+int CANbus::request_positions_rt(int32_t groupid) {}
+int CANbus::request_puck_state_rt(int32_t nodeid) {}
+int CANbus::request_hand_state_rt() {}
+int CANbus::request_tactile_rt() {}
+int CANbus::request_strain_rt() {}
+int CANbus::request_forcetorque_rt() {}
+
+int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {}
+int CANbus::process_arm_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {}
+int CANbus::process_safety_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {}
+int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {}
+int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {}
+
 void CANstats::rosprint()  {
   //  ROS_DEBUG_NAMED("times","CANbus::send %2.1fms per group (2 groups)",
   //		  cansend_time);
   //  ROS_DEBUG_NAMED("times","CANbus::read: send=%2.1fms, read=%2.1fms",
   //		  canread_sendtime, canread_readtime);
-  ROS_DEBUG_NAMED("times","CANbus::set_puck_state: %2.2fms",
-  		  cansetpuckstate_time);
 }
   
- RTIME CANbus::time_now_ns() {
-   struct timeval tv;
-   gettimeofday(&tv,NULL);
-   return (tv.tv_sec * 1e6 + tv.tv_usec);
- }
+RTIME CANbus::time_now_ns() {
+  struct timeval tv;
+  gettimeofday(&tv,NULL);
+  return (tv.tv_sec * 1e6 + tv.tv_usec);
+}
 
 
 void CANbus::initPropertyDefs(int32_t firmwareVersion){

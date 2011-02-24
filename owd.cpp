@@ -1,6 +1,6 @@
 /***********************************************************************
 
-  Copyright 2008-2010 Carnegie Mellon University and Intel Corporation
+  Copyright 2008-2011 Carnegie Mellon University and Intel Corporation
   Author: Mike Vande Weghe <vandeweg@cmu.edu>
 
   This file is part of owd.
@@ -28,6 +28,7 @@
 #include "openwamdriver.h"
 #include "bhd280.hh"
 #include "ft.hh"
+#include "tactile.hh"
 #include <sys/mman.h>
 
 int main(int argc, char** argv)
@@ -63,6 +64,7 @@ int main(int argc, char** argv)
   if (! hand_type.compare(0,3,"280")) {
     BH_model=280;
     if (! hand_type.compare("280+TACT")) {
+      ROS_DEBUG("Expecting tactile sensors on this hand");
       tactile=true;
     }
   } else if (! hand_type.compare(0,3,"260")) {
@@ -118,6 +120,11 @@ int main(int argc, char** argv)
   if (forcetorque) {
     ft = new FT(&(wam.bus));
   }
+
+  Tactile *tact(NULL);
+  if (tactile) {
+    tact = new Tactile(&(wam.bus));
+  }
 #endif // OWDSIM
 
 
@@ -136,6 +143,10 @@ int main(int argc, char** argv)
   ros::Timer ft_timer;
   if (ft) {
     ft_timer = n.createTimer(ros::Duration(0.1), &FT::Pump, ft);
+  }
+  ros::Timer tactile_timer;
+  if (tact) {
+    tactile_timer = n.createTimer(ros::Duration(0.1), &Tactile::Pump, tact);
   }
 #endif // OWDSIM
   ros::MultiThreadedSpinner s(3);

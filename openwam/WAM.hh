@@ -17,7 +17,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* Modified 2007-2010 by:
+/* Modified 2007-2011 by:
       Mike Vande Weghe <vandeweg@cmu.edu>
       Robotics Institute
       Carnegie Mellon University
@@ -168,6 +168,7 @@ public:
   R6 WSControl(double dt);
   void JSControl(double qdd[Joint::Jn+1], double dt);
   void newJSControl_rt(double q_target[], double q[], double dt, double pid_torq[]); // Mike
+  bool check_for_idle_rt();
 
   void lock(const char *name="unspecified");
   bool lock_rt(const char *name="unspecified");
@@ -176,7 +177,7 @@ public:
   CANbus* bus;                             // pointer to the CAN bus
   ControlLoop ctrl_loop;            // control loop object
 
-  WAM(CANbus* cb, int BH_model, bool forcetorque);
+  WAM(CANbus* cb, int BH_model, bool forcetorque, bool tactile);
   ~WAM();
  
   int init();                       // initialise the WAM
@@ -191,7 +192,7 @@ public:
   bool safety_torques_exceeded(double t[]); // check pid torqs against thresholds
 
   int  set_targ_jpos(double* pos);          // set the target joint positions online 
-  int  set_jpos(double pos[Joint::Jn+1]);   // set the joint positions offline
+  int  set_jpos(double pos[]);   // set the joint positions offline
   bool set_gains(unsigned int joint, pr_msgs::PIDgains &gains);
   bool get_gains(std::vector<pr_msgs::PIDgains> &gains);
 
@@ -233,6 +234,7 @@ public:
 
   int BH_model;
   bool ForceTorque;
+  bool Tactile;
 };
 
 #endif

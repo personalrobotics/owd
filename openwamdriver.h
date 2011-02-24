@@ -41,6 +41,7 @@
 #include <pr_msgs/ReplaceTrajectory.h>
 #include <pr_msgs/MassProperties.h>
 #include <pr_msgs/SetStiffness.h>
+#include <pr_msgs/SetJointStiffness.h>
 #include <pr_msgs/SetSpeed.h>
 #include <pr_msgs/WAMState.h>
 #include <pr_msgs/WAMInternals.h>
@@ -95,6 +96,8 @@ public:
                            pr_msgs::ReplaceTrajectory::Response &res);
     bool SetStiffness(pr_msgs::SetStiffness::Request &req,
                       pr_msgs::SetStiffness::Response &res);
+    bool SetJointStiffness(pr_msgs::SetJointStiffness::Request &req,
+                      pr_msgs::SetJointStiffness::Response &res);
     bool SetSpeed(pr_msgs::SetSpeed::Request &req,
                   pr_msgs::SetSpeed::Response &res);
     bool GetDOF(pr_msgs::GetDOF::Request &req,
@@ -222,6 +225,7 @@ private:
       ss_AddTrajectory,
       ss_AddPrecomputedTrajectory,
       ss_SetStiffness,
+      ss_SetJointStiffness,
       ss_DeleteTrajectory, 
       ss_CancelAllTrajectories,
       ss_PauseTrajectory,

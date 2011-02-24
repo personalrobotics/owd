@@ -35,12 +35,12 @@ extern int MODE;  // puck parameter
  * Create a new WAM that uses the CAN bus cb;
  */
 
-WAM::WAM(CANbus* cb, int bh_model, bool forcetorque) :
+WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile) :
     check_safety_torques(true),rec(false),wsdyn(false),jsdyn(false),
     holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
     pid_count(0),safety_hold(false),bus(cb),ctrl_loop(cb->id, &control_loop_rt, this),
     motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000),
-    BH_model(bh_model), ForceTorque(forcetorque)
+    BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile)
 {
 
 #ifdef OWD_RT
@@ -398,7 +398,7 @@ void WAM::jtrq2mtrq(){
  * Should really backup the joints and motor values in case that 
  * CANBus::set_positions(double*) fails so that we can write them back...
  */
-int WAM::set_jpos(double* pos){
+int WAM::set_jpos(double pos[]){
   double mpos[NUM_NODES+1];
 
   // block the control loop from messing with the motors and joints
@@ -483,7 +483,6 @@ void WAM::stop(){
 void control_loop_rt(void* argv){
   WAM* wam = (WAM*)argv;                      // read the WAM argument
   ControlLoop* ctrl_loop = &(wam->ctrl_loop); // get the ControlLoop member
-  RTIME t1,t2,t4;
 
   // Use __LATENCY__ to record stuff for control loop latencies
 #ifdef __LATENCY__
@@ -502,113 +501,213 @@ void control_loop_rt(void* argv){
 #endif
 
 
-  unsigned int slowcounts=0;
-  unsigned int fastcounts=0;
-  double readtime=0.0f;
-  double controltime=0.0f;
-  double sendtime=0.0f;
-  double slowtime=0.0f;
-  double slowmax=0.0f;
-  double slowreadtime=0.0f;
-  double slowctrltime=0.0f;
-  double slowsendtime=0.0f;
-  double looptime=0.0f;
-  unsigned int loopcount = 0;
-  unsigned int slowcount=0;
+  unsigned int slowcounts(0);
+  unsigned int fastcounts(0);
+  double readtime(0.0f);
+  double controltime(0.0f);
+  double sendtime(0.0f);
+  double slowtime(0.0f);
+  double slowmax(0.0f);
+  double slowreadtime(0.0f);
+  double slowctrltime(0.0f);
+  double slowsendtime(0.0f);
+  double this_cycle_time(0.0f);
+  unsigned int loopcount ( 0);
+  unsigned int slowcount(0);
+  int missing_data_cycles(0);
+  RTIME control_start_time, sendtorque_start_time, sendtorque_end_time;
 
-  t1 = ControlLoop::get_time_ns_rt() - ControlLoop::PERIOD * 1e9;  // first-time initialization
+  RTIME last_sendtorque_time = ControlLoop::get_time_ns_rt() - ControlLoop::PERIOD * 1e9;  // first-time initialization
+  RTIME last_loopstart_time = last_sendtorque_time;
   ROS_DEBUG("Control loop started");
 
+  int hand_cycles=12;  // we need 12 cycles to get everything we need
+                       // from the hand pucks (tactile takes 9 cycles)
+  int hand_counter=0;
   // Main control loop
   while((ctrl_loop->state_rt() == CONTROLLOOP_RUN) && (ros::ok())){
-      t2 = ControlLoop::get_time_ns_rt(); // record the time
+      RTIME loopstart_time = ControlLoop::get_time_ns_rt(); // record the time
 
-      // GET POSITIONS
-      if(wam->bus->read_positions_rt() == OW_FAILURE){
-        ROS_FATAL("control_loop: read_positions failed");
-        return;
-      }
-      
-      wam->bus->clear();
-      
-      RTIME bt1 = ControlLoop::get_time_ns_rt();
-      readtime += (bt1-t2 ) * 1e-6;
-      
-#ifndef BH280_ONLY
-      // CONTROL LOOP
-      wam->newcontrol_rt( ((double)(t2-t1)) * 1e-9); // ns to s
-#endif // BH280_ONLY
-
-      RTIME bt2 = ControlLoop::get_time_ns_rt();
-      controltime += (bt2-bt1) * 1e-6; // ns to ms
-
-      // SEND TORQUES
-      if(wam->bus->send_torques_rt() == OW_FAILURE){
-        ROS_FATAL("control_loop: send_torques failed.");
+      // REQUEST POSITIONS
+      if(wam->bus->request_positions_rt(4) == OW_FAILURE){
+        ROS_FATAL("control_loop: request_positions failed");
         return;
       }
 
-      RTIME bt3 = ControlLoop::get_time_ns_rt();
-      sendtime += (bt3-bt2) * 1e-6;
-
-#ifndef BH280_ONLY
-      // MOTOR STATE
-      // only check the state every 200 cycles
-      static int stateperiod=0;
-      if (++stateperiod == 200) {
-	//        printf("checking puck state\n");
-        if (wam->bus->set_puck_state_rt() != OW_SUCCESS) {
-	  // what to do?
+      // While the pucks are receiving and processing the position request,
+      // send out our secondary request for retrieval afterwards.
+      // Each of these use a unique counter, so their update rates need
+      // not be the same, as long as
+      //      (1) they are always offset from one another so that there
+      //          are not multiple requests in the same cycle, and
+      //      (2) no additional requests are made from the hand for several
+      //          cycles after the tactile data is requested.
+      if (wam->bus->BH280_installed) {
+	if (hand_counter==0) {
+	  wam->bus->request_hand_state_rt();
 	}
-        stateperiod=0;
-      }
-#endif // BH280_ONLY
-
-#ifndef OWDSIM
-      if (wam->BH_model == 280) {
-	// Hand moving?
-	static int handstateperiod=16; // start offset from motor state
-	if (++handstateperiod == 50) { // every 0.1 seconds
-	  wam->bus->hand_set_state_rt();
-	  handstateperiod=0;
+	if (hand_counter==1) {
+	  wam->bus->request_positions_rt(5);
 	}
-      }
-
-      if (wam->ForceTorque) {
-	static int forcetorqueperiod=33;  // offset from hand state
-	if (++forcetorqueperiod == 50) { // also every 0.1 seconds
-	  wam->bus->read_forcetorque_rt();
-	  // If we are running a trajectory, pass it the new force/torque
-	  // values so that it can servo and/or stop in response
-	  if (wam->jointstraj) {
-	    wam->jointstraj->ForceFeedback(wam->bus->forcetorque);
+	static int strain_cycles(9);
+	if (hand_counter==2) {
+	  wam->bus->request_strain_rt();
+	}
+	if (wam->bus->tactile_data) {
+	  if (hand_counter==3) {
+	    wam->bus->request_tactile_rt();
 	  }
-	  forcetorqueperiod=0;
 	}
       }
-#endif // ! OWDSIM
-
-      // check for slow loops
-      double thistime = (t2-t1)* 1e-6;  // milliseconds
-      if (thistime > ControlLoop::PERIOD * 1000 * 1.1) {
-	// more than 10% above expected period
-        slowcount++;
-        slowtime += thistime;
-	if (thistime > slowmax) {
-	  slowmax=thistime;
+#ifndef BH280_ONLY
+      if (wam->bus->forcetorque_data) {
+	// we'll grab the forcetorque data twice as fast as the hand
+	// data, on specific cycles when the bus is not too busy
+	if ((hand_counter==4) || (hand_counter==4 + hand_cycles/2)) {
+	  wam->bus->request_forcetorque_rt();
 	}
-        slowreadtime += (bt1-t2) * 1e-6;
-        slowctrltime += (bt2-bt1) * 1e-6;
-        slowsendtime += (bt3-bt2) * 1e-6;
       }
-      looptime += thistime;
+      static int state_cycles(0);
+      if (hand_counter==0) {
+	if (++state_cycles==10) { // once every 10 hand cycles
+	  wam->bus->request_puck_state_rt(1);
+	  state_cycles=0;
+	}
+      }
+#endif // ! BH280_ONLY
 
+      // increment our counter
+      if (++hand_counter > hand_cycles) {
+	hand_counter=0;
+      }
+
+      // Now just read the response packets for as much time as we have
+      // until the next control cycle.  As soon as we get back all seven
+      // joint angles we will compute the new torques and send them out, then
+      // keep processing the remaining (presumably lower-priority) responses.
+      RTIME read_start_time = ControlLoop::get_time_ns_rt(); // record the time
+      int32_t time_to_wait = ControlLoop::PERIOD * 1e6  // sec to usecs
+	- (read_start_time - loopstart_time) * 1e-3;  // nsecs to usecs
+      bool torques_sent(false);
+      while (time_to_wait>0) {
+	uint8_t  msg[8];
+	int32_t msgid, msglen;
+	
+	if (wam->bus->read_rt(&msgid, msg, &msglen, time_to_wait) == OW_FAILURE){
+	  break; // nothing more to read
+	}
+	
+	// process the response
+	uint32_t TO_GROUP = msgid & 0x41F;
+	uint32_t FROM_NODE = (msgid & 0x3E0) >> 5;
+	if ((msgid & 0x41F) == 0x403) {
+	  // 22-bit AP response
+	  wam->bus->process_positions_rt(msgid, msg, msglen);
+	} else if (FROM_NODE == 8) {
+	  // forcetorque puck
+	  wam->bus->process_forcetorque_response_rt(msgid,msg,msglen);
+	  if (wam->jointstraj) {
+	    // pass the new values to the running trajectory
+	    wam->jointstraj->ForceFeedback(wam->bus->forcetorque_data);
+	  }
+	} else if (FROM_NODE == 10) {
+	  // safety puck
+	  wam->bus->process_safety_response_rt(msgid,msg,msglen);
+	} else if ((FROM_NODE >= 11) && (FROM_NODE <= 14)) {
+	  // hand puck
+	  wam->bus->process_hand_response_rt(msgid,msg,msglen);
+	} else if ((FROM_NODE >= 1) && (FROM_NODE <= 7)) {
+	  // arm puck
+	  wam->bus->process_arm_response_rt(msgid,msg,msglen);
+	  if ((wam->bus->received_state_flags & 2) == 2) {
+	    if (wam->check_for_idle_rt()) {
+	      // The user has pressed shift-idle.  If we wanted to 
+	      // keep running and wait for them to activate again,
+	      // we could handle it here.
+	      // would have to turn off the controllers and
+	      // turn off dynamics so that the torques go to zero,
+	      // then keep running the loop until they pressed activate
+	      // so that we could turn dynamics back on.
+	      if (wam->exit_on_pendant_press) {
+		goto CONTROL_DONE;
+	      }
+	    } else {
+	      // here's where we could check to see if the user has
+	      // re-activated after pressing shift-idle
+	    }
+	    wam->bus->received_state_flags &= 0xFD; // clear the #1 flag
+	  }
+	} else {
+	  // unknown
+	  ROS_WARN("control_loop_rt: Unexpected response on CANbus type %X", msgid);
+	  wam->bus->stats.canread_badpackets++;
+	  continue;
+	}
+
+#ifndef BH280_ONLY
+	if (!torques_sent && ((wam->bus->received_position_flags & 0xFE) == 0xFE)) {
+	  // we've received the 7 arm joint values, so compute and
+	  // send out the torques
+	  control_start_time = ControlLoop::get_time_ns_rt();
+	  // tell the control function how long it was between successive
+	  // request_position_rt() calls.  
+	  wam->newcontrol_rt( ((double)(loopstart_time - last_loopstart_time)) * 1e-9); // ns to s
+	  last_loopstart_time = loopstart_time;
+	  sendtorque_start_time = ControlLoop::get_time_ns_rt();
+	  if(wam->bus->send_torques_rt() == OW_FAILURE){
+	    ROS_FATAL("control_loop: send_torques failed.");
+	    return;
+	  }
+	  torques_sent=true;
+	  sendtorque_end_time = ControlLoop::get_time_ns_rt();
+
+	  // make sure we're not falling behind
+	  this_cycle_time = 
+	    (sendtorque_end_time - last_sendtorque_time)* 1e-6;  // millisecs
+	  if (this_cycle_time > ControlLoop::PERIOD * 1000 * 1.25) {
+	    // more than 25% above expected period
+	    slowcount++;
+	    slowtime += this_cycle_time;
+	    if (this_cycle_time > slowmax) {
+	      slowmax=this_cycle_time;
+	    }
+	    slowreadtime += (control_start_time-read_start_time) * 1e-6;
+	    slowctrltime += (sendtorque_start_time-control_start_time) * 1e-6;
+	    slowsendtime += (sendtorque_end_time-sendtorque_start_time) * 1e-6;
+	  }
+	  // remember time for next cycle
+	  last_sendtorque_time = sendtorque_end_time;
+	}
+#endif // ! BH280_ONLY
+
+	readtime += (control_start_time-read_start_time ) * 1e-6; // ns to ms
+	controltime += (sendtorque_start_time-control_start_time) * 1e-6;
+	sendtime += (sendtorque_end_time-sendtorque_start_time) * 1e-6;
+
+	time_to_wait = ControlLoop::PERIOD * 1e6  // sec to usecs
+	  - (ControlLoop::get_time_ns_rt() - loopstart_time) * 1e-3;  // nsecs to usecs
+      } // END OF READ LOOP
+
+      if (! torques_sent) {
+	// we must have not received all 7 joint values before the
+	// time expired
+	if (++missing_data_cycles == 10) {
+	  // we went 10 cycles in a row while missing values from at
+	  // least 1 puck; give up!
+	  ROS_WARN("Missed CANbus replies from 10 cycles in a row");
+	  missing_data_cycles=0; // reset
+	  return;
+	}
+      } else {
+	missing_data_cycles = 0;
+      }
+      
       // save time stats
       if (++loopcount == 1000) {
         wam->stats.loopread= readtime/1000.0;
         wam->stats.loopctrl= controltime/1000.0;
         wam->stats.loopsend= sendtime/1000.0;
-        wam->stats.looptime= looptime/1000.0;
+        wam->stats.looptime= this_cycle_time/1000.0;
         wam->stats.slowcount = slowcount/10.0;
         wam->stats.slowavg = slowtime/slowcount;
         wam->stats.slowreadtime = slowreadtime/slowcount;
@@ -618,51 +717,16 @@ void control_loop_rt(void* argv){
         readtime=controltime=sendtime=slowtime=0.0f;
         slowreadtime=slowctrltime=slowsendtime=0.0f;
 	slowmax=0.0f;
-        looptime=0.0f;
+        this_cycle_time=0.0f;
         loopcount=slowcount=0;
       }
-
-#ifndef BH280_ONLY      
-      if (!wam->bus->simulation) { // skip if running in simulation
-	int puckstate=wam->bus->get_puck_state();
-	if (puckstate != 2) {
-	  wam->motor_state=WAM::MOTORS_IDLE;
-	  //ROS_DEBUG("Puckstate = %d",puckstate);
-	  if (wam->exit_on_pendant_press) {
-	    // The motors have been idled (someone pressed shift-idle), so go ahead
-	    // and exit without being told.
-	    // first, though, send a zero-torque packet to extinguish
-	    // the torque warning light
-	    for(int m=Motor::M1; m<=Motor::Mn; m++) {
-	      wam->motors[m].trq(0.0);
-	    }
-	    wam->send_mtrq();
-            
-	    ROS_WARN("Detected motor switch to idle; exiting controller.");
-	    ROS_WARN("If the pendant shows a torque or velocity fault, and the yellow idle");
-	    ROS_WARN("button is still lit, you can clear the fault by pressing shift-idle");
-	    ROS_WARN("again, and encoder values will be preserved.");
-	    ROS_WARN("To restart the controller, just re-run the previous command.");
-	    break;
-	  }
-	} else {
-	  wam->motor_state=WAM::MOTORS_ACTIVE;
-	}        
-      }    
-#endif // BH280_ONLY
-
-
-      // get ready for next pass
-      int32_t time_to_wait = (ControlLoop::PERIOD * 1e6) - (thistime * 1e3); // microseconds
-      if (time_to_wait > 0) {
-	// If we're compiled for Real Time, then wait_rt will ignore the time argument
-	// and just wait until the next period.  If we're not compiled for Real Time, then
-	// wait_rt will do a usleep for the time specified.
-	ctrl_loop->wait_rt(time_to_wait);    // wait for the next control iteration;
-      }
-
-      t1 = t2;
   }
+ CONTROL_DONE:
+  ROS_WARN("Detected motor switch to idle; exiting controller.");
+  ROS_WARN("If the pendant shows a torque or velocity fault, and the yellow idle");
+  ROS_WARN("button is still lit, you can clear the fault by pressing shift-idle");
+  ROS_WARN("again, and encoder values will be preserved.");
+  ROS_WARN("To restart the controller, just re-run the previous command.");
   ROS_DEBUG("Control loop finished");
 
 #ifdef __LATENCY__
@@ -679,10 +743,64 @@ void control_loop_rt(void* argv){
   fclose(fp);
   ROS_DEBUG("Data dumped in file: identification" );
 #endif
+  
+  // Send a zero-torque packet to extinguish the torque warning light
+  for(int m=Motor::M1; m<=Motor::Mn; m++) {
+    wam->motors[m].trq(0.0);
+  }
+  wam->send_mtrq();
+  wam->bus->send_torques_rt();
+  
+  // Now idle all of the pucks
+  /*
+  for(int p=1; p<=wam->bus->n_arm_pucks; p++){
+    if(wam->bus->set_property_rt(wam->bus->pucks[p].id(), MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
+      ROS_WARN("set_property MODE=IDLE failed for puck %d",p);
+    }
+  }
+  if (wam->bus->BH280_installed) {
+    for(int p=11; p<=14; p++){
+      if(wam->bus->set_property_rt(p, MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
+	ROS_WARN("set_property MODE=IDLE failed for puck %d",p);
+      }
+    }
+  }
+  if (wam->bus->forcetorque_data) {
+    if(wam->bus->set_property_rt(8, MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
+      ROS_WARN("set_property MODE=IDLE failed for puck 8");
+    }
+  }
+  if(wam->bus->set_property_rt(10, MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
+      ROS_WARN("set_property MODE=IDLE failed for safety puck 10");
+      }
 
+  ROS_FATAL("Motors have been idled; exiting OWD");
+  */
   return;
 }
 
+bool WAM::check_for_idle_rt() {
+
+#ifdef BH280_ONLY
+  return false;
+#endif // BH280_ONLY
+
+  if (bus->simulation) { // skip if running in simulation
+    motor_state=WAM::MOTORS_ACTIVE;
+    return false;
+  }
+
+  int puckstate=bus->get_puck_state();
+  if (puckstate == 2) {
+    motor_state=WAM::MOTORS_ACTIVE;
+    return false;
+  }
+
+  //// The motors have been idled (someone pressed shift-idle)
+
+  motor_state=WAM::MOTORS_IDLE;
+  return true;
+}
 
 /*
  * This is the function called at each control loop
@@ -701,299 +819,299 @@ void control_loop_rt(void* argv){
 //   6. apply jsdynamics torq plus control torq
 // question: will control torque be trying to do more than necessary?
 void WAM::newcontrol_rt(double dt){
-    static double   q[Joint::Jn+1];
-    static double   q_target[Joint::Jn+1];
-    static double  qd_target[Joint::Jn+1];
-    static double qdd_target[Joint::Jn+1];
-    static double dyn_torq[Joint::Jn+1];
-    R6 F;
+  static double   q[Joint::Jn+1];
+  static double   q_target[Joint::Jn+1];
+  static double  qd_target[Joint::Jn+1];
+  static double qdd_target[Joint::Jn+1];
+  static double dyn_torq[Joint::Jn+1];
+  R6 F;
     
-    static int tc1=0;
-    static double jscontroltime=0.0f;
-    static int dyncount=0;
-    static int trajcount=0;
-    static double dyntime=0.0f;
-    static double trajtime=0.0f;
-    static int safety_torque_count=0;
+  static int tc1=0;
+  static double jscontroltime=0.0f;
+  static int dyncount=0;
+  static int trajcount=0;
+  static double dyntime=0.0f;
+  static double trajtime=0.0f;
+  static int safety_torque_count=0;
     
-    double traj_timestep;
-    static double timestep_factor = 1.0f;
-    traj_timestep = dt;
-    /*    if (dt > .004) {
-      traj_timestep = .004; // bound the time in case the system got delayed; don't want to lurch
-    } else {
-      traj_timestep = dt;
-    }
-    */
+  double traj_timestep;
+  static double timestep_factor = 1.0f;
+  traj_timestep = dt;
+  /*    if (dt > .004) {
+	traj_timestep = .004; // bound the time in case the system got delayed; don't want to lurch
+	} else {
+	traj_timestep = dt;
+	}
+  */
     
-    // read new motor positions
-    recv_mpos(); // will always succeed, since it's just a copy
+  // read new motor positions
+  recv_mpos(); // will always succeed, since it's just a copy
 
-    mpos2jpos();    // convert to joint positions
+  mpos2jpos();    // convert to joint positions
     
-    for(int j=Joint::J1; j<=Joint::Jn; j++){
-      q_target[j] = q[j] = joints[j].q; // set q_target for traj->eval
-      links[j].theta(q[j]);
-      sim_links[j].theta(q[j]);
-      qd_target[j] = qdd_target[j] = 0.0; // zero out
-    }
-    std::vector<double> data;
-    bool data_recorded=false;
+  for(int j=Joint::J1; j<=Joint::Jn; j++){
+    q_target[j] = q[j] = joints[j].q; // set q_target for traj->eval
+    links[j].theta(q[j]);
+    sim_links[j].theta(q[j]);
+    qd_target[j] = qdd_target[j] = 0.0; // zero out
+  }
+  std::vector<double> data;
+  bool data_recorded=false;
 
-    // is there a joint trajectory running
-    static int skipped_locks=0;
+  // is there a joint trajectory running
+  static int skipped_locks=0;
     
-    if (! this->lock_rt("newcontrol") ) {
-      // if we couldn't get the lock in the time we wanted, then
-      // just republish the previous torques.  we will only do this
-      // 10 times before giving up on the current trajectory
-      if (++skipped_locks > 10) {
-	// reduce the torque
-        for(int j=Joint::J1; j<=Joint::Jn; j++){
-	  joints[j].t *= 0.99; // this should bring the WAM to zero torque in about 250 cycles (0.5 secs)
-        }
-        jtrq2mtrq();         // results in motor::torque
-	// need to push an error message through a message pipe
+  if (! this->lock_rt("newcontrol") ) {
+    // if we couldn't get the lock in the time we wanted, then
+    // just republish the previous torques.  we will only do this
+    // 10 times before giving up on the current trajectory
+    if (++skipped_locks > 10) {
+      // reduce the torque
+      for(int j=Joint::J1; j<=Joint::Jn; j++){
+	joints[j].t *= 0.99; // this should bring the WAM to zero torque in about 250 cycles (0.5 secs)
       }
-      if(send_mtrq() == OW_FAILURE) {
-	ROS_ERROR("WAM::control_loop: send_mtrq failed.");
-      }
-      return;
+      jtrq2mtrq();         // results in motor::torque
+      // need to push an error message through a message pipe
     }
+    if(send_mtrq() == OW_FAILURE) {
+      ROS_ERROR("WAM::control_loop: send_mtrq failed.");
+    }
+    return;
+  }
 
-    skipped_locks=0;
+  skipped_locks=0;
 
-    if(jointstraj != NULL){
-      try {
-            RTIME t3 = ControlLoop::get_time_ns_rt();        
-            jointstraj->evaluate(q_target, qd_target, qdd_target, traj_timestep * timestep_factor);
-            RTIME t4 = ControlLoop::get_time_ns_rt();        
-            trajtime += (t4-t3) / 1e6;
-            for(int j=Joint::J1; j<=Joint::Jn; j++){
-              qd_target[j] *= timestep_factor;
-              qdd_target[j] *= timestep_factor * timestep_factor;
-            }
-            if(jointstraj->state() == Trajectory::DONE){
-              // we've gone past the last time in the trajectory,
-              // so set up to hold at the final position.  we'll let
-              // the trajectory control values persist for the rest of this
-              // iteration (to help deccelerate if we're still moving), but
-              // the next time around we'll start holding at the endpoint
-              jointstraj->endPosition().cpy(&heldPositions[Joint::J1]);
-              holdpos = true;  // should have been true already, but just making sure
-              delete jointstraj;
-              jointstraj = NULL;
-              //ROS_INFO("Trajectory done");
-            }
+  if(jointstraj != NULL){
+    try {
+      RTIME t3 = ControlLoop::get_time_ns_rt();        
+      jointstraj->evaluate(q_target, qd_target, qdd_target, traj_timestep * timestep_factor);
+      RTIME t4 = ControlLoop::get_time_ns_rt();        
+      trajtime += (t4-t3) / 1e6;
+      for(int j=Joint::J1; j<=Joint::Jn; j++){
+	qd_target[j] *= timestep_factor;
+	qdd_target[j] *= timestep_factor * timestep_factor;
+      }
+      if(jointstraj->state() == Trajectory::DONE){
+	// we've gone past the last time in the trajectory,
+	// so set up to hold at the final position.  we'll let
+	// the trajectory control values persist for the rest of this
+	// iteration (to help deccelerate if we're still moving), but
+	// the next time around we'll start holding at the endpoint
+	jointstraj->endPosition().cpy(&heldPositions[Joint::J1]);
+	holdpos = true;  // should have been true already, but just making sure
+	delete jointstraj;
+	jointstraj = NULL;
+	//ROS_INFO("Trajectory done");
+      }
             
-            // ask the controllers to compute the correction torques.
-            RTIME t1 = ControlLoop::get_time_ns_rt();
-            newJSControl_rt(q_target,q,dt,pid_torq);
-            RTIME t2 = ControlLoop::get_time_ns_rt();
-            jscontroltime += (t2-t1) / 1e6;
+      // ask the controllers to compute the correction torques.
+      RTIME t1 = ControlLoop::get_time_ns_rt();
+      newJSControl_rt(q_target,q,dt,pid_torq);
+      RTIME t2 = ControlLoop::get_time_ns_rt();
+      jscontroltime += (t2-t1) / 1e6;
             
-	    // inform the trajectory of how much torque it's causing
-	    if (jointstraj) { // make sure it wasn't deleted, above
-	      jointstraj->update_torques(pid_torq);
-	    }
+      // inform the trajectory of how much torque it's causing
+      if (jointstraj) { // make sure it wasn't deleted, above
+	jointstraj->update_torques(pid_torq);
+      }
 
-	    data_recorded=true;
-	    data.push_back(t1); // record the current time
-	    data.push_back(timestep_factor);  // time factor
-	    if (jointstraj) {
-	      data.push_back(jointstraj->curtime());  // traj time
-	    } else {
-	      data.push_back(0);
-	    }
-	    for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
-		  data.push_back(q_target[j]);  // record target position
-		  data.push_back(q[j]);         // record actual position
-		  data.push_back(pid_torq[j]);  // record the pid torques
-	    }
+      data_recorded=true;
+      data.push_back(t1); // record the current time
+      data.push_back(timestep_factor);  // time factor
+      if (jointstraj) {
+	data.push_back(jointstraj->curtime());  // traj time
+      } else {
+	data.push_back(0);
+      }
+      for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+	data.push_back(q_target[j]);  // record target position
+	data.push_back(q[j]);         // record actual position
+	data.push_back(pid_torq[j]);  // record the pid torques
+      }
 
 #ifndef OWDSIM
-            if (safety_torques_exceeded(pid_torq)) {
-              // hold here with zero target velocity and acceleration,
-              // and wait until the limit condition goes away.
-              if (jointstraj  // might have ended and been cleared (above)
-		  && (jointstraj->state()
-		      == Trajectory::RUN)) { // only mess with the traj if
-		//                              we are still running
+      if (safety_torques_exceeded(pid_torq)) {
+	// hold here with zero target velocity and acceleration,
+	// and wait until the limit condition goes away.
+	if (jointstraj  // might have ended and been cleared (above)
+	    && (jointstraj->state()
+		== Trajectory::RUN)) { // only mess with the traj if
+	  //                              we are still running
 
-                // just slow down the time, and take a smaller step.
-                // as long as we keep exceeding, keep trying smaller steps.
-                // as we free up, we can start taking bigger steps again.
-                if (timestep_factor > 0.05f) {
-                  timestep_factor *= 0.97; // at 3% decrease per control loop
-		                           // it will take 100ms to reach
-		                           // 5% real-time.
-                }
-                safety_torque_count++;
-                safety_hold=true; // let the app know that we're hitting something
-                if (jointstraj->HoldOnStall) {
-                  jointstraj->stop();  // still have to stop if the app wants to
-                }
-              }
-            } else if (timestep_factor < 1.0f) {
-              // we're back within the safety thresholds, so start 
-	      // increasing our stepsize again
-              timestep_factor *= 1.03f;
-              if (timestep_factor > 1.0f) {
-                timestep_factor = 1.0f;
-              }
-              if (jointstraj != NULL) {
-                if (!jointstraj->HoldOnStall) {
-                  jointstraj->run();
-                }
-              }
-              safety_hold=false;
-            }
+	  // just slow down the time, and take a smaller step.
+	  // as long as we keep exceeding, keep trying smaller steps.
+	  // as we free up, we can start taking bigger steps again.
+	  if (timestep_factor > 0.05f) {
+	    timestep_factor *= 0.97; // at 3% decrease per control loop
+	    // it will take 100ms to reach
+	    // 5% real-time.
+	  }
+	  safety_torque_count++;
+	  safety_hold=true; // let the app know that we're hitting something
+	  if (jointstraj->HoldOnStall) {
+	    jointstraj->stop();  // still have to stop if the app wants to
+	  }
+	}
+      } else if (timestep_factor < 1.0f) {
+	// we're back within the safety thresholds, so start 
+	// increasing our stepsize again
+	timestep_factor *= 1.03f;
+	if (timestep_factor > 1.0f) {
+	  timestep_factor = 1.0f;
+	}
+	if (jointstraj != NULL) {
+	  if (!jointstraj->HoldOnStall) {
+	    jointstraj->run();
+	  }
+	}
+	safety_hold=false;
+      }
 #endif // OWDSIM
-          } catch (char *error) {
-            // most likely a problem evaluating the trajectory, so
-            // halt it and just hold position
-            ROS_ERROR("Problem in trajectory; aborting and holding current position");
-            delete jointstraj;
-            jointstraj = NULL;
-            double heldPositions[Joint::Jn+1];
-            hold_position(heldPositions,false);
+    } catch (char *error) {
+      // most likely a problem evaluating the trajectory, so
+      // halt it and just hold position
+      ROS_ERROR("Problem in trajectory; aborting and holding current position");
+      delete jointstraj;
+      jointstraj = NULL;
+      double heldPositions[Joint::Jn+1];
+      hold_position(heldPositions,false);
 
 	      
-            for(int i = Joint::J1; i <= Joint::Jn; i++) {
-              q_target[i] = heldPositions[i];
-            }
-            // ask the controllers to compute the correction torques.
-            RTIME t1 = ControlLoop::get_time_ns_rt();
-            newJSControl_rt(q_target,q,dt,pid_torq);
-            RTIME t2 = ControlLoop::get_time_ns_rt();
-            jscontroltime += (t2-t1) / 1e6;
+      for(int i = Joint::J1; i <= Joint::Jn; i++) {
+	q_target[i] = heldPositions[i];
+      }
+      // ask the controllers to compute the correction torques.
+      RTIME t1 = ControlLoop::get_time_ns_rt();
+      newJSControl_rt(q_target,q,dt,pid_torq);
+      RTIME t2 = ControlLoop::get_time_ns_rt();
+      jscontroltime += (t2-t1) / 1e6;
             
-          }
-        } else if (holdpos) {
+    }
+  } else if (holdpos) {
 
-          for(int i = Joint::J1; i <= Joint::Jn; i++) {
-            q_target[i] = heldPositions[i];
-          }
+    for(int i = Joint::J1; i <= Joint::Jn; i++) {
+      q_target[i] = heldPositions[i];
+    }
           
-          // ask the controllers to compute the correction torques.
-          RTIME t1 = ControlLoop::get_time_ns_rt();
-          newJSControl_rt(q_target,q,dt,pid_torq);
-          RTIME t2 = ControlLoop::get_time_ns_rt();
-          jscontroltime += (t2-t1) / 1e6;
+    // ask the controllers to compute the correction torques.
+    RTIME t1 = ControlLoop::get_time_ns_rt();
+    newJSControl_rt(q_target,q,dt,pid_torq);
+    RTIME t2 = ControlLoop::get_time_ns_rt();
+    jscontroltime += (t2-t1) / 1e6;
           
-	  data_recorded=true;
-	  data.push_back(t1); // record the current time
-	  data.push_back(0);  // time factor (zero for no traj)
-	  data.push_back(0); // trajectory time (zero for no traj)
-	  for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
-	    data.push_back(q_target[j]);  // record target position
-	    data.push_back(q[j]);         // record actual position
-	    data.push_back(pid_torq[j]);  // record the pid torques
-	  }
+    data_recorded=true;
+    data.push_back(t1); // record the current time
+    data.push_back(0);  // time factor (zero for no traj)
+    data.push_back(0); // trajectory time (zero for no traj)
+    for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+      data.push_back(q_target[j]);  // record target position
+      data.push_back(q[j]);         // record actual position
+      data.push_back(pid_torq[j]);  // record the pid torques
+    }
 
-          if (safety_torques_exceeded(pid_torq)) {
-            // NEW WAY:
+    if (safety_torques_exceeded(pid_torq)) {
+      // NEW WAY:
 
-	    for(int jj = Joint::J1; jj <= Joint::Jn; jj++) {
-	      double jointdiff = joints[jj].q - heldPositions[jj];
-	      // inch the target pos 10% towards the current pos
-	      heldPositions[jj] += 0.1f * jointdiff;
-	    }
-          }
+      for(int jj = Joint::J1; jj <= Joint::Jn; jj++) {
+	double jointdiff = joints[jj].q - heldPositions[jj];
+	// inch the target pos 10% towards the current pos
+	heldPositions[jj] += 0.1f * jointdiff;
+      }
+    }
 
-        } else {
-          for(int i = Joint::J1; i <= Joint::Jn; i++) {
-            pid_torq[i]=0.0f;  // zero out the torques otherwise
-          }
-        }
-        if (++trajcount == 1000) {
-          stats.trajtime = trajtime/1000.0;
-          stats.jsctrltime=jscontroltime/1000.0;
-          stats.safetycount=safety_torque_count;
-	  for (unsigned int i=0; i<7; ++i) {
-	    stats.hitorquecount[i]=safetytorquecount[i];
-	    stats.hitorqueavg[i]=safetytorquesum[i] / safetytorquecount[i];
-	    safetytorquesum[i]=safetytorquecount[i]=0;
-	  }
-          trajcount=safety_torque_count=0;
-          trajtime=jscontroltime=0.0f;
-        }
+  } else {
+    for(int i = Joint::J1; i <= Joint::Jn; i++) {
+      pid_torq[i]=0.0f;  // zero out the torques otherwise
+    }
+  }
+  if (++trajcount == 1000) {
+    stats.trajtime = trajtime/1000.0;
+    stats.jsctrltime=jscontroltime/1000.0;
+    stats.safetycount=safety_torque_count;
+    for (unsigned int i=0; i<7; ++i) {
+      stats.hitorquecount[i]=safetytorquecount[i];
+      stats.hitorqueavg[i]=safetytorquesum[i] / safetytorquecount[i];
+      safetytorquesum[i]=safetytorquecount[i]=0;
+    }
+    trajcount=safety_torque_count=0;
+    trajtime=jscontroltime=0.0f;
+  }
         
      
-        // compute the torque required to meet the desired qd and qdd
-	// always calculate simulated dynamics (we'll overwrite dyn_torq later)
-	JSdynamics(sim_torq, sim_links, qd_target, qdd_target); 
-	if (data_recorded) {
-	  for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
-	    data.push_back(sim_torq[j]); // torques from sim model
-	  }
-	}
-        if(jsdyn){
-          RTIME t4 = ControlLoop::get_time_ns_rt();
-          JSdynamics(dyn_torq, links, qd_target, qdd_target); 
-          RTIME t5 = ControlLoop::get_time_ns_rt();
-          dyntime += (t5-t4) / 1e6;
-          if (++dyncount == 1000) {
-            stats.dyntime = dyntime/1000.0;
-            dyncount=0; dyntime=0.0f;
-          }
+  // compute the torque required to meet the desired qd and qdd
+  // always calculate simulated dynamics (we'll overwrite dyn_torq later)
+  JSdynamics(sim_torq, sim_links, qd_target, qdd_target); 
+  if (data_recorded) {
+    for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+      data.push_back(sim_torq[j]); // torques from sim model
+    }
+  }
+  if(jsdyn){
+    RTIME t4 = ControlLoop::get_time_ns_rt();
+    JSdynamics(dyn_torq, links, qd_target, qdd_target); 
+    RTIME t5 = ControlLoop::get_time_ns_rt();
+    dyntime += (t5-t4) / 1e6;
+    if (++dyncount == 1000) {
+      stats.dyntime = dyntime/1000.0;
+      dyncount=0; dyntime=0.0f;
+    }
 
-        } else {
-            for (int j=Joint::J1; j<=Joint::Jn; j++) {
-                dyn_torq[j]=0.0;  // zero out the torques otherwise
-            }
-        }
-	if (data_recorded) {
-	  for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
-	    data.push_back(dyn_torq[j]); // dynamic torques
-	  }
-	  recorder.add(data);
-	}
+  } else {
+    for (int j=Joint::J1; j<=Joint::Jn; j++) {
+      dyn_torq[j]=0.0;  // zero out the torques otherwise
+    }
+  }
+  if (data_recorded) {
+    for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+      data.push_back(dyn_torq[j]); // dynamic torques
+    }
+    recorder.add(data);
+  }
 
         
-        // finally, sum the control torq and dynamics torq
-        for(int j=Joint::J1; j<=Joint::Jn; j++){
-            joints[j].trq(stiffness*pid_torq[j] + dyn_torq[j]);  // send to the joints
-        }
+  // finally, sum the control torq and dynamics torq
+  for(int j=Joint::J1; j<=Joint::Jn; j++){
+    joints[j].trq(stiffness*pid_torq[j] + dyn_torq[j]);  // send to the joints
+  }
         
-        jtrq2mtrq();         // results in motor::torque
+  jtrq2mtrq();         // results in motor::torque
         
-        if(send_mtrq() == OW_FAILURE) {
-          ROS_ERROR("WAM::control_loop: send_mtrq failed.");
-        }
-	if (bus->simulation) {
-	  // If we're running in simulation mode, then set the joint positions
-	  // as if they instantly moved to where we wanted.
-	  this->unlock();
-	  set_jpos(q_target);
-	  this->lock_rt("newcontrol2");
-	}
-
+  if(send_mtrq() == OW_FAILURE) {
+    ROS_ERROR("WAM::control_loop: send_mtrq failed.");
+  }
+  if (bus->simulation) {
+    // If we're running in simulation mode, then set the joint positions
+    // as if they instantly moved to where we wanted.
     this->unlock();
+    set_jpos(q_target);
+    this->lock_rt("newcontrol2");
+  }
+
+  this->unlock();
 }
 
 bool WAM::safety_torques_exceeded(double t[]) {
-    //    static double safety_torqs[8]={0.0,10.0,10.0,5.0,5.0,2,2,2};
-    static double safety_torqs[8]={0.0, 15.0, 30.0, 10.0, 15.0, 3.0, 3.0, 3.0};
-    //static double safety_torqs[8]={0.0,50.0,75.0,75.0,60.0,15.0,15.0,15.0};
-    bool bExceeded = false;
-    if (!check_safety_torques) {
-        return bExceeded;
-    }
-    for (int i = 1; i <= Joint::Jn; i++) {
-        if (stiffness * fabs(t[i])>safety_torqs[i]) {
-          //          ROS_WARN("SAFETY TORQUE EXCEEDED: J%d, %2.2f>%2.2f\n",
-          //                                   i,fabs(t[i]),safety_torqs[i]);
-          // set s.t. it will not exceed
-          if (stiffness != 0.0) {
-            //t[i] = safety_torqs[i]/stiffness *  t[i]/fabs(t[i]);
-          }
-          bExceeded = true;
-	  safetytorquecount[i-1]++;
-	  safetytorquesum[i-1] += fabs(t[i]);
-        }
-    }
+  //    static double safety_torqs[8]={0.0,10.0,10.0,5.0,5.0,2,2,2};
+  static double safety_torqs[8]={0.0, 15.0, 30.0, 10.0, 15.0, 3.0, 3.0, 3.0};
+  //static double safety_torqs[8]={0.0,50.0,75.0,75.0,60.0,15.0,15.0,15.0};
+  bool bExceeded = false;
+  if (!check_safety_torques) {
     return bExceeded;
+  }
+  for (int i = 1; i <= Joint::Jn; i++) {
+    if (stiffness * fabs(t[i])>safety_torqs[i]) {
+      //          ROS_WARN("SAFETY TORQUE EXCEEDED: J%d, %2.2f>%2.2f\n",
+      //                                   i,fabs(t[i]),safety_torqs[i]);
+      // set s.t. it will not exceed
+      if (stiffness != 0.0) {
+	//t[i] = safety_torqs[i]/stiffness *  t[i]/fabs(t[i]);
+      }
+      bExceeded = true;
+      safetytorquecount[i-1]++;
+      safetytorquesum[i-1] += fabs(t[i]);
+    }
+  }
+  return bExceeded;
 }
 
 
@@ -1018,13 +1136,13 @@ R6 WAM::WSControl(double dt){
 }
 
 void WAM::newJSControl_rt(double q_target[],double q[],double dt,double pid_torq[]) {
-   for(int j=Joint::J1; j<=Joint::Jn; j++) {
-       if (suppress_controller[j]) {
-           pid_torq[j] = 0;
-       } else {
-           pid_torq[j]= jointsctrl[j].evaluate(q_target[j], q[j], dt );
-       }
-   }
+  for(int j=Joint::J1; j<=Joint::Jn; j++) {
+    if (suppress_controller[j]) {
+      pid_torq[j] = 0;
+    } else {
+      pid_torq[j]= jointsctrl[j].evaluate(q_target[j], q[j], dt );
+    }
+  }
 }
 
 void WAM::JSControl(double qdd[Joint::Jn+1], double dt){
@@ -1044,68 +1162,68 @@ void WAM::JSControl(double qdd[Joint::Jn+1], double dt){
 }
 
 int WAM::run_trajectory(Trajectory *traj) {
-    if (jointstraj) {
-        // we still have a previous active trajectory
-      ROS_WARN("Previous trajectory (id=%d) still active; cannot run new one (id=%d)",jointstraj->id,traj->id);
-        return OW_FAILURE;
-    }
-    if (!holdpos) {
-        // we can only start if the controllers are already holding the initial
-        // position; otherwise the arm could have drifted and we'll get a bad lurch
-        // when we try to start the trajectory
-      ROS_ERROR("Cannot start a trajectory without first holding position");
-      return OW_FAILURE;
-    }
-    if (! traj->WaitForStart) {
-      traj->run(); // put into running state
-      ROS_DEBUG("Starting trajectory %d",traj->id);
-    } else {
-      ROS_DEBUG("Starting trajectory %d in paused state",traj->id);
-      // app must call resume_trajectory() to start
-    }
-    //    this->lock("run_traj");
-    jointstraj = traj;
-    //    this->unlock("run_traj");
-    return OW_SUCCESS;
+  if (jointstraj) {
+    // we still have a previous active trajectory
+    ROS_WARN("Previous trajectory (id=%d) still active; cannot run new one (id=%d)",jointstraj->id,traj->id);
+    return OW_FAILURE;
+  }
+  if (!holdpos) {
+    // we can only start if the controllers are already holding the initial
+    // position; otherwise the arm could have drifted and we'll get a bad lurch
+    // when we try to start the trajectory
+    ROS_ERROR("Cannot start a trajectory without first holding position");
+    return OW_FAILURE;
+  }
+  if (! traj->WaitForStart) {
+    traj->run(); // put into running state
+    ROS_DEBUG("Starting trajectory %d",traj->id);
+  } else {
+    ROS_DEBUG("Starting trajectory %d in paused state",traj->id);
+    // app must call resume_trajectory() to start
+  }
+  //    this->lock("run_traj");
+  jointstraj = traj;
+  //    this->unlock("run_traj");
+  return OW_SUCCESS;
 }
 
 int WAM::pause_trajectory() {
-    if (!jointstraj) {
-        // there was no trajectory running
-        return OW_FAILURE;
-    }
-    jointstraj->stop();
-    return OW_SUCCESS;
+  if (!jointstraj) {
+    // there was no trajectory running
+    return OW_FAILURE;
+  }
+  jointstraj->stop();
+  return OW_SUCCESS;
 }
 
 int WAM::resume_trajectory() {
-    if (!jointstraj) {
-        // there was no trajectory running
-        return OW_FAILURE;
-    }
+  if (!jointstraj) {
+    // there was no trajectory running
+    return OW_FAILURE;
+  }
 
-    //    this->lock("resume_traj");
-    jointstraj->run();
-    //    this->unlock("resume_traj");
-    return OW_SUCCESS;
+  //    this->lock("resume_traj");
+  jointstraj->run();
+  //    this->unlock("resume_traj");
+  return OW_SUCCESS;
 }
 
 int WAM::cancel_trajectory() {
-    if (!jointstraj) {
-        // no trajectory exists
-        return OW_SUCCESS;
-    }
-    this->lock("cancel_traj");
-    jointstraj->stop();
-
-    for(int i = Joint::J1; i<=Joint::Jn; i++) {
-      heldPositions[i] = joints[i].q;
-    }
-    holdpos = true;  // should have been true already, but just making sure
-    delete jointstraj;
-    jointstraj = NULL;
-    this->unlock("cancel_traj");
+  if (!jointstraj) {
+    // no trajectory exists
     return OW_SUCCESS;
+  }
+  this->lock("cancel_traj");
+  jointstraj->stop();
+
+  for(int i = Joint::J1; i<=Joint::Jn; i++) {
+    heldPositions[i] = joints[i].q;
+  }
+  holdpos = true;  // should have been true already, but just making sure
+  delete jointstraj;
+  jointstraj = NULL;
+  this->unlock("cancel_traj");
+  return OW_SUCCESS;
 }
 
 
@@ -1126,75 +1244,72 @@ void WAM::set_stiffness(float s) {
 }
 
 int WAM::hold_position(double jval[],bool grab_lock) 
-   // jval defaults to NULL, grab_lock defaults to true
-   // If jval is non-null, it returns the position being held.
-   // if grab_lock is false, it assumes the mutex has already been acquired
+// jval defaults to NULL, grab_lock defaults to true
+// If jval is non-null, it returns the position being held.
+// if grab_lock is false, it assumes the mutex has already been acquired
    
 {
-    if (holdpos) { // we're already holding
-        if (jval != NULL) {  // but we still need to return the position if requested
-            for (int i = Joint::J1; i<=Joint::Jn; i++) {
-                jval[i]=heldPositions[i];
-            }
-        }
-        return OW_FAILURE;
-    }
 
+  if (grab_lock) {
+    this->lock("hold pos");
+  }
+
+  if(pulsetraj != NULL && !pulsetraj->done) {
+    ROS_WARN("Cannot hold position, pulse trajectory is running\n");
     if (grab_lock) {
-      this->lock("hold pos");
+      this->unlock("hold pos");
     }
+    return OW_FAILURE;
+  }
 
-    if(pulsetraj != NULL && !pulsetraj->done)
-    {
-      ROS_WARN("Cannot hold position, pulse trajectory is running\n");
-        if (grab_lock) {
-            this->unlock("hold pos");
-        }
-        return OW_FAILURE;
-    }
+  if(jointstraj != NULL) {
+    jointstraj->stop();
+  }
 
-    if(jointstraj != NULL)
-    {
-        jointstraj->stop();
-    }
+  for(int i = Joint::J1; i <= Joint::Jn; i++) {
+    heldPositions[i] = joints[i].q;
+    jointsctrl[i].reset();
+    jointsctrl[i].set(heldPositions[i]);
+    jointsctrl[i].run();
+    suppress_controller[i] = false;
 
-    for(int i = Joint::J1; i <= Joint::Jn; i++)
-    {
-        heldPositions[i] = joints[i].q;
-        jointsctrl[i].reset();
-        jointsctrl[i].set(heldPositions[i]);
-        jointsctrl[i].run();
-        if (jval != NULL) {
-            jval[i]=heldPositions[i];
-        }
+    if (jval != NULL) {
+      jval[i]=heldPositions[i];
     }
-    holdpos = true;
+  }
 
-    if (grab_lock) {
-        this->unlock("hold pos");
-    }
-    return OW_SUCCESS;
+  if (grab_lock) {
+    this->unlock("hold pos");
+  }
+  
+  if (holdpos) { 
+    // we were already holding, so return an error
+    return OW_FAILURE;
+  }
+  
+  holdpos = true;
+  return OW_SUCCESS;
 }
 
 
 void WAM::release_position(bool grab_lock)
 {
 
-    if(holdpos)
+  if(holdpos)
     {
-        if (grab_lock) {
-            this->lock("release pos");
-        }
-        for(int i = Joint::J1; i <= Joint::Jn; i++)
+      if (grab_lock) {
+	this->lock("release pos");
+      }
+      for(int i = Joint::J1; i <= Joint::Jn; i++)
         {
-            jointsctrl[i].stop();
+	  jointsctrl[i].stop();
         }
-        holdpos = false;
+      holdpos = false;
 
 
-        if (grab_lock) {
-            this->unlock("release pos");
-        }
+      if (grab_lock) {
+	this->unlock("release pos");
+      }
     }
 }
 
@@ -1217,13 +1332,13 @@ void WAM::lock(const char *name) {
 #endif // ! OWD_RT
   strncpy(last_locked_by,name,100);
   last_locked_by[99]=0; // just in case it was more than 99 chars long
-    if (name) {
-      static char msg[200];
-      //      sprintf(msg,"OPENWAM locked by %s",name);
-      //      syslog(LOG_ERR,msg);
-        //    } else {
-        //        syslog(LOG_ERR,"OPENWAM locked by (unknown)");
-    }
+  if (name) {
+    static char msg[200];
+    //      sprintf(msg,"OPENWAM locked by %s",name);
+    //      syslog(LOG_ERR,msg);
+    //    } else {
+    //        syslog(LOG_ERR,"OPENWAM locked by (unknown)");
+  }
 }
 
 bool WAM::lock_rt(const char *name) {
@@ -1297,7 +1412,6 @@ void WAMstats::rosprint(int recorder_count) const {
       }
     }
   }
-
   ROS_DEBUG_NAMED("times","newcontrol dynamics time: %2.2fms",
                   dyntime);
 }
