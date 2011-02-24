@@ -78,7 +78,7 @@ int ControlLoop::stop(){
   return OW_SUCCESS;
 }
 
-int ControlLoop::state(){
+int ControlLoop::state_rt(){
   CONTROLLOOP_STATE s;
   lock();
   s = cls;
@@ -86,11 +86,11 @@ int ControlLoop::state(){
   return s;
 }
 
-void ControlLoop::wait() {
+void ControlLoop::wait_rt(int32_t usecs) {
   usleep(700);
 }
 
-RTIME ControlLoop::get_time_ns() {
+RTIME ControlLoop::get_time_ns_rt() {
   timeval t;
   gettimeofday(&t, NULL);
   return t.tv_sec * 1e9 + t.tv_usec * 1e3;
