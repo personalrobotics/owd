@@ -11,8 +11,5 @@
   <depend package="geometry_msgs"/>
   <depend package="sensor_msgs"/>
   <depend package="actionlib_msgs"/>
-  <export>
-	<cpp cflags="-I${prefix}/msg/cpp -I${prefix}/srv/cpp"/>
-  </export>
 </package>
 
