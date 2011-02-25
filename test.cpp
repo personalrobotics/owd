@@ -98,7 +98,7 @@ public:
 
   void Subscribe() {
     sub_wamstate =
-      node.subscribe("/owd/wamstate", 5, &Test::wamstate_callback,this);
+      node.subscribe("owd/wamstate", 5, &Test::wamstate_callback,this);
   }
 
 
@@ -108,7 +108,7 @@ public:
     
     req.stiffness = s;
 
-    if(ros::service::call("/owd/SetStiffness", req, res)) {
+    if(ros::service::call("owd/SetStiffness", req, res)) {
       ROS_DEBUG("SetStiffness %1.1f",req.stiffness);
     } else {
       ROS_WARN("Could not call SetStiffness");
@@ -119,7 +119,7 @@ public:
     pr_msgs::DeleteTrajectory::Request delete_req;
     pr_msgs::DeleteTrajectory::Response delete_res;
     delete_req.ids.push_back(id);
-    ros::service::call("/owd/DeleteTrajectory",delete_req,delete_res);
+    ros::service::call("owd/DeleteTrajectory",delete_req,delete_res);
     return;
   }
 
@@ -174,7 +174,7 @@ public:
     if (StopOnForce) {
             traj_req.traj.options = traj_req.traj.opt_HoldOnForceInput;
     }
-    if (ros::service::call("/owd/AddTrajectory",traj_req,traj_res)) {
+    if (ros::service::call("owd/AddTrajectory",traj_req,traj_res)) {
       ROS_DEBUG("Added Trajectory %d",traj_res.id);
       if (traj_res.id == 0) {
 	ROS_WARN("Adding trajectory failed");
