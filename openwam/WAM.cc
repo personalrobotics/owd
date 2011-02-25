@@ -600,7 +600,7 @@ void control_loop_rt(void* argv){
 	// process the response
 	uint32_t TO_GROUP = msgid & 0x41F;
 	uint32_t FROM_NODE = (msgid & 0x3E0) >> 5;
-	if ((msgid & 0x41F) == 0x403) {
+	if ((msgid & 0x41F) == 0x403) { // group 3
 	  // 22-bit AP response
 	  wam->bus->process_positions_rt(msgid, msg, msglen);
 	} else if (FROM_NODE == 8) {

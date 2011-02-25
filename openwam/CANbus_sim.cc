@@ -164,6 +164,8 @@ int CANbus::compile(int32_t property, int32_t value,
 
 int CANbus::read_rt(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs){
     //    ROS_ERROR("CANbus:: READ");
+  *msgid=0x403;
+  msglen=0;
   return OW_SUCCESS;
 }
 
@@ -213,11 +215,15 @@ int CANbus::request_tactile_rt() {}
 int CANbus::request_strain_rt() {}
 int CANbus::request_forcetorque_rt() {}
 
-int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {}
-int CANbus::process_arm_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {}
-int CANbus::process_safety_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {}
-int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {}
-int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {}
+int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
+  // make it look like we've already received all 7 joint values
+  received_position_flags = 0xFE;
+  return OW_SUCCESS; 
+}
+int CANbus::process_arm_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) { return OW_SUCCESS; }
+int CANbus::process_safety_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) { return OW_SUCCESS; }
+int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) { return OW_SUCCESS; }
+int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) { return OW_SUCCESS; }
 
 void CANstats::rosprint()  {
   //  ROS_DEBUG_NAMED("times","CANbus::send %2.1fms per group (2 groups)",
