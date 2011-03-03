@@ -411,7 +411,7 @@ int CANbus::check(){
       continue;
     }
     
-    int32_t a(-1),b(-1),c(-1);
+    int32_t a(-1),b(-1),c(-1),v(-1);
     if (get_property_rt(nodeid,GRPA,&a,20000) != OW_SUCCESS) {
       ROS_WARN("CANbus::check: Failed to get puck %d GRPA during final check",nodeid);
       return OW_FAILURE;
@@ -423,8 +423,11 @@ int CANbus::check(){
     if (get_property_rt(nodeid,GRPC,&c,20000) != OW_SUCCESS) {
       ROS_WARN("CANbus::check: Failed to get puck %d GRPC during final check",nodeid);
     }
-    ROS_INFO_NAMED("cancheck","Puck %d: GRPA=%d, GRPB=%d, GRPC=%d",
-		   nodeid,a,b,c);
+    if (get_property_rt(nodeid,VERS,&v,20000) != OW_SUCCESS) {
+      ROS_WARN("CANbus::check: Failed to get puck %d VERS during final check",nodeid);
+    }
+    ROS_INFO_NAMED("cancheck","Puck %d: GRPA=%d, GRPB=%d, GRPC=%d, VERS=%d",
+		   nodeid,a,b,c,v);
   }
 
   return OW_SUCCESS;
@@ -843,16 +846,24 @@ int CANbus::read_positions(double* positions){
   return OW_SUCCESS;
 }
 
-int CANbus::request_positions_rt(int32_t groupid) {
+int CANbus::request_positions_rt(int32_t id) {
   uint8_t  msg[8];
 
   // clear the flags that keep track of which responses we've gotten
-  if (groupid == 4) {
+  if (id == 0x404) {
     // clear the arm flags (lower 8 bits)
     received_position_flags &= 0xFF00;
-  } else if (groupid == 5) {
+  } else if (id == 0x405) {
     // clear the hand flags (upper 8 bits)
     received_position_flags &= 0x00FF;
+  } else if (id == 11) {
+    received_position_flags &= 0xFBFF;
+  } else if (id == 12) {
+    received_position_flags &= 0xF7FF;
+  } else if (id == 13) {
+    received_position_flags &= 0xEFFF;
+  } else if (id == 14) {
+    received_position_flags &= 0xDFFF;
   } else {
     // clear all the flags
     received_position_flags=0;
@@ -865,7 +876,7 @@ int CANbus::request_positions_rt(int32_t groupid) {
   RTIME bt1 = time_now_ns();
 #endif // RT_STATS
 
-  if(send_rt(GROUPID(groupid), msg, 1, 100) == OW_FAILURE){
+  if(send_rt(id, msg, 1, 100) == OW_FAILURE){
     ROS_WARN("CANbus::request_positions: send failed: %s",last_error);
     return OW_FAILURE;
   }
@@ -924,7 +935,7 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
 
 int CANbus::read_positions_rt(){
   // send request to Group 4 pucks (all of arm)
-  if (request_positions_rt(4) != OW_SUCCESS) {
+  if (request_positions_rt(GROUPID(4)) != OW_SUCCESS) {
     ROS_WARN("Could not send request for positions");
     return OW_FAILURE;
   }
@@ -2048,13 +2059,16 @@ int CANbus::finger_reset(int32_t nodeid) {
   // now wait for the change in mode
   ROS_DEBUG_NAMED("can_bh280", "Waiting for MODE change to IDLE");
   int32_t mode = MODE_VELOCITY;
+   usleep(50000); // give it a chance
   int32_t sleepcount=0;
+  // wait until the puck returns to MODE_IDLE (normal for pucks 11-13) or
+  //   MODE_PID (normal for puck 14)
   while ((get_property_rt(nodeid,MODE,&mode,1000000) == OW_SUCCESS) &&
-	 (mode == MODE_VELOCITY) &&
+	 (mode != MODE_IDLE) && (mode != MODE_PID) &&
 	 ros::ok()) {
     usleep(50000);
     if (++sleepcount ==25) {
-      ROS_WARN_NAMED("can_bh280","Still waiting for finger to finish HI; mode is %d", mode);
+      ROS_WARN_NAMED("can_bh280","Still waiting for finger %d to finish HI; mode is %d", nodeid, mode);
       sleepcount=0;
     }
   }
