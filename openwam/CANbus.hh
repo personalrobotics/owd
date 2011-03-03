@@ -121,6 +121,7 @@ public:
   Group groups[NUM_GROUPS+1];
   int32_t* trq;
   double* pos;
+  double* jpos;
   double* forcetorque_data;
   float* tactile_data;
   bool valid_forcetorque_data;
@@ -172,7 +173,8 @@ DataRecorder<canio_data> candata;
   
   int status(int32_t* nodes);
   int parse(int32_t msgid, uint8_t* msg, int32_t msglen,
-	    int32_t* nodeid, int32_t* property, int32_t* value);
+	    int32_t* nodeid, int32_t* property, 
+	    int32_t* value, int32_t *value2=NULL);
   int compile(int32_t property, int32_t value, uint8_t *msg, int32_t *msglen);
   
   int set_property_rt(int32_t nid, int32_t property, int32_t value, bool check =false, int32_t usecs=200);
@@ -296,6 +298,8 @@ DataRecorder<canio_data> candata;
 
 private:
   int32_t hand_positions[4+1];
+  int32_t hand_distal_positions[4+1];
+  double hand_strain[4+1];
 #ifdef OWD_RT
   RT_MUTEX hand_queue_mutex;
   RT_MUTEX hand_cmd_mutex;
@@ -322,6 +326,8 @@ public:
   int hand_velocity(double v1, double v2, double v3, double v4);
   int hand_relax();
   int hand_get_positions(double &p1, double &p2, double &p3, double &p4);
+  int hand_get_distal_positions(double &p1, double &p2, double &p3);
+  int hand_get_strain(double &s1, double &s2, double &s3);
   int hand_get_state(int32_t &state);
 
   int ft_get_data(double *values);

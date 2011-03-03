@@ -153,7 +153,8 @@ int CANbus::send_AP(int32_t* apval){
 }
 
 int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
-		  int32_t* nodeid, int32_t* property, int32_t* value){
+		  int32_t* nodeid, int32_t* property, 
+		  int32_t* value, int32_t* value2){
   return OW_SUCCESS;
 }
 
@@ -166,6 +167,7 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs
     //    ROS_ERROR("CANbus:: READ");
   *msgid=0x403;
   msglen=0;
+  usleep(2400); // have to spend some time here so that owdsim doesn't busy-wait
   return OW_SUCCESS;
 }
 

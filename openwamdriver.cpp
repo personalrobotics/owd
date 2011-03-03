@@ -114,6 +114,7 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   }
 #ifdef FAKE7
   wamstate.positions.resize(7,0.0f);
+  wamstate.jpositions.resize(4,0.0f);
   wamstate.torques.resize(7,0.0f);
   waminternals.positions.resize(7,0.0f);
   waminternals.total_torque.resize(7,0.0f);
@@ -122,7 +123,8 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   pr_msgs::PIDgains empty_gains;
   waminternals.gains.resize(7);
 #else
-  wamstate.positions.resize(nJoints);
+  wamstate.positions.resize(nJoints,0.0f);
+  wamstate.jpositions.resize(4,0.0f);
   wamstate.torques.resize(nJoints,0.0f);
   waminternals.positions.resize(nJoints,0.0f);
   waminternals.total_torque.resize(nJoints,0.0f);
@@ -1368,6 +1370,7 @@ bool WamDriver::verify_home_position() {
 
 bool WamDriver::Publish() {
   double jointpos[nJoints+1];
+  double abs_jointpos[4+1];
   double totaltorqs[nJoints+1]; // total actual torq
   double jointtorqs[nJoints+1];  // PID error-correction torques,
   //                                       after removing dynamic torques
@@ -1379,6 +1382,9 @@ bool WamDriver::Publish() {
 
   for (unsigned int i=0; i<nJoints; ++i) {
     wamstate.positions[i] = waminternals.positions[i] = jointpos[i+1];
+    //    if (i<4) {
+    //      wamstate.jpositions[i]=abs_jointpos[i+1];
+    //    }
     wamstate.torques[i] = jointtorqs[i+1];
     waminternals.total_torque[i] 
       = waminternals.dynamic_torque[i]

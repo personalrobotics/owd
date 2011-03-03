@@ -200,6 +200,7 @@ public:
 			double *nettrq, double *sim_torq=NULL);
                   // get the joint positions, torques, net torques, and
                   // simulated torques (any pointer can be NULL)
+  void get_abs_positions(double *abs_pos);
   void get_jtrq(double trq[Joint::Jn+1]);   // get the joint torques
   void get_net_jtrq(double trq[Joint::Jn+1]); // get the net joint torques
 

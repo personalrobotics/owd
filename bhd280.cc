@@ -29,7 +29,8 @@ BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   bhstate.state = pr_msgs::BHState::state_done;
   bhstate.temperature=0.0f;
   bhstate.positions.resize(4, 0.0f);
-  bhstate.strain.resize(4, 0.0f);
+  bhstate.secondary_positions.resize(3, 0.0f);
+  bhstate.strain.resize(3, 0.0f);
   baseShift = btTransform(btMatrix3x3(cos(M_PI_2), -sin(M_PI_2), 0, sin(M_PI_2), cos(M_PI_2), 0, 0, 0, 1), btVector3(0,0,.06));
 }
 
@@ -85,6 +86,14 @@ bool BHD_280::Publish() {
     return false;
   }
     
+  bus->hand_get_strain(bhstate.strain[0],
+		       bhstate.strain[1],
+		       bhstate.strain[2]);
+
+  bus->hand_get_distal_positions(bhstate.secondary_positions[0],
+				 bhstate.secondary_positions[1],
+				 bhstate.secondary_positions[2]);
+
   bus->hand_get_state(state);
   if (state == CANbus::HANDSTATE_UNINIT) {
     bhstate.state = pr_msgs::BHState::state_uninitialized;

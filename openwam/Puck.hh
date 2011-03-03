@@ -42,6 +42,7 @@ class Puck{
    int group_order; 
    int motor_id;   
    int cpr;             // Encoder counts per revolution
+   int j_cpr;           // Secondary ("joint") encoder CPR
 
 
   static const int MIN_TRQ[];
@@ -54,6 +55,7 @@ class Puck{
   int order(){return group_order;}
   int motor(){return motor_id;}
   int CPR(){return cpr;}
+  int J_CPR(){return j_cpr;}
   
   friend ostream& operator << (ostream& s, Puck& p){
     s << "Puck (id#): "     << p.id()     << "; "

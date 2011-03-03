@@ -48,7 +48,7 @@
 
 CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, bool tactile) : 
   puck_state(-1),BH280_installed(bh280),id(bus_id),trq(NULL),
-  pos(NULL), forcetorque_data(NULL), tactile_data(NULL),
+  pos(NULL), jpos(NULL), forcetorque_data(NULL), tactile_data(NULL),
   valid_forcetorque_data(false), valid_tactile_data(false),
   tactile_top10(false), pucks(NULL),n_arm_pucks(number_of_arm_pucks),
   simulation(false), received_position_flags(0), received_state_flags(0),
@@ -67,6 +67,15 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
 
   handstate = HANDSTATE_UNINIT;
   first_moving_finger=11;
+  hand_positions[1]=hand_positions[2]=hand_positions[3]=hand_positions[4]=0;
+  hand_distal_positions[1]=hand_distal_positions[2]=hand_distal_positions[3]=hand_distal_positions[4]=0;
+
+  // the fourth finger finger puck also returns a strain value when we 
+  // ask group 5 for strain, but it is meaningless and is not used
+  // outside of OWD, so even though we have a four position in the array it
+  // is not necessary to initialize it.
+  hand_strain[1]=hand_strain[2]=hand_strain[3]=0.0f;
+
 #ifdef OWD_RT
   int err = rt_pipe_create(&handpipe,"HANDPIPE",P_MINOR_AUTO,0);
   if (err) {
@@ -83,6 +92,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   pucks = new Puck[n_arm_pucks+1];
   trq = new int32_t[n_arm_pucks+1];
   pos = new double[n_arm_pucks+1];
+  jpos = new double[n_arm_pucks+1];
   if (ft) {
     forcetorque_data = new double[6];
   }
@@ -106,6 +116,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
       pucks[p].group_order = p-7;
     }
     pucks[p].cpr = 4096;
+    pucks[p].j_cpr = 4096;
   }
 
   for(int p=1; p<=n_arm_pucks; p++){
@@ -874,10 +885,10 @@ int CANbus::request_positions_rt(int32_t groupid) {
 }
 
 int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
-  int32_t nodeid, property, value;
+  int32_t nodeid, property, value, value2;
 
   // extract the payload
-  if(parse(msgid, msg, msglen, &nodeid, &property, &value) == OW_FAILURE){
+  if(parse(msgid, msg, msglen, &nodeid, &property, &value, &value2) == OW_FAILURE){
     ROS_WARN("CANbus::process_positions: parse failed: %s",last_error);
     return OW_FAILURE;
   }
@@ -892,8 +903,17 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
   if ((nodeid >= 1) && (nodeid <=7)) {
     pos[ pucks[nodeid].motor() ] = 2.0*M_PI*( (double) value )/ 
       ( (double) pucks[nodeid].CPR() );
+    if (msglen==6) {
+      // this puck also sent a joint encoder value
+      jpos[pucks[nodeid].motor() ] = 2.0*M_PI*( (double) value2 )/ 
+      ( (double) pucks[nodeid].J_CPR() );
+    }
   } else if (BH280_installed && (nodeid >=11) && (nodeid <=14)) {
-    hand_positions[nodeid] = value;
+    hand_positions[nodeid-10] = value;
+    if (msglen==6) {
+      // this puck also sent a value for the distal joint
+      hand_distal_positions[nodeid-10] = value2;
+    }
   }
 
   // set the flag
@@ -1040,10 +1060,16 @@ int CANbus::send_AP(int32_t* apval){
 }
 
 int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
-		  int32_t* nodeid, int32_t* property, int32_t* value){
+		  int32_t* nodeid, int32_t* property, int32_t* value,
+		  int32_t *value2){
 
   int32_t i;
   int32_t dataHeader;
+
+  if (!msg || !nodeid || !property || !value) {
+    ROS_ERROR("CANbus::parse requires non-NULL pointers for msg, nodeid, property, and value");
+    return OW_FAILURE;
+  }
 
   *nodeid = ADDR2NODE(msgid);
   if(*nodeid == -1){
@@ -1061,21 +1087,23 @@ int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
     *value |= ( (int32_t)msg[1] << 8 ) & 0x0000FF00;
     *value |= ( (int32_t)msg[2] )      & 0x000000FF;
       
-    if(*value & 0x00200000) // If negative 
+    if(*value & 0x00200000) { // If negative 
       *value |= 0xFFC00000; // Sign-extend 
-      
+    }
+
     *property = AP;
 
-#ifdef JOINT_ENCODERS
-    jointPosition[*nodeid] = 0;
-    jointPosition[*nodeid] |= ( (int32_t)messageData[3] << 16) & 0x003F0000;
-    jointPosition[*nodeid] |= ( (int32_t)messageData[4] << 8 ) & 0x0000FF00;
-    jointPosition[*nodeid] |= ( (int32_t)messageData[5] ) & 0x000000FF;
+    if ((msglen==6) && value2) {
+      // the next three data bytes encode the 22-bit joint encoder
+      *value2 = 0;
+      *value2 |= ( (int32_t)msg[3] << 16) & 0x003F0000;
+      *value2 |= ( (int32_t)msg[4] << 8 ) & 0x0000FF00;
+      *value2 |= ( (int32_t)msg[5] ) & 0x000000FF;
       
-    if (jointPosition[*nodeid] & 0x00200000) /* If negative */
-      jointPosition[*nodeid] |= 0xFFC00000; /* Sign-extend */
-#endif // JOINT_ENCODERS
-
+      if (*value2 & 0x00200000) { /* If negative */
+	*value2 |= 0xFFC00000; /* Sign-extend */
+      }
+    }
     break;
 
   case 2:  // Data is normal, SET 
@@ -1885,6 +1913,20 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     }
     return OW_SUCCESS;
 
+  } else if (property == SG) {
+    // 12-bit straingauge data
+    if (msglen<4) {
+      ROS_WARN("Not enough bytes for straingauge data (%d)",msglen);
+      return OW_FAILURE;
+    }
+    int32_t value = 0;
+    value |= msg[3]<<8;
+    value |= msg[2];
+    if (value & 0x00000800) { // If negative 
+      value |=  0xFFFFF000; // Sign-extend 
+    }
+    hand_strain[nodeid-10]=value;
+    return OW_SUCCESS;
   } else if ((msgid & 0x41F) == 0x408) { // group 8
     // Tactile Top 10 data
     // The 8 data fields look like this:
@@ -1960,7 +2002,7 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
       valid_tactile_data=true;
     }
   } else {
-    ROS_WARN("CANbus::process_arm_response_rt: unexpected property %d", property);
+    ROS_WARN("CANbus::process_hand_response_rt: unexpected property %d", property);
     return OW_FAILURE;
   }
   return OW_SUCCESS;
@@ -1985,7 +2027,15 @@ int CANbus::process_safety_response_rt(int32_t msgid, uint8_t* msg, int32_t msgl
 }
 
 int CANbus::request_strain_rt() {
-  // not implemented yet
+  uint8_t  msg[8];
+
+  // Compile the packet
+  msg[0] = (uint8_t)SG;
+
+  if(send_rt(GROUPID(5), msg, 1, 100) == OW_FAILURE){
+    ROS_WARN("CANbus::request_strain_rt: send failed: %s",last_error);
+    return OW_FAILURE;
+  }
   return OW_SUCCESS;
 }
 
@@ -2260,6 +2310,20 @@ int CANbus::hand_get_positions(double &p1, double &p2, double &p3, double &p4) {
   return OW_SUCCESS;
 }
  
+int CANbus::hand_get_distal_positions(double &p1, double &p2, double &p3) {
+  p1 = finger_encoder_to_radians(hand_distal_positions[1]);
+  p2 = finger_encoder_to_radians(hand_distal_positions[2]);
+  p3 = finger_encoder_to_radians(hand_distal_positions[3]);
+  return OW_SUCCESS;
+}
+
+int CANbus::hand_get_strain(double &s1, double &s2, double &s3) {
+  s1 = hand_strain[1];
+  s2 = hand_strain[2];
+  s3 = hand_strain[3];
+  return OW_SUCCESS;
+}
+
 int CANbus::hand_get_state(int32_t &state) {
   state=handstate;
   return OW_SUCCESS;
@@ -2646,10 +2710,23 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
 	  fprintf(csv,"SET %03d=%d,%d,%d,%d",cdata.msgdata[0] & 0x7F, tq1,tq2,tq3,tq4);
 	} else if ((cdata.msgid & 0x41F) == 0x403) {
 	  // message set to GROUP 3 are 22-bit position updates
-	  int32_t value = (cdata.msgdata[0] << 16) +
+	  int32_t value = ((cdata.msgdata[0] & 0x3F) << 16) +
 	    (cdata.msgdata[1] << 8) +
 	    cdata.msgdata[2];
+	  if (value & 0x00200000) { // If negative 
+	    value |= 0xFFC00000; // Sign-extend
+	  }
 	  fprintf(csv,"SET P=%d",value);
+	  if (cdata.msglen == 6) {
+	    // this puck also sent a secondary value (JP)
+	    value = ((cdata.msgdata[3] & 0x3F) << 16) +
+	      (cdata.msgdata[4] << 8) +
+	      cdata.msgdata[5];
+	    if (value & 0x00200000) { // If negative 
+	      value |= 0xFFC00000; // Sign-extend
+	    }
+	    fprintf(csv," JP=%d",value);
+	  }
 	} else {
 	  // regular property
 	  int32_t value = (cdata.msgdata[3] << 8) + cdata.msgdata[2];
