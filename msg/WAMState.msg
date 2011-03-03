@@ -1,4 +1,5 @@
 float64[] positions
+float64[] jpositions
 # float64[] velocities  # not implemented yet
 float64[] torques
 pr_msgs/TrajInfo[] trajectory_queue
