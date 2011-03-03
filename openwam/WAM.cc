@@ -31,6 +31,8 @@ static void control_loop_rt(void* argv);
 
 extern int MODE;  // puck parameter
 
+#define GROUPID(n)   (0x0400 + (n))
+
 /*
  * Create a new WAM that uses the CAN bus cb;
  */
@@ -529,7 +531,7 @@ void control_loop_rt(void* argv){
       RTIME loopstart_time = ControlLoop::get_time_ns_rt(); // record the time
 
       // REQUEST POSITIONS
-      if(wam->bus->request_positions_rt(4) == OW_FAILURE){
+      if(wam->bus->request_positions_rt(GROUPID(4)) == OW_FAILURE){
         ROS_FATAL("control_loop: request_positions failed");
         return;
       }
@@ -547,7 +549,11 @@ void control_loop_rt(void* argv){
 	  wam->bus->request_hand_state_rt();
 	}
 	if (hand_counter==1) {
-	  wam->bus->request_positions_rt(5);
+	  wam->bus->request_positions_rt(GROUPID(5));
+	  //	  wam->bus->request_positions_rt(11);
+	  //	  wam->bus->request_positions_rt(12);
+	  //	  wam->bus->request_positions_rt(13);
+	  //	  wam->bus->request_positions_rt(14);
 	}
 	static int strain_cycles(9);
 	if (hand_counter==2) {
@@ -689,9 +695,11 @@ void control_loop_rt(void* argv){
 	  - (ControlLoop::get_time_ns_rt() - loopstart_time) * 1e-3;  // nsecs to usecs
       } // END OF READ LOOP
 
+      static int total_missed_data_cycles=0;
       if (! torques_sent) {
 	// we must have not received all 7 joint values before the
 	// time expired
+	++total_missed_data_cycles;
 	if (++missing_data_cycles == 10) {
 	  // we went 10 cycles in a row while missing values from at
 	  // least 1 puck; give up!
@@ -714,9 +722,11 @@ void control_loop_rt(void* argv){
         wam->stats.slowreadtime = slowreadtime/slowcount;
         wam->stats.slowctrltime = slowctrltime/slowcount;
         wam->stats.slowsendtime = slowsendtime/slowcount;
+	wam->stats.missed_reads = total_missed_data_cycles;
 	wam->stats.slowmax = slowmax;
         readtime=controltime=sendtime=slowtime=0.0f;
         slowreadtime=slowctrltime=slowsendtime=0.0f;
+	total_missed_data_cycles=0;
 	slowmax=0.0f;
         this_cycle_time=0.0f;
         loopcount=slowcount=0;
@@ -1398,6 +1408,9 @@ void WAMstats::rosprint(int recorder_count) const {
       ROS_WARN_NAMED("times",
 		     "Realtime control thread took %2.1fms", slowmax);
     }
+  }
+  if (missed_reads > 0) {
+    ROS_INFO_NAMED("times","Incomplete read cycles %d",missed_reads);
   }
   ROS_DEBUG_NAMED("times",
                   "trajectory eval %2.2fms, jscontrol %2.2fms, safetycount=%d, recordercount=%d",

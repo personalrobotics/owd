@@ -67,6 +67,7 @@ public:
   double slowreadtime;
   double slowctrltime;
   double slowsendtime;
+  int missed_reads;
   double dyntime;
   int hitorquecount[7];
   double hitorqueavg[7];
