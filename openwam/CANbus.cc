@@ -623,21 +623,21 @@ int CANbus::get_property_rt(int32_t nid, int32_t property, int32_t* value, int32
     
     // Check that the ids and properties match
     if(nodeid!=nid) {
-      ROS_WARN("Asked for property %d from node %d but got answer from node %d, %d previously missed messages",
-	       property, nid, nodeid, unread_packets);
+      // ROS_WARN("Asked for property %d from node %d but got answer from node %d, %d previously missed messages",
+      //	       property, nid, nodeid, unread_packets);
       if (unread_packets > 0) {
-	ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)", unread_packets);
+	//	ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)", unread_packets);
 	--unread_packets;
 	goto REREAD;
       }
       continue;
     }
     else if (prop!=property) {
-      ROS_WARN("Asked node %d for property %d but got property %d",
-	       nid, property, prop);
+      //ROS_WARN("Asked node %d for property %d but got property %d",
+      //	       nid, property, prop);
       if (unread_packets > 0) {
-	ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)",
-		 unread_packets);
+	//	ROS_WARN("Throwing out packet and waiting for next one (%d missed messages remaining)",
+	//		 unread_packets);
 	--unread_packets;
 	goto REREAD;
       }
@@ -689,9 +689,6 @@ int CANbus::send_torques_rt(){
                   torques[p] = clip(mytorqs[puck->motor()], 
                                     Puck::MIN_TRQ[puck->id()], 
                                     Puck::MAX_TRQ[puck->id()] );
-		  if (DEBUGCOUNT==0) {
-		    //		    ROS_DEBUG_NAMED("torques","Puck %d Torque %d",puck->id(),torques[p]);
-		  }
               }
               else{
                   torques[p] = 0;	    
@@ -715,6 +712,17 @@ int CANbus::send_torques_rt(){
       }
       
   }
+
+#ifdef RT_STATS
+  RTIME bt2 = time_now_ns();
+  sendtime += (bt2-bt1) * 1e-6; // ns to ms
+  if (++sendcount == 1000) {
+    stats.cansend_time = sendtime/1000.0;
+    sendcount=0;
+    sendtime=0.0f;
+  }
+#endif // RT_STATS
+
 
   if (BH280_installed || forcetorque_data) {
     static uint8_t msgbuf[20];
@@ -784,21 +792,6 @@ int CANbus::send_torques_rt(){
     }
 #endif // ! OWD_RT
   }
-  
-#ifdef RT_STATS
-#ifdef OWD_RT
-  RTIME bt2 = time_now_ns();
-  sendtime += (bt2-bt1) * 1e-6; // ns to ms
-  if (++sendcount == 1000) {
-    stats.cansend_time = sendtime/1000.0;
-    sendcount=0;
-    sendtime=0.0f;
-  }
-#else // ! OWD_RT
-  // use gettimeofday()
-#endif // ! OWD_RT
-#endif // RT_STATS
-  
   return OW_SUCCESS;
 }
 
@@ -900,13 +893,13 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
 
   // extract the payload
   if(parse(msgid, msg, msglen, &nodeid, &property, &value, &value2) == OW_FAILURE){
-    ROS_WARN("CANbus::process_positions: parse failed: %s",last_error);
+    //    ROS_WARN("CANbus::process_positions: parse failed: %s",last_error);
     return OW_FAILURE;
   }
 
   // verify the property
   if (property != AP) {
-    ROS_WARN("CANbus::process_positions: unexpected property %d", property);
+    //ROS_WARN("CANbus::process_positions: unexpected property %d", property);
     return OW_FAILURE;
   }
 
@@ -951,7 +944,7 @@ int CANbus::read_positions_rt(){
       // 22-bit AP response
       process_positions_rt(msgid, msg, msglen);
     } else {
-      ROS_WARN("CANbus::read_positions_rt: received unexpected CAN message ID %X while waiting for AP", msgid);
+      // ROS_WARN("CANbus::read_positions_rt: received unexpected CAN message ID %X while waiting for AP", msgid);
     }
   }
 
@@ -988,7 +981,7 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
 
   // verify the sender
   if (nodeid != 8) {
-    ROS_WARN("CANbus::process_forcetorque_response_rt: response from unexpected puck id %d", nodeid);
+    //    ROS_WARN("CANbus::process_forcetorque_response_rt: response from unexpected puck id %d", nodeid);
     return OW_FAILURE;
   }
 
@@ -1007,7 +1000,7 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
     forcetorque_data[5]=ft_combine(msg[4], msg[5]) / 4096.0;
     torque_received=true;
   } else {
-    ROS_ERROR("CANbus::process_forcetorque_response_rt: Unknown message type %X", msgid);
+    //    ROS_ERROR("CANbus::process_forcetorque_response_rt: Unknown message type %X", msgid);
     return OW_FAILURE;
   }
   if (force_received && torque_received) {
@@ -1614,13 +1607,13 @@ int CANbus::process_arm_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen)
   int32_t nodeid, property, value;
   // extract the payload
   if(parse(msgid, msg, msglen, &nodeid, &property, &value) != OW_SUCCESS){
-    ROS_WARN("CANbus::process_arm_response_rt: parse failed: %s",last_error);
+    //ROS_WARN("CANbus::process_arm_response_rt: parse failed: %s",last_error);
     return OW_FAILURE;
   }
 
   // verify the sender
   if ((nodeid < 1) || (nodeid > 7)) {
-    ROS_ERROR("CANbus::process_arm_response_rt: don't know how to handle response from puck %d", nodeid);
+    //ROS_ERROR("CANbus::process_arm_response_rt: don't know how to handle response from puck %d", nodeid);
     return OW_FAILURE;
   }
 
@@ -1629,7 +1622,7 @@ int CANbus::process_arm_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen)
     received_state_flags |= 1 << nodeid;
     puck_state = value;
   } else {
-    ROS_WARN("CANbus::process_arm_response_rt: unexpected property %d", property);
+    //    ROS_WARN("CANbus::process_arm_response_rt: unexpected property %d", property);
     return OW_FAILURE;
   }
 
@@ -1881,13 +1874,13 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
   int32_t nodeid, property, value;
   // extract the payload
   if(parse(msgid, msg, msglen, &nodeid, &property, &value) != OW_SUCCESS){
-    ROS_WARN("CANbus::process_hand_response_rt: parse failed: %s",last_error);
+    //    ROS_WARN("CANbus::process_hand_response_rt: parse failed: %s",last_error);
     return OW_FAILURE;
   }
 
   // verify the sender
   if ((nodeid < 11) || (nodeid > 14)) {
-    ROS_ERROR("CANbus::process_hand_response_rt: don't know how to handle response from puck %d", nodeid);
+    //    ROS_ERROR("CANbus::process_hand_response_rt: don't know how to handle response from puck %d", nodeid);
     return OW_FAILURE;
   }
 
@@ -1927,15 +1920,10 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
   } else if (property == SG) {
     // 12-bit straingauge data
     if (msglen<4) {
-      ROS_WARN("Not enough bytes for straingauge data (%d)",msglen);
+      //      ROS_WARN("Not enough bytes for straingauge data (%d)",msglen);
       return OW_FAILURE;
     }
-    int32_t value = 0;
-    value |= msg[3]<<8;
-    value |= msg[2];
-    if (value & 0x00000800) { // If negative 
-      value |=  0xFFFFF000; // Sign-extend 
-    }
+    int32_t value = (msg[3]<<8) + msg[2] - 2048; // center on zero
     hand_strain[nodeid-10]=value;
     return OW_SUCCESS;
   } else if ((msgid & 0x41F) == 0x408) { // group 8
@@ -1946,8 +1934,8 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     //  AAAA = 4-bit value of the lowest sensor ID in the map (N/cm2)
     //  BBBB = 4-bit value of the next lowest sensor ID in the map (N/cm2)
     if (msglen != 8) {
-      ROS_ERROR("Bad TACTILE response: payload was only %d bytes instead of 8",
-		msglen);
+      //      ROS_ERROR("Bad TACTILE response: payload was only %d bytes instead of 8",
+      //		msglen);
       return OW_FAILURE;
     }
     uint32_t bitmap = msg[0] << 16 | msg[1] << 8 | msg[2];
@@ -1992,8 +1980,8 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     //  AAAAaaaaaaaa = 12-bit sensor data from first sensor in group, divide by 256 to get N/cm2
     //  BBBBbbbbbbbb = 12-bit sensor data from second sensor in group, divide by 256 to get N/cm2
     if (msglen != 8) {
-      ROS_ERROR("Bad TACTILE response: payload was only %d bytes instead of 8",
-		msglen);
+      //      ROS_ERROR("Bad TACTILE response: payload was only %d bytes instead of 8",
+      //		msglen);
       return OW_FAILURE;
     }
     int sensor_group=(msg[0]>>4)*5;
@@ -2013,7 +2001,7 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
       valid_tactile_data=true;
     }
   } else {
-    ROS_WARN("CANbus::process_hand_response_rt: unexpected property %d", property);
+    //    ROS_WARN("CANbus::process_hand_response_rt: unexpected property %d", property);
     return OW_FAILURE;
   }
   return OW_SUCCESS;
@@ -2023,13 +2011,13 @@ int CANbus::process_safety_response_rt(int32_t msgid, uint8_t* msg, int32_t msgl
   int32_t nodeid, property, value;
   // extract the payload
   if(parse(msgid, msg, msglen, &nodeid, &property, &value) != OW_SUCCESS){
-    ROS_WARN("CANbus::process_safety_response: parse failed: %s",last_error);
+    //    ROS_WARN("CANbus::process_safety_response: parse failed: %s",last_error);
     return OW_FAILURE;
   }
 
   // verify the sender
   if (nodeid != 10) {
-    ROS_WARN("CANbus::process_safety_response: node id %d is not the safety puck", nodeid);
+    //    ROS_WARN("CANbus::process_safety_response: node id %d is not the safety puck", nodeid);
     return OW_FAILURE;
   }
   
@@ -2057,7 +2045,6 @@ int CANbus::finger_reset(int32_t nodeid) {
     return OW_FAILURE;
   }
   // now wait for the change in mode
-  ROS_DEBUG_NAMED("can_bh280", "Waiting for MODE change to IDLE");
   int32_t mode = MODE_VELOCITY;
    usleep(50000); // give it a chance
   int32_t sleepcount=0;
@@ -2079,7 +2066,6 @@ int CANbus::finger_reset(int32_t nodeid) {
     ROS_WARN_NAMED("can_bh280","No response with 1s from finger puck %d while waiting for HI",nodeid);
     return OW_FAILURE;
   }
-  ROS_DEBUG_NAMED("can_bh280", "Finger reset");
   
   return OW_SUCCESS;
 }
@@ -2131,7 +2117,7 @@ int CANbus::hand_reset() {
   for (unsigned int attempts =0; attempts < 3; ++attempts) {
     // F1-F3
     for (int32_t nodeid=11; nodeid<14; ++nodeid) {
-      ROS_DEBUG_NAMED("can_bh280", "Resetting finger puck %d", nodeid-10);
+      ROS_INFO_NAMED("can_bh280", "Resetting finger puck %d", nodeid-10);
       if ((finger_reset(nodeid) != OW_SUCCESS) &&
 	  (attempts == 2)) {
 	ROS_WARN_NAMED("can_bh280","Failed to reset finger puck %d",nodeid-10);
@@ -2141,7 +2127,7 @@ int CANbus::hand_reset() {
     }
   }
   // F4
-  ROS_DEBUG_NAMED("can_bh280", "Resetting finger puck 4");
+  ROS_INFO_NAMED("can_bh280", "Resetting finger puck 4");
   if (finger_reset(14) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280","Failed to reset finger puck 4");
     handstate = HANDSTATE_UNINIT;
@@ -2230,7 +2216,7 @@ int CANbus::configure_tactile_sensors() {
 }
 
 int CANbus::hand_move(double p1, double p2, double p3, double p4) {
-  ROS_INFO_NAMED("bhd280", "executing hand_move");
+  ROS_DEBUG_NAMED("bhd280", "executing hand_move");
 
   if (hand_set_property(11,E,finger_radians_to_encoder(p1)) != OW_SUCCESS) {
       return OW_FAILURE;
@@ -2258,12 +2244,11 @@ int CANbus::hand_move(double p1, double p2, double p3, double p4) {
     }
   first_moving_finger=11;
   handstate = HANDSTATE_MOVING;
-  ROS_INFO_NAMED("bhd280", "done hand_move");
   return OW_SUCCESS;
 }
 
 int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
-  ROS_INFO_NAMED("bhd280", "executing hand_velocity");
+  ROS_DEBUG_NAMED("bhd280", "executing hand_velocity");
   if (hand_set_property(11,V,finger_radians_to_encoder(v1)/1000.0) != OW_SUCCESS) {
     return OW_FAILURE;
   }
@@ -2295,7 +2280,6 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
  }
  first_moving_finger=11;
  handstate = HANDSTATE_MOVING;
- ROS_INFO_NAMED("bhd280", "done executing hand_velocity");
  return OW_SUCCESS;
 }
  

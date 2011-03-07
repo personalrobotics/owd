@@ -459,6 +459,16 @@ void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *sim
     this->unlock();
 }
 
+void WAM::get_abs_positions(double* jpos) {
+  if (jpos) {
+    this->lock();
+    for(int j=1; j<=4; ++j) {
+      jpos[ j ] = bus->jpos[j];
+    }
+    this->unlock();
+  }
+}
+
 /*
  * Start the control timer and loop
  */
@@ -645,7 +655,6 @@ void control_loop_rt(void* argv){
 	  }
 	} else {
 	  // unknown
-	  ROS_WARN("control_loop_rt: Unexpected response on CANbus type %X", msgid);
 	  wam->bus->stats.canread_badpackets++;
 	  continue;
 	}
@@ -700,10 +709,11 @@ void control_loop_rt(void* argv){
 	// we must have not received all 7 joint values before the
 	// time expired
 	++total_missed_data_cycles;
-	if (++missing_data_cycles == 10) {
-	  // we went 10 cycles in a row while missing values from at
-	  // least 1 puck; give up!
-	  ROS_WARN("Missed CANbus replies from 10 cycles in a row");
+	if (++missing_data_cycles == 50) {
+	  // we went 50 cycles in a row while missing values from at
+	  // least 1 puck; the safety puck has generated a heartbeat
+	  // fault by now, so give up!
+	  ROS_FATAL("Missed CANbus replies from 50 cycles in a row");
 	  missing_data_cycles=0; // reset
 	  return;
 	}

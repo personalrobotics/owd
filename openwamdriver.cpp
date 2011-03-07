@@ -1378,13 +1378,14 @@ bool WamDriver::Publish() {
                                // (used for experiental mass properties)
 
   owam->get_current_data(jointpos,totaltorqs,jointtorqs,simtorqs);
+  owam->get_abs_positions(abs_jointpos);
   owam->get_gains(waminternals.gains);
 
   for (unsigned int i=0; i<nJoints; ++i) {
     wamstate.positions[i] = waminternals.positions[i] = jointpos[i+1];
-    //    if (i<4) {
-    //      wamstate.jpositions[i]=abs_jointpos[i+1];
-    //    }
+    if (i<4) {
+      wamstate.jpositions[i]=abs_jointpos[i+1];
+    }
     wamstate.torques[i] = jointtorqs[i+1];
     waminternals.total_torque[i] 
       = waminternals.dynamic_torque[i]
