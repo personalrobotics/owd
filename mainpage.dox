@@ -24,9 +24,10 @@ The Peak Linux driver can be obtained from
 
 Build it as follows:
 \verbatim
-  make NET=NO RT=XENOMAI
+  make NET=NO RT=NO_RT
   sudo make install
 \endverbatim
+(if you are trying to build the RT version of OWD, substitute RT=XENOMAI in place of RT=NO_RT)
 
 The remaining system dependencies can be installed using rosdep once
 you have owd in your ROS_PACKAGE_PATH:
