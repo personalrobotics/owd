@@ -1711,9 +1711,20 @@ int CANbus::ft_tare() {
   return hand_set_property(8,FT,0);
 }
 
-int CANbus::tactile_get_data(float *values) {
-  if (tactile_data && valid_tactile_data && values) {
-    memcpy(values,tactile_data,96*sizeof(float));
+int CANbus::tactile_get_data(float *f1, float *f2, float *f3, float *palm) {
+  if (tactile_data && valid_tactile_data) {
+    if (f1) {
+      memcpy(f1,tactile_data,24*sizeof(float));
+    }
+    if (f2) {
+      memcpy(f2,tactile_data+24,24*sizeof(float));
+    }
+    if (f3) {
+      memcpy(f3,tactile_data+48,24*sizeof(float));
+    }
+    if (palm) {
+      memcpy(palm,tactile_data+72,24*sizeof(float));
+    }
     return OW_SUCCESS;
   }
   return OW_FAILURE;

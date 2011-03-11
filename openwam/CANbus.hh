@@ -333,7 +333,7 @@ public:
   int ft_get_data(double *values);
   int ft_tare();
 
-  int tactile_get_data(float *values);
+  int tactile_get_data(float *f1, float *f2, float *f3, float *palm);
   int tactile_set_hires(bool hires);
 
   int limits(double jointVel, double tipVel, double elbowVel);

@@ -23,7 +23,10 @@
 #include "tactile.hh"
 
 Tactile::Tactile(CANbus *cb) : bus(cb), node("~") {
-  tactile_msg.force.resize(96);
+  tactile_msg.finger1.resize(24);
+  tactile_msg.finger2.resize(24);
+  tactile_msg.finger3.resize(24);
+  tactile_msg.palm.resize(24);
   AdvertiseAndSubscribe(node);
 }
 
@@ -32,7 +35,7 @@ Tactile::~Tactile() {
 }
 
 void Tactile::AdvertiseAndSubscribe(ros::NodeHandle &n) {
-  pub_tactile = n.advertise<pr_msgs::BHTactile>("tactile", 10);
+  pub_tactile = n.advertise<pr_msgs::BHTactile>("tactile", 40);
 }
 
 void Tactile::Unadvertise() {
@@ -40,7 +43,10 @@ void Tactile::Unadvertise() {
 }
 
 void Tactile::Pump(const ros::TimerEvent& e) {
-  if (bus->tactile_get_data(&(tactile_msg.force[0])) != OW_SUCCESS) {
+  if (bus->tactile_get_data(&tactile_msg.finger1[0],
+			    &tactile_msg.finger2[0],
+			    &tactile_msg.finger3[0],
+			    &tactile_msg.palm[0]) != OW_SUCCESS) {
     ROS_WARN_NAMED("tactile","Unable to get data from Tactile sensors");
     return;
   }
