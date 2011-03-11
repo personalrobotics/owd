@@ -430,6 +430,7 @@ Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
   bool bWaitForStart=(jt.options & jt.opt_WaitForStart);
   bool bHoldOnStall=(jt.options & jt.opt_HoldOnStall);
   bool bHoldOnForceInput=(jt.options & jt.opt_HoldOnForceInput);
+  ROS_DEBUG_NAMED("BuildTrajectory","Building trajectory with options WaitForStart=%d HoldOnStall=%d HoldOnForceInput=%d",int(bWaitForStart), int(bHoldOnStall), int(bHoldOnForceInput));
 
   if (!blended_traj) {
     ROS_WARN_NAMED("BuildTrajectory","No blends found; using ParaJointTraj");
