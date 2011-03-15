@@ -555,7 +555,14 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
     }
 
     ROS_ERROR("\n  Return the WAM to the initial position.");
-    ROS_ERROR("  Press shift-idle on the pendant when ready.");
+    ROS_ERROR("  Press RETURN when you are ready to disable the motors.");
+    char *line=NULL;
+    size_t linelen = 0;
+    linelen = getline(&line,&linelen,stdin);
+    free(line);
+    owam->jsdynamics() = false;
+    ROS_ERROR("  Now verify that the WAM is still in the intended home position.");
+    ROS_ERROR("  Press shift-idle on the pendant when ready to save the calibration values.");
     owam->exit_on_pendant_press=false;
 
     // wait for shift-idle to be pressed
