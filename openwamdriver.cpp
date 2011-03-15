@@ -1409,23 +1409,13 @@ bool WamDriver::Publish() {
   owam->lock();
   if (owam->jointstraj) {
     if (owam->jointstraj->state() == Trajectory::STOP) {
-      if (owam->safety_hold) {
-        wamstate.state=pr_msgs::WAMState::state_stalled;
-      } else {
-        wamstate.state=pr_msgs::WAMState::state_fixed;
-      }
-      if (wamstate.trajectory_queue.size() > 0) {
-	wamstate.trajectory_queue[0].state=pr_msgs::TrajInfo::state_paused;
-      }
+      wamstate.state=pr_msgs::WAMState::state_traj_paused;
     } else {
       // trajectory is still running, but we still might be hitting something
       if (owam->safety_hold) {
-        wamstate.state=pr_msgs::WAMState::state_stalled;
+        wamstate.state=pr_msgs::WAMState::state_traj_stalled;
       } else {
-	wamstate.state=pr_msgs::WAMState::state_moving;
-      }
-      if (wamstate.trajectory_queue.size() > 0) {
-	wamstate.trajectory_queue[0].state=pr_msgs::TrajInfo::state_running;
+	wamstate.state=pr_msgs::WAMState::state_traj_active;
       }
     }
   } else if (owam->holdpos) {
@@ -1653,7 +1643,7 @@ pr_msgs::AddTrajectory::Response WamDriver::AddTrajectory(
 
   // run the trajectory
   owam->run_trajectory(t);
-  wamstate.trajectory_queue[0].state=pr_msgs::TrajInfo::state_running;
+  wamstate.trajectory_queue[0].state=pr_msgs::TrajInfo::state_active;
   ROS_INFO("Added trajectory #%d",t->id);
   res.reason="Trajectory started";
   res.id = t->id;
@@ -1794,15 +1784,9 @@ bool WamDriver::PauseTrajectory(pr_msgs::PauseTrajectory::Request &req,
   if (owam->jointstraj) {
     if (req.pause) {
       owam->pause_trajectory();
-      if (wamstate.trajectory_queue.size() > 0) {
-	wamstate.trajectory_queue[0].state = pr_msgs::TrajInfo::state_paused;
-      }
       ROS_INFO("Trajectory paused");
     } else {
       owam->resume_trajectory();
-      if (wamstate.trajectory_queue.size() > 0) {
-	wamstate.trajectory_queue[0].state = pr_msgs::TrajInfo::state_running;
-      }
       ROS_INFO("Trajectory resumed");
     }
     return true;
@@ -1988,7 +1972,7 @@ void WamDriver::Update() {
   owam->run_trajectory(trajectory_list.front());
   trajectory_list.pop_front();
   if (wamstate.trajectory_queue.size() > 0) {
-    wamstate.trajectory_queue.front().state=pr_msgs::TrajInfo::state_running;
+    wamstate.trajectory_queue.front().state=pr_msgs::TrajInfo::state_active;
   }
 }
 

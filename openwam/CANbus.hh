@@ -315,6 +315,7 @@ private:
   int32_t finger_radians_to_encoder(double radians);
   double spread_encoder_to_radians(int32_t enc);
   int32_t spread_radians_to_encoder(double radians);
+  double finger_innerlink_encoder_to_radians(int32_t enc);
 
 public:
   int hand_get_property(int32_t id, int32_t prop, int32_t *val);

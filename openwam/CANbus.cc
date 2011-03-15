@@ -429,6 +429,19 @@ int CANbus::check(){
     ROS_INFO_NAMED("cancheck","Puck %d: GRPA=%d, GRPB=%d, GRPC=%d, VERS=%d",
 		   nodeid,a,b,c,v);
   }
+  int32_t voltlevel;
+  if (get_property_rt(SAFETY_MODULE,VOLTL1,&voltlevel) == OW_SUCCESS) {
+    ROS_DEBUG_NAMED("safety","VOLTL1 = %d",voltlevel);
+  }
+  if (get_property_rt(SAFETY_MODULE,VOLTL2,&voltlevel) == OW_SUCCESS) {
+    ROS_DEBUG_NAMED("safety","VOLTL2 = %d",voltlevel);
+  }
+  if (get_property_rt(SAFETY_MODULE,VOLTH1,&voltlevel) == OW_SUCCESS) {
+    ROS_DEBUG_NAMED("safety","VOLTH1 = %d",voltlevel);
+  }
+  if (get_property_rt(SAFETY_MODULE,VOLTH2,&voltlevel) == OW_SUCCESS) {
+    ROS_DEBUG_NAMED("safety","VOLTH2 = %d",voltlevel);
+  }
 
   return OW_SUCCESS;
 }
@@ -1537,7 +1550,7 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
     ROS_ERROR("CANbus::limits failed to get previous high voltage warning level.");
     return OW_FAILURE;
   }
-  ROS_DEBUG_NAMED("canlimits","VOLTH1 was %d, changing to 57",voltlevel);
+  ROS_DEBUG_NAMED("canlimits","VOLTH2 was %d, changing to 57",voltlevel);
   if (set_property_rt(SAFETY_MODULE,VOLTH2,57,false,15000) == OW_FAILURE) {
     ROS_ERROR("CANbus::limits: set_prop failed");
     return OW_FAILURE;
@@ -1900,12 +1913,20 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     received_state_flags |= 1 << nodeid;
     int32_t mode=value;
     // first three motors are stationary if they have returned to MODE_IDLE
-    if ((first_moving_finger < 14) && (mode != MODE_IDLE)) {
-      handstate = HANDSTATE_MOVING;
-      return OW_SUCCESS;
+    if (nodeid < 14) {
+      if (mode != MODE_IDLE) {
+	handstate = HANDSTATE_MOVING;
+	return OW_SUCCESS;
+      } else {
+	// next time check the next finger
+	if (first_moving_finger < 14) {
+	  ++first_moving_finger;
+	}
+	return OW_SUCCESS;
+      }
     }
     // spread motor is stationary if it's returned to MODE_PID
-    if ((first_moving_finger == 14) && (mode != MODE_PID)) {
+    if (mode != MODE_PID) {
       static int no_movement_count = 0;
       // make sure we're actually still moving
       static int32_t last_f4_pos = 0; // the initial value doesn't really matter; we're just
@@ -1919,13 +1940,9 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
       last_f4_pos = hand_positions[4];
       no_movement_count=0;
     }
-    // this finger was stationary, so next time check the next one
-    ++first_moving_finger;
-    if (first_moving_finger > 14) {
-      // we've checked them all; we're done!
-      handstate=HANDSTATE_DONE;
-      first_moving_finger=11;
-    }
+    // the last joint was stationary, so we're done!
+    handstate=HANDSTATE_DONE;
+    first_moving_finger=11;  // ready for next time
     return OW_SUCCESS;
 
   } else if (property == SG) {
@@ -1987,7 +2004,7 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     // Each of the five will contain 5 12-bit values
     // The 8 data fields look like this:
     // [NNNNAAAA] [aaaaaaaa] [BBBBbbbb] [bbbbCCCC] [cccccccc] [DDDDdddd] [ddddEEEE] [eeeeeeee]
-    //  NNNN = 4-bit sensor group: 0 = sensors 1-5, 2 = sensors 6-10, etc.
+    //  NNNN = 4-bit sensor group: 0 = sensors 1-5, 1 = sensors 6-10, etc.
     //  AAAAaaaaaaaa = 12-bit sensor data from first sensor in group, divide by 256 to get N/cm2
     //  BBBBbbbbbbbb = 12-bit sensor data from second sensor in group, divide by 256 to get N/cm2
     if (msglen != 8) {
@@ -1995,15 +2012,15 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
       //		msglen);
       return OW_FAILURE;
     }
-    int sensor_group=(msg[0]>>4)*5;
-    int offset = (nodeid-11)*24 + sensor_group;
+    int sensor_group=msg[0]>>4;
+    int offset = (nodeid-11)*24 + sensor_group * 5;
     tactile_data[offset]  = (msg[0] & 0xF) + msg[1] / 256.0;
     tactile_data[offset+1]= ((msg[2]<<4) + (msg[3]>>4)) / 256.0;
     tactile_data[offset+2]= (msg[3] & 0xF) + msg[4] / 256.0;
     tactile_data[offset+3]= ((msg[5]<<4) + (msg[6]>>4)) / 256.0;
     if (sensor_group < 4) {
-      // there are only 24 sensors, so the last group of 5
-      //   only has 4 members
+      // there are only 24 sensors, so only use the 5th member
+      // of the group if we aren't processing the final group
       tactile_data[offset+4]= (msg[6] & 0xF) + msg[7] / 256.0;
     }
     static uint8_t hires_received(0);
@@ -2097,7 +2114,7 @@ int CANbus::hand_reset() {
 		nodeid);
       return OW_FAILURE;
     }
-    if (((nodeid < 14) && (tstop != 150)) 
+    if (((nodeid < 14) && (tstop != 100)) 
 	|| ((nodeid == 14) && (tstop != 200))) {
       ready=false;
       break;
@@ -2149,7 +2166,7 @@ int CANbus::hand_reset() {
   // (tried 50 for a while but it wouldn't get out of jams, so
   //  increased to 150 on 2/1/2011.  MVW)
   for (int32_t nodeid=11; nodeid<=13; ++nodeid) {
-    if (set_property_rt(nodeid,TSTOP,150) != OW_SUCCESS) {
+    if (set_property_rt(nodeid,TSTOP,100) != OW_SUCCESS) {
       return OW_FAILURE;
     }
     usleep(100);
@@ -2320,9 +2337,9 @@ int CANbus::hand_get_positions(double &p1, double &p2, double &p3, double &p4) {
 }
  
 int CANbus::hand_get_distal_positions(double &p1, double &p2, double &p3) {
-  p1 = finger_encoder_to_radians(hand_distal_positions[1]);
-  p2 = finger_encoder_to_radians(hand_distal_positions[2]);
-  p3 = finger_encoder_to_radians(hand_distal_positions[3]);
+  p1 = finger_innerlink_encoder_to_radians(hand_distal_positions[1]);
+  p2 = finger_innerlink_encoder_to_radians(hand_distal_positions[2]);
+  p3 = finger_innerlink_encoder_to_radians(hand_distal_positions[3]);
   return OW_SUCCESS;
 }
 
@@ -2339,13 +2356,21 @@ int CANbus::hand_get_state(int32_t &state) {
 }
 
 double CANbus::finger_encoder_to_radians(int32_t enc) {
-  // encoder range: 0 to -200,000
+  // encoder range: 0 to -199,111.1
   // degree range: 0 to 140
-  return  ((double)enc / 200000.0) * 140.0 * 3.1416/180.0;
+  return  ((double)enc / 199111.1) * 140.0 * 3.1416/180.0;
+}
+
+double CANbus::finger_innerlink_encoder_to_radians(int32_t enc) {
+  // encoder range: 0 to 4096
+  // degree range: 360
+
+  //  return ((double)enc / 4096) * 3.1416 * 2.0;
+  return (double) enc;  // for debugging, send the raw encoder val
 }
 
 int32_t CANbus::finger_radians_to_encoder(double radians) {
-  return(radians * 180.0/3.1416 / 140.0 * 200000.0);
+  return(radians * 180.0/3.1416 / 140.0 * 199111.1);
 }
 
 double CANbus::spread_encoder_to_radians(int32_t enc) {
