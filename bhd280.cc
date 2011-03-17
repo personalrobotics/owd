@@ -31,7 +31,30 @@ BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   bhstate.positions.resize(4, 0.0f);
   bhstate.secondary_positions.resize(3, 0.0f);
   bhstate.strain.resize(3, 0.0f);
-  baseShift = btTransform(btMatrix3x3(cos(M_PI_2), -sin(M_PI_2), 0, sin(M_PI_2), cos(M_PI_2), 0, 0, 0, 1), btVector3(0,0,.06));
+  
+  const double PI=3.14159;
+  const double LINK2_OFFSET=2.46/180.0*PI;
+  const double LINK3_OFFSET=39.56/180.0*PI;
+
+  btQuaternion PI_YAW,ZERO;
+  ZERO.setRPY(0,0,0);
+  PI_YAW.setRPY(0,0,PI);
+
+  // create transforms from WAM7 to origin of each finger's link1
+  finger_link1_base[0]=btTransform(ZERO,btVector3(0,-0.025,0.135));
+  finger_link1_base[1]=btTransform(ZERO,btVector3(0, 0.025,0.135));
+  finger_link1_base[2]=btTransform(PI_YAW,btVector3(0,0,0.135));
+
+  // create transforms from each link to the next
+  btQuaternion HALFPI_ROLL_PLUS_LINK2_PITCH;
+  HALFPI_ROLL_PLUS_LINK2_PITCH.setRPY(PI/2,LINK2_OFFSET,0);
+  btQuaternion LINK3_YAW;
+  LINK3_YAW.setRPY(0,0,LINK3_OFFSET);
+
+  // from link1 to link2 origin
+  finger_link2_base=btTransform(HALFPI_ROLL_PLUS_LINK2_PITCH,btVector3(.05,0,0));
+  // from link2 to link3 origin
+  finger_link3_base=btTransform(LINK3_YAW,btVector3(0.070,0,0));
 }
 
 BHD_280::~BHD_280() {
@@ -105,46 +128,40 @@ bool BHD_280::Publish() {
   
   pub_handstate.publish(bhstate);
 
-  // calculate the transforms
-  // code by Andrew Yeager, CMU
-  static double t[4][4][4];
-  
-  static const int r[3] = {-1, 1, 0};
-  static const int j[3] = {1, 1, -1};
-  
-  static const double A[4] = {25, 50, 70, 50};
-  static const double D[4] = {84-19, 0, 0, 9.5};  // new 280 hand is 19mm shorter
-  static const double PHI[3] = {0, .0429351, .8726646};
-    
-  int i;
-
-  for (int finger=1; finger <=3; ++finger) {
-    
-    createT(r[finger-1]*A[0], 0, D[0], r[finger-1] * bhstate.positions[(finger-1)*3] - M_PI_2*j[finger-1], t[0]);
-    createT(A[1], M_PI_2, D[1], bhstate.positions[1 + (finger-1)*3] + PHI[1], t[1]);
-    createT(A[2], 0, D[2], bhstate.positions[2 + (finger-1)*3] + PHI[2], t[2]);                 
-    createT(A[3], -M_PI_2, D[3], 0, t[3]);
-    
-    //Publish Transform Information
-    tf::StampedTransform baseShift_stf(baseShift, ros::Time::now(), "wam7" , "BHDBase");
-    tf_broadcaster->sendTransform(baseShift_stf);
-    for(i = 0; i < 4; i++) {
+  for (int f=0; f<3; ++f) {
       char jref[50], jname[50];
-      if(i > 0)
-	snprintf(jref, 50, "finger%d_%d", finger-1, i-1);
-      else
-	snprintf(jref, 50, "BHDBase");
+      btQuaternion YAW;
       
-      snprintf(jname, 50, "finger%d_%d", finger-1, i);
-      
-      btTransform finger_tf = btTransform(btMatrix3x3(t[i][0][0],t[i][0][1],t[i][0][2],t[i][1][0],t[i][1][1],t[i][1][2],t[i][2][0],t[i][2][1],t[i][2][2]), btVector3(t[i][0][3]/1000,t[i][1][3]/1000,t[i][2][3]/1000));                                                  
-      tf::StampedTransform finger_stf(finger_tf, ros::Time::now(), jref, jname);
-      
-      
-      tf_broadcaster->sendTransform(finger_stf);
-    }
+      // LINK 1
+      snprintf(jref,50,"wam7");
+      snprintf(jname,50,"finger%d_0",f);
+      if (f==0) {
+	YAW.setRPY(0,0,-bhstate.positions[3]);
+      } else if (f==1) {
+	YAW.setRPY(0,0, bhstate.positions[3]);
+      } else {
+	// finger 3 has link1 fixed
+	YAW.setRPY(0,0,0);
+      }
+      btTransform finger_tf = finger_link1_base[f] * btTransform(YAW);
+      tf_broadcaster->sendTransform(tf::StampedTransform(finger_tf,ros::Time::now(),jref,jname));
+
+      // LINK 2
+      snprintf(jref,50,"finger%d_0",f);
+      snprintf(jname,50,"finger%d_1",f);
+      YAW.setRPY(0,0,bhstate.positions[f]);
+      finger_tf = finger_link2_base * btTransform(YAW);
+      tf_broadcaster->sendTransform(tf::StampedTransform(finger_tf,ros::Time::now(),jref,jname));
+
+      // LINK 3
+      snprintf(jref,50,"finger%d_1",f);
+      snprintf(jname,50,"finger%d_2",f);
+      YAW.setRPY(0,0,bhstate.positions[f]/3.0); // distal link moves at 1/3
+      finger_tf = finger_link3_base * btTransform(YAW);
+      tf_broadcaster->sendTransform(tf::StampedTransform(finger_tf,ros::Time::now(),jref,jname));
+
   }
-  
+
   return true;
 }
   

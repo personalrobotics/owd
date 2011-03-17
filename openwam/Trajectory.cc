@@ -67,9 +67,16 @@ void Trajectory::ForceFeedback(double ft[]) {
   memcpy(forcetorque,ft,6*sizeof(double));
   valid_ft=true;
   // simplistic check to see if greater than 3N of force towards palm
+  static int forcecount(0);
   if ((runstate==RUN) &&
       HoldOnForceInput &&
       (ft[2] < -3.0)) {
-    stop();
+    if (++forcecount == 2) {
+      // only stop if we have two cycles in a row that exceed the threshold
+      stop();
+      forcecount=0;
+    }
+  } else {
+    forcecount=0;
   }
 }
