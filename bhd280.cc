@@ -251,6 +251,9 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
   } else if (req.movetype == pr_msgs::MoveHand::Request::movetype_velocity) {
     bhstate.state = pr_msgs::BHState::state_moving;
     ROS_ERROR_NAMED("bhd280", "Received MoveHand Velocity");
+    if (req.positions.size() != 4) {
+      return false;
+    }
     for (unsigned int i=0; i<4; ++i) {
       if (req.positions[i] < -max_velocity) {
 	ROS_WARN_NAMED("bhd280",
@@ -273,8 +276,18 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
     } else {
       return true;
     }
-  }
-  else {
+  } else if (req.movetype == 3) { // "hidden" torque mode
+    bhstate.state = pr_msgs::BHState::state_moving;
+    pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
+    if (bus->hand_torque(req.positions[0],
+			 req.positions[1],
+			 req.positions[2],
+			 req.positions[3]) != OW_SUCCESS) {
+      return false;
+    } else {
+      return true;
+    }
+  } else {
     return false; // unknown move type
   }
 }
