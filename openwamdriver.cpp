@@ -1729,8 +1729,8 @@ bool WamDriver::SetJointStiffness(pr_msgs::SetJointStiffness::Request &req,
                              pr_msgs::SetJointStiffness::Response &res) {
   if (req.stiffness.size() != nJoints) {
     char errmsg[200];
-    sprintf(errmsg,"SetJointStiffness expects a vector of %d stiffness values, but %d were sent",nJoints,req.stiffness.size());
-    ROS_WARN(errmsg);
+    sprintf(errmsg,"SetJointStiffness expects a vector of %d stiffness values, but %zd were sent",nJoints,req.stiffness.size());
+    ROS_WARN("%s",errmsg);
     res.reason=errmsg;
     res.result=false;
   }
@@ -1742,7 +1742,7 @@ bool WamDriver::SetJointStiffness(pr_msgs::SetJointStiffness::Request &req,
   }
   double current_pos[8];
   owam->hold_position(current_pos);
-  for (int i=0; i<nJoints; ++i) {
+  for (unsigned int i=0; i<nJoints; ++i) {
     if (req.stiffness[i] != 0) {
       owam->jointsctrl[i+1].reset();
       owam->jointsctrl[i+1].set(current_pos[i+1]);
