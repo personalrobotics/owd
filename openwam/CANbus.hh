@@ -325,6 +325,7 @@ public:
   int hand_reset();
   int hand_move(double p1, double p2, double p3, double p4);
   int hand_velocity(double v1, double v2, double v3, double v4);
+  int hand_torque(double t1, double t2, double t3, double t4);
   int hand_relax();
   int hand_get_positions(double &p1, double &p2, double &p3, double &p4);
   int hand_get_distal_positions(double &p1, double &p2, double &p3);

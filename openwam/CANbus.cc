@@ -775,7 +775,7 @@ int CANbus::send_torques_rt(){
 	  return OW_FAILURE;
 	}
       } else {
-	if (get_property_rt(handmsg.nodeid, handmsg.property, &handmsg.value) != OW_SUCCESS) {
+	if (request_property_rt(handmsg.nodeid, handmsg.property) != OW_SUCCESS) {
 	  snprintf(last_error,200,"Error getting property %d from hand puck %d",
 		   handmsg.property, handmsg.nodeid);
 #ifndef OWD_RT
@@ -783,20 +783,6 @@ int CANbus::send_torques_rt(){
 #endif // ! OWD_RT
 	  return OW_FAILURE;
 	}
-#ifdef OWD_RT
-	bytecount = rt_pipe_write(&handpipe,&handmsg,sizeof(CANmsg),P_NORMAL);
-	if (bytecount < sizeof(CANmsg)) {
-	  if (bytecount < 0) {
-	    snprintf(last_error,200,"Error writing to hand message pipe: %zd",bytecount);
-	  } else {
-	    snprintf(last_error,200,"Incomplete write to hand message pipe: only %zd of %ld bytes were written",
-		     bytecount,sizeof(CANmsg));
-	  }
-	  return OW_FAILURE;
-	}
-#else // ! OWD_RT
-	hand_response_queue.push(handmsg);
-#endif // ! OWD_RT
       }
     }
 #ifndef OWD_RT
@@ -1831,7 +1817,10 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
       done=true;
     }
     mutex_unlock(&hand_queue_mutex);
-  } while (!done);
+  } while (!done && ros::ok());
+  if (!ros::ok()) {
+    return OW_FAILURE;
+  }
 #endif // ! OWD_RT
 
   mutex_unlock(&hand_cmd_mutex);
@@ -2029,8 +2018,27 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
       valid_tactile_data=true;
     }
   } else {
-    //    ROS_WARN("CANbus::process_hand_response_rt: unexpected property %d", property);
-    return OW_FAILURE;
+    // assume it's a response to a GetHandProperty request, and send
+    // the result back through the hand queue/pipe
+    CANmsg handmsg;
+    handmsg.nodeid = nodeid;
+    handmsg.property = property;
+    handmsg.value = value;
+#ifdef OWD_RT
+    ssize_t bytecount = rt_pipe_write(&handpipe,&handmsg,sizeof(CANmsg),P_NORMAL);
+    if (bytecount < sizeof(CANmsg)) {
+      if (bytecount < 0) {
+	snprintf(last_error,200,"Error writing to hand message pipe: %zd",bytecount);
+      } else {
+	snprintf(last_error,200,"Incomplete write to hand message pipe: only %zd of %ld bytes were written",
+		 bytecount,sizeof(CANmsg));
+      }
+      return OW_FAILURE;
+    }
+#else // ! OWD_RT
+    hand_response_queue.push(handmsg);
+#endif // ! OWD_RT
+    
   }
   return OW_SUCCESS;
 }
@@ -2311,6 +2319,47 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
  return OW_SUCCESS;
 }
  
+int CANbus::hand_torque(double t1, double t2, double t3, double t4) {
+  ROS_DEBUG_NAMED("bhd280", "executing hand_velocity");
+  if (t4 != 0) {
+    if ((hand_set_property(14,MODE,MODE_TORQUE) != OW_SUCCESS) ||
+	(hand_set_property(14,T,t4) != OW_SUCCESS)) {
+      ROS_ERROR_NAMED("bhd280","could not set torque for spread");
+      return OW_FAILURE;
+    }
+    first_moving_finger=14;
+    handstate = HANDSTATE_MOVING;
+  }
+  if (t3 != 0) {
+    if ((hand_set_property(13,MODE,MODE_TORQUE) != OW_SUCCESS) ||
+	(hand_set_property(13,T,t3) != OW_SUCCESS)) {
+      ROS_ERROR_NAMED("bhd280","could not set torque for finger 3");
+      return OW_FAILURE;
+    }
+    first_moving_finger=13;
+    handstate = HANDSTATE_MOVING;
+  }
+  if (t2 != 0) {
+    if ((hand_set_property(12,MODE,MODE_TORQUE) != OW_SUCCESS) ||
+	(hand_set_property(12,T,t2) != OW_SUCCESS)) {
+      ROS_ERROR_NAMED("bhd280","could not set torque for finger 2");
+      return OW_FAILURE;
+    }
+    first_moving_finger=12;
+    handstate = HANDSTATE_MOVING;
+  }
+  if (t1 != 0) {
+    if ((hand_set_property(11,MODE,MODE_TORQUE) != OW_SUCCESS) ||
+	(hand_set_property(11,T,t1) != OW_SUCCESS)) {
+      ROS_ERROR_NAMED("bhd280","could not set torque for finger 1");
+      return OW_FAILURE;
+    }
+    first_moving_finger=11;
+    handstate = HANDSTATE_MOVING;
+  }
+  return OW_SUCCESS;
+}
+
 int CANbus::hand_relax() {
   if (hand_set_property(11,MODE,PUCK_IDLE) != OW_SUCCESS) {
     return OW_FAILURE;
@@ -2407,121 +2456,8 @@ void CANstats::rosprint() {
  
 void CANbus::initPropertyDefs(int32_t firmwareVersion){
   if(firmwareVersion < 40){
-    VERS = 0;
-    ROLE = 1;
-    SN   = 2;
-    ID   = 3;
-    ERROR= 4;
-    STAT = 5;
-    ADDR = 6;
-    VALUE= 7;
-    MODE = 8;
-    D    = 9;
-    T=TORQ=10;
-    P    = 11;
-    V    = 12;
-    E    = 13;
-    B=FET0=14;
-    MD   = 15;
-    MT   = 16;
-    MV   = 17;
-    MCV  = 18;
-    MOV  = 19;
-    MOFST= 20;
-    IOFST= 21;
-    PTEMP= 22;
-    UPSECS=23;
-    OD   = 24;
-    MDS  = 25;
-    AP   = 26;
-    AP2  = 27;
-    MECH = 28;
-    MECH2= 29;
-    CTS  = 30;
-    CTS2 = 31;
-    DP   = 32;
-    DP2  = 33;
-    OT   = 34;
-    OT2  = 35;
-    CT   = 36;
-    CT2  = 37;
-    BAUD = 38;
-    TEMP = 39;
-    OTEMP= 40;
-    _LOCK= 41;
-    DIG0 = 42;
-    DIG1 = 43;
-    ANA0 = 44;
-    ANA1 = 45;
-    THERM= 46;
-    VBUS = 47;
-    IMOTOR=48;
-    VLOGIC=49;
-    ILOGIC=50;
-    GRPA = 51;
-    GRPB = 52;
-    GRPC = 53;
-    PIDX = 54;
-    ZERO = 55;
-    SG   = 56;
-    HSG  = 57;
-    LSG  = 58;
-    _DS  = 59;
-    IVEL = 60;
-    IOFF = 61;
-    MPE  = 62;
-    EN   = 63;
-    TSTOP= 64;
-    KP   = 65;
-    KD   = 66;
-    KI   = 67;
-    SAMPLE=68;
-    ACCEL= 69;
-    TENSION=FET1=70;
-    UNITS= 71;
-    RATIO= 72;
-    LOG  = 73;
-    DUMP = 74;
-    LOG1 = 75;
-    LOG2 = 76;
-    LOG3 = 77;
-    LOG4 = 78;
-    GAIN1= 79;
-    GAIN2= 80;
-    GAIN3= 81;
-    OFFSET1=82;
-    OFFSET2=83;
-    OFFSET3=84;
-    PEN  = 85;
-    SAFE = 86;
-    SAVE = 87;
-    LOAD = 88;
-    DEF  = 89;
-    VL1  = 90;
-    VL2  = 91;
-    TL1  = 92;
-    TL2  = 93;
-    VOLTL1=94;
-    VOLTL2=95;
-    VOLTH1=96;
-    VOLTH2=97;
-    MAXPWR=98;
-    PWR  = 99;
-    IFAULT=100;
-    IKP  = 101;
-    IKI  = 102;
-    IKCOR= 103;
-    VNOM = 104;
-    TENST= 105;
-    TENSO= 106;
-    JIDX = 107;
-    IPNM = 108;
-    
-    PROP_END = 108;
-    
-
+    throw "Unsupported early firmware version";
   } else { // (firmwareVersion >= 40)
-    
     /* Common */
     VERS = 0;
     ROLE = 1; /* P=PRODUCT, R=ROLE: XXXX PPPP XXXX RRRR */

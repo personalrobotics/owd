@@ -537,13 +537,15 @@ void control_loop_rt(void* argv){
                        // from the hand pucks (tactile takes 9 cycles)
   int hand_counter=0;
   // Main control loop
+  bool failure=false;
   while((ctrl_loop->state_rt() == CONTROLLOOP_RUN) && (ros::ok())){
       RTIME loopstart_time = ControlLoop::get_time_ns_rt(); // record the time
 
       // REQUEST POSITIONS
       if(wam->bus->request_positions_rt(GROUPID(4)) == OW_FAILURE){
         ROS_FATAL("control_loop: request_positions failed");
-        return;
+	failure=true;
+	break;
       }
 
       // While the pucks are receiving and processing the position request,
@@ -671,7 +673,8 @@ void control_loop_rt(void* argv){
 	  sendtorque_start_time = ControlLoop::get_time_ns_rt();
 	  if(wam->bus->send_torques_rt() == OW_FAILURE){
 	    ROS_FATAL("control_loop: send_torques failed.");
-	    return;
+	    failure=true;
+	    break;
 	  }
 	  torques_sent=true;
 	  sendtorque_end_time = ControlLoop::get_time_ns_rt();
@@ -742,12 +745,21 @@ void control_loop_rt(void* argv){
         loopcount=slowcount=0;
       }
   }
- CONTROL_DONE:
-  ROS_WARN("Detected motor switch to idle; exiting controller.");
-  ROS_WARN("If the pendant shows a torque or velocity fault, and the yellow idle");
-  ROS_WARN("button is still lit, you can clear the fault by pressing shift-idle");
-  ROS_WARN("again, and encoder values will be preserved.");
-  ROS_WARN("To restart the controller, just re-run the previous command.");
+  if (!failure) {
+  CONTROL_DONE:
+    ROS_WARN("Detected motor switch to idle; exiting controller.");
+    ROS_WARN("If the pendant shows a torque or velocity fault, and the yellow idle");
+    ROS_WARN("button is still lit, you can clear the fault by pressing shift-idle");
+    ROS_WARN("again, and encoder values will be preserved.");
+    ROS_WARN("To restart the controller, just re-run the previous command.");
+
+    // Send a zero-torque packet to extinguish the torque warning light
+    for(int m=Motor::M1; m<=Motor::Mn; m++) {
+      wam->motors[m].trq(0.0);
+    }
+    wam->send_mtrq();
+    wam->bus->send_torques_rt();
+  }
   ROS_DEBUG("Control loop finished");
 
 #ifdef __LATENCY__
@@ -764,13 +776,6 @@ void control_loop_rt(void* argv){
   fclose(fp);
   ROS_DEBUG("Data dumped in file: identification" );
 #endif
-  
-  // Send a zero-torque packet to extinguish the torque warning light
-  for(int m=Motor::M1; m<=Motor::Mn; m++) {
-    wam->motors[m].trq(0.0);
-  }
-  wam->send_mtrq();
-  wam->bus->send_torques_rt();
   
   // Now idle all of the pucks
   /*
@@ -797,6 +802,10 @@ void control_loop_rt(void* argv){
 
   ROS_FATAL("Motors have been idled; exiting OWD");
   */
+
+
+  // have to tell the other threads that it's time to shut down
+  ros::shutdown();
   return;
 }
 
