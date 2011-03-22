@@ -309,6 +309,8 @@ private:
 #endif // ! OWD_RT
   int32_t handstate;
   int first_moving_finger;
+  double squeeze_goal[4];
+  bool apply_squeeze;
 
   int finger_reset(int32_t id);
   double finger_encoder_to_radians(int32_t enc);
@@ -323,7 +325,7 @@ public:
   int hand_set_state_rt();
   int hand_activate(int32_t *nodes);
   int hand_reset();
-  int hand_move(double p1, double p2, double p3, double p4);
+  int hand_move(std::vector<double> p);
   int hand_velocity(double v1, double v2, double v3, double v4);
   int hand_torque(double t1, double t2, double t3, double t4);
   int hand_relax();

@@ -1931,6 +1931,23 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     }
     // the last joint was stationary, so we're done!
     handstate=HANDSTATE_DONE;
+    if (apply_squeeze) {
+      // Put the fingers into a mode so that they will keep trying to 
+      // reach the goal, even if they were stopped short.  To do this,
+      // we will reduce the Max Torque, turn off TSTOP (which stops the move
+      // on a stall), and re-issue the move command.  We'll leave
+      // the handstate = HANDSTATE_DONE so that the client doesn't know
+      // the difference
+      if (hand_set_property(GROUPID(5),MT,800) != OW_SUCCESS) {
+	return OW_FAILURE;
+      }
+      if (hand_set_property(GROUPID(5),TSTOP,0) != OW_SUCCESS) {
+	return OW_FAILURE;
+      }
+      if (hand_set_property(GROUPID(5),MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+	return OW_FAILURE;
+      }
+    }      
     first_moving_finger=11;  // ready for next time
     return OW_SUCCESS;
 
@@ -2251,33 +2268,54 @@ int CANbus::configure_tactile_sensors() {
   return OW_SUCCESS;
 }
 
-int CANbus::hand_move(double p1, double p2, double p3, double p4) {
+int CANbus::hand_move(std::vector<double> p) {
+  if (p.size() != 4) {
+    ROS_ERROR_NAMED("bhd280", "hand_move requires 4 position arguments");
+    return OW_FAILURE;
+  }
   ROS_DEBUG_NAMED("bhd280", "executing hand_move");
 
-  if (hand_set_property(11,E,finger_radians_to_encoder(p1)) != OW_SUCCESS) {
+  // First set the hand pucks back to the higher-torque threshold
+  // with TSTOP enabled so that they stop when done/stalled
+  if (hand_set_property(GROUPID(5),TSTOP,100) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  if (hand_set_property(GROUPID(5),MT,5000) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+
+
+  // Now set the endpoints and issue the move command
+  for (unsigned int i=0; i<4; ++i) {
+    // make sure we don't try to move beyond the 0 to 2.6 range
+    if (p[i] < 0) {
+      p[i]=0;
+    }
+    if (p[i] > 2.6) {
+      p[i]=2.6;
+    }
+    if (hand_set_property(11+i,E,finger_radians_to_encoder(p[i])) 
+	!= OW_SUCCESS) {
       return OW_FAILURE;
     }
-  if (hand_set_property(12,E,finger_radians_to_encoder(p2)) != OW_SUCCESS) {
+  }
+  if (hand_set_property(GROUPID(5),MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
       return OW_FAILURE;
+  }
+
+  // Finally, check to see if we should apply a squeeze after the
+  // move is complete.  If any of the goal positions are non-zero,
+  // we'll follow up with a squeeze.
+  apply_squeeze=false;
+  for (unsigned int i=0; i<4; ++i) {
+    if (p[i] > 0) {
+      // record the fact that once the hand stops, we want to keep
+      // applying pressure.  this helps to ensure that even if a gripped
+      // object slips, we will still adjust until we reach the goal position.
+      apply_squeeze=true;
+      break;
     }
-  if (hand_set_property(13,E,finger_radians_to_encoder(p3)) != OW_SUCCESS) {
-      return OW_FAILURE;
-    }
-  if (hand_set_property(14,E,spread_radians_to_encoder(p4)) != OW_SUCCESS) {
-      return OW_FAILURE;
-    }
-  if (hand_set_property(11,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
-      return OW_FAILURE;
-    }
-  if (hand_set_property(12,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
-      return OW_FAILURE;
-    }
-  if (hand_set_property(13,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
-      return OW_FAILURE;
-    }
-  if (hand_set_property(14,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
-      return OW_FAILURE;
-    }
+  }
   first_moving_finger=11;
   handstate = HANDSTATE_MOVING;
   return OW_SUCCESS;
@@ -2361,16 +2399,7 @@ int CANbus::hand_torque(double t1, double t2, double t3, double t4) {
 }
 
 int CANbus::hand_relax() {
-  if (hand_set_property(11,MODE,PUCK_IDLE) != OW_SUCCESS) {
-    return OW_FAILURE;
-  }
-  if (hand_set_property(12,MODE,PUCK_IDLE) != OW_SUCCESS) {
-    return OW_FAILURE;
-  }
-  if (hand_set_property(13,MODE,PUCK_IDLE) != OW_SUCCESS) {
-    return OW_FAILURE;
-  }
-  if (hand_set_property(14,MODE,PUCK_IDLE) != OW_SUCCESS) {
+  if (hand_set_property(GROUPID(5),MODE,PUCK_IDLE) != OW_SUCCESS) {
     return OW_FAILURE;
   }
   handstate = HANDSTATE_DONE;

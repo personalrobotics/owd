@@ -201,7 +201,7 @@ bool BHD_280::GetDOF(pr_msgs::GetDOF::Request &req,
 
 // Relax command
 bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
-			    pr_msgs::RelaxHand::Response &res) {
+			pr_msgs::RelaxHand::Response &res) {
   if (bus->hand_relax() == OW_SUCCESS) {
     return true;
   } else {
@@ -211,7 +211,7 @@ bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
 
 // Reset command
 bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
-			    pr_msgs::ResetHand::Response &res) {
+			pr_msgs::ResetHand::Response &res) {
   if (bus->hand_reset() == OW_SUCCESS) {
     bhstate.state = pr_msgs::BHState::state_done;
     return true;
@@ -224,7 +224,7 @@ bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
 
 // Move command
 bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
-			   pr_msgs::MoveHand::Response &res) {
+		       pr_msgs::MoveHand::Response &res) {
   if (bhstate.state == pr_msgs::BHState::state_uninitialized) {
     ROS_WARN_NAMED("bhd280","Rejected MoveHand: hand is uninitialized");
     return false;
@@ -237,24 +237,39 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
   }
   
   if (req.movetype == pr_msgs::MoveHand::Request::movetype_position) {
+    if (req.positions.size() != 4) {
+      ROS_ERROR_NAMED("bhd280", "MoveHand requires 4 position arguments");
+      return false;
+    }
     bhstate.state = pr_msgs::BHState::state_moving;
-    ROS_ERROR_NAMED("bhd280", "Received MoveHand");
+    ROS_INFO_NAMED("bhd280", "Received MoveHand");
     pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
-    if (bus->hand_move(req.positions[0],
-		       req.positions[1],
-		       req.positions[2],
-		       req.positions[3]) != OW_SUCCESS) {
+    if (bus->hand_move(req.positions) != OW_SUCCESS) {
       return false;
     } else {
       return true;
     }
   } else if (req.movetype == pr_msgs::MoveHand::Request::movetype_velocity) {
-    bhstate.state = pr_msgs::BHState::state_moving;
-    ROS_ERROR_NAMED("bhd280", "Received MoveHand Velocity");
     if (req.positions.size() != 4) {
+      ROS_ERROR_NAMED("bhd280", "MoveHand Velocity requires 4 velocity arguments");
       return false;
     }
+    bhstate.state = pr_msgs::BHState::state_moving;
+    ROS_ERROR_NAMED("bhd280", "Received MoveHand Velocity; changing to MoveHand");
+    // change all the velocities to positions at the appropriate end
     for (unsigned int i=0; i<4; ++i) {
+      if (req.positions[i] > 0) {
+	req.positions[i] = 2.6;
+      } else {
+	req.positions[i] = 0;
+      }
+    }
+    req.movetype = pr_msgs::MoveHand::Request::movetype_position;
+    return MoveHand(req,res);
+
+    // original velocity code follows
+
+    /*    for (unsigned int i=0; i<4; ++i) {
       if (req.positions[i] < -max_velocity) {
 	ROS_WARN_NAMED("bhd280",
 		       "Joint %d velocity request of %2.2f limited to max of %2.2f radians/sec",
@@ -276,6 +291,7 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
     } else {
       return true;
     }
+    */
   } else if (req.movetype == 3) { // "hidden" torque mode
     bhstate.state = pr_msgs::BHState::state_moving;
     pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
