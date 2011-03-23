@@ -790,19 +790,21 @@ void WamDriver::calibrate_joint_angles() {
         printf("    \r");
         usleep(10000);
     }
+    // restore terminal settings
+    tcsetattr(fileno(stdin), TCSANOW, &previous_termattr);
+
     owam->release_position();
     owam->check_safety_torques = true;
     for (unsigned int j=1; j<=nJoints; ++j) {
         owam->suppress_controller[j]=false;
     }
+
     if (save) {
         apply_joint_offsets(joint_offsets);
     }
 
     // start accepting trajectories again
     discard_movements=false;
-    // restore terminal settings
-    tcsetattr(fileno(stdin), TCSANOW, &previous_termattr);
 
 }
 
