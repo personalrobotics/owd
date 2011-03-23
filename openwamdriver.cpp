@@ -556,6 +556,8 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
 
     ROS_ERROR("\n  Return the WAM to the initial position.");
     ROS_ERROR("  Press RETURN when you are ready to disable the motors.");
+    ROS_ERROR("  WARNING: the arms will lose all power when you hit RETURN,");
+    ROS_ERROR("  so be sure they are well-supported or they will drop quickly.");
     char *line=NULL;
     size_t linelen = 0;
     linelen = getline(&line,&linelen,stdin);
