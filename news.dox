@@ -1,5 +1,63 @@
 /**
 \page news OWD News
+<b>Model 280 Hand now keeps squeezing grasped objects</b>
+The behavior of the MoveHand service call has been improved for users
+with a model 280 Hand.  Previously, the hand would try to move the
+fingers to the commanded position, and stop once the fingers stalled
+or when the end position was reached, whichever came first.  This
+posed a problem when grasping, because if the object shifted while
+being lifted, the fingers did not close further in order to hold it
+tight.  Starting in revision 8086 of OWD, once the fingers stop moving
+the first time, OWD will begin reporting their state as "state_done"
+(value 1), but will turn off the TSTOP flag on the three fingers and
+reissue the move command with a much lower maximum torque value.  This
+will cause the fingers to keep applying moderate pressure in the same
+direction as they were moving, and to move when possible, up to the
+same ending position.  The torque value (currently 800ma) has been
+chosen to be strong enough to keep applying steady pressure but low
+enough so that the finger motors will not overheat if they are kept in
+this condition indefinitely.  This change affects F1-F3 only; the
+spread behavior is unchanged.  [23-Mar-2011]
+
+<b>Corrected finger transforms</b>
+Some of the transforms that OWD published for the fingers on the 280
+hand were incorrect.  The code has been rewritten and is now behaving
+correctly in rev. 8011.  Associated with this change is a modification
+to the origin of the link1.iv file used in OpenRAVE, and the
+bh_link1.stl file used in RViz.  New versions of both files have been
+checked in to pr/public/data/ormodels/robots/barrett. [17-Mar-2011]
+
+<b>Reorganized Tactile messages</b>
+Tactile data message is now broken into 4 arrays: finger1, finger2,
+finger3, and palm.  This was requested by a user to make it easier to
+identify particular tactile pads.  The arrays are still all sent in a
+single message (pr_msgs/BHTactile).  [15-Mar-2011]
+
+<b>Improved WAMState and TrajInfo state values
+The state values in WAMState and TrajInfo messages have changed
+slightly in order to make it easier to infer what OWD is currently
+doing.  Instead of having to look at WAMState.state to see that a
+trajectory is active (state_moving) and then having to examine the
+TrajInfo.state to see what's going on (running vs. paused), all the
+motion states are now in WAMState.state.  The state names contain the
+word "traj" if a trajectory is active:
+ uint8 state_free=0
+ uint8 state_fixed=1
+ uint8 state_traj_active=2
+ uint8 state_traj_stalled=3
+ uint8 state_traj_paused=4
+ uint8 state_inactive=25
+The TrajInfo.state will now contain minimal information as to whether
+the trajectory is pending, active, done, or aborted.  Some of the 
+previous state names have been deprecated and will be removed
+in a future release. [15-Mar-2011]
+
+<b>Improved routine for saving calibration values</b>
+The calibration routine has been changed so that after the arm is returned to
+home with grav-comp on, OWD waits for <return> and then turns the motors
+off so that the user can readjust the home position before pressing
+shift-idle.  This helps to avoid the sudden relaxation of the arm that
+can throw off the saved home position values. [15-Mar-2011]
 
 <b>Support for 280 Tactile Sensors</b>
 Can now read the full 96-cell Tactile data from a model 280 Hand.
