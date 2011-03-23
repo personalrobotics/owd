@@ -745,7 +745,7 @@ void control_loop_rt(void* argv){
         loopcount=slowcount=0;
       }
   }
-  if (!failure) {
+  if (!failure && wam->exit_on_pendant_press) {
   CONTROL_DONE:
     ROS_WARN("Detected motor switch to idle; exiting controller.");
     ROS_WARN("If the pendant shows a torque or velocity fault, and the yellow idle");
@@ -804,8 +804,11 @@ void control_loop_rt(void* argv){
   */
 
 
-  // have to tell the other threads that it's time to shut down
-  ros::shutdown();
+
+  if (wam->exit_on_pendant_press) {
+    // have to tell the other threads that it's time to shut down
+    ros::shutdown();
+  }
   return;
 }
 

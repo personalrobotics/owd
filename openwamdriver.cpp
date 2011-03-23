@@ -621,6 +621,7 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
     start_control_loop();
     owam->jsdynamics()=true;
 
+    owam->exit_on_pendant_press=true; // from now on, exit if the user hits e-stop or idle
     ROS_DEBUG("New offsets recorded; server ready.");
 }        
 
@@ -685,15 +686,12 @@ void WamDriver::calibrate_joint_angles() {
         owam->cancel_trajectory();
     }
 
-    // set idle mode so that joints can be moved
-    owam->release_position();
-
-    // turn off all the controllers, then go to hold position mode
+    // put in hold mode, but suppress each of the controllers
+    owam->check_safety_torques=false; // hold positions stiffly
+    owam->hold_position();
     for (unsigned int j=1; j<=nJoints; ++j) {
         owam->suppress_controller[j]=true;
     }
-    owam->check_safety_torques=false; // hold positions stiffly
-    owam->hold_position();
 
     ROS_ERROR("Robot is in calibration mode.  For each joint,");
     ROS_ERROR("move it to be parallel or square to the previous");
@@ -791,7 +789,7 @@ void WamDriver::calibrate_joint_angles() {
         usleep(10000);
     }
     // restore terminal settings
-    tcsetattr(fileno(stdin), TCSANOW, &previous_termattr);
+    tcsetattr(fileno(stdin), TCSAFLUSH, &previous_termattr);
 
     owam->release_position();
     owam->check_safety_torques = true;
@@ -800,7 +798,7 @@ void WamDriver::calibrate_joint_angles() {
     }
 
     if (save) {
-        apply_joint_offsets(joint_offsets);
+      apply_joint_offsets(joint_offsets);
     }
 
     // start accepting trajectories again
