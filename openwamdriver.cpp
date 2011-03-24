@@ -1434,6 +1434,8 @@ bool WamDriver::Publish() {
   }
   owam->unlock();
 
+  wamstate.header.stamp = ros::Time::now();
+
   pub_wamstate.publish(wamstate);
   pub_waminternals.publish(waminternals);
   return true;
