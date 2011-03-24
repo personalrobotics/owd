@@ -73,6 +73,8 @@ public:
     return runstate;
   }
 
+  //  class Traj
+
   virtual void evaluate(double y[], double yd[], double ydd[], double dt)=0;
 
   inline virtual const JointPos &endPosition() const {return end_position;}

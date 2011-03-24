@@ -1938,11 +1938,13 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
       // on a stall), and re-issue the move command.  We'll leave
       // the handstate = HANDSTATE_DONE so that the client doesn't know
       // the difference
-      if (hand_set_property(GROUPID(5),MT,800) != OW_SUCCESS) {
-	return OW_FAILURE;
-      }
-      if (hand_set_property(GROUPID(5),TSTOP,0) != OW_SUCCESS) {
-	return OW_FAILURE;
+      for (unsigned int node=11; node<=13; ++node) {
+	if (hand_set_property(node,MT,800) != OW_SUCCESS) {
+	  return OW_FAILURE;
+	}
+	if (hand_set_property(node,TSTOP,0) != OW_SUCCESS) {
+	  return OW_FAILURE;
+	}
       }
       if (hand_set_property(GROUPID(5),MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
 	return OW_FAILURE;
@@ -2107,7 +2109,7 @@ int CANbus::finger_reset(int32_t nodeid) {
 	 (mode != MODE_IDLE) && (mode != MODE_PID) &&
 	 ros::ok()) {
     usleep(50000);
-    if (++sleepcount ==25) {
+    if (++sleepcount ==35) {
       ROS_WARN_NAMED("can_bh280","Still waiting for finger %d to finish HI; mode is %d", nodeid, mode);
       sleepcount=0;
     }
@@ -2139,7 +2141,7 @@ int CANbus::hand_reset() {
 		nodeid);
       return OW_FAILURE;
     }
-    if (((nodeid < 14) && (tstop != 100)) 
+    if (((nodeid < 14) && (tstop != 50)) 
 	|| ((nodeid == 14) && (tstop != 200))) {
       ready=false;
       break;
@@ -2187,11 +2189,9 @@ int CANbus::hand_reset() {
     return OW_FAILURE;
   }
 
-  // Set the torque stop value to 150 to reduce heating on stall
-  // (tried 50 for a while but it wouldn't get out of jams, so
-  //  increased to 150 on 2/1/2011.  MVW)
+  // Set the torque stop value to reduce heating on stall
   for (int32_t nodeid=11; nodeid<=13; ++nodeid) {
-    if (set_property_rt(nodeid,TSTOP,100) != OW_SUCCESS) {
+    if (set_property_rt(nodeid,TSTOP,50) != OW_SUCCESS) {
       return OW_FAILURE;
     }
     usleep(100);
@@ -2219,14 +2219,34 @@ int CANbus::hand_reset() {
       return OW_FAILURE;
     }
   }
+  
+  // Pull the fingers away from their open stop while we have
+  // the default MT (max torque)
+  for (int32_t nodeid=11; nodeid<=13; ++nodeid) {
+    if (hand_set_property(nodeid,E,finger_radians_to_encoder(0.05)) 
+	!= OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+    if (hand_set_property(nodeid,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  }
 
+  /*  3000 is too low; fingers still can't get out of jams
+       going back to 5000 but with a very short TSTOP
+       // now reduce MT
+       if (hand_set_property(GROUPID(5),MT,3000) != OW_SUCCESS) {
+       return OW_FAILURE;
+       }
+  */
+  
   if (tactile_data) {
     if (configure_tactile_sensors() != OW_SUCCESS) {
       ROS_ERROR("Could not initialize Tactile Sensors");
       return OW_FAILURE;
     }
   }
-
+  
   handstate = HANDSTATE_DONE;
   return OW_SUCCESS;
 }
@@ -2243,12 +2263,12 @@ int CANbus::configure_tactile_sensors() {
       }
     }
   }
-
+  
   // it appears that sending the SET TACT message triggers a
   // tactile data response to be sent, just as if we had done
   // a GET TACT.  we need to read these responses now so that 
   // they don't linger on the bus
-
+  
   // first, wait for pucks to process the request
   usleep(20000);
   int tactile_responses;
@@ -2275,18 +2295,19 @@ int CANbus::hand_move(std::vector<double> p) {
   }
   ROS_DEBUG_NAMED("bhd280", "executing hand_move");
 
-  // First set the hand pucks back to the higher-torque threshold
+  // First set the finger pucks back to the higher-torque threshold
   // with TSTOP enabled so that they stop when done/stalled
-  if (hand_set_property(GROUPID(5),TSTOP,100) != OW_SUCCESS) {
-    return OW_FAILURE;
+  for (int32_t node=11; node<=13; ++node) {
+    if (hand_set_property(node,TSTOP,50) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+    if (hand_set_property(node,MT,5000) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
   }
-  if (hand_set_property(GROUPID(5),MT,5000) != OW_SUCCESS) {
-    return OW_FAILURE;
-  }
-
 
   // Now set the endpoints and issue the move command
-  for (unsigned int i=0; i<4; ++i) {
+  for (int32_t i=0; i<3; ++i) {
     // make sure we don't try to move beyond the 0 to 2.6 range
     if (p[i] < 0) {
       p[i]=0;
@@ -2299,8 +2320,13 @@ int CANbus::hand_move(std::vector<double> p) {
       return OW_FAILURE;
     }
   }
+  // set the spread position
+  if (hand_set_property(14,E,spread_radians_to_encoder(p[3])) 
+      != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
   if (hand_set_property(GROUPID(5),MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
-      return OW_FAILURE;
+    return OW_FAILURE;
   }
 
   // Finally, check to see if we should apply a squeeze after the

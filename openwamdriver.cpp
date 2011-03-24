@@ -672,140 +672,141 @@ void WamDriver::calibrate_joint_angles() {
     return;
   }
 
-    // Set up stdin to work char-by-char instead of line-by-line
-    struct termios previous_termattr;
-    struct termios new_termattr;
-    tcgetattr(fileno(stdin), &previous_termattr);
-    tcgetattr(fileno(stdin), &new_termattr);
-    new_termattr.c_lflag &= ~ICANON;
-    new_termattr.c_cc[VMIN] =0;
-    new_termattr.c_cc[VTIME] = 0;
-    tcsetattr(fileno(stdin), TCSANOW, &new_termattr);
+  // Set up stdin to work char-by-char instead of line-by-line
+  struct termios previous_termattr;
+  struct termios new_termattr;
+  tcgetattr(fileno(stdin), &previous_termattr);
+  tcgetattr(fileno(stdin), &new_termattr);
+  new_termattr.c_lflag &= ~ICANON;
+  new_termattr.c_cc[VMIN] =0;
+  new_termattr.c_cc[VTIME] = 0;
+  tcsetattr(fileno(stdin), TCSANOW, &new_termattr);
+  
+  // cancel any pending trajectories and ignore future ones
+  discard_movements=true;
+  wamstate.state = pr_msgs::WAMState::state_inactive;
+  if (owam->jointstraj) {
+    owam->cancel_trajectory();
+  }
 
-    // cancel any pending trajectories and ignore future ones
-    discard_movements=true;
-    if (owam->jointstraj) {
-        owam->cancel_trajectory();
-    }
+  // put in hold mode, but suppress each of the controllers
+  owam->check_safety_torques=false; // hold positions stiffly
+  owam->hold_position();
+  for (unsigned int j=1; j<=nJoints; ++j) {
+    owam->suppress_controller[j]=true;
+  }
 
-    // put in hold mode, but suppress each of the controllers
-    owam->check_safety_torques=false; // hold positions stiffly
-    owam->hold_position();
-    for (unsigned int j=1; j<=nJoints; ++j) {
-        owam->suppress_controller[j]=true;
-    }
+  ROS_ERROR("Robot is in calibration mode.  For each joint,");
+  ROS_ERROR("move it to be parallel or square to the previous");
+  ROS_ERROR("joint, then press key 1-7 corresponding to the joint");
+  ROS_ERROR("number.");
+  ROS_ERROR("'h' will hold a joint angle, 'u' will unhold it.");
+  ROS_ERROR("Hit 'd' when done, or 'q' to quit.");
+  double joint_offsets[nJoints+1];
+  for (unsigned int j = 1; j <=nJoints; ++j) {
+    joint_offsets[j] = 0.0f;
+  }
+  bool done = false;
+  bool save = true;
+  char cmd;
+  unsigned int jnum;
+  double jointpos[nJoints+1];
+  while (!done) {
+    owam->get_current_data(jointpos,NULL,NULL); // update the joint positions
+    if (read(fileno(stdin),&cmd,1)) {
+      switch(cmd) {
+      case 'd' :
+      case 'D':
+	done = true;
+      break;
+      case '1' :
+	save_joint_offset(jointpos[1],joint_offsets + 1);
+	break;
+      case '2' :
+	save_joint_offset(jointpos[2],joint_offsets + 2);
+	break;
+      case '3' :
+	save_joint_offset(jointpos[3],joint_offsets + 3);
+	break;
+      case '4' :
+	save_joint_offset(jointpos[4],joint_offsets + 4);
+	break;
+      case '5' :
+	if (nJoints>4) {
+	  save_joint_offset(jointpos[5],joint_offsets + 5);
+	}
+	break;
+      case '6' :
+	if (nJoints>4) {
+	  save_joint_offset(jointpos[6],joint_offsets + 6);
+	}
+	break;
+      case '7' :
+	if (nJoints>4) {
+	  save_joint_offset(jointpos[7],joint_offsets + 7);
+	}
+	break;
+      case 'h' :
+	// hold a joint angle
+	ROS_ERROR("\nHold joint number 1-%d: holdpos: %d\n",nJoints, owam->holdpos);
+	jnum = get_joint_num();
+	if ((jnum > 0) && (jnum <= nJoints)) {
 
-    ROS_ERROR("Robot is in calibration mode.  For each joint,");
-    ROS_ERROR("move it to be parallel or square to the previous");
-    ROS_ERROR("joint, then press key 1-7 corresponding to the joint");
-    ROS_ERROR("number.");
-    ROS_ERROR("'h' will hold a joint angle, 'u' will unhold it.");
-    ROS_ERROR("Hit 'd' when done, or 'q' to quit.");
-    double joint_offsets[nJoints+1];
-    for (unsigned int j = 1; j <=nJoints; ++j) {
-        joint_offsets[j] = 0.0f;
-    }
-    bool done = false;
-    bool save = true;
-    char cmd;
-    unsigned int jnum;
-    double jointpos[nJoints+1];
-    while (!done) {
-      owam->get_current_data(jointpos,NULL,NULL); // update the joint positions
-        if (read(fileno(stdin),&cmd,1)) {
-            switch(cmd) {
-            case 'd' :
-            case 'D':
-                done = true;
-                break;
-            case '1' :
-                save_joint_offset(jointpos[1],joint_offsets + 1);
-                break;
-            case '2' :
-                save_joint_offset(jointpos[2],joint_offsets + 2);
-                break;
-            case '3' :
-                save_joint_offset(jointpos[3],joint_offsets + 3);
-                break;
-            case '4' :
-                save_joint_offset(jointpos[4],joint_offsets + 4);
-                break;
-            case '5' :
-                if (nJoints>4) {
-                    save_joint_offset(jointpos[5],joint_offsets + 5);
-                }
-                break;
-            case '6' :
-                if (nJoints>4) {
-                    save_joint_offset(jointpos[6],joint_offsets + 6);
-                }
-                break;
-            case '7' :
-                if (nJoints>4) {
-                    save_joint_offset(jointpos[7],joint_offsets + 7);
-                }
-                break;
-            case 'h' :
-                // hold a joint angle
-                ROS_ERROR("\nHold joint number 1-%d: holdpos: %d\n",nJoints, owam->holdpos);
-                jnum = get_joint_num();
-                if ((jnum > 0) && (jnum <= nJoints)) {
-
-                    // get current held positions
+	  // get current held positions
 #ifdef BUILD_FOR_SEA
-                    owam->posSmoother.getSmoothedPVA(owam->heldPositions);
+	  owam->posSmoother.getSmoothedPVA(owam->heldPositions);
 #endif // BUILD_FOR_SEA
 
-                    // if it's within 2 deg of parallel or square,
-                    // set it to parallel or square
-                    double holdval = get_nearest_joint_value(jointpos[jnum] - joint_offsets[jnum],2);
-		    owam->heldPositions[jnum] = holdval+joint_offsets[jnum];
-                    owam->jointsctrl[jnum].reset();
+	  // if it's within 2 deg of parallel or square,
+	  // set it to parallel or square
+	  double holdval = get_nearest_joint_value(jointpos[jnum] - joint_offsets[jnum],2);
+	  owam->heldPositions[jnum] = holdval+joint_offsets[jnum];
+	  owam->jointsctrl[jnum].reset();
 #ifdef BUILD_FOR_SEA
-                    owam->heldPositions[jnum] = holdval+joint_offsets[jnum];
-                    owam->posSmoother.reset(owam->heldPositions, Joint::Jn+1);   
+	  owam->heldPositions[jnum] = holdval+joint_offsets[jnum];
+	  owam->posSmoother.reset(owam->heldPositions, Joint::Jn+1);   
 #endif // BUILD_FOR_SEA
-                    owam->jointsctrl[jnum].set(holdval+joint_offsets[jnum]);
-                    owam->jointsctrl[jnum].run();
-                    owam->suppress_controller[jnum]=false;
-                }
-                break;
-            case 'u' :
-                // unhold a joint angle
-                ROS_ERROR("\nUnhold joint number 1-%d: holdpos: %d\n",nJoints, owam->holdpos);
-                jnum = get_joint_num();
-                if ((jnum > 0) && (jnum <= nJoints)) {
-                    owam->suppress_controller[jnum]=true;
-                }
-                break;
-            case 'q' :
-            case 'Q' :
-                save = false;
-                done = true;
-            }
-        }
-        for (unsigned int j=1; j <= nJoints; j++) {
-          printf("%d=% 3.2f  ",j,(jointpos[j] - joint_offsets[j]) * 180.0 / 3.141592654);
-        }
-        printf("    \r");
-        usleep(10000);
+	  owam->jointsctrl[jnum].set(holdval+joint_offsets[jnum]);
+	  owam->jointsctrl[jnum].run();
+	  owam->suppress_controller[jnum]=false;
+	}
+	break;
+      case 'u' :
+	// unhold a joint angle
+	ROS_ERROR("\nUnhold joint number 1-%d: holdpos: %d\n",nJoints, owam->holdpos);
+	jnum = get_joint_num();
+	if ((jnum > 0) && (jnum <= nJoints)) {
+	  owam->suppress_controller[jnum]=true;
+	}
+	break;
+      case 'q' :
+      case 'Q' :
+	save = false;
+      done = true;
+      }
     }
-    // restore terminal settings
-    tcsetattr(fileno(stdin), TCSAFLUSH, &previous_termattr);
-
-    owam->release_position();
-    owam->check_safety_torques = true;
-    for (unsigned int j=1; j<=nJoints; ++j) {
-        owam->suppress_controller[j]=false;
+    for (unsigned int j=1; j <= nJoints; j++) {
+      printf("%d=% 3.2f  ",j,(jointpos[j] - joint_offsets[j]) * 180.0 / 3.141592654);
     }
+    printf("    \r");
+    usleep(10000);
+  }
+  // restore terminal settings
+  tcsetattr(fileno(stdin), TCSAFLUSH, &previous_termattr);
 
-    if (save) {
-      apply_joint_offsets(joint_offsets);
-    }
+  owam->release_position();
+  owam->check_safety_torques = true;
+  for (unsigned int j=1; j<=nJoints; ++j) {
+    owam->suppress_controller[j]=false;
+  }
 
-    // start accepting trajectories again
-    discard_movements=false;
+  if (save) {
+    apply_joint_offsets(joint_offsets);
+  }
 
+  // start accepting trajectories again
+  discard_movements=false;
+  wamstate.state = pr_msgs::WAMState::state_free;
 }
 
 
@@ -1386,6 +1387,12 @@ bool WamDriver::Publish() {
   //                                       after removing dynamic torques
   double simtorqs[nJoints+1];  // Torques calculated from simulated links
                                // (used for experiental mass properties)
+  if (! ros::ok()) {
+    wamstate.state = pr_msgs::WAMState::state_inactive;
+    wamstate.header.stamp = ros::Time::now();
+    pub_wamstate.publish(wamstate);  // no need to fill in anything else
+    return true;
+  }
 
   owam->get_current_data(jointpos,totaltorqs,jointtorqs,simtorqs);
   owam->get_abs_positions(abs_jointpos);
