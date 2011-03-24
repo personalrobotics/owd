@@ -386,6 +386,7 @@ int CANbus::check(){
     ROS_INFO_NAMED("can_bh280","done.");
   }
 
+#ifndef BH280_ONLY
   if (forcetorque_data) {
     ROS_INFO_NAMED("can_ft","  Initializing force/torque sensor...");
     if(wake_puck(8) == OW_FAILURE){
@@ -442,6 +443,7 @@ int CANbus::check(){
   if (get_property_rt(SAFETY_MODULE,VOLTH2,&voltlevel) == OW_SUCCESS) {
     ROS_DEBUG_NAMED("safety","VOLTH2 = %d",voltlevel);
   }
+#endif  // not BH280_ONLY
 
   return OW_SUCCESS;
 }
@@ -849,13 +851,13 @@ int CANbus::request_positions_rt(int32_t id) {
     // clear the hand flags (upper 8 bits)
     received_position_flags &= 0x00FF;
   } else if (id == 11) {
-    received_position_flags &= 0xFBFF;
+    received_position_flags &= ~(0x0800);
   } else if (id == 12) {
-    received_position_flags &= 0xF7FF;
+    received_position_flags &= ~(0x1000);
   } else if (id == 13) {
-    received_position_flags &= 0xEFFF;
+    received_position_flags &= ~(0x2000);
   } else if (id == 14) {
-    received_position_flags &= 0xDFFF;
+    received_position_flags &= ~(0x4000);
   } else {
     // clear all the flags
     received_position_flags=0;
@@ -1593,7 +1595,7 @@ int32_t CANbus::get_puck_state() {
 int CANbus::request_puck_state_rt(int32_t nodeid) {
   int32_t puck1_state;
   
-  received_state_flags &= !(1 << nodeid);
+  received_state_flags &= ~(1 << nodeid);
   if (request_property_rt(nodeid,MODE) != OW_SUCCESS) {
     ROS_WARN("Failure while requesting MODE of puck #%d",nodeid);
     puck1_state = -1;
@@ -1618,7 +1620,7 @@ int CANbus::process_arm_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen)
 
   // check the property
   if (property == MODE) {
-    received_state_flags |= 1 << nodeid;
+    received_state_flags |= (1 << nodeid);
     puck_state = value;
   } else {
     //    ROS_WARN("CANbus::process_arm_response_rt: unexpected property %d", property);
@@ -1899,7 +1901,7 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 
   // check the property
   if (property == MODE) {
-    received_state_flags |= 1 << nodeid;
+    received_state_flags |= (1 << nodeid);
     int32_t mode=value;
     // first three motors are stationary if they have returned to MODE_IDLE
     if (nodeid < 14) {
@@ -1931,6 +1933,14 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     }
     // the last joint was stationary, so we're done!
     handstate=HANDSTATE_DONE;
+    /*  Have to remove this temporarily.  There's a race condition
+	 between sending the CMD=M, which has to go through the hand
+	 command queue, and listening for the MODE response.  I've been
+	 seeing cases where we request all four MODES and see that they
+	 are stationary before the fingers even get the move command,
+	 and then we switch to the lower squeeze torque too early.
+	 Need to make sure we latch on the motion first before
+	 waiting for it to go back to idle. 
     if (apply_squeeze) {
       // Put the fingers into a mode so that they will keep trying to 
       // reach the goal, even if they were stopped short.  To do this,
@@ -1950,6 +1960,7 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 	return OW_FAILURE;
       }
     }      
+    */
     first_moving_finger=11;  // ready for next time
     return OW_SUCCESS;
 
@@ -2344,6 +2355,7 @@ int CANbus::hand_move(std::vector<double> p) {
   }
   first_moving_finger=11;
   handstate = HANDSTATE_MOVING;
+  received_state_flags &= ~(0x7800); // clear the four hand bits
   return OW_SUCCESS;
 }
 

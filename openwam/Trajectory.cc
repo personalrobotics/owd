@@ -71,8 +71,8 @@ void Trajectory::ForceFeedback(double ft[]) {
   if ((runstate==RUN) &&
       HoldOnForceInput &&
       (forcetorque[2] < -6.0)) {
-    if (++forcecount == 2) {
-      // only stop if we have two cycles in a row that exceed the threshold
+    if (++forcecount == 8) {
+      // only stop if we have four cycles in a row that exceed the threshold
       stop();
       forcecount=0;
     }
