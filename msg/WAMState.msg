@@ -1,3 +1,5 @@
+Header header
+
 float64[] positions
 float64[] jpositions
 # float64[] velocities  # not implemented yet
