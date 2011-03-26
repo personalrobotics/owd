@@ -12,8 +12,8 @@ It can do some stuff.
 \section downloading Downloading
 The OWD ROS package, and its pr_msgs dependency, can be obtained via svn from
 \verbatim
-http://svn.pittsburgh.intel-research.net/repos/pr/public/trunk/src/owd
-http://svn.pittsburgh.intel-research.net/repos/pr/public/trunk/src/pr_msgs
+https://svn.pittsburgh.intel-research.net/repos/pr/public/trunk/src/owd
+https://svn.pittsburgh.intel-research.net/repos/pr/public/trunk/src/pr_msgs
 \endverbatim
 
 \section dependencies Dependencies
