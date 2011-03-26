@@ -3,7 +3,7 @@
      ROS driver for the Barrett WAM
   </description>
   <author>Mike Vande Weghe (vandeweg@cmu.edu)</author>
-  <url>http://personalrobotics.intel-research.net/intel-pkg/owd</url>
+  <url>http://personalrobotics.intel-research.net/intel-pkg/owd/html/index.html</url>
   <license>LGPL</license>
   <depend package="roscpp"/>
   <depend package="std_msgs"/>
