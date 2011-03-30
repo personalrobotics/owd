@@ -101,6 +101,9 @@ void BHD_280::Pump(ros::TimerEvent const& e) {
 
 bool BHD_280::Publish() {
   int32_t state;
+
+  bhstate.header.stamp = ros::Time::now();
+
   if (bus->hand_get_positions(bhstate.positions[0],
 			      bhstate.positions[1],
 			      bhstate.positions[2],
