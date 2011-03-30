@@ -776,6 +776,9 @@ int CANbus::send_torques_rt(){
 #endif // ! OWD_RT
 	  return OW_FAILURE;
 	}
+	if (((handmsg.property & 0x7F)== MODE) && (handmsg.value == MODE_TRAPEZOID)) {
+	  hand_move_command_sent=true;
+	}
       } else {
 	if (request_property_rt(handmsg.nodeid, handmsg.property) != OW_SUCCESS) {
 	  snprintf(last_error,200,"Error getting property %d from hand puck %d",
@@ -1901,6 +1904,11 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 
   // check the property
   if (property == MODE) {
+    if (! hand_move_command_sent) {
+      // the hand_command_queue has not delivered the move request
+      // to the CANbus yet, so we have to ignore this command)
+      return OW_SUCCESS;
+    }
     received_state_flags |= (1 << nodeid);
     int32_t mode=value;
     // first three motors are stationary if they have returned to MODE_IDLE
@@ -1933,14 +1941,7 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     }
     // the last joint was stationary, so we're done!
     handstate=HANDSTATE_DONE;
-    /*  Have to remove this temporarily.  There's a race condition
-	 between sending the CMD=M, which has to go through the hand
-	 command queue, and listening for the MODE response.  I've been
-	 seeing cases where we request all four MODES and see that they
-	 are stationary before the fingers even get the move command,
-	 and then we switch to the lower squeeze torque too early.
-	 Need to make sure we latch on the motion first before
-	 waiting for it to go back to idle. 
+ 
     if (apply_squeeze) {
       // Put the fingers into a mode so that they will keep trying to 
       // reach the goal, even if they were stopped short.  To do this,
@@ -1959,8 +1960,8 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
       if (hand_set_property(GROUPID(5),MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
 	return OW_FAILURE;
       }
+      apply_squeeze=false;
     }      
-    */
     first_moving_finger=11;  // ready for next time
     return OW_SUCCESS;
 
@@ -2243,13 +2244,10 @@ int CANbus::hand_reset() {
     }
   }
 
-  /*  3000 is too low; fingers still can't get out of jams
-       going back to 5000 but with a very short TSTOP
-       // now reduce MT
-       if (hand_set_property(GROUPID(5),MT,3000) != OW_SUCCESS) {
-       return OW_FAILURE;
-       }
-  */
+  /* Trying MT=1700 on puck firmware version 174 */
+  if (hand_set_property(GROUPID(5),MT,1700) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
   
   if (tactile_data) {
     if (configure_tactile_sensors() != OW_SUCCESS) {
@@ -2312,7 +2310,7 @@ int CANbus::hand_move(std::vector<double> p) {
     if (hand_set_property(node,TSTOP,50) != OW_SUCCESS) {
       return OW_FAILURE;
     }
-    if (hand_set_property(node,MT,5000) != OW_SUCCESS) {
+    if (hand_set_property(node,MT,1700) != OW_SUCCESS) {
       return OW_FAILURE;
     }
   }
@@ -2336,6 +2334,8 @@ int CANbus::hand_move(std::vector<double> p) {
       != OW_SUCCESS) {
     return OW_FAILURE;
   }
+  // send the move command
+  hand_move_command_sent=false;
   if (hand_set_property(GROUPID(5),MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
     return OW_FAILURE;
   }

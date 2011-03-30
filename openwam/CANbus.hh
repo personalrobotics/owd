@@ -310,7 +310,7 @@ private:
   int32_t handstate;
   int first_moving_finger;
   double squeeze_goal[4];
-  bool apply_squeeze;
+  bool apply_squeeze, hand_move_command_sent;
 
   int finger_reset(int32_t id);
   double finger_encoder_to_radians(int32_t enc);
