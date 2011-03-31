@@ -52,6 +52,8 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   valid_forcetorque_data(false), valid_tactile_data(false),
   tactile_top10(false), pucks(NULL),n_arm_pucks(number_of_arm_pucks),
   simulation(false), received_position_flags(0), received_state_flags(0),
+  hand_motion_state_sequence(0),
+
 #ifdef CAN_RECORD
   candata(100000),
 #endif // CAN_RECORD
@@ -65,10 +67,14 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   // makes sure that the response you get from the queue corresponds to the command you sent.
   mutex_init(&hand_cmd_mutex);
 
-  handstate = HANDSTATE_UNINIT;
-  first_moving_finger=11;
+  for (unsigned int i=0; i<4; ++i) {
+    handstate[i] = HANDSTATE_UNINIT;
+  }
   hand_positions[1]=hand_positions[2]=hand_positions[3]=hand_positions[4]=0;
+  last_hand_positions[1]=last_hand_positions[2]=last_hand_positions[3]=last_hand_positions[4]=0;
   hand_distal_positions[1]=hand_distal_positions[2]=hand_distal_positions[3]=hand_distal_positions[4]=0;
+  encoder_changed[0]=encoder_changed[1]=encoder_changed[2]=encoder_changed[3] = false;
+  apply_squeeze[0]=apply_squeeze[1]=apply_squeeze[2]=apply_squeeze[3] = false;
 
   // the fourth finger finger puck also returns a strain value when we 
   // ask group 5 for strain, but it is meaningless and is not used
@@ -776,8 +782,13 @@ int CANbus::send_torques_rt(){
 #endif // ! OWD_RT
 	  return OW_FAILURE;
 	}
-	if (((handmsg.property & 0x7F)== MODE) && (handmsg.value == MODE_TRAPEZOID)) {
-	  hand_move_command_sent=true;
+	if ((handmsg.property & 0x7F)== MODE) {
+	  if ((handmsg.value == MODE_TRAPEZOID)
+	      || (handmsg.value == MODE_VELOCITY)
+	      || (handmsg.value == MODE_TORQUE)) {
+	    // record the fact that the motion command has actually been sent
+	    hand_motion_state_sequence=2;
+	  }
 	}
       } else {
 	if (request_property_rt(handmsg.nodeid, handmsg.property) != OW_SUCCESS) {
@@ -918,6 +929,12 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
     }
   } else if (BH280_installed && (nodeid >=11) && (nodeid <=14)) {
     hand_positions[nodeid-10] = value;
+    if (labs(value - last_hand_positions[nodeid-10]) > 50) {
+      encoder_changed[nodeid-11] = true;
+    } else {
+      encoder_changed[nodeid-11] = false;
+    }
+    last_hand_positions[nodeid-10] = value;
     if (msglen==6) {
       // this puck also sent a value for the distal joint
       hand_distal_positions[nodeid-10] = value2;
@@ -1874,16 +1891,31 @@ int CANbus::hand_activate(int32_t *nodes) {
 int CANbus::request_hand_state_rt() {
   // If we were already stationary, assume we're still
   // stationary.
-  if (handstate != HANDSTATE_MOVING) {
+  bool moving(false);
+  for (unsigned int i=0; i<4; ++i) {
+    if (handstate[i] != HANDSTATE_DONE) {
+      moving=true;
+      break;
+    }
+  }
+  if (!moving) {
     return OW_SUCCESS;
   }
-  
-  // otherwise, check one finger for movement
+
+  // otherwise, request state from hand pucks
   int32_t mode;
-  if (request_property_rt(first_moving_finger,MODE) != OW_SUCCESS) {
+  if (request_property_rt(GROUPID(5),MODE) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280",
-		   "Failed to request MODE from hand puck %d: %s",first_moving_finger, last_error);
+		   "Failed to request MODE from hand pucks: %s",
+		   last_error);
     return OW_FAILURE;
+  }
+
+  // if we had recently sent a move command, record the fact that
+  // we have now requested the state and subsequent state responses
+  // will be valid
+  if (hand_motion_state_sequence == 2) {
+    hand_motion_state_sequence=0;
   }
   return OW_SUCCESS;
 }
@@ -1904,65 +1936,67 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 
   // check the property
   if (property == MODE) {
-    if (! hand_move_command_sent) {
-      // the hand_command_queue has not delivered the move request
-      // to the CANbus yet, so we have to ignore this command)
+    if ( hand_motion_state_sequence != 0 ) {
+      // either the hand_command_queue has not delivered the move request
+      // to the CANbus yet, or a subsequent state request has not yet been
+      // made, so we have to ignore this response as out-of-date
       return OW_SUCCESS;
     }
     received_state_flags |= (1 << nodeid);
     int32_t mode=value;
-    // first three motors are stationary if they have returned to MODE_IDLE
-    if (nodeid < 14) {
-      if (mode != MODE_IDLE) {
-	handstate = HANDSTATE_MOVING;
-	return OW_SUCCESS;
+
+    switch (mode) {
+    case MODE_IDLE:
+    case MODE_PID:
+      if (nodeid == 14) {
+	handstate[nodeid-11] = HANDSTATE_DONE;
+	break;
+      }
+      if ((apply_squeeze[nodeid-11]) && (labs(hand_positions[nodeid-10] - hand_goal_positions[nodeid-10]) > 600)) {
+	// only apply the squeeze if we're still more than 600 encoder ticks
+	// from the goal
+	handstate[nodeid-11] = HANDSTATE_MOVING;
+	if (hand_set_property(nodeid,MT,800) != OW_SUCCESS) {
+	  return OW_FAILURE;
+	}
+	if (hand_set_property(nodeid,TSTOP,0) != OW_SUCCESS) {
+	  return OW_FAILURE;
+	}
+	// the value of E was already set, so we just change MODE
+	if (hand_set_property(nodeid,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+	  return OW_FAILURE;
+	}
+	apply_squeeze[nodeid-11]=false;
       } else {
-	// next time check the next finger
-	if (first_moving_finger < 14) {
-	  ++first_moving_finger;
+	handstate[nodeid-11] = HANDSTATE_DONE;
+      }	
+      break;
+
+    case MODE_TRAPEZOID:
+      // if near goal, state=done
+      // if changing, state=moving
+      // otherwise state=stalled
+      if ((labs(hand_positions[nodeid-10] - hand_goal_positions[nodeid-10])
+	   < 600) && !apply_squeeze[nodeid-11]) {
+	  // if we're within 600 encoder ticks of the goal, and we've
+	  // already applied the squeeze, call it done
+	  handstate[nodeid-11] = HANDSTATE_DONE;
+	  // could try switching back to MODE_IDLE/MODE_PID here
+      } else {
+	if (encoder_changed[nodeid-11]) {
+	  handstate[nodeid-11] = HANDSTATE_MOVING;
+	} else {
+	  handstate[nodeid-11] = HANDSTATE_STALLED;
 	}
-	return OW_SUCCESS;
       }
+      break;
+      
+    case MODE_VELOCITY:
+    case MODE_TORQUE:
+      handstate[nodeid-11] = HANDSTATE_MOVING;
+      break;
+
     }
-    // spread motor is stationary if it's returned to MODE_PID
-    if (mode != MODE_PID) {
-      static int no_movement_count = 0;
-      // make sure we're actually still moving
-      static int32_t last_f4_pos = 0; // the initial value doesn't really matter; we're just
-      // checking to see if it's the same 10 times in a row
-      if (llabs(last_f4_pos - hand_positions[4]) < 50) {
-	if (++no_movement_count < 10) {
-	  handstate = HANDSTATE_MOVING;
-	  return OW_SUCCESS;
-	}
-      }
-      last_f4_pos = hand_positions[4];
-      no_movement_count=0;
-    }
-    // the last joint was stationary, so we're done!
-    handstate=HANDSTATE_DONE;
- 
-    if (apply_squeeze) {
-      // Put the fingers into a mode so that they will keep trying to 
-      // reach the goal, even if they were stopped short.  To do this,
-      // we will reduce the Max Torque, turn off TSTOP (which stops the move
-      // on a stall), and re-issue the move command.  We'll leave
-      // the handstate = HANDSTATE_DONE so that the client doesn't know
-      // the difference
-      for (unsigned int node=11; node<=13; ++node) {
-	if (hand_set_property(node,MT,800) != OW_SUCCESS) {
-	  return OW_FAILURE;
-	}
-	if (hand_set_property(node,TSTOP,0) != OW_SUCCESS) {
-	  return OW_FAILURE;
-	}
-      }
-      if (hand_set_property(GROUPID(5),MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
-	return OW_FAILURE;
-      }
-      apply_squeeze=false;
-    }      
-    first_moving_finger=11;  // ready for next time
     return OW_SUCCESS;
 
   } else if (property == SG) {
@@ -2147,14 +2181,14 @@ int CANbus::hand_reset() {
   //    Open F4
   bool ready=true;
   for (int nodeid=11; nodeid<=14; ++nodeid) {
-    int32_t tstop;
-    if (get_property_rt(nodeid,TSTOP,&tstop,4000) != OW_SUCCESS) {
+    int32_t hold;
+    if (get_property_rt(nodeid,HOLD,&hold,4000) != OW_SUCCESS) {
       ROS_ERROR("Could not get TSTOP property from hand puck %d",
 		nodeid);
       return OW_FAILURE;
     }
-    if (((nodeid < 14) && (tstop != 50)) 
-	|| ((nodeid == 14) && (tstop != 200))) {
+    if (((nodeid < 14) && (hold != 0)) 
+	|| ((nodeid == 14) && (hold != 1))) {
       ready=false;
       break;
     }
@@ -2162,8 +2196,9 @@ int CANbus::hand_reset() {
   
   if (ready) {
     // all the fingers have already been HI'd
-
-    handstate=HANDSTATE_DONE;
+    for (unsigned int i=0; i<4; ++i) {
+      handstate[i]=HANDSTATE_DONE;
+    }
 
     if (tactile_data) {
       if (configure_tactile_sensors() != OW_SUCCESS) {
@@ -2188,7 +2223,7 @@ int CANbus::hand_reset() {
       if ((finger_reset(nodeid) != OW_SUCCESS) &&
 	  (attempts == 2)) {
 	ROS_WARN_NAMED("can_bh280","Failed to reset finger puck %d",nodeid-10);
-	handstate = HANDSTATE_UNINIT;
+	handstate[nodeid-11] = HANDSTATE_UNINIT;
 	return OW_FAILURE;
       }
     }
@@ -2197,7 +2232,7 @@ int CANbus::hand_reset() {
   ROS_INFO_NAMED("can_bh280", "Resetting finger puck 4");
   if (finger_reset(14) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280","Failed to reset finger puck 4");
-    handstate = HANDSTATE_UNINIT;
+    handstate[3] = HANDSTATE_UNINIT;
     return OW_FAILURE;
   }
 
@@ -2255,8 +2290,9 @@ int CANbus::hand_reset() {
       return OW_FAILURE;
     }
   }
-  
-  handstate = HANDSTATE_DONE;
+  for (unsigned int i=0; i<4; ++i) {
+    handstate[i] = HANDSTATE_DONE;
+  }
   return OW_SUCCESS;
 }
 
@@ -2303,6 +2339,8 @@ int CANbus::hand_move(std::vector<double> p) {
     return OW_FAILURE;
   }
   ROS_DEBUG_NAMED("bhd280", "executing hand_move");
+  // We 
+
 
   // First set the finger pucks back to the higher-torque threshold
   // with TSTOP enabled so that they stop when done/stalled
@@ -2324,18 +2362,25 @@ int CANbus::hand_move(std::vector<double> p) {
     if (p[i] > 2.6) {
       p[i]=2.6;
     }
-    if (hand_set_property(11+i,E,finger_radians_to_encoder(p[i])) 
+    hand_goal_positions[i+1] = finger_radians_to_encoder(p[i]);
+    if (hand_set_property(11+i,E,hand_goal_positions[i+1]) 
 	!= OW_SUCCESS) {
       return OW_FAILURE;
     }
   }
   // set the spread position
-  if (hand_set_property(14,E,spread_radians_to_encoder(p[3])) 
+  hand_goal_positions[4] = spread_radians_to_encoder(p[3]);
+  if (hand_set_property(14,E,hand_goal_positions[4])
       != OW_SUCCESS) {
     return OW_FAILURE;
   }
+
+  // record the fact that a motion request is in progress, so we should
+  // ignore any state responses that were made between now and when the
+  // move command actually makes it to the pucks
+  hand_motion_state_sequence = 1;
+
   // send the move command
-  hand_move_command_sent=false;
   if (hand_set_property(GROUPID(5),MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
     return OW_FAILURE;
   }
@@ -2343,18 +2388,19 @@ int CANbus::hand_move(std::vector<double> p) {
   // Finally, check to see if we should apply a squeeze after the
   // move is complete.  If any of the goal positions are non-zero,
   // we'll follow up with a squeeze.
-  apply_squeeze=false;
   for (unsigned int i=0; i<4; ++i) {
     if (p[i] > 0) {
       // record the fact that once the hand stops, we want to keep
       // applying pressure.  this helps to ensure that even if a gripped
       // object slips, we will still adjust until we reach the goal position.
-      apply_squeeze=true;
-      break;
+      apply_squeeze[i]=true;
+    } else {
+      apply_squeeze[i]=false;
     }
   }
-  first_moving_finger=11;
-  handstate = HANDSTATE_MOVING;
+  for (unsigned int i=0; i<4; ++i) {
+    handstate[i] = HANDSTATE_MOVING;
+  }
   received_state_flags &= ~(0x7800); // clear the four hand bits
   return OW_SUCCESS;
 }
@@ -2374,37 +2420,49 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
     return OW_FAILURE;
   }
   
-  if ((v1 != 0.0)
-      && (hand_set_property(11,MODE,MODE_VELOCITY) != OW_SUCCESS)) {
-    return OW_FAILURE;
+  if (v1 != 0.0) {
+    handstate[0] = HANDSTATE_MOVING;
+    if (hand_set_property(11,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
   }
- if ((v2 != 0.0)
-     && (hand_set_property(12,MODE,MODE_VELOCITY) != OW_SUCCESS)) {
-    return OW_FAILURE;
+  if (v2 != 0.0) {
+    handstate[1] = HANDSTATE_MOVING;
+    if (hand_set_property(12,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
   }
- if ((v3 != 0.0)
-     && (hand_set_property(13,MODE,MODE_VELOCITY) != OW_SUCCESS)) {
-    return OW_FAILURE;
- }
- if ((v4 != 0.0)
-     && (hand_set_property(14,MODE,MODE_VELOCITY) != OW_SUCCESS)) {
-   return OW_FAILURE;
- }
- first_moving_finger=11;
- handstate = HANDSTATE_MOVING;
- return OW_SUCCESS;
+  if (v3 != 0.0) {
+    handstate[2] = HANDSTATE_MOVING;
+    if (hand_set_property(13,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  }
+  if (v4 != 0.0) {
+    handstate[3] = HANDSTATE_MOVING;
+    if (hand_set_property(14,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  }
+  
+
+  // record the fact that a motion request is in progress, so we should
+  // ignore any state responses that were made between now and when the
+  // move command actually makes it to the pucks
+  hand_motion_state_sequence = 1;
+
+  return OW_SUCCESS;
 }
  
 int CANbus::hand_torque(double t1, double t2, double t3, double t4) {
-  ROS_DEBUG_NAMED("bhd280", "executing hand_velocity");
+  ROS_DEBUG_NAMED("bhd280", "executing hand_torque");
   if (t4 != 0) {
     if ((hand_set_property(14,MODE,MODE_TORQUE) != OW_SUCCESS) ||
 	(hand_set_property(14,T,t4) != OW_SUCCESS)) {
       ROS_ERROR_NAMED("bhd280","could not set torque for spread");
       return OW_FAILURE;
     }
-    first_moving_finger=14;
-    handstate = HANDSTATE_MOVING;
+    handstate[3] = HANDSTATE_MOVING;
   }
   if (t3 != 0) {
     if ((hand_set_property(13,MODE,MODE_TORQUE) != OW_SUCCESS) ||
@@ -2412,8 +2470,7 @@ int CANbus::hand_torque(double t1, double t2, double t3, double t4) {
       ROS_ERROR_NAMED("bhd280","could not set torque for finger 3");
       return OW_FAILURE;
     }
-    first_moving_finger=13;
-    handstate = HANDSTATE_MOVING;
+    handstate[2] = HANDSTATE_MOVING;
   }
   if (t2 != 0) {
     if ((hand_set_property(12,MODE,MODE_TORQUE) != OW_SUCCESS) ||
@@ -2421,8 +2478,7 @@ int CANbus::hand_torque(double t1, double t2, double t3, double t4) {
       ROS_ERROR_NAMED("bhd280","could not set torque for finger 2");
       return OW_FAILURE;
     }
-    first_moving_finger=12;
-    handstate = HANDSTATE_MOVING;
+    handstate[1] = HANDSTATE_MOVING;
   }
   if (t1 != 0) {
     if ((hand_set_property(11,MODE,MODE_TORQUE) != OW_SUCCESS) ||
@@ -2430,9 +2486,14 @@ int CANbus::hand_torque(double t1, double t2, double t3, double t4) {
       ROS_ERROR_NAMED("bhd280","could not set torque for finger 1");
       return OW_FAILURE;
     }
-    first_moving_finger=11;
-    handstate = HANDSTATE_MOVING;
+    handstate[0] = HANDSTATE_MOVING;
   }
+
+  // record the fact that a motion request is in progress, so we should
+  // ignore any state responses that were made between now and when the
+  // move command actually makes it to the pucks
+  hand_motion_state_sequence = 1;
+
   return OW_SUCCESS;
 }
 
@@ -2440,7 +2501,9 @@ int CANbus::hand_relax() {
   if (hand_set_property(GROUPID(5),MODE,PUCK_IDLE) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  handstate = HANDSTATE_DONE;
+  for (unsigned int i=0; i<4; ++i) {
+    handstate[i] = HANDSTATE_DONE;
+  }
   return OW_SUCCESS;
 }
 
@@ -2466,8 +2529,13 @@ int CANbus::hand_get_strain(double &s1, double &s2, double &s3) {
   return OW_SUCCESS;
 }
 
-int CANbus::hand_get_state(int32_t &state) {
-  state=handstate;
+int CANbus::hand_get_state(int32_t *state) {
+  if (state != NULL) {
+    for (unsigned int i=0; i<4; ++i) {
+      state[i]=handstate[i];
+    }    
+  
+  }
   return OW_SUCCESS;
 }
 
@@ -2520,144 +2588,147 @@ void CANstats::rosprint() {
    return (tv.tv_sec * 1e6 + tv.tv_usec);
 #endif // ! OWD_RT
  }
+
+#define DEFPROP(s,x) s=x; propname[x]=#s
  
 void CANbus::initPropertyDefs(int32_t firmwareVersion){
   if(firmwareVersion < 40){
     throw "Unsupported early firmware version";
   } else { // (firmwareVersion >= 40)
     /* Common */
-    VERS = 0;
-    ROLE = 1; /* P=PRODUCT, R=ROLE: XXXX PPPP XXXX RRRR */
-    SN   = 2;
-    ID   = 3;
-    ERROR= 4;
-    STAT = 5;
-    ADDR = 6;
-    VALUE= 7;
-    MODE = 8;
-    TEMP = 9;
-    PTEMP= 10;
-    OTEMP= 11;
-    BAUD = 12;
-    _LOCK= 13;
-    DIG0 = 14;
-    DIG1 = 15;
-    TENSION=FET0= 16;
-    BRAKE=  FET1= 17;
-    ANA0 = 18;
-    ANA1 = 19;
-    THERM= 20;
-    VBUS = 21;
-    IMOTOR=22;
-    VLOGIC=23;
-    ILOGIC=24;
-    SG   = 25;
-    GRPA = 26;
-    GRPB = 27;
-    GRPC = 28;
-    CMD  = 29; /* For commands w/o values: RESET,HOME,KEEP,PASS,LOOP,HI,IC,IO,TC,TO,C,O,T */
-    SAVE = 30;
-    LOAD = 31;
-    DEF  = 32;
-    FIND = 33;
-    X0   = 34;
-    X1   = 35;
-    X2   = 36;
-    X3   = 37;
-    X4   = 38;
-    X5   = 39;
-    X6   = 40;
-    X7   = 41;
-    
-    /* Motor pucks */
-    T=TORQ=42;
-    MT   = 43;
-    V    = 44;
-    MV   = 45;
-    MCV  = 46;
-    MOV  = 47;
-    AP=P = 48; /* 32-Bit Present Position */
-    P2   = 49;
-    DP   = 50; /* 32-Bit Default Position */
-    DP2  = 51;
-    E    = 52; /* 32-Bit Endpoint */
-    E2   = 53;
-    OT   = 54; /* 32-Bit Open Target */
-    OT2  = 55;
-    CT   = 56; /* 32-Bit Close Target */
-    CT2  = 57;
-    M    = 58; /* 32-Bit Move command for CAN*/
-    M2   = 59;
-    _DS  = 60;
-    MOFST= 61;
-    IOFST= 62;
-    UPSECS=63;
-    OD   = 64;
-    MDS  = 65;
-    MECH = 66; /* 32-Bit */
-    MECH2= 67;
-    CTS  = 68; /* 32-Bit */
-    CTS2 = 69;
-    PIDX = 70;
-    HSG  = 71;
-    LSG  = 72;
-    IVEL = 73;
-    IOFF = 74; /* 32-Bit */
-    IOFF2= 75;
-    MPE  = 76;
-    HOLD = 77;
-    TSTOP= 78;
-    KP   = 79;
-    KD   = 80;
-    KI   = 81;
-    ACCEL= 82;
-    TENST= 83;
-    TENSO= 84;
-    JIDX = 85;
-    IPNM = 86;
-    HALLS= 87;
-    HALLH= 88; /* 32-Bit */
-    HALLH2=89;
-    POLES= 90;
-    IKP  = 91;
-    IKI  = 92;
-    IKCOR= 93;
-    EN   = 94;
-    EN2  = 95;
-    JP   = 96;
-    JP2  = 97;
-    JOFST= 98;
-    JOFST2=99;
-    TIE  = 100;
-    ECMAX= 101;
-    ECMIN= 102;
-    LFLAGS=103;
-    LCTC = 104;
-    LCVC = 105;
-    TACT = 106;
-    TACTID=107;
-    
-    PROP_END=107;
+    DEFPROP(VERS , 0);
+    DEFPROP(ROLE , 1); /* P=PRODUCT, R=ROLE: XXXX PPPP XXXX RRRR */
+    DEFPROP(SN   , 2);
+    DEFPROP(ID   , 3);
+    DEFPROP(ERROR, 4);
+    DEFPROP(STAT , 5);
+    DEFPROP(ADDR , 6);
+    DEFPROP(VALUE, 7);
+    DEFPROP(MODE , 8);
+    DEFPROP(TEMP , 9);
+    DEFPROP(PTEMP, 10);
+    DEFPROP(OTEMP, 11);
+    DEFPROP(BAUD , 12);
+    DEFPROP(_LOCK, 13);
+    DEFPROP(DIG0 , 14);
+    DEFPROP(DIG1 , 15);
+    DEFPROP(TENSION,16); DEFPROP(FET0,16);
+    DEFPROP(BRAKE, 17);  DEFPROP(FET1,17);
+    DEFPROP(ANA0 , 18);
+    DEFPROP(ANA1 , 19);
+    DEFPROP(THERM, 20);
+    DEFPROP(VBUS , 21);
+    DEFPROP(IMOTOR,22);
+    DEFPROP(VLOGIC,23);
+    DEFPROP(ILOGIC,24);
+    DEFPROP(SG   , 25);
+    DEFPROP(GRPA , 26);
+    DEFPROP(GRPB , 27);
+    DEFPROP(GRPC , 28);
+    /* CMD is for sending hand commands to the hand pucks:
+            RESET,HOME,KEEP,PASS,LOOP,HI,IC,IO,TC,TO,C,O,T */
+    DEFPROP(CMD  , 29); 
+    DEFPROP(SAVE , 30);
+    DEFPROP(LOAD , 31);
+    DEFPROP(DEF  , 32);
+    DEFPROP(FIND , 33);
+    DEFPROP(X0   , 34);
+    DEFPROP(X1   , 35);
+    DEFPROP(X2   , 36);
+    DEFPROP(X3   , 37);
+    DEFPROP(X4   , 38);
+    DEFPROP(X5   , 39);
+    DEFPROP(X6   , 40);
+    DEFPROP(X7   , 41);
 
     /* Safety puck */
-    ZERO = 42;
-    PEN  = 43;
-    SAFE = 44;
-    VL1  = 45;
-    VL2  = 46;
-    TL1  = 47;
-    TL2  = 48;
-    VOLTL1=49;
-    VOLTL2=50;
-    VOLTH1=51;
-    VOLTH2=52;
-    PWR  = 53;
-    MAXPWR=54;
-    IFAULT=55;
-    VNOM = 56;
+    DEFPROP(ZERO , 42);
+    DEFPROP(PEN  , 43);
+    DEFPROP(SAFE , 44);
+    DEFPROP(VL1  , 45);
+    DEFPROP(VL2  , 46);
+    DEFPROP(TL1  , 47);
+    DEFPROP(TL2  , 48);
+    DEFPROP(VOLTL1,49);
+    DEFPROP(VOLTL2,50);
+    DEFPROP(VOLTH1,51);
+    DEFPROP(VOLTH2,52);
+    DEFPROP(PWR  , 53);
+    DEFPROP(MAXPWR,54);
+    DEFPROP(IFAULT,55);
+    DEFPROP(VNOM , 56);
     
+    /* Motor pucks */
+    DEFPROP(T    , 42);  DEFPROP(TORQ,42);
+    DEFPROP(MT   , 43);
+    DEFPROP(V    , 44);
+    DEFPROP(MV   , 45);
+    DEFPROP(MCV  , 46);
+    DEFPROP(MOV  , 47);
+    DEFPROP(AP   , 48); DEFPROP(P,48); /* 32-Bit Present Position */
+    DEFPROP(P2   , 49);
+    DEFPROP(DP   , 50); /* 32-Bit Default Position */
+    DEFPROP(DP2  , 51);
+    DEFPROP(E    , 52); /* 32-Bit Endpoint */
+    DEFPROP(E2   , 53);
+    DEFPROP(OT   , 54); /* 32-Bit Open Target */
+    DEFPROP(OT2  , 55);
+    DEFPROP(CT   , 56); /* 32-Bit Close Target */
+    DEFPROP(CT2  , 57);
+    DEFPROP(M    , 58); /* 32-Bit Move command for CAN*/
+    DEFPROP(M2   , 59);
+    DEFPROP(_DS  , 60);
+    DEFPROP(MOFST, 61);
+    DEFPROP(IOFST, 62);
+    DEFPROP(UPSECS,63);
+    DEFPROP(OD   , 64);
+    DEFPROP(MDS  , 65);
+    DEFPROP(MECH , 66); /* 32-Bit */
+    DEFPROP(MECH2, 67);
+    DEFPROP(CTS  , 68); /* 32-Bit */
+    DEFPROP(CTS2 , 69);
+    DEFPROP(PIDX , 70);
+    DEFPROP(HSG  , 71);
+    DEFPROP(LSG  , 72);
+    DEFPROP(IVEL , 73);
+    DEFPROP(IOFF , 74); /* 32-Bit */
+    DEFPROP(IOFF2, 75);
+    DEFPROP(MPE  , 76);
+    DEFPROP(HOLD , 77);
+    DEFPROP(TSTOP, 78);
+    DEFPROP(KP   , 79);
+    DEFPROP(KD   , 80);
+    DEFPROP(KI   , 81);
+    DEFPROP(ACCEL, 82);
+    DEFPROP(TENST, 83);
+    DEFPROP(TENSO, 84);
+    DEFPROP(JIDX , 85);
+    DEFPROP(IPNM , 86);
+    DEFPROP(HALLS, 87);
+    DEFPROP(HALLH, 88); /* 32-Bit */
+    DEFPROP(HALLH2,89);
+    DEFPROP(POLES, 90);
+    DEFPROP(IKP  , 91);
+    DEFPROP(IKI  , 92);
+    DEFPROP(IKCOR, 93);
+    DEFPROP(EN   , 94);
+    DEFPROP(EN2  , 95);
+    DEFPROP(JP   , 96);
+    DEFPROP(JP2  , 97);
+    DEFPROP(JOFST, 98);
+    DEFPROP(JOFST2,99);
+    DEFPROP(TIE  , 100);
+    DEFPROP(ECMAX, 101);
+    DEFPROP(ECMIN, 102);
+    DEFPROP(LFLAGS,103);
+    DEFPROP(LCTC , 104);
+    DEFPROP(LCVC , 105);
+    DEFPROP(TACT , 106);
+    DEFPROP(TACTID,107);
+    PROP_END=107;
+
     /* Force/Torque sensor */
-    FT   = 54;
+    DEFPROP(FT   , 54);
   }
 }
 
@@ -2731,7 +2802,7 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
 	Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 4096.0;
 	Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 4096.0;
 	fprintf(csv,"SET TORQUE X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
-      } else if (cdata.msgdata[0] & 0x80) {
+      } else if (cdata.msgdata[0] & 0x80) {  // SET
 	if (cdata.msgdata[0] == (42 | 0x80)) {
 	  // Packed Torque message
 	  int32_t tq1 = (cdata.msgdata[1] << 6) +
@@ -2744,7 +2815,7 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
 	    (cdata.msgdata[6] >> 6);
 	  int32_t tq4 = ((cdata.msgdata[6] & 0x3F) << 8) +
 	    cdata.msgdata[7];
-	  fprintf(csv,"SET %03d=%d,%d,%d,%d",cdata.msgdata[0] & 0x7F, tq1,tq2,tq3,tq4);
+	  fprintf(csv,"SET T=%d,%d,%d,%d", tq1,tq2,tq3,tq4);
 	} else if ((cdata.msgid & 0x41F) == 0x403) {
 	  // message set to GROUP 3 are 22-bit position updates
 	  int32_t value = ((cdata.msgdata[0] & 0x3F) << 16) +
@@ -2770,10 +2841,18 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
 	  if (cdata.msglen == 6) {
 	    value += (cdata.msgdata[4] << 16) + (cdata.msgdata[5] << 24);
 	  }
-	  fprintf(csv,"SET %03d=%d",cdata.msgdata[0] & 0x7F, value);
+	  if (CANbus::propname.find(cdata.msgdata[0] & 0x7F) != CANbus::propname.end()) {
+	    fprintf(csv,"SET %s=%d",CANbus::propname[cdata.msgdata[0] & 0x7F].c_str(), value);
+	  } else {
+	    fprintf(csv,"SET %03d=%d",cdata.msgdata[0] & 0x7F, value);
+	  }
 	}
-      } else {
-	fprintf(csv,"GET %03d",cdata.msgdata[0]);
+      } else {  // GET
+	if (CANbus::propname.find(cdata.msgdata[0]) != CANbus::propname.end()) {
+	  fprintf(csv,"GET %s",CANbus::propname[cdata.msgdata[0]].c_str());
+	} else {
+	  fprintf(csv,"GET %03d",cdata.msgdata[0]);
+	}
       }
       
       fprintf(csv,"\n");
@@ -2799,3 +2878,4 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
 #endif    
  }
  
+std::map <int, std::string> CANbus::propname;

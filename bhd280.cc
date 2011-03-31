@@ -31,6 +31,7 @@ BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   bhstate.positions.resize(4, 0.0f);
   bhstate.secondary_positions.resize(3, 0.0f);
   bhstate.strain.resize(3, 0.0f);
+  bhstate.internal_state.resize(4);
   
   const double PI=3.14159;
   const double LINK2_OFFSET=2.46/180.0*PI;
@@ -100,7 +101,7 @@ void BHD_280::Pump(ros::TimerEvent const& e) {
 }
 
 bool BHD_280::Publish() {
-  int32_t state;
+  int32_t state[4];
 
   bhstate.header.stamp = ros::Time::now();
 
@@ -121,12 +122,48 @@ bool BHD_280::Publish() {
 				 bhstate.secondary_positions[2]);
 
   bus->hand_get_state(state);
-  if (state == CANbus::HANDSTATE_UNINIT) {
-    bhstate.state = pr_msgs::BHState::state_uninitialized;
-  } else if (state == CANbus::HANDSTATE_DONE) {
-    bhstate.state = pr_msgs::BHState::state_done;
-  } else if (state == CANbus::HANDSTATE_MOVING) {
-    bhstate.state = pr_msgs::BHState::state_moving;
+  // combine all the individual states into one
+  // UNINIT has the highest priority
+  // MOVING has priority over STALLED
+  // STALLED has priority over DONE
+
+  // set the default case
+  bhstate.state=pr_msgs::BHState::state_done;
+
+
+  // the internal_state field will eventually become the regular
+  // state field once herbcontroller is updated
+  for (unsigned int i=0; i<4; ++i) {
+    if (state[i] == CANbus::HANDSTATE_UNINIT) {
+      bhstate.internal_state[i] = pr_msgs::BHState::state_uninitialized;
+    } else if (state[i] == CANbus::HANDSTATE_MOVING) {
+      bhstate.internal_state[i] = pr_msgs::BHState::state_moving;
+    } else if (state[i] == CANbus::HANDSTATE_STALLED) {
+      bhstate.internal_state[i] = pr_msgs::BHState::state_stalled;
+    } else if (state[i] == CANbus::HANDSTATE_DONE) {
+      bhstate.internal_state[i] = pr_msgs::BHState::state_done;
+    } else {
+      bhstate.internal_state[i] = 0;
+    }
+  }
+
+  for (unsigned int i=0; i<4; ++i) {
+    if (state[i] == CANbus::HANDSTATE_UNINIT) {
+      bhstate.state = pr_msgs::BHState::state_uninitialized;
+      break; // don't have to check any others
+    } else if (state[i] == CANbus::HANDSTATE_MOVING) {
+      // moving always overrides state_stalled or state_done
+      bhstate.state = pr_msgs::BHState::state_moving;
+      
+      /* Until herbcontroller is updated to know about the stalled
+	 state, we will ignore stalled and treat it as state_done
+	 
+	 // } else if ((state[i] == CANbus::HANDSTATE_STALLED) && 
+	 // (bhstate.state != pr_msgs::BHState::state_moving)) {
+	 //   // stalled cannot override moving
+	 // bhstate.state = pr_msgs::BHState::state_stalled;
+      */
+    }
   }
   
   pub_handstate.publish(bhstate);

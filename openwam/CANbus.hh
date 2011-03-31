@@ -29,6 +29,7 @@
 #include <pthread.h>
 #include <math.h>            // M_PI
 #include <iomanip>
+#include <map>
 
 #ifndef OWDSIM
 
@@ -133,6 +134,9 @@ public:
   char last_error[200];
   int32_t received_position_flags;
   int32_t received_state_flags;
+  int hand_motion_state_sequence;
+
+  static std::map<int,std::string> propname; // reverse number-to-name lookup
 
 #ifndef OWDSIM
 #ifdef CAN_RECORD
@@ -293,12 +297,16 @@ DataRecorder<canio_data> candata;
 
 
   enum {HANDSTATE_UNINIT=0,
-    HANDSTATE_DONE,
-    HANDSTATE_MOVING };
+	HANDSTATE_DONE,
+	HANDSTATE_MOVING,
+	HANDSTATE_STALLED};
 
 private:
   int32_t hand_positions[4+1];
+  int32_t last_hand_positions[4+1];
+  bool encoder_changed[4];
   int32_t hand_distal_positions[4+1];
+  int32_t hand_goal_positions[4+1];
   double hand_strain[4+1];
 #ifdef OWD_RT
   RT_MUTEX hand_queue_mutex;
@@ -307,10 +315,9 @@ private:
   pthread_mutex_t hand_queue_mutex;
   pthread_mutex_t hand_cmd_mutex;
 #endif // ! OWD_RT
-  int32_t handstate;
-  int first_moving_finger;
-  double squeeze_goal[4];
-  bool apply_squeeze, hand_move_command_sent;
+  int32_t handstate[4];
+  int32_t endpoint[4];
+  bool apply_squeeze[4];
 
   int finger_reset(int32_t id);
   double finger_encoder_to_radians(int32_t enc);
@@ -332,7 +339,7 @@ public:
   int hand_get_positions(double &p1, double &p2, double &p3, double &p4);
   int hand_get_distal_positions(double &p1, double &p2, double &p3);
   int hand_get_strain(double &s1, double &s2, double &s3);
-  int hand_get_state(int32_t &state);
+  int hand_get_state(int32_t *state);
 
   int ft_get_data(double *values);
   int ft_tare();
