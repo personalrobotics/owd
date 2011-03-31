@@ -43,8 +43,9 @@ CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
   pucks = new Puck[n_arm_pucks+1];
   trq = new int32_t[n_arm_pucks+1];
   pos = new double[n_arm_pucks+1];
+  jpos = new double[n_arm_pucks+1];
   for(int p=1; p<=n_arm_pucks; p++){
-    pos[p] = 0.0;
+    pos[p] = jpos[p] = 0.0;
     trq[p] = 0;
     pucks[p].ID = p;
     pucks[p].motor_id = p;
