@@ -50,21 +50,21 @@ public:
     wamstate = *ws;
     if (running) {
       if ((wamstate.trajectory_queue.size() > 0) &&
-	  (wamstate.trajectory_queue[0].state == pr_msgs::TrajInfo::state_paused)) {
-	// reverse direction shortly after it stalls
-	DeleteTrajectory(wamstate.trajectory_queue[0].id);
-	return;
+          (wamstate.trajectory_queue[0].state == pr_msgs::TrajInfo::state_paused)) {
+        // reverse direction shortly after it stalls
+        DeleteTrajectory(wamstate.trajectory_queue[0].id);
+        return;
       }
       if ((last_traj_id == 0) // first time
-	  || (wamstate.prev_trajectory.id == last_traj_id)) {
-	if (++point > 2) {
-	  point = 1;
-	}
-	if (point == 1) {
-	  last_traj_id = MoveTo(p1,false);
-	} else {
-	  last_traj_id = MoveTo(p2,true);
-	}
+          || (wamstate.prev_trajectory.id == last_traj_id)) {
+        if (++point > 2) {
+          point = 1;
+        }
+        if (point == 1) {
+          last_traj_id = MoveTo(p1,false);
+        } else {
+          last_traj_id = MoveTo(p2,true);
+        }
       }
       ROS_DEBUG("Moving to point %d",point);
     }
@@ -72,7 +72,7 @@ public:
   }
 
   Test(ros::NodeHandle &n) : node(n), running(false),
-		       point(0), last_traj_id(0)
+                       point(0), last_traj_id(0)
   {
     p1.j.resize(7);
     p2.j.resize(7);
@@ -135,20 +135,20 @@ public:
       first_far_joint = -1;
       rms_distance = 0.0;
       for (unsigned int i=0; i<7; ++i) {
-	double joint_dist = pow(p1.j[i]
-				- wamstate.positions[i],2);
-	rms_distance += joint_dist;
-	if ((first_far_joint == -1) &&
-	    (joint_dist > 0.1)) {
-	  first_far_joint = i;
-	  far_joint_distance = sqrt(joint_dist);
-	}
+        double joint_dist = pow(p1.j[i]
+          - wamstate.positions[i],2);
+        rms_distance += joint_dist;
+        if ((first_far_joint == -1) &&
+            (joint_dist > 0.1)) {
+          first_far_joint = i;
+          far_joint_distance = sqrt(joint_dist);
+        }
       }
       rms_distance = sqrt(rms_distance);
       if (rms_distance > 0.84) {
-	ROS_WARN("Too far from preferred position: joint %d error is %2.2f",
-		 first_far_joint+1,far_joint_distance);
-	sleep(1);
+        ROS_WARN("Too far from preferred position: joint %d error is %2.2f",
+                 first_far_joint+1,far_joint_distance);
+        sleep(1);
       }
     } while (rms_distance > 0.84);
     ROS_WARN("Moving to p1");
@@ -172,15 +172,15 @@ public:
     traj_req.traj.blend_radius.push_back(0.0);
     
     if (StopOnForce) {
-            traj_req.traj.options = traj_req.traj.opt_HoldOnForceInput;
+      traj_req.traj.options = traj_req.traj.opt_HoldOnForceInput;
     }
     if (ros::service::call("owd/AddTrajectory",traj_req,traj_res)) {
       ROS_DEBUG("Added Trajectory %d",traj_res.id);
       if (traj_res.id == 0) {
-	ROS_WARN("Adding trajectory failed");
-	return -2;
+        ROS_WARN("Adding trajectory failed");
+        return -2;
       } else {
-	return traj_res.id;
+        return traj_res.id;
       }
     } else {
       ROS_WARN("Could not Add Trajectory");

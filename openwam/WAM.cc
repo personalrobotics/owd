@@ -460,7 +460,7 @@ void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *sim
 }
 
 void WAM::get_abs_positions(double* jpos) {
-  if (jpos) {
+  if (jpos && bus->jpos){
     this->lock();
     for(int j=1; j<=4; ++j) {
       jpos[ j ] = bus->jpos[j];
