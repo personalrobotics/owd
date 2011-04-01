@@ -295,7 +295,10 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
       return false;
     }
     bhstate.state = pr_msgs::BHState::state_moving;
-    ROS_ERROR_NAMED("bhd280", "Received MoveHand Velocity; changing to MoveHand");
+
+    /*  this was a temporary override to change velocity commands to
+	position moves just for the Personal Robotics project at Intel.
+   ROS_ERROR_NAMED("bhd280", "Received MoveHand Velocity; changing to MoveHand");
     // change all the velocities to positions at the appropriate end
     for (unsigned int i=0; i<4; ++i) {
       if (req.positions[i] > 0) {
@@ -306,10 +309,10 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
     }
     req.movetype = pr_msgs::MoveHand::Request::movetype_position;
     return MoveHand(req,res);
+    */
+    
 
-    // original velocity code follows
-
-    /*    for (unsigned int i=0; i<4; ++i) {
+    for (unsigned int i=0; i<4; ++i) {
       if (req.positions[i] < -max_velocity) {
 	ROS_WARN_NAMED("bhd280",
 		       "Joint %d velocity request of %2.2f limited to max of %2.2f radians/sec",
@@ -331,7 +334,6 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
     } else {
       return true;
     }
-    */
   } else if (req.movetype == 3) { // "hidden" torque mode
     bhstate.state = pr_msgs::BHState::state_moving;
     pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
