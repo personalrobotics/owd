@@ -282,7 +282,11 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
       return false;
     }
     bhstate.state = pr_msgs::BHState::state_moving;
-    ROS_INFO_NAMED("bhd280", "Received MoveHand");
+    ROS_INFO_NAMED("bhd280", "Received MoveHand Position %2.2f %2.2f %2.2f %2.2f",
+		   req.positions[0],
+		   req.positions[1],
+		   req.positions[2],
+		   req.positions[3]);
     pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
     if (bus->hand_move(req.positions) != OW_SUCCESS) {
       return false;
@@ -294,6 +298,11 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
       ROS_ERROR_NAMED("bhd280", "MoveHand Velocity requires 4 velocity arguments");
       return false;
     }
+    ROS_INFO_NAMED("bhd280", "Received MoveHand Velocity %2.2f %2.2f %2.2f %2.2f",
+		   req.positions[0],
+		   req.positions[1],
+		   req.positions[2],
+		   req.positions[3]);
     bhstate.state = pr_msgs::BHState::state_moving;
 
     /*  this was a temporary override to change velocity commands to

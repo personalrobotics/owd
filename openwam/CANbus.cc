@@ -930,9 +930,9 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
   } else if (BH280_installed && (nodeid >=11) && (nodeid <=14)) {
     hand_positions[nodeid-10] = value;
     if (labs(value - last_hand_positions[nodeid-10]) > 50) {
-      encoder_changed[nodeid-11] = 3;
+      encoder_changed[nodeid-11] = 6;
     } else {
-      // it will take 3 stationary cycles before encoder_changed
+      // it will take 6 stationary cycles before encoder_changed
       // becomes zero
       if (encoder_changed[nodeid-11] > 0) {
 	--encoder_changed[nodeid-11];
@@ -2416,6 +2416,7 @@ int CANbus::hand_move(std::vector<double> p) {
   }
   for (unsigned int i=0; i<4; ++i) {
     handstate[i] = HANDSTATE_MOVING;
+    encoder_changed[i] = 6;
   }
   received_state_flags &= ~(0x7800); // clear the four hand bits
   return OW_SUCCESS;
@@ -2438,24 +2439,28 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   
   if (v1 != 0.0) {
     handstate[0] = HANDSTATE_MOVING;
+    encoder_changed[0] = 6;
     if (hand_set_property(11,MODE,MODE_VELOCITY) != OW_SUCCESS) {
       return OW_FAILURE;
     }
   }
   if (v2 != 0.0) {
     handstate[1] = HANDSTATE_MOVING;
+    encoder_changed[1] = 6;
     if (hand_set_property(12,MODE,MODE_VELOCITY) != OW_SUCCESS) {
       return OW_FAILURE;
     }
   }
   if (v3 != 0.0) {
     handstate[2] = HANDSTATE_MOVING;
+    encoder_changed[2] = 6;
     if (hand_set_property(13,MODE,MODE_VELOCITY) != OW_SUCCESS) {
       return OW_FAILURE;
     }
   }
   if (v4 != 0.0) {
     handstate[3] = HANDSTATE_MOVING;
+    encoder_changed[3] = 6;
     if (hand_set_property(14,MODE,MODE_VELOCITY) != OW_SUCCESS) {
       return OW_FAILURE;
     }
@@ -2479,6 +2484,7 @@ int CANbus::hand_torque(double t1, double t2, double t3, double t4) {
       return OW_FAILURE;
     }
     handstate[3] = HANDSTATE_MOVING;
+    encoder_changed[3] = 6;
   }
   if (t3 != 0) {
     if ((hand_set_property(13,MODE,MODE_TORQUE) != OW_SUCCESS) ||
@@ -2487,6 +2493,7 @@ int CANbus::hand_torque(double t1, double t2, double t3, double t4) {
       return OW_FAILURE;
     }
     handstate[2] = HANDSTATE_MOVING;
+    encoder_changed[2] = 6;
   }
   if (t2 != 0) {
     if ((hand_set_property(12,MODE,MODE_TORQUE) != OW_SUCCESS) ||
@@ -2495,6 +2502,7 @@ int CANbus::hand_torque(double t1, double t2, double t3, double t4) {
       return OW_FAILURE;
     }
     handstate[1] = HANDSTATE_MOVING;
+    encoder_changed[1] = 6;
   }
   if (t1 != 0) {
     if ((hand_set_property(11,MODE,MODE_TORQUE) != OW_SUCCESS) ||
@@ -2503,6 +2511,7 @@ int CANbus::hand_torque(double t1, double t2, double t3, double t4) {
       return OW_FAILURE;
     }
     handstate[0] = HANDSTATE_MOVING;
+    encoder_changed[0] = 6;
   }
 
   // record the fact that a motion request is in progress, so we should
