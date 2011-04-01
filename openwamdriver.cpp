@@ -1472,7 +1472,9 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   if (req.traj.positions.size() < 2) {
     ROS_ERROR_NAMED("AddTrajectory","Minimum of 2 traj points required");
     res.id = 0;
-    return false;
+    res.ok=false;
+    res.reason="Minimum of 2 traj points required";
+    return true;
   }
 
 #ifdef FAKE7
@@ -1480,7 +1482,9 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
     ROS_ERROR("FAKE7 was defined but openwam was compiled with 7 DOF");
     ROS_ERROR("Remove -DWRIST from openwam and relink");
     res.id = 0;
-    return false;
+    res.ok=false;
+    res.reason="FAKE7 was defined but openwam was compiled with 7 DOF";
+    return true;
   }
     
   // we're only running a 4DOF wam, so strip the extra DOFS from the
@@ -1491,12 +1495,14 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
 #endif // FAKE7
 
   res = AddTrajectory(&req,NULL);
+  res.ok=true;
   return true;
 }
 
 bool WamDriver::AddPrecomputedTrajectory(
     pr_msgs::AddPrecomputedTrajectory::Request &req,
     pr_msgs::AddPrecomputedTrajectory::Response &res) {
+  // not implemented, so always return false for now
   return false;
 }
 
@@ -1672,7 +1678,9 @@ pr_msgs::AddTrajectory::Response WamDriver::AddTrajectory(
 bool WamDriver::DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
                                  pr_msgs::DeleteTrajectory::Response &res) {
 #ifdef FAKE7
-  return false;
+  res.ok=false;
+  res.reason="Not implemented for FAKE7 compilation option";
+  return true;
 #endif
 
   std::list<Trajectory *>::iterator tl_it;
@@ -1733,7 +1741,8 @@ bool WamDriver::DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
   }
   ROS_INFO("DeleteTrajectory processed: new queue size %zd",
            trajectory_list.size());
-  return false;
+  res.ok=true;
+  return true;
 }
 
 bool WamDriver::SetJointStiffness(pr_msgs::SetJointStiffness::Request &req,
@@ -1743,7 +1752,8 @@ bool WamDriver::SetJointStiffness(pr_msgs::SetJointStiffness::Request &req,
     sprintf(errmsg,"SetJointStiffness expects a vector of %d stiffness values, but %zd were sent",nJoints,req.stiffness.size());
     ROS_WARN("%s",errmsg);
     res.reason=errmsg;
-    res.result=false;
+    res.ok=false;
+    return true;
   }
   if (owam->jointstraj) {
     pr_msgs::CancelAllTrajectories::Request cancel_req;
@@ -1763,7 +1773,7 @@ bool WamDriver::SetJointStiffness(pr_msgs::SetJointStiffness::Request &req,
       owam->suppress_controller[i+1]=true;
     }
   }
-  res.result=true;
+  res.ok=true;
   return true;
 }
 
@@ -1794,6 +1804,7 @@ bool WamDriver::SetStiffness(pr_msgs::SetStiffness::Request &req,
     owam->set_stiffness(0.0);
     ROS_INFO("Position released by SetStiffness command");
   }
+  res.ok=true;
   return true;
 }
 
@@ -1807,11 +1818,13 @@ bool WamDriver::PauseTrajectory(pr_msgs::PauseTrajectory::Request &req,
       owam->resume_trajectory();
       ROS_INFO("Trajectory resumed");
     }
-    return true;
+    res.ok=true;
   } else {
-    ROS_ERROR("PauseTrajectory called while no trajectory was running");
-    return false;
+    res.ok=false;
+    res.reason="PauseTrajectory called while no trajectory was running";
+    ROS_ERROR("%s",res.reason.c_str());
   }
+  return true;
 }
 
 bool WamDriver::ReplaceTrajectory(pr_msgs::ReplaceTrajectory::Request &req,
@@ -1862,6 +1875,7 @@ bool WamDriver::CancelAllTrajectories(
     wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_aborted;
     wamstate.trajectory_queue.clear();
   }
+  res.ok=true;
   return true;
 }
 
@@ -1869,8 +1883,10 @@ bool WamDriver::CancelAllTrajectories(
 bool WamDriver::SetSpeed(pr_msgs::SetSpeed::Request &req,
                          pr_msgs::SetSpeed::Response &res) {
   if (req.velocities.size() != nJoints) {
-    ROS_ERROR("Received SetSpeed command with wrong array size");
-    return false;
+    res.ok=false;
+    res.reason="Received SetSpeed command with wrong array size";
+    ROS_ERROR("%s",res.reason.c_str());
+    return true;
   }
   for (unsigned int i=0; i<nJoints; ++i) {
     if (req.velocities[i] > max_joint_vel[i]) {
@@ -1887,6 +1903,7 @@ bool WamDriver::SetSpeed(pr_msgs::SetSpeed::Request &req,
     joint_accel[i] = joint_vel[i] / req.min_accel_time;
   }
   ROS_INFO("Processed SetSpeed command");
+  res.ok=true;
   return true;
 }
  

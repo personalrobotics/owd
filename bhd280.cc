@@ -243,10 +243,12 @@ bool BHD_280::GetDOF(pr_msgs::GetDOF::Request &req,
 bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
 			pr_msgs::RelaxHand::Response &res) {
   if (bus->hand_relax() == OW_SUCCESS) {
-    return true;
+    res.ok=true;
   } else {
-    return false;
+    res.ok=false;
+    res.reason="Failed";
   }
+  return true;
 }
 
 // Reset command
@@ -254,12 +256,13 @@ bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
 			pr_msgs::ResetHand::Response &res) {
   if (bus->hand_reset() == OW_SUCCESS) {
     bhstate.state = pr_msgs::BHState::state_done;
-    return true;
+    res.ok=true;
   } else {
     bhstate.state = pr_msgs::BHState::state_uninitialized;
-    return false;
+    res.ok=false;
+    res.reason="Failed";
   }
-  return false;
+  return true;
 }
 
 // Move command
@@ -267,20 +270,21 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
 		       pr_msgs::MoveHand::Response &res) {
   if (bhstate.state == pr_msgs::BHState::state_uninitialized) {
     ROS_WARN_NAMED("bhd280","Rejected MoveHand: hand is uninitialized");
-    return false;
+    res.ok=false;
+    res.reason="Hand is uninitialized";
+    return true;
   }
 
   if (req.positions.size() != 4) {
-    ROS_ERROR_NAMED("bhd280","Expected 4 joints for MoveHand; received %zd",
-	      req.positions.size());
-    return false;
+    std::stringstream s("Expected 4 joints for MoveHand but received ");
+    s << req.positions.size();
+    ROS_ERROR_NAMED("bhd280","%s",s.str().c_str());
+    res.ok=false;
+    res.reason=s.str().c_str();
+    return true;
   }
   
   if (req.movetype == pr_msgs::MoveHand::Request::movetype_position) {
-    if (req.positions.size() != 4) {
-      ROS_ERROR_NAMED("bhd280", "MoveHand requires 4 position arguments");
-      return false;
-    }
     bhstate.state = pr_msgs::BHState::state_moving;
     ROS_INFO_NAMED("bhd280", "Received MoveHand Position %2.2f %2.2f %2.2f %2.2f",
 		   req.positions[0],
@@ -289,15 +293,13 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
 		   req.positions[3]);
     pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
     if (bus->hand_move(req.positions) != OW_SUCCESS) {
-      return false;
+      res.ok=false;
+      res.reason="Failed";
     } else {
-      return true;
+      res.ok=true;
     }
+    return true;
   } else if (req.movetype == pr_msgs::MoveHand::Request::movetype_velocity) {
-    if (req.positions.size() != 4) {
-      ROS_ERROR_NAMED("bhd280", "MoveHand Velocity requires 4 velocity arguments");
-      return false;
-    }
     ROS_INFO_NAMED("bhd280", "Received MoveHand Velocity %2.2f %2.2f %2.2f %2.2f",
 		   req.positions[0],
 		   req.positions[1],
@@ -339,10 +341,12 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
 			   req.positions[1],
 			   req.positions[2],
 			   req.positions[3]) != OW_SUCCESS) {
-      return false;
+      res.ok=false;
+      res.reason="Failed";
     } else {
-      return true;
+      res.ok=true;
     }
+    return true;
   } else if (req.movetype == 3) { // "hidden" torque mode
     bhstate.state = pr_msgs::BHState::state_moving;
     pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
@@ -350,12 +354,16 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
 			 req.positions[1],
 			 req.positions[2],
 			 req.positions[3]) != OW_SUCCESS) {
-      return false;
+      res.ok=false;
+      res.reason="Failed";
     } else {
-      return true;
+      res.ok=true;
     }
+    return true;
   } else {
-    return false; // unknown move type
+    res.ok=false;
+    res.reason="Unknown move type";
+    return true;
   }
 }
 
@@ -364,7 +372,10 @@ bool BHD_280::SetHandProperty(pr_msgs::SetHandProperty::Request &req,
   if (bus->hand_set_property(req.nodeid,req.property,req.value) != OW_SUCCESS) {
     ROS_WARN_NAMED("bhd280","Failed to set property %d = %d on puck %d",
 		   req.property,req.value,req.nodeid);
-    return false;
+    res.ok=false;
+    res.reason="Failed to set property";
+  } else {
+    res.ok=true;
   }
   return true;
 }
@@ -374,7 +385,10 @@ bool BHD_280::GetHandProperty(pr_msgs::GetHandProperty::Request &req,
   if (bus->hand_get_property(req.nodeid,req.property,&res.value) != OW_SUCCESS) {
     ROS_WARN_NAMED("bhd280","Failure getting property %d from puck %d",
 		   req.property,req.nodeid);
-    return false;
+    res.ok=false;
+    res.reason="Failed to get property";
+  } else {
+    res.ok=true;
   }
   return true;
 }
