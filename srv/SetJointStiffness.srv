@@ -1,4 +1,4 @@
 float32[] stiffness
 ---
-bool result
+bool ok
 string reason
