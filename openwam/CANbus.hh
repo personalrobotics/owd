@@ -304,7 +304,7 @@ DataRecorder<canio_data> candata;
 private:
   int32_t hand_positions[4+1];
   int32_t last_hand_positions[4+1];
-  bool encoder_changed[4];
+  int encoder_changed[4];
   int32_t hand_distal_positions[4+1];
   int32_t hand_goal_positions[4+1];
   double hand_strain[4+1];

@@ -73,7 +73,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   hand_positions[1]=hand_positions[2]=hand_positions[3]=hand_positions[4]=0;
   last_hand_positions[1]=last_hand_positions[2]=last_hand_positions[3]=last_hand_positions[4]=0;
   hand_distal_positions[1]=hand_distal_positions[2]=hand_distal_positions[3]=hand_distal_positions[4]=0;
-  encoder_changed[0]=encoder_changed[1]=encoder_changed[2]=encoder_changed[3] = false;
+  encoder_changed[0]=encoder_changed[1]=encoder_changed[2]=encoder_changed[3] = 0;
   apply_squeeze[0]=apply_squeeze[1]=apply_squeeze[2]=apply_squeeze[3] = false;
 
   // the fourth finger finger puck also returns a strain value when we 
@@ -899,7 +899,7 @@ int CANbus::request_positions_rt(int32_t id) {
     sendtime=loopcount=0;
   }
 #endif // RT_STATS
-
+  
   return OW_SUCCESS;
 }
 
@@ -930,9 +930,13 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
   } else if (BH280_installed && (nodeid >=11) && (nodeid <=14)) {
     hand_positions[nodeid-10] = value;
     if (labs(value - last_hand_positions[nodeid-10]) > 50) {
-      encoder_changed[nodeid-11] = true;
+      encoder_changed[nodeid-11] = 3;
     } else {
-      encoder_changed[nodeid-11] = false;
+      // it will take 3 stationary cycles before encoder_changed
+      // becomes zero
+      if (encoder_changed[nodeid-11] > 0) {
+	--encoder_changed[nodeid-11];
+      }
     }
     last_hand_positions[nodeid-10] = value;
     if (msglen==6) {
@@ -2180,19 +2184,27 @@ int CANbus::hand_reset() {
   //    }
   //    Open F4
   bool ready=true;
-  for (int nodeid=11; nodeid<=14; ++nodeid) {
-    int32_t hold;
-    if (get_property_rt(nodeid,HOLD,&hold,4000) != OW_SUCCESS) {
-      ROS_ERROR("Could not get TSTOP property from hand puck %d",
+  for (int nodeid=11; nodeid<=13; ++nodeid) {
+    int32_t ct;
+    if (get_property_rt(nodeid,CT,&ct,4000) != OW_SUCCESS) {
+      ROS_ERROR("Could not get CT property from hand puck %d",
 		nodeid);
       return OW_FAILURE;
     }
-    if (((nodeid < 14) && (hold != 0)) 
-	|| ((nodeid == 14) && (hold != 1))) {
+    if (ct != finger_radians_to_encoder(2.4)) {
       ready=false;
       break;
     }
   }
+  int32_t tstop;
+  if (get_property_rt(14,TSTOP,&tstop,4000) != OW_SUCCESS) {
+      ROS_ERROR("Could not get TSTOP property from hand puck 14");
+      return OW_FAILURE;
+  }
+  if (tstop != 200) {
+    ready=false;
+  }
+  
   
   if (ready) {
     // all the fingers have already been HI'd
@@ -2247,6 +2259,10 @@ int CANbus::hand_reset() {
       return OW_FAILURE;
     }
     usleep(100);
+    // Set the CT so that torque is cut after 2.4 radians
+    if (set_property_rt(nodeid,CT,finger_radians_to_encoder(2.4)) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
   }
   if (set_property_rt(14,TSTOP,200) != OW_SUCCESS) {
     return OW_FAILURE;
@@ -2355,12 +2371,12 @@ int CANbus::hand_move(std::vector<double> p) {
 
   // Now set the endpoints and issue the move command
   for (int32_t i=0; i<3; ++i) {
-    // make sure we don't try to move beyond the 0 to 2.6 range
+    // make sure we don't try to move beyond the 0 to 2.4 range
     if (p[i] < 0) {
       p[i]=0;
     }
-    if (p[i] > 2.6) {
-      p[i]=2.6;
+    if (p[i] > 2.4) {
+      p[i]=2.4;
     }
     hand_goal_positions[i+1] = finger_radians_to_encoder(p[i]);
     if (hand_set_property(11+i,E,hand_goal_positions[i+1]) 
