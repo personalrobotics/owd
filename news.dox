@@ -33,7 +33,7 @@ finger3, and palm.  This was requested by a user to make it easier to
 identify particular tactile pads.  The arrays are still all sent in a
 single message (pr_msgs/BHTactile).  [15-Mar-2011]
 
-<b>Improved WAMState and TrajInfo state values
+<b>Improved WAMState and TrajInfo state values</b>
 The state values in WAMState and TrajInfo messages have changed
 slightly in order to make it easier to infer what OWD is currently
 doing.  Instead of having to look at WAMState.state to see that a
