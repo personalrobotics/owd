@@ -77,19 +77,39 @@ If the motor encoder values have not been preserved from a previous run, owd wil
 
 \section controlling Controlling
 
-OWD is primarily controlled through ROS Service Calls.  The following service calls are currently supported (most services are defined in the pr_msgs package; the remainder are in owd):
- - \b AddTrajectory: Adds a new joint trajectory to the queue
- - \b SetStiffness: Controls how firmly OWD will try to hold the current position, on a scale from 0 (no holding at all) to 1 (firmly holding).
+The most common way of using OWD is send it jointspace trajectories that define the path of the arm.  OWD does not do any self-collision or environment collision checking, so that responsibility lies with the client sending the trajectory.  The following ROS Service Calls are supported for manipulating trajectories:
+ - \b AddTrajectory: Adds a new joint trajectory to the queue (note: trajectories can only be added when OWD is already holding position (call SetStiffness 1), and the first point must match the current position)
  - \b PauseTrajectory: Pauses the currently-running trajectory
  - \b DeleteTrajectory: Deletes the specified trajectory from the queue.  If the current trajectory is deleted then the arm will stop where it is.  Any queued trajectories following the deleted one will also be deleted if their start position does not match the current position (if the current trajectory was deleted) or the end position of the previous trajectory (if a queued trajectory was deleted)
  - \b CancelAllTrajectories: Always brings the arm to an immediate stop by deleting the current trajectory and all queued trajectories.
  - \b ReplaceTrajectory: Replaces a queued trajectory with a new one.  If the end position changes, then any subsequent trajectories already in the queue will be deleted.
+
+<!--  rough notes to be cleaned up and added:
+ The blend radius is in radians, and it describes the radius of
+curvature of a circular blend that connects the two adjacent straight
+segments.  Remember this is all happening in 7-DOF jointspace, but any
+two intersecting 7-dimensional straight segments will always be
+coplanar, and the blend lies in that plane.  The blend changes the path
+that the arm will take (in both jointspace and workspace), of course, so
+it's up to you to make sure that the blended path is still
+collision-free.  Also, by adding the blend you are effectively
+shortening the segments, so you have to make sure that the size of the
+blend at each end does not shrink the segment to zero (or negative)
+length.  If OWD starts processing the trajectory and discovers that the
+blend radii are incompatible with the segment distances, it will throw
+out the blends and just run it as an unblended trajectory, which will
+require V=0 at each segment intersection.
+-->
+
+
+A few additional service calls are provided for manipulating OWD:
+ - \b SetStiffness: Controls how firmly OWD will try to hold the current position, on a scale from 0 (no holding at all) to 1 (firmly holding).
  - \b SetSpeed: Sets the max speed of each joint.  Note that there are compiled-in joint velocity limits which prevent the speed from being set to an unsafe value.
  - \b GetArmDOF: Returns the number of joints
  - \b CalibrateJoints: Puts the arm into <b>Calibration Mode</b>, so that the joints can be calibrated using the text interface on stdin/stdout.
 
-OWD can also be controlled by publishing messages to ROS topics:
- - \b wamservo: A vector of one or more joint indices and corresponding velocities for moving the arm in velocity mode
+OWD can also be controlled by sending velocities directly to one or more of the joints.  Once again, OWD does not do any collision checking, so the responsiblity lies with the client to avoid sending velocity commands that will crash the arm into things.  If the requested velocity is not equal to the current velocity, OWD will (de)accelerate at the maximum acceleration limit for that joint until the velocities match.  If a new velocity command is not received for more than 100ms, OWD will bring the arm to a controlled stop (the assumption is that the client has died or given up).  Velocity commands should be published to the following topic:
+ - \b wamservo (type pr_msgs/Servo): A vector of one or more joint indices followed by a vector of corresponding velocities in radians/sec.
 
 OWD provides feedback through the following ROS topics:
  - \b wamstate: Joint positions, velocities, estimated torques due to external forces, and the state of the trajectory queue
