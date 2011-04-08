@@ -1,0 +1,6 @@
+int32 joint
+float64 distance
+---
+bool ok
+string reason
+uint32 id
