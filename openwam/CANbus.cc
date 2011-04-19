@@ -2440,6 +2440,7 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   if (v1 != 0.0) {
     handstate[0] = HANDSTATE_MOVING;
     encoder_changed[0] = 6;
+    apply_squeeze[0]=false;
     if (hand_set_property(11,MODE,MODE_VELOCITY) != OW_SUCCESS) {
       return OW_FAILURE;
     }
@@ -2447,6 +2448,7 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   if (v2 != 0.0) {
     handstate[1] = HANDSTATE_MOVING;
     encoder_changed[1] = 6;
+    apply_squeeze[1]=false;
     if (hand_set_property(12,MODE,MODE_VELOCITY) != OW_SUCCESS) {
       return OW_FAILURE;
     }
@@ -2454,6 +2456,7 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   if (v3 != 0.0) {
     handstate[2] = HANDSTATE_MOVING;
     encoder_changed[2] = 6;
+    apply_squeeze[2]=false;
     if (hand_set_property(13,MODE,MODE_VELOCITY) != OW_SUCCESS) {
       return OW_FAILURE;
     }
@@ -2461,6 +2464,7 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   if (v4 != 0.0) {
     handstate[3] = HANDSTATE_MOVING;
     encoder_changed[3] = 6;
+    apply_squeeze[3]=false;
     if (hand_set_property(14,MODE,MODE_VELOCITY) != OW_SUCCESS) {
       return OW_FAILURE;
     }
