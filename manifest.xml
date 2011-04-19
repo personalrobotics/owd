@@ -7,4 +7,5 @@
   <url>http://personalrobotics.intel-research.net/intel-pkg/owd/html/index.html</url>
   <license>LGPL</license>
   <depend package="owd"/>
+  <depend package="std_msgs"/>
 </package>

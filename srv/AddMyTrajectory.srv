@@ -1,5 +1,5 @@
 int32 joint
-float64 distance
+float64 torque
 ---
 bool ok
 string reason
