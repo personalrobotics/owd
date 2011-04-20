@@ -263,7 +263,7 @@ int WAM::init(){
   //                        Kp    Kd    Ki
     jointsctrl[5].set_gains(  40,  0.5, 0.5);
     jointsctrl[6].set_gains(  40,  0.5, 0.5);
-    jointsctrl[7].set_gains(  8,  0.08, 0.1);
+    jointsctrl[7].set_gains(  16,  0.16, 0.1);
   }
   if (Joint::Jn > 7) {
     // set 280 Hand gains here
