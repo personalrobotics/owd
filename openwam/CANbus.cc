@@ -1957,7 +1957,7 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 	break;
       }
       if ((apply_squeeze[nodeid-11]) && (labs(hand_positions[nodeid-10] - hand_goal_positions[nodeid-10]) > 600)) {
-	if (apply_hand_goal_positions[nodeid-10] == 0) {
+	if (hand_goal_positions[nodeid-10] == 0) {
 	  // If the original goal was zero (completely open), then we
 	  // need to repeat the command with the same torque setting so
 	  // that the breakaway torque is properly set
@@ -2476,8 +2476,7 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   // v=0, because they might have been previously moving and this will
   // be the way to stop them.
   if (hand_set_property(GROUPID(5),MODE,MODE_VELOCITY) != OW_SUCCESS) {
-      return OW_FAILURE;
-    }
+    return OW_FAILURE;
   }
 
   // record the fact that a motion request is in progress, so we should
