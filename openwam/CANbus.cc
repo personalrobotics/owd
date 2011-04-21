@@ -2424,6 +2424,12 @@ int CANbus::hand_move(std::vector<double> p) {
 
 int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   ROS_DEBUG_NAMED("bhd280", "executing hand_velocity");
+
+  // turn off any pending squeezes remaining from a previous position move
+  for (int i=0; i<4; ++i) {
+    apply_squeeze[i]=false;
+  }
+
   if (hand_set_property(11,V,finger_radians_to_encoder(v1)/1000.0) != OW_SUCCESS) {
     return OW_FAILURE;
   }
@@ -2440,36 +2446,27 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   if (v1 != 0.0) {
     handstate[0] = HANDSTATE_MOVING;
     encoder_changed[0] = 6;
-    apply_squeeze[0]=false;
-    if (hand_set_property(11,MODE,MODE_VELOCITY) != OW_SUCCESS) {
-      return OW_FAILURE;
-    }
   }
   if (v2 != 0.0) {
     handstate[1] = HANDSTATE_MOVING;
     encoder_changed[1] = 6;
-    apply_squeeze[1]=false;
-    if (hand_set_property(12,MODE,MODE_VELOCITY) != OW_SUCCESS) {
-      return OW_FAILURE;
-    }
   }
   if (v3 != 0.0) {
     handstate[2] = HANDSTATE_MOVING;
     encoder_changed[2] = 6;
-    apply_squeeze[2]=false;
-    if (hand_set_property(13,MODE,MODE_VELOCITY) != OW_SUCCESS) {
-      return OW_FAILURE;
-    }
   }
   if (v4 != 0.0) {
     handstate[3] = HANDSTATE_MOVING;
     encoder_changed[3] = 6;
-    apply_squeeze[3]=false;
-    if (hand_set_property(14,MODE,MODE_VELOCITY) != OW_SUCCESS) {
+  }
+
+  // we send the MODE_VELOCITY to all fingers, even ones that might have
+  // v=0, because they might have been previously moving and this will
+  // be the way to stop them.
+  if (hand_set_property(GROUPID(5),MODE,MODE_VELOCITY) != OW_SUCCESS) {
       return OW_FAILURE;
     }
   }
-  
 
   // record the fact that a motion request is in progress, so we should
   // ignore any state responses that were made between now and when the
