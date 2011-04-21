@@ -1957,22 +1957,34 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 	break;
       }
       if ((apply_squeeze[nodeid-11]) && (labs(hand_positions[nodeid-10] - hand_goal_positions[nodeid-10]) > 600)) {
-	// only apply the squeeze if we're still more than 600 encoder ticks
-	// from the goal
-	handstate[nodeid-11] = HANDSTATE_MOVING;
-	if (hand_set_property(nodeid,MT,800) != OW_SUCCESS) {
-	  return OW_FAILURE;
-	}
-	if (hand_set_property(nodeid,TSTOP,0) != OW_SUCCESS) {
-	  return OW_FAILURE;
-	}
-	// the value of E was already set, so we just change MODE
-	if (hand_set_property(nodeid,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
-	  return OW_FAILURE;
+	if (apply_hand_goal_positions[nodeid-10] == 0) {
+	  // If the original goal was zero (completely open), then we
+	  // need to repeat the command with the same torque setting so
+	  // that the breakaway torque is properly set
+	  if (hand_set_property(nodeid,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+	    return OW_FAILURE;
+	  }
+	} else {
+	  // our target was not zero, but we got stuck more than 600 encoder
+	  // ticks away from the goal, so reapply the command with no torque
+	  // stopping and with a torque limit low enough that it can keep
+	  // applying the force indefinitely without overheating.
+	  handstate[nodeid-11] = HANDSTATE_MOVING;
+	  if (hand_set_property(nodeid,MT,800) != OW_SUCCESS) {
+	    return OW_FAILURE;
+	  }
+	  if (hand_set_property(nodeid,TSTOP,0) != OW_SUCCESS) {
+	    return OW_FAILURE;
+	  }
+	  // the value of E was already set, so we just change MODE
+	  if (hand_set_property(nodeid,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+	    return OW_FAILURE;
+	  }
 	}
 	apply_squeeze[nodeid-11]=false;
       } else {
 	handstate[nodeid-11] = HANDSTATE_DONE;
+	apply_squeeze[nodeid-11]=false;
       }	
       break;
 
