@@ -1,6 +1,6 @@
 uint32 id
+string type
 float64[] end_position
-uint32 options
 uint32 state
 
 uint8 state_pending=0
