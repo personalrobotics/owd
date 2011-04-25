@@ -5,5 +5,5 @@ set(ROS_BUILD_TYPE Debug)
 rosbuild_init()
 rosbuild_gensrv()
 
-rosbuild_add_library(mytraj MyTraj.cpp)
+rosbuild_add_library(myplugin MyPlugin.cpp)
 #add_library(mytraj SHARED MyTraj.cpp)
