@@ -1,3 +1,16 @@
+/***********************************************************************
+
+  Copyright 2011 Carnegie Mellon University and Intel Corporation
+  Author: Mike Vande Weghe <vandeweg@cmu.edu>
+
+  This ROS package serves as a sample for how to make an OWD plugin.
+  For more information about OWD, please see the webpage
+  http://personalrobotics.intel-research.net/intel-pkg/owd/html/index.html
+
+  You are free to modify and reuse this code without restrictions.
+
+**********************************************************************/
+
 #include "MyPlugin.hh"
 #include <ros/ros.h>
 #include <std_msgs/String.h>
