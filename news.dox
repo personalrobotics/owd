@@ -54,7 +54,7 @@ in a future release. [15-Mar-2011]
 
 <b>Improved routine for saving calibration values</b>
 The calibration routine has been changed so that after the arm is returned to
-home with grav-comp on, OWD waits for <return> and then turns the motors
+home with grav-comp on, OWD waits for \<return\> and then turns the motors
 off so that the user can readjust the home position before pressing
 shift-idle.  This helps to avoid the sudden relaxation of the arm that
 can throw off the saved home position values. [15-Mar-2011]

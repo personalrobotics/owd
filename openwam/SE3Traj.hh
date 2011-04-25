@@ -34,7 +34,7 @@ using namespace std;
  * linear motions will be generated
  */
 
-class SE3Traj : public Trajectory{
+class SE3Traj : public OWD::Trajectory{
 
 protected:
   SE3 E01 ;  // initial (frame 1) transformations 
@@ -51,7 +51,7 @@ protected:
 public:
 
   SE3Traj(const SE3& e01, const SE3& e02, 
-		Profile* lp, Profile* rp) : Trajectory(){
+	  Profile* lp, Profile* rp) : OWD::Trajectory("SE3Traj"){
     E01=e01; 
     linprof=lp;
     rotprof=rp;
@@ -79,9 +79,9 @@ public:
   void run (){linprof->run();  rotprof->run();}
   void stop(){linprof->stop(); rotprof->stop();}
   int state(){
-    if(linprof->state() == Profile::RUN) return Trajectory::RUN;
-    if(rotprof->state() == Profile::RUN) return Trajectory::RUN;
-    return Trajectory::STOP;
+    if(linprof->state() == Profile::RUN) return OWD::Trajectory::RUN;
+    if(rotprof->state() == Profile::RUN) return OWD::Trajectory::RUN;
+    return OWD::Trajectory::STOP;
   }
 
   /*
@@ -89,7 +89,7 @@ public:
    * acceleration, as well as the desired rotational velocity and acceleration
    */
   void evaluate(SE3& E0ns, R3& pd, R3& pdd, R3& wd, R3& wdd, double dt){
-    if(state() == Trajectory::RUN){
+    if(state() == OWD::Trajectory::RUN){
       double x, xd, xdd, theta, thetad, thetadd;
   
       linprof->evaluate(x,     xd,     xdd,     dt);
@@ -106,7 +106,7 @@ public:
     }
   }
 
-  void evaluate(double *q, double *qd, double *qdd, double dt) {}
+  void evaluate(OWD::Trajectory::TrajControl &tc, double dt) {};
 };
 
 #endif

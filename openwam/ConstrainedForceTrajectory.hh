@@ -29,7 +29,7 @@
 #ifndef __CONSTRAINEDFORCETRAJECTORY_HH
 #define __CONSTRAINEDFORCETRAJECTORY_HH
 
-class ConstrainedForceTrajectory : public Trajectory {
+class ConstrainedForceTrajectory : public OWD::Trajectory {
 public:
 
   class EndCondition {
@@ -51,7 +51,8 @@ public:
 			     int trajid);
   virtual ~ConstrainedForceTrajectory();
     
-  void evaluate(double y[], double yd[], double ydd[], double dt);
+  //  void evaluate(double y[], double yd[], double ydd[], double dt);
+  void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
   void update_torques(double t[]);
 
 private:

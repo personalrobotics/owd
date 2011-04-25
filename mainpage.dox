@@ -41,13 +41,14 @@ Make sure you have both the owd and pr_msgs directories in your ROS_PACKAGE_PATH
 rosmake owd
 \endverbatim
 
-Six executables will be created:
+Seven executables will be created:
  - \b owd Driver for arm only
  - \b owdrt Driver for arm running under Xenomai RT
  - \b owdbhd Driver for arm plus 280 Hand
  - \b owdbhdrt Driver for arm plus 280 Hand (Xenomai)
  - \b canbhd Driver for 280 Hand only
  - \b canbhdrt Driver for 280 Hand only (Xenomai)
+ - \b owdsim Simulation driver for testing clients offline
 
 \section configuration Configuring
 \b owd.launch is a sample launch file for staring owd using \b roslaunch.  The following parameters are supported:
@@ -59,9 +60,10 @@ Six executables will be created:
    - \b 280+TACT For a BH280 Hand with the fingertip tactile arrays installed
    - \b none For no hand installed
  - \b ~/forcetorque_sensor Whether the Barrett Force/Torque sensor is installed (true/false)
- - \b ~/calibration_file A string specifying a file to keep on disk of the joint calibration values (see the \ref Calibration section below)
+ - \b ~/calibration_file A string specifying a file to keep on disk of the joint calibration values (see the \ref calibration section below)
  - \b ~/home_position A comma-separated list of joint values, in radians, of the configuration of the arm when the encoder values have been lost and the home position needs to be reset.
  - \b ~/tactile_top10 If set to True will only report 4-bit values for the 10 ten pressures in each tactile array.  Default is false (all values are reported as 12-bit numbers).  Setting to true reduces the communication demands on the CAN bus.
+ - \b ~/owd_plugins A comma-separated list of shared library files to be loaded.  See the \subpage plugins documentation for more info.
 
 \section running Running
 
@@ -73,7 +75,7 @@ roslaunch owd.launch
 
 No more than one OWD should be started from a single roslaunch file so that the stdio from each remains independent.
 
-If the motor encoder values have not been preserved from a previous run, owd will ask you to first move the hand to a safe space for initialization, and then to move the arm to its home position.  You can choose the home position to be something convenient based on how your WAM is mounted, but in general it's good to have as many joints as possible against one of their stops for repeatability.  As long as you match the joint angles specified in the <em>home_position</em> ROS parameter, owd be able to successfully set the correct joint angles.  For more accurate joint angle calibration, see the \ref Calibration section for details on preserving calibration values in a file.
+If the motor encoder values have not been preserved from a previous run, owd will ask you to first move the hand to a safe space for initialization, and then to move the arm to its home position.  You can choose the home position to be something convenient based on how your WAM is mounted, but in general it's good to have as many joints as possible against one of their stops for repeatability.  As long as you match the joint angles specified in the <em>home_position</em> ROS parameter, owd be able to successfully set the correct joint angles.  For more accurate joint angle calibration, see the \ref calibration section for details on preserving calibration values in a file.
 
 \section controlling Controlling
 
@@ -117,6 +119,10 @@ OWD provides feedback through the following ROS topics:
  - \b forcetorque: A geometry_msgs/Wrench message containing the values from the force/torque sensor (only published if installed)
 
 Additionally, OWD publishes a TF frame for every link, defining \b wam1 in terms of \b wam0, \b wam2 in terms of \b wam1, etc, all the way up to \b wam7 in terms of \b wam6.
+
+\section customizing Customizing
+
+OWD allows users to add new features via run-time loadable plugins.  See the \subpage plugins page for details.
 
 \section shutdown Shutting down
 

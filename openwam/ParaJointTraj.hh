@@ -30,45 +30,47 @@
 #ifndef __PARAJOINTTRAJ_HH__
 #define __PARAJOINTTRAJ_HH__
 
+namespace OWD {
+
 class ParaJointTraj : public Trajectory {
 private:
     int DOF;
-    vector<double> max_joint_vel;
-    vector<double> max_joint_accel;
-    int rescale_to_slowest(int slowest_joint,double max_end_time,double accel_time, const vector<double> &max_joint_vel, const vector<double> &max_joint_accel);
-    inline int sgn(double x) { return (x>0.0f)?1:(x<0.0f)?-1:0; }
-    bool check_for_bend(vector<ParabolicSegment> *ps,
-                               TrajPoint &p1, TrajPoint &p2);
-    double restart_time;
-    vector<ParabolicSegment>::iterator *current_segment;
+  std::vector<double> max_joint_vel;
+  std::vector<double> max_joint_accel;
+  int rescale_to_slowest(int slowest_joint,double max_end_time,double accel_time, const std::vector<double> &max_joint_vel, const std::vector<double> &max_joint_accel);
+  inline int sgn(double x) { return (x>0.0f)?1:(x<0.0f)?-1:0; }
+  bool check_for_bend(std::vector<ParabolicSegment> *ps,
+		      TrajPoint &p1, TrajPoint &p2);
+  double restart_time;
+  std::vector<ParabolicSegment>::iterator *current_segment;
     
 public:
     
-    vector<ParabolicSegment> *parsegs;
-    vector <ParabolicSegment> restart_parsegs;
-    bool restart;
-
-    double traj_duration;
-    
-    ParaJointTraj(TrajType &vtraj, 
-                  const vector<double> &max_joint_vel, 
-                  const vector<double> &max_joint_accel,
-                  bool bWaitForStart,
-                  bool bHoldOnStall,
-		  bool bHoldOnForceInput,
-                  int trajid);
-    virtual ~ParaJointTraj();
-    
-    void lock(){pthread_mutex_lock(&mutex);}
-    void unlock(){pthread_mutex_unlock(&mutex);}
-    bool log(const char *prefix);
-    
-    void run();
-    void stop();
-    int  state();
-    void evaluate(double y[], double yd[], double ydd[], double dt);
-    void rebuild_from_current();
-  void reset(double t);
+  std::vector<ParabolicSegment> *parsegs;
+  std::vector <ParabolicSegment> restart_parsegs;
+  bool restart;
+  
+  double traj_duration;
+  
+  ParaJointTraj(TrajType &vtraj, 
+		const std::vector<double> &max_joint_vel, 
+		const std::vector<double> &max_joint_accel,
+		bool bWaitForStart,
+		bool bHoldOnStall,
+		bool bHoldOnForceInput);
+  virtual ~ParaJointTraj();
+  
+  virtual void lock(){pthread_mutex_lock(&mutex);}
+  virtual void unlock(){pthread_mutex_unlock(&mutex);}
+  virtual bool log(const char *prefix);
+  
+  virtual void run();
+  virtual void stop();
+  virtual int  state();
+  virtual void evaluate(Trajectory::TrajControl &tc, double dt);
+  virtual void reset(double t);
+  //  virtual void rebuild_from_current();
 };
 
+}; // namespace OWD
 #endif

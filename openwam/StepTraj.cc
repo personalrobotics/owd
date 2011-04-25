@@ -22,10 +22,12 @@
 
 #include "StepTraj.hh"
 
+namespace OWD {
 
 StepTraj::StepTraj(int trajid, int dof, unsigned int joint,
 		   double *start_pos, double step_size)
-  : nDOF(dof)
+  : Trajectory("StepTraj"),
+    nDOF(dof)
 {
   id=trajid;
   start_position.SetFromArray(nDOF,start_pos);
@@ -39,21 +41,25 @@ StepTraj::StepTraj(int trajid, int dof, unsigned int joint,
 StepTraj::~StepTraj() {
 }
     
-void StepTraj::evaluate(double y[], double yd[], double ydd[], double dt) {
+void StepTraj::evaluate(Trajectory::TrajControl &tc, double dt) {
+  if (tc.q.size() < nDOF) {
+    runstate=DONE;
+    return;
+  }
   time += dt;
   if (time < 1.0) {
-    for (unsigned int i = 0; i<nDOF; ++i) {
-      y[i+1]=start_position[i];
-      yd[i+1]=ydd[i+1]=0;
-    }
+    tc.q=start_position;
+    tc.qd.resize(nDOF,0);
+    tc.qdd.resize(nDOF,0);
   } else {
-    for (unsigned int i = 0; i<nDOF; ++i) {
-      y[i+1]=end_position[i];
-      yd[i+1]=ydd[i+1]=0;
-    }
+    tc.q=end_position;
+    tc.qd.resize(nDOF,0);
+    tc.qdd.resize(nDOF,0);
   }
   if (time>3.0) {
     runstate = DONE;
   }
 
 }
+
+}; // namespace OWD

@@ -28,6 +28,8 @@
 #ifndef __STEPTRAJ_HH__
 #define __STEPTRAJ_HH__
 
+namespace OWD {
+
 class StepTraj : public Trajectory {
 private:
   int nDOF;
@@ -38,7 +40,9 @@ public:
   virtual ~StepTraj();
 
   // mandatory functions inherited from Trajectory
-  void evaluate(double y[], double yd[], double ydd[], double dt);
+  virtual void evaluate(Trajectory::TrajControl &tc, double dt);
 };
+
+}; // namespace OWD
 
 #endif

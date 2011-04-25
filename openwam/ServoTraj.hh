@@ -28,6 +28,8 @@
 #ifndef __SERVOTRAJ_HH__
 #define __SERVOTRAJ_HH__
 
+namespace OWD {
+
 class ServoTraj : public Trajectory {
 private:
   int nDOF;
@@ -47,11 +49,13 @@ public:
 	    double *upper_joint_limits = NULL);
   virtual ~ServoTraj();
 
-  bool SetVelocity(int j, float v, float duration = 0.5);
-  void stop(); // override of base class stop()
+  virtual bool SetVelocity(int j, float v, float duration = 0.5);
+  virtual void stop(); // override of base class stop()
   
   // mandatory functions inherited from Trajectory
-  void evaluate(double y[], double yd[], double ydd[], double dt);
+  virtual void evaluate(Trajectory::TrajControl &tc, double dt);
 };
+
+}; // namespace OWD
 
 #endif

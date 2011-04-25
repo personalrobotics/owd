@@ -31,9 +31,12 @@
 
 CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
 	       bool ft, bool tactile) : 
-  puck_state(2),BH280_installed(bh280),id(bus_id),
-  trq(NULL),pos(NULL),
-  pucks(NULL),n_arm_pucks(num_pucks),simulation(true)
+  puck_state(2),BH280_installed(bh280),id(bus_id),trq(NULL),
+  pos(NULL),jpos(NULL), forcetorque_data(NULL), tactile_data(NULL),
+  valid_forcetorque_data(NULL), valid_tactile_data(NULL),
+  tactile_top10(false), pucks(NULL),n_arm_pucks(num_pucks),
+  simulation(true), received_position_flags(0), received_state_flags(0),
+  hand_motion_state_sequence(0)
 {
   //  pthread_mutex_init(&trqmutex, NULL);
   //  pthread_mutex_init(&posmutex, NULL);
@@ -211,6 +214,34 @@ int CANbus::set_puck_group_id(int32_t nid) {
   return OW_SUCCESS;
 }
 
+double CANbus::finger_encoder_to_radians(int32_t enc) {
+  // encoder range: 0 to -199,111.1
+  // degree range: 0 to 140
+  return  ((double)enc / 199111.1) * 140.0 * 3.1416/180.0;
+}
+
+double CANbus::finger_innerlink_encoder_to_radians(int32_t enc) {
+  // encoder range: 0 to 4096
+  // degree range: 360
+
+  //  return ((double)enc / 4096) * 3.1416 * 2.0;
+  return (double) enc;  // for debugging, send the raw encoder val
+}
+
+int32_t CANbus::finger_radians_to_encoder(double radians) {
+  return(radians * 180.0/3.1416 / 140.0 * 199111.1);
+}
+
+double CANbus::spread_encoder_to_radians(int32_t enc) {
+  // encoder range: 0 to -35950
+  // degree range: 0 to 180
+  return ((double)enc / 35950.0) * 180.0 * 3.1416/180.0;
+}
+
+int32_t CANbus::spread_radians_to_encoder(double radians) {
+  return(radians * 180.0/3.1416 / 180.0 * 35950.0);
+}
+
 int CANbus::request_positions_rt(int32_t groupid) {}
 int CANbus::request_puck_state_rt(int32_t nodeid) {}
 int CANbus::request_hand_state_rt() {}
@@ -228,6 +259,21 @@ int CANbus::process_safety_response_rt(int32_t msgid, uint8_t* msg, int32_t msgl
 int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) { return OW_SUCCESS; }
 int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) { return OW_SUCCESS; }
 
+int CANbus::ft_tare() {return OW_SUCCESS; }
+int CANbus::hand_move(std::vector<double> p) {
+  for (int f=0; f<3; ++f) {
+    hand_positions[f+1] = finger_radians_to_encoder(p[f]);
+  }
+  hand_positions[4] = spread_radians_to_encoder(p[3]);
+  return OW_SUCCESS;
+}
+int CANbus::hand_velocity(const std::vector<double> &v) {
+  return OW_SUCCESS;
+}
+int CANbus::hand_torque(const std::vector<double> &t) {
+  return OW_SUCCESS;
+}
+  
 void CANstats::rosprint()  {
   //  ROS_DEBUG_NAMED("times","CANbus::send %2.1fms per group (2 groups)",
   //		  cansend_time);

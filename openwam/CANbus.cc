@@ -2417,14 +2417,10 @@ int CANbus::hand_move(std::vector<double> p) {
   // move is complete.  If any of the goal positions are non-zero,
   // we'll follow up with a squeeze.
   for (unsigned int i=0; i<4; ++i) {
-    if (p[i] > 0) {
-      // record the fact that once the hand stops, we want to keep
-      // applying pressure.  this helps to ensure that even if a gripped
-      // object slips, we will still adjust until we reach the goal position.
-      apply_squeeze[i]=true;
-    } else {
-      apply_squeeze[i]=false;
-    }
+    // record the fact that once the hand stops, we want to keep
+    // applying pressure.  this helps to ensure that even if a gripped
+    // object slips, we will still adjust until we reach the goal position.
+    apply_squeeze[i]=true;
   }
   for (unsigned int i=0; i<4; ++i) {
     handstate[i] = HANDSTATE_MOVING;
@@ -2434,7 +2430,7 @@ int CANbus::hand_move(std::vector<double> p) {
   return OW_SUCCESS;
 }
 
-int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
+int CANbus::hand_velocity(const std::vector<double> &v) {
   ROS_DEBUG_NAMED("bhd280", "executing hand_velocity");
 
   // turn off any pending squeezes remaining from a previous position move
@@ -2442,32 +2438,32 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
     apply_squeeze[i]=false;
   }
 
-  if (hand_set_property(11,V,finger_radians_to_encoder(v1)/1000.0) != OW_SUCCESS) {
+  if (hand_set_property(11,V,finger_radians_to_encoder(v[0])/1000.0) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (hand_set_property(12,V,finger_radians_to_encoder(v2)/1000.0) != OW_SUCCESS) {
+  if (hand_set_property(12,V,finger_radians_to_encoder(v[1])/1000.0) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (hand_set_property(13,V,finger_radians_to_encoder(v3)/1000.0) != OW_SUCCESS) {
+  if (hand_set_property(13,V,finger_radians_to_encoder(v[2])/1000.0) != OW_SUCCESS) {
     return OW_FAILURE;
   }
-  if (hand_set_property(14,V,finger_radians_to_encoder(v4)/1000.0) != OW_SUCCESS) {
+  if (hand_set_property(14,V,spread_radians_to_encoder(v[3])/1000.0) != OW_SUCCESS) {
     return OW_FAILURE;
   }
   
-  if (v1 != 0.0) {
+  if (v[0] != 0.0) {
     handstate[0] = HANDSTATE_MOVING;
     encoder_changed[0] = 6;
   }
-  if (v2 != 0.0) {
+  if (v[1] != 0.0) {
     handstate[1] = HANDSTATE_MOVING;
     encoder_changed[1] = 6;
   }
-  if (v3 != 0.0) {
+  if (v[2] != 0.0) {
     handstate[2] = HANDSTATE_MOVING;
     encoder_changed[2] = 6;
   }
-  if (v4 != 0.0) {
+  if (v[3] != 0.0) {
     handstate[3] = HANDSTATE_MOVING;
     encoder_changed[3] = 6;
   }
@@ -2487,43 +2483,19 @@ int CANbus::hand_velocity(double v1, double v2, double v3, double v4) {
   return OW_SUCCESS;
 }
  
-int CANbus::hand_torque(double t1, double t2, double t3, double t4) {
+int CANbus::hand_torque(const std::vector<double> &t) {
   ROS_DEBUG_NAMED("bhd280", "executing hand_torque");
-  if (t4 != 0) {
-    if ((hand_set_property(14,MODE,MODE_TORQUE) != OW_SUCCESS) ||
-	(hand_set_property(14,T,t4) != OW_SUCCESS)) {
-      ROS_ERROR_NAMED("bhd280","could not set torque for spread");
-      return OW_FAILURE;
+
+  for (unsigned int f=0; f<4; ++f) {
+    if (t[f] != 0) {
+      if ((hand_set_property(11+f,MODE,MODE_TORQUE) != OW_SUCCESS) ||
+	  (hand_set_property(11+f,T,t[f]) != OW_SUCCESS)) {
+	ROS_ERROR_NAMED("bhd280","could not set torque for F%d",f);
+	return OW_FAILURE;
+      }
+      handstate[f] = HANDSTATE_MOVING;
+      encoder_changed[f] = 6;
     }
-    handstate[3] = HANDSTATE_MOVING;
-    encoder_changed[3] = 6;
-  }
-  if (t3 != 0) {
-    if ((hand_set_property(13,MODE,MODE_TORQUE) != OW_SUCCESS) ||
-	(hand_set_property(13,T,t3) != OW_SUCCESS)) {
-      ROS_ERROR_NAMED("bhd280","could not set torque for finger 3");
-      return OW_FAILURE;
-    }
-    handstate[2] = HANDSTATE_MOVING;
-    encoder_changed[2] = 6;
-  }
-  if (t2 != 0) {
-    if ((hand_set_property(12,MODE,MODE_TORQUE) != OW_SUCCESS) ||
-	(hand_set_property(12,T,t2) != OW_SUCCESS)) {
-      ROS_ERROR_NAMED("bhd280","could not set torque for finger 2");
-      return OW_FAILURE;
-    }
-    handstate[1] = HANDSTATE_MOVING;
-    encoder_changed[1] = 6;
-  }
-  if (t1 != 0) {
-    if ((hand_set_property(11,MODE,MODE_TORQUE) != OW_SUCCESS) ||
-	(hand_set_property(11,T,t1) != OW_SUCCESS)) {
-      ROS_ERROR_NAMED("bhd280","could not set torque for finger 1");
-      return OW_FAILURE;
-    }
-    handstate[0] = HANDSTATE_MOVING;
-    encoder_changed[0] = 6;
   }
 
   // record the fact that a motion request is in progress, so we should

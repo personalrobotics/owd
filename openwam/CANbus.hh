@@ -190,8 +190,14 @@ DataRecorder<canio_data> candata;
   /// \param usecs Time to wait for response (defaults to 2000
   ///              if not specified)
   /// \param retries Number of times to resend the request after a timeout
-  int request_property_rt(int32_t id, int32_t property);
   int get_property_rt(int32_t nid, int32_t property, int32_t* value, int32_t usecs=2000, int32_t retries=0);
+
+  /// Send out a property request, but don't wait for it to return
+  /// The main message processing loop will dispatch the return message
+  /// to the matching processing function.
+  /// \param id Node number
+  /// \param property Property number
+  int request_property_rt(int32_t id, int32_t property);
   
   int read_rt(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs);
   int send_rt(int32_t  msgid, uint8_t* msg, int32_t  msglen, int32_t usecs);
@@ -301,13 +307,13 @@ DataRecorder<canio_data> candata;
 	HANDSTATE_MOVING,
 	HANDSTATE_STALLED};
 
-private:
   int32_t hand_positions[4+1];
   int32_t last_hand_positions[4+1];
   int encoder_changed[4];
   int32_t hand_distal_positions[4+1];
   int32_t hand_goal_positions[4+1];
   double hand_strain[4+1];
+private:
 #ifdef OWD_RT
   RT_MUTEX hand_queue_mutex;
   RT_MUTEX hand_cmd_mutex;
@@ -320,21 +326,21 @@ private:
   bool apply_squeeze[4];
 
   int finger_reset(int32_t id);
+
+public:
   double finger_encoder_to_radians(int32_t enc);
   int32_t finger_radians_to_encoder(double radians);
   double spread_encoder_to_radians(int32_t enc);
   int32_t spread_radians_to_encoder(double radians);
   double finger_innerlink_encoder_to_radians(int32_t enc);
-
-public:
   int hand_get_property(int32_t id, int32_t prop, int32_t *val);
   int hand_set_property(int32_t id, int32_t prop, int32_t val);
   int hand_set_state_rt();
   int hand_activate(int32_t *nodes);
   int hand_reset();
   int hand_move(std::vector<double> p);
-  int hand_velocity(double v1, double v2, double v3, double v4);
-  int hand_torque(double t1, double t2, double t3, double t4);
+  int hand_velocity(const std::vector<double> &v);
+  int hand_torque(const std::vector<double> &t);
   int hand_relax();
   int hand_get_positions(double &p1, double &p2, double &p3, double &p4);
   int hand_get_distal_positions(double &p1, double &p2, double &p3);

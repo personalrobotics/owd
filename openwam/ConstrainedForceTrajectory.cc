@@ -36,6 +36,7 @@ ConstrainedForceTrajectory::ConstrainedForceTrajectory(
       Link wam_links[],
       double max_velocity,
       int trajid) :
+  OWD::Trajectory("ConstrainedForceTrajectory"),
   initial_force_vector(starting_force_vector),
   current_force_vector(starting_force_vector),
   end_cond(end_condition),
@@ -53,21 +54,18 @@ ConstrainedForceTrajectory::ConstrainedForceTrajectory(
 
 }
 
-void ConstrainedForceTrajectory::evaluate(double y[], double yd[], double ydd[], double dt) {
-  // shift the pointers to be 1-based (only if they're non-NULL)
-  if (y) y++;
-  if (yd) yd++;
-  if (ydd) ydd++;
+void ConstrainedForceTrajectory::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   
-  if (!y) {
-    return; // can't do anything
+  if (tc.q.size() < DOF) {
+    runstate = DONE;  // can't do anything
+    return;
   }
 
   // compute the joint movement since last call
   static double *y_diff=(double *)malloc(DOF*sizeof(double));
   for (unsigned int i=0; i<DOF; ++i) {
-    y_diff[i]=y[i]-old_y[i];
-    old_y[i]=y[i]; // save the y for next time
+    y_diff[i]=tc.q[i]-old_y[i];
+    old_y[i]=tc.q[i]; // save the y for next time
   }
 
   // compute the current Jacobian
@@ -105,12 +103,7 @@ void ConstrainedForceTrajectory::evaluate(double y[], double yd[], double ydd[],
     stop();
     // don't need to change y[]; just leave it as is.
     for (unsigned int i=0; i<DOF; ++i) {
-      if (yd) {
-	yd[i]=0;
-      }
-      if (ydd) {
-	ydd[i]=0;
-      }
+      tc.qd[i]=tc.qdd[i]=0;
     }
     return;
   }
@@ -119,9 +112,6 @@ void ConstrainedForceTrajectory::evaluate(double y[], double yd[], double ydd[],
 
   // compute the new joint angles for the step
 
-}
-
-void ConstrainedForceTrajectory::update_torques(double t[]) {
 }
 
 ConstrainedForceTrajectory::~ConstrainedForceTrajectory() {

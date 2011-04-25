@@ -337,10 +337,7 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
       }
     }
     pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
-    if (bus->hand_velocity(req.positions[0],
-			   req.positions[1],
-			   req.positions[2],
-			   req.positions[3]) != OW_SUCCESS) {
+    if (bus->hand_velocity(req.positions) != OW_SUCCESS) {
       res.ok=false;
       res.reason="Failed";
     } else {
@@ -350,10 +347,7 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
   } else if (req.movetype == 3) { // "hidden" torque mode
     bhstate.state = pr_msgs::BHState::state_moving;
     pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
-    if (bus->hand_torque(req.positions[0],
-			 req.positions[1],
-			 req.positions[2],
-			 req.positions[3]) != OW_SUCCESS) {
+    if (bus->hand_torque(req.positions) != OW_SUCCESS) {
       res.ok=false;
       res.reason="Failed";
     } else {

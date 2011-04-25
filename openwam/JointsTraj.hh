@@ -38,7 +38,7 @@
  * for Cartesian trajectory, then this class is the equivalent of SE3Trajectory
  */
 
-class JointsTraj : public Trajectory{
+class JointsTraj : public OWD::Trajectory{
 protected:
 
   Profile *prof[Joint::Jn+1];
@@ -49,7 +49,7 @@ public:
 
   JointsTraj( const double Q1[Joint::Jn+1], 
 	      const double Q2[Joint::Jn+1], 
-	      Profile* p[Joint::Jn+1] ) : Trajectory(){
+	      Profile* p[Joint::Jn+1] ) : OWD::Trajectory("JointsTraj"){
 
     for(int j=Joint::J1; j<=Joint::Jn; j++){
       q1[j] = Q1[j];
@@ -88,20 +88,18 @@ public:
     for(int j=Joint::J1; j<=Joint::Jn; j++)
       if(prof[j]->state() == Profile::RUN){run = true;}
     unlock();
-    if(run) return Trajectory::RUN;
-    return Trajectory::STOP;
+    if(run) return OWD::Trajectory::RUN;
+    return OWD::Trajectory::STOP;
   }
 
-  void evaluate(double y[Joint::Jn+1], 
-                double yd[Joint::Jn+1], 
-                double ydd[Joint::Jn+1], double dt){
-      if(state() == Trajectory::RUN){
+  void evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+      if(state() == OWD::Trajectory::RUN){
           lock();
           for(int j=Joint::J1; j<=Joint::Jn; j++){
-              prof[j]->evaluate(y[j], yd[j], ydd[j], dt);
-              y[j] = u[j]*y[j] + q1[j];
-              yd[j] = u[j]*yd[j];
-              ydd[j] = u[j]*ydd[j];  // DANGER: we changed this from y[j] to u[j]
+              prof[j]->evaluate(tc.q[j-1], tc.qd[j-1], tc.qdd[j-1], dt);
+              tc.q[j-1] = u[j]*tc.q[j-1] + q1[j];
+              tc.qd[j-1] = u[j]*tc.qd[j-1];
+              tc.qdd[j-1] = u[j]*tc.qdd[j-1];
           }
           unlock();
       }

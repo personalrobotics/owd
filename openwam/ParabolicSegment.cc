@@ -144,7 +144,7 @@ void ParabolicSegment::refit_curve(double max_v, double max_a, double new_end_ti
     return;
 }
 
-void ParabolicSegment::evaluate(double *y, double *yd, double *ydd, double t) {
+void ParabolicSegment::evaluate(double &q, double &qd, double &qdd, double t) {
     // return the joint value at time t
     if ((t < start_time) || (t > end_time)) {
       ROS_ERROR("ParabolicSegment: requested time of %3.3f exceeds segment end time of %3.3f\n",t,end_time);
@@ -153,29 +153,29 @@ void ParabolicSegment::evaluate(double *y, double *yd, double *ydd, double t) {
     
     if (dir == CONST) {
         // easy
-        *y = start_pos;
-        *yd = 0.0;
-        *ydd = 0.0;
-        return;
+      q = start_pos;
+      qd = 0.0;
+      qdd = 0.0;
+      return;
     }
     if (t < start_time + time_a) {
         // we're in the first parabolic segment
-        *y = start_pos + dir * 0.5 * accel * pow(t-start_time,2);
-        *yd = dir * accel * (t-start_time);
-        *ydd = dir * accel;
+        q = start_pos + dir * 0.5 * accel * pow(t-start_time,2);
+        qd = dir * accel * (t-start_time);
+        qdd = dir * accel;
         return;
     } else if (t < start_time + time_a + time_v) {
         // we're in the linear segment
-        *y = start_pos + dir * (0.5 * accel * pow(time_a,2) // parabolic
+        q = start_pos + dir * (0.5 * accel * pow(time_a,2) // parabolic
                                 + accel * time_a * (t-start_time-time_a)); // linear
-        *yd = dir * accel * time_a;
-        *ydd = 0.0;
+        qd = dir * accel * time_a;
+        qdd = 0.0;
         return;
     } else {
         // we must be in the second parabolic segment
-        *y = end_pos - dir * 0.5 * accel * pow(end_time - t,2);
-        *yd = dir * accel * (end_time - t);
-        *ydd = -dir * accel;
+        q = end_pos - dir * 0.5 * accel * pow(end_time - t,2);
+        qd = dir * accel * (end_time - t);
+        qdd = -dir * accel;
         return;
     }
 }

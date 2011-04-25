@@ -5,6 +5,9 @@
   <author>Mike Vande Weghe (vandeweg@cmu.edu)</author>
   <url>http://personalrobotics.intel-research.net/intel-pkg/owd/html/index.html</url>
   <license>LGPL</license>
+  <export>
+    <cpp cflags="-I${prefix}"/>
+  </export>
   <depend package="roscpp"/>
   <depend package="std_msgs"/>
   <depend package="pr_msgs"/>

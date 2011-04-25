@@ -30,6 +30,8 @@
 #ifndef __MACJOINTTRAJ_HH__
 #define __MACJOINTTRAJ_HH__
 
+namespace OWD {
+
 class MacJointTraj : public Trajectory {
 private:
   int DOF;
@@ -37,21 +39,15 @@ private:
   JointPos max_joint_accel;
   std::vector<MacQuinticElement *>::iterator current_piece;
 public:
-  vector<MacQuinticElement *> macpieces;
+  std::vector<MacQuinticElement *> macpieces;
   double traj_duration;
-
-  static const int STOP = 0;
-  static const int RUN  = 1;
-  static const int DONE = 2;
-  static const int LOG  = 3;
-
 
 private:
   int rescale_to_slowest(int slowest_joint,
 			 double max_end_time,
 			 double accel_time,
-			 const vector<double> &max_joint_vel,
-			 const vector<double> &max_joint_accel);
+			 const std::vector<double> &max_joint_vel,
+			 const std::vector<double> &max_joint_accel);
 
   inline int sgn(double x) { return (x>0.0f)?1:(x<0.0f)?-1:0; }
 
@@ -59,25 +55,26 @@ private:
 
 public:
   MacJointTraj(TrajType &vtraj, 
-		 const JointPos &max_joint_vel, 
-		 const JointPos &max_joint_accel,
-		 double max_jerk,
-		 bool bWaitForStart,
-		 bool bHoldOnStall,
-                 bool bHoldOnForceInput,
-		 int trajid);
+	       const JointPos &max_joint_vel, 
+	       const JointPos &max_joint_accel,
+	       double max_jerk,
+	       bool bWaitForStart,
+	       bool bHoldOnStall,
+	       bool bHoldOnForceInput);
 
   virtual ~MacJointTraj();
     
-  void log(char *prefix);
+  virtual void log(char *prefix);
     
-  void run();
-  void evaluate(double y[], double yd[], double ydd[], double dt);
-  void get_path_values(double *path_vel, double *path_accel) const;
-  void get_limits(double *max_path_vel, double *max_path_accel) const;
-  void rebuild_from_current();
-  void dump();
-  void reset(double t);
+  virtual void run();
+  virtual void evaluate(Trajectory::TrajControl &tc, double dt);
+  virtual void get_path_values(double *path_vel, double *path_accel) const;
+  virtual void get_limits(double *max_path_vel, double *max_path_accel) const;
+  //  virtual void rebuild_from_current();
+  virtual void dump();
+  virtual void reset(double t);
 };
+
+}; // namespace OWD
 
 #endif

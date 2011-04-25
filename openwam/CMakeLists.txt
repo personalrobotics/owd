@@ -50,22 +50,23 @@ add_library(openwamsim STATIC  Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc
                                ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc
                                TrajType.cc PulseTraj.cc Trajectory.cc ParabolicSegment.cc
                                ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc
-                               ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc)
+                               ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc
+			       Plugin.cc)
 rosbuild_add_compile_flags(openwamsim "-DOWDSIM")
 
-add_library(wamcan STATIC      ControlLoop.cc CANbus.cc WAM.cc)
+add_library(wamcan STATIC      ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)
 rosbuild_add_compile_flags(wamcan "${CANBUS_DEFS}")
 rosbuild_add_link_flags(wamcan "${CANBUS_LIBS}")
 
-add_library(wamcanrt STATIC      ControlLoop.cc CANbus.cc WAM.cc)
+add_library(wamcanrt STATIC      ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)
 rosbuild_add_compile_flags(wamcanrt "${CANBUS_DEFS} ${RT_DEFS}")
 rosbuild_add_link_flags(wamcanrt "${CANBUS_LIBS} ${RT_LIBS}")
 
-add_library(bhdcan STATIC      ControlLoop.cc CANbus.cc WAM.cc)
+add_library(bhdcan STATIC      ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)
 rosbuild_add_compile_flags(bhdcan "${CANBUS_DEFS} -DBH280_ONLY")
 rosbuild_add_link_flags(bhdcan "${CANBUS_LIBS}")
 
-add_library(bhdcanrt STATIC      ControlLoop.cc CANbus.cc WAM.cc)
+add_library(bhdcanrt STATIC      ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)
 rosbuild_add_compile_flags(bhdcanrt "${CANBUS_DEFS} ${RT_DEFS} -DBH280_ONLY")
 rosbuild_add_link_flags(bhdcanrt "${CANBUS_LIBS} ${RT_LIBS}")
 

@@ -212,7 +212,7 @@ double MacQuinticBlend::PathAcceleration() const {
 }
 
 
-void MacQuinticBlend::evaluate(double *y, double *yd, double *ydd, double t) {
+void MacQuinticBlend::evaluate(OWD::Trajectory::TrajControl &tc, double t) {
   if (velocity <0) {
     throw "Error: must set blend velocity before evaluating";
   }
@@ -256,10 +256,10 @@ void MacQuinticBlend::evaluate(double *y, double *yd, double *ydd, double t) {
 		      - m2_minus_m1*k*betadotdot)
     * pow(velocity/(2*blend_radius),2);
 
-  // copy into the argument pointers
-  if (y) x.cpy(y);
-  if (yd) xdot.cpy(yd);
-  if (ydd) xdotdot.cpy(ydd);
+  // Set our return values
+  tc.q=x;
+  tc.qd=xdot;
+  tc.qdd=xdotdot;
 
   current_path_vel = xdot.length();
   current_path_accel=xdotdot.length();

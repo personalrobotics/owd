@@ -24,6 +24,9 @@
 */
 
 
+#ifndef __WAM_H__
+#define __WAM_H__
+
 #include <semaphore.h>
 #include <list>
 
@@ -46,11 +49,6 @@
 #include <pr_msgs/PIDgains.h>
 
 #include "DataRecorder.cc"
-
-#ifndef __WAM_H__
-#define __WAM_H__
-
-using namespace std;
 
 class WAMstats{
 public:
@@ -133,12 +131,16 @@ public:
   bool check_safety_torques;
   double pid_torq[Joint::Jn+1];
   double sim_torq[Joint::Jn+1];
+  double dyn_torq[Joint::Jn+1];
+  double traj_torq[Joint::Jn+1];
+  double q[Joint::Jn+1];
+  OWD::Trajectory::TrajControl tc;
  
   SE3 E0n;                                 // forward kinematics transformation
 
   SE3Traj     *se3traj;                    // Cartesian trajectory
   SE3CtrlPD    se3ctrl;                    // basic Cartesian controller
-  Trajectory *jointstraj;
+  OWD::Trajectory *jointstraj;
   PulseTraj   *pulsetraj;                  // trajectory of joint acceleration pulses
   int safetytorquecount[7];
   double safetytorquesum[7];
@@ -167,7 +169,6 @@ public:
   void jtrq2mtrq();
 
   R6 WSControl(double dt);
-  void JSControl(double qdd[Joint::Jn+1], double dt);
   void newJSControl_rt(double q_target[], double q[], double dt, double pid_torq[]); // Mike
   bool check_for_idle_rt();
 
@@ -197,8 +198,8 @@ public:
   bool set_gains(unsigned int joint, pr_msgs::PIDgains &gains);
   bool get_gains(std::vector<pr_msgs::PIDgains> &gains);
 
-  void get_current_data(double *pos, double *trq, 
-			double *nettrq, double *sim_torq=NULL);
+  void get_current_data(double *pos, double *trq, double *nettrq, 
+			double *sim_torq=NULL, double *traj_torq=NULL);
                   // get the joint positions, torques, net torques, and
                   // simulated torques (any pointer can be NULL)
   void get_abs_positions(double *abs_pos);
@@ -215,7 +216,7 @@ public:
   void move_trapezoid(const SE3& E0ns);
   void move_trapezoid(const double q[Joint::Jn+1]);
 
-  int run_trajectory(Trajectory *traj);  // start a trajectory
+  int run_trajectory(OWD::Trajectory *traj);  // start a trajectory
   int pause_trajectory();
   int resume_trajectory();
   int cancel_trajectory();

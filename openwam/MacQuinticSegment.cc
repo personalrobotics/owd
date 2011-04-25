@@ -966,7 +966,7 @@ double MacQuinticSegment::PathAcceleration() const {
   return current_path_accel;
 }
 
-void MacQuinticSegment::evaluate(double *y, double *yd, double *ydd, double t) {
+void MacQuinticSegment::evaluate(OWD::Trajectory::TrajControl &tc, double t) {
   if (duration <0) {
     throw "MacQuinticSegment: BuildProfile() was never called";
   }
@@ -997,17 +997,17 @@ void MacQuinticSegment::evaluate(double *y, double *yd, double *ydd, double t) {
   }
   // first, get the 1-D values (relative position, path vel, path accel),
   double path_pos;
-  accel_elements[i]->eval(&path_pos,&current_path_vel,&current_path_accel,t);
+  accel_elements[i]->eval(path_pos,current_path_vel,current_path_accel,t);
   // now, compute the n-D values
   JointPos pos, vel, accel;
   pos = start_pos + direction * path_pos;
   vel = direction * current_path_vel;
   accel = direction * current_path_accel;
 
-  // copy the values into the output pointers
-  if (y) pos.cpy(y);
-  if (yd) vel.cpy(yd);
-  if (ydd) accel.cpy(ydd);
+  // copy the values into the output
+  tc.q=pos;
+  tc.qd=vel;
+  tc.qdd=accel;
   return;
 }
 
@@ -1027,13 +1027,10 @@ void MacQuinticSegment::dump() {
     return;
   }
   printf("  eval at t=%2.3f: ",start_time+duration);
-  double *y = (double *) malloc (sizeof(double) * direction.size());
-  evaluate(y,0,0,start_time+duration);
-  JointPos jpy;
-  jpy.resize(direction.size());
-  memcpy(&(jpy[0]),y,sizeof(double)*direction.size());
+  OWD::Trajectory::TrajControl tc(direction.size());
+  evaluate(tc,start_time+duration);
+  JointPos jpy = tc.q;
   jpy.dump();
-  free(y);
 
   printf("  start_vel=%2.3f  end_vel=%2.3f\n",start_vel,end_vel);
   printf("  distance=%2.3f\n",distance);

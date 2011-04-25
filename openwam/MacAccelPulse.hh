@@ -62,7 +62,7 @@ public:
   virtual void extend_sustain_time_by(double t) =0;
   virtual void reset(double pos, double vel, double delta_vel,
 		     double accel, double jerk, double t) =0;
-  virtual void eval(double *y, double *yd, double *ydd, double t) const =0;
+  virtual void eval(double &q, double &qd, double &qdd, double t) const =0;
   virtual void dump() const {
     printf("     start_pos=%2.3f  dist=%2.3f  end_pos=%2.3f\n",
 	   start_p,dist,start_p+dist);
@@ -206,7 +206,7 @@ public:
     fit_curve();
   }
 
-  void eval(double *y, double *yd, double *ydd, double t) const {
+  void eval(double &y, double &yd, double &ydd, double t) const {
     t -= start_t; // normalize to start at t=0
     if (t < 0) {
       t=0;
@@ -216,36 +216,36 @@ public:
     }
     if (t<atime) {
       // initial rise
-      if (y) *y = start_p
+      y = start_p
 	+ start_v*t
 	+ a*0.25*t*t
 	- a*atime*atime/PI/PI * 0.5*(sin(t*PI/atime - 0.5*PI) +1);
-      if (yd) *yd = start_v
-	 + a*0.5*t
+      yd = start_v
+	+ a*0.5*t
 	- a*0.5*atime/PI * cos(t*PI/atime - 0.5*PI);
-      if (ydd) *ydd = a*0.5 * (sin(t*PI/atime - 0.5*PI) +1);
+      ydd = a*0.5 * (sin(t*PI/atime - 0.5*PI) +1);
       return;
 
     } else if (t<(atime + sustain_t)) {
       // linear sustain
       t -= atime;  // adjust t to be the time inside the sustain
-      if (y) *y = pa
+      y = pa
 	+ t * (sa + 0.5*a*t);
-      if (yd) *yd = sa + a*t;
-      if (ydd) *ydd = a;
+      yd = sa + a*t;
+      ydd = a;
       return;
 
     } else {
       // final fall
       t -= atime + sustain_t; // adjust t to be inside the fall
-      if (y) *y = pb               // pb is correct
-	       + sb*t              // sb matches sa
-	       + a*0.25*t*t        // a is the same
+      y = pb               // pb is correct
+	+ sb*t              // sb matches sa
+	+ a*0.25*t*t        // a is the same
 	- a*atime*atime/PI/PI * 0.5*(sin(t*PI/atime + 0.5*PI) -1.0);
-      if (yd) *yd = sb
+      yd = sb
 	+ a*0.5*t
 	- a*0.5*atime/PI * cos(t*PI/atime + 0.5*PI);
-      if (ydd) *ydd = a*0.5 * (sin(t*PI/atime + 0.5*PI) + 1);
+      ydd = a*0.5 * (sin(t*PI/atime + 0.5*PI) + 1);
       return;
     }
   }
@@ -256,8 +256,8 @@ public:
 	   start_t, start_t+atime,start_p,pa,pa-start_p);
     printf("          v=%2.4f to v=%2.4f (delta_v=%2.4f)\n",
 	   start_v, sa, sa-start_v);
-    double q,qd;
-    eval(&q,&qd,0,start_t+atime);
+    double q,qd,qdd;
+    eval(q,qd,qdd,start_t+atime);
     printf("          eval at t=%2.4f: pos=%2.4f, vel=%2.4f\n",
 	   start_t+atime,q,qd);
 
@@ -266,7 +266,7 @@ public:
 	     start_t+atime, start_t+atime+sustain_t, pa, pb, pb-pa);
       printf("          v=%2.4f to v=%2.4f (delta_v=%2.4f)\n",
 	     sa, sb, sb-sa);
-      eval(&q,&qd,0,start_t+atime+sustain_t);
+      eval(q,qd,qdd,start_t+atime+sustain_t);
       printf("          eval at t=%2.4f: pos=%2.4f, vel=%2.4f\n",
 	     start_t+atime+sustain_t,q,qd);
     }
@@ -274,7 +274,7 @@ public:
 	   start_t+atime+sustain_t, start_t+2*atime+sustain_t,pb,start_p+dist,start_p+dist-pb);
     printf("          v=%2.4f to v=%2.4f (delta_v=%2.4f)\n",
 	   sb, end_v, end_v-sb);
-    eval(&q,&qd,0,start_t+2*atime+sustain_t);
+    eval(q,qd,qdd,start_t+2*atime+sustain_t);
     printf("          eval at t=%2.4f: pos=%2.4f, vel=%2.4f\n",
 	   start_t+2*atime+sustain_t,q,qd);
   }
@@ -334,7 +334,7 @@ public:
     }
   }
 
-  void eval(double *y, double *yd, double *ydd, double t) const {
+  void eval(double &y, double &yd, double &ydd, double t) const {
     t -= start_t;
     if (t<0) {
       t = 0;
@@ -342,9 +342,9 @@ public:
     if (t>dur) {
       t = dur;
     }
-    if (y) *y = start_p + t*start_v;
-    if (yd) *yd = start_v;
-    if (ydd) *ydd = 0;
+    y = start_p + t*start_v;
+    yd = start_v;
+    ydd = 0;
     return;
   }
 

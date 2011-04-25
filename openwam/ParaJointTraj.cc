@@ -23,7 +23,7 @@
 #include "ParaJointTraj.hh"
 #include <ros/ros.h>
 
-
+namespace OWD {
 
 ParaJointTraj::~ParaJointTraj() {
     delete [] parsegs;
@@ -63,28 +63,28 @@ keep adding inflection points until no collisions.
 
 
 ParaJointTraj::ParaJointTraj(TrajType &vtraj, 
-                             const vector<double> &mjv, 
-                             const vector<double> &mja,
+                             const std::vector<double> &mjv, 
+                             const std::vector<double> &mja,
                              bool bWaitForStart,
                              bool bHoldOnStall,
-			     bool bHoldOnForceInput,
-                             int trajid) :
-  max_joint_vel(mjv), max_joint_accel(mja), restart(false)
+			     bool bHoldOnForceInput) :
+  Trajectory("ParaJointTraj"),max_joint_vel(mjv),
+  max_joint_accel(mja), restart(false)
 {
   WaitForStart=bWaitForStart;
   HoldOnStall=bHoldOnStall;
   HoldOnForceInput=bHoldOnForceInput;
-    pthread_mutex_init(&mutex, NULL);
-    runstate=STOP;
-    time=0.0;
-    id=trajid;
+  pthread_mutex_init(&mutex, NULL);
+  runstate=STOP;
+  time=0.0;
+  id=0;
     if (vtraj.size() < 2) {
       throw "Trajectories must have 2 or more points; do a move instead";
     }
 
     DOF = vtraj[0].size();
-    parsegs = new vector<ParabolicSegment>[DOF];
-    current_segment = new vector<ParabolicSegment>::iterator[DOF];
+    parsegs = new std::vector<ParabolicSegment>[DOF];
+    current_segment = new std::vector<ParabolicSegment>::iterator[DOF];
 
     int numpoints = vtraj.size();
     start_position = vtraj.front();
@@ -219,7 +219,7 @@ ParaJointTraj::ParaJointTraj(TrajType &vtraj,
     return;
 }
 
-bool ParaJointTraj::check_for_bend(vector<ParabolicSegment> *ps,
+bool ParaJointTraj::check_for_bend(std::vector<ParabolicSegment> *ps,
                                    TrajPoint& p1, TrajPoint &p2) {
     double biggest_slope=0.0f;
     int biggest_slope_j=-1;
@@ -257,7 +257,7 @@ bool ParaJointTraj::check_for_bend(vector<ParabolicSegment> *ps,
     return false;
 }
 
-int ParaJointTraj::rescale_to_slowest(int slowest_joint,double max_end_time,double accel_time,const vector<double> &max_joint_vel, const vector<double> &max_joint_accel) {
+int ParaJointTraj::rescale_to_slowest(int slowest_joint,double max_end_time,double accel_time,const std::vector<double> &max_joint_vel, const std::vector<double> &max_joint_accel) {
     // Make one more pass through the segments, rescaling
     // most of them to match the slowest one
     for (int k=0; k<DOF; ++k) {
@@ -283,13 +283,18 @@ int ParaJointTraj::rescale_to_slowest(int slowest_joint,double max_end_time,doub
     return 0;
 }
 
-void ParaJointTraj::evaluate(double y[], double yd[], double ydd[], double dt) {
+void ParaJointTraj::evaluate(Trajectory::TrajControl &tc, double dt) {
 
   // DANGER: cannot call any ROSOUT functions (ROS_DEBUG, etc) from within
   // this function, or it will kill our realtime performance.  Instead, the
   // message should be pushed onto a queue or a RT fifo, so that the non-RT
   // thread can get them out and print them.  For now they are all commented
   // out.
+
+  if (tc.q.size() < DOF) {
+    runstate=DONE;
+    return;
+  }
 
   // if we're running, then increment the time.  Otherwise, stay where we are
   if ((runstate == RUN) || (runstate == LOG)) {
@@ -334,8 +339,8 @@ void ParaJointTraj::evaluate(double y[], double yd[], double ydd[], double dt) {
     }
     if (current_segment[j] == parsegs[j].end()) {
       // we're done
-      y[j+1] = parsegs[j].back().end_pos;
-      yd[j+1]=ydd[j+1]=0.0;
+      tc.q[j] = parsegs[j].back().end_pos;
+      tc.qd[j]=tc.qdd[j]=0.0;
       finished_joints++;
     } else try {
 	// now that we've found the right segments, ask each segment
@@ -343,10 +348,10 @@ void ParaJointTraj::evaluate(double y[], double yd[], double ydd[], double dt) {
 	if (restart) {
 	  // if we stopped during a previous restart, use the
 	  // restart segments
-	  restart_parsegs[j].evaluate(y+j+1,yd+j+1,ydd+j+1,restart_time);
+	  restart_parsegs[j].evaluate(tc.q[j],tc.qd[j],tc.qdd[j],restart_time);
 	} else {
 	  // otherwise, use the standard segments
-	  current_segment[j]->evaluate(y+j+1,yd+j+1,ydd+j+1,time);
+	  current_segment[j]->evaluate(tc.q[j],tc.qd[j],tc.qdd[j],time);
 	}
       } catch(int e) {
 	if (restart) {
@@ -374,7 +379,7 @@ void ParaJointTraj::evaluate(double y[], double yd[], double ydd[], double dt) {
       // if we're supposed to be stationary, keep the position values we
       // calculated, but zero out the vel and accel
       for (int j=0; j < DOF; j++) {
-	yd[j+1]=ydd[j+1]=0.0;
+	tc.qd[j]=tc.qdd[j]=0.0;
       }
     }
   }
@@ -408,27 +413,28 @@ void ParaJointTraj::run() {
     double max_end_time=0.0f;
     double accel_time;
     int slowest_joint;
-    double y[DOF], yd, ydd,endpos[DOF];
+    double endpos[DOF];
+    OWD::Trajectory::TrajControl tc(DOF);
     for (int j=0; j<DOF; j++) {
         // get the current and end positions
         if (restart) {
             // if we were already in a restart segment and got stopped again,
             // use the restart segment and time for the current position
-            restart_parsegs[j].evaluate(y+j,&yd,&ydd,restart_time);
+            restart_parsegs[j].evaluate(tc.q[j],tc.qd[j],tc.qdd[j],restart_time);
             endpos[j] = restart_parsegs[j].end_pos;
         } else {
             // otherwise, use the original segment
-            current_segment[j]->evaluate(y+j,&yd,&ydd,time);
-            endpos[j] = current_segment[j]->end_pos;
+	  current_segment[j]->evaluate(tc.q[j],tc.qd[j],tc.qdd[j],time);
+	  endpos[j] = current_segment[j]->end_pos;
         }
     }
     if (restart_parsegs.size() > 0) {
-        // we're done with the previous restart segs, so delete them
-        restart_parsegs.clear();
+      // we're done with the previous restart segs, so delete them
+      restart_parsegs.clear();
     }
     for (int j=0; j<DOF; j++) {
-        // create our replacement segment
-        ParabolicSegment ps(0,0.0f,y[j],endpos[j]);
+      // create our replacement segment
+      ParabolicSegment ps(0,0.0f,tc.q[j],endpos[j]);
         ps.end_index = 1;
         ps.end_pos = endpos[j];
         ps.fit_curve(max_joint_vel[j],max_joint_accel[j]);
@@ -499,22 +505,24 @@ bool ParaJointTraj::log(const char *trajname) {
     sprintf(simfname,"%s_sim.csv",trajname);
     FILE *csv = fopen(simfname,"w");
     if (csv) {
-        double y[8],yd[8],ydd[8];
+      Trajectory::TrajControl tc(DOF);
         runstate=LOG;
         time=0.0;
         while (runstate == LOG) {
-            evaluate(y,yd,ydd,0.01);
+            evaluate(tc,0.01);
             fprintf(csv,"%3.8f, ",time);
-            for (int j=1; j<DOF; ++j) {
-                fprintf(csv,"%2.8f, ",y[j]);
+            for (int j=0; j<DOF; ++j) {
+                fprintf(csv,"%2.8f, ",tc.q[j]);
             }
-            for (int j=1; j<DOF; ++j) {
-                fprintf(csv,"%2.8f, ",yd[j]);
+            for (int j=0; j<DOF; ++j) {
+                fprintf(csv,"%2.8f, ",tc.qd[j]);
             }
-            for (int j=1; j<DOF; ++j) {
-                fprintf(csv,"%2.8f, ",ydd[j]);
+            for (int j=0; j<DOF; ++j) {
+                fprintf(csv,"%2.8f, ",tc.qdd[j]);
             }
-            fprintf(csv,"0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0\n"); // torq
+            for (int j=0; j<DOF; ++j) {
+                fprintf(csv,"%2.8f, ",tc.t[j]);
+            }
         }
         fclose(csv);
     }
@@ -530,3 +538,5 @@ void ParaJointTraj::reset(double t) {
     current_segment[j]=parsegs[j].begin();
   }
 }
+
+}; // namespace OWD

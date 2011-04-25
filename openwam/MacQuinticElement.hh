@@ -24,7 +24,7 @@
 #define MACQUINTICELEMENT_H
 
 #include "MacAccelPulse.hh"
-#include "TrajType.hh"
+#include "Trajectory.hh"
 #include <string.h>
 
 class MacQuinticElement {
@@ -64,7 +64,7 @@ public:
       return start_time+duration;
     }
   }
-  virtual void evaluate(double *y, double *yd, double *ydd, double t)=0;
+  virtual void evaluate(OWD::Trajectory::TrajControl &tc, double t)=0;
   virtual double calc_time(JointPos value) const =0;
 
   MacQuinticElement(JointPos start, JointPos end)

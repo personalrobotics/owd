@@ -77,7 +77,7 @@ public:
   double StartVelocity() const;
   double EndVelocity() const;
   
-  void evaluate(double *y, double *yd, double *ydd, double t);
+  void evaluate(OWD::Trajectory::TrajControl &tc, double t);
   double calc_time(JointPos value) const;
   double PathVelocity() const;
   double PathAcceleration() const;

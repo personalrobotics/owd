@@ -23,10 +23,13 @@
 #include "ServoTraj.hh"
 #include <string.h>
 
+namespace OWD {
+
 ServoTraj::ServoTraj(int dof, int id_num, double *start_pos,
 		     double *lower_joint_limits,
 		     double *upper_joint_limits)
-  : nDOF(dof),
+  : Trajectory("ServoTraj"),
+    nDOF(dof),
     vlimit(0.5),
     accel(2.5)
 {
@@ -42,13 +45,25 @@ ServoTraj::ServoTraj(int dof, int id_num, double *start_pos,
     memcpy(lower_jlimit,lower_joint_limits,7*sizeof(double));
   } else {
     // WAM default
-    lower_jlimit = {-2.60, -1.96, -2.73, -0.86, -4.79, -1.56, -2.99};
+    lower_jlimit[0]= -2.60;
+    lower_jlimit[1]= -1.96;
+    lower_jlimit[2]= -2.73;
+    lower_jlimit[3]= -0.86;
+    lower_jlimit[4]= -4.79;
+    lower_jlimit[5]= -1.56;
+    lower_jlimit[6]= -2.99;
   }
   if (upper_joint_limits) {
     memcpy(upper_jlimit,upper_joint_limits,7*sizeof(double));
   } else {
     // WAM default
-    upper_jlimit ={ 2.60,  1.96,  2.73,  3.13,  1.30,  1.56,  2.99};
+    upper_jlimit[0]=  2.60;
+    upper_jlimit[1]=  1.96;
+    upper_jlimit[2]=  2.73;
+    upper_jlimit[3]=  3.13;
+    upper_jlimit[4]=  1.30;
+    upper_jlimit[5]=  1.56;
+    upper_jlimit[6]=  2.99;
   }
  // space to leave near joint limits to allow for deceleration 
   jlimit_buffer = 0.5*vlimit*vlimit/accel * 1.3;
@@ -76,7 +91,11 @@ void ServoTraj::stop() {
   Trajectory::stop();
 }
 
-void ServoTraj::evaluate(double y[], double yd[], double ydd[], double dt) {
+void ServoTraj::evaluate(Trajectory::TrajControl &tc, double dt) {
+  if (tc.q.size() < nDOF) {
+    runstate=DONE;
+    return;
+  }
   time += dt;
   bool active = false;
   for (unsigned int i = 0; i<nDOF; ++i) {
@@ -107,13 +126,13 @@ void ServoTraj::evaluate(double y[], double yd[], double ydd[], double dt) {
 
       // update position and velocity
       current_position[i] += current_velocity[i] * dt;
-      yd[i+1] = current_velocity[i];
+      tc.qd[i] = current_velocity[i];
       active = true;
     } else {
-      yd[i+1]=0.0;
+      tc.qd[i]=0.0;
     }
-    y[i+1] = current_position[i];
-    ydd[i+1] = 0.0;
+    tc.q[i] = current_position[i];
+    tc.qdd[i] = 0.0;
   }
   if (!active) {
     end_position = current_position;
@@ -121,3 +140,5 @@ void ServoTraj::evaluate(double y[], double yd[], double ydd[], double dt) {
   }
 
 }
+
+};// namespace OWD

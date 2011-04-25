@@ -23,18 +23,12 @@
 #ifndef OPENWAMDRIVER_H
 #define OPENWAMDRIVER_H
 
-#include <TrajType.hh>
-#include "openwam/Trajectory.hh"
-#include "openwam/Joint.hh"
-#include "CANbus.hh"
-#include "WAM.hh"
 #include <list>
 #include <vector>
 #include <algorithm>
 #include <ros/ros.h>
 #include <boost/thread/mutex.hpp>
 #include <pr_msgs/AddTrajectory.h>
-#include <pr_msgs/AddPrecomputedTrajectory.h>
 #include <pr_msgs/DeleteTrajectory.h>
 #include <pr_msgs/CancelAllTrajectories.h>
 #include <pr_msgs/PauseTrajectory.h>
@@ -59,7 +53,18 @@
   #include <pr_msgs/WamRequestSeaCtrlKi.h>
 #endif
 
-class WamDriver
+#include "openwam/Joint.hh"
+#include "openwam/TrajType.hh"
+
+// forward declaration of a few classes we keep pointers to, 
+// so that we don't have to include their .hh files right now
+class WAM;
+class CANbus;
+
+namespace OWD {
+  class Trajectory;
+
+  class WamDriver
 {
 public:
   /// Constructor
@@ -82,10 +87,10 @@ public:
 
     void Update();
 
+    uint32_t AddTrajectory(Trajectory *traj, std::string &failure_reason);
+
     bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
                        pr_msgs::AddTrajectory::Response &res);
-    bool AddPrecomputedTrajectory(pr_msgs::AddPrecomputedTrajectory::Request &req,
-                       pr_msgs::AddPrecomputedTrajectory::Response &res);
     bool DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
                           pr_msgs::DeleteTrajectory::Response &res);
     bool CancelAllTrajectories(pr_msgs::CancelAllTrajectories::Request &req,
@@ -109,11 +114,10 @@ public:
     bool SetGains(owd::SetGains::Request &req,
 		  owd::SetGains::Response &res);
 
-    void AdvertiseAndSubscribe(ros::NodeHandle &n);
+    void AdvertiseAndSubscribe(ros::NodeHandle &n, int publish_frequency);
 
     pr_msgs::AddTrajectory::Response AddTrajectory(
-	   pr_msgs::AddTrajectory::Request *,
-	   pr_msgs::WAMPrecomputedBlendedTrajectory *pretraj);
+						   pr_msgs::AddTrajectory::Request *);
 
     void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &message);
     void MassProperties_callback(const boost::shared_ptr<const pr_msgs::MassProperties> &message);
@@ -179,6 +183,8 @@ private:
     int BH_model; /// model number of the hand, either 260, 280, or 0 (no hand)
     bool ForceTorque; /// whether the Force/Torque sensor is installed
     bool Tactile;  /// whether the Tactile sensors are installed (280 hand only)
+    typedef pair<void *,bool (*)()> PluginPointers;
+    std::vector<PluginPointers> loaded_plugins;
 
     // update internal structures
     void resetDesiredJointPositions(void);
@@ -205,7 +211,7 @@ private:
     TrajType ros2owd_traj (pr_msgs::JointTraj &jt);
 
  public: // make this public so that it can be shared with BHD_280
-    CANbus bus;
+    CANbus *bus;
  private:
     WAM *owam;
     boost::mutex queue_mutex;
@@ -223,7 +229,6 @@ private:
 
     ros::ServiceServer 
       ss_AddTrajectory,
-      ss_AddPrecomputedTrajectory,
       ss_SetStiffness,
       ss_SetJointStiffness,
       ss_DeleteTrajectory, 
@@ -262,6 +267,7 @@ private:
 
     friend class PositionCommand;
     friend class TrajectoryCommand;
+    friend class Trajectory;
 };
-
+};
 #endif //  OPENWAMDRIVER_H

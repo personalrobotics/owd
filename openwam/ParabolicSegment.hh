@@ -48,7 +48,7 @@ public:
 
     void refit_curve(double max_v, double max_a, double new_end_time, double new_accel_time);
 
-    void evaluate(double *y, double *yd, double *ydd, double t);
+    void evaluate(double &y, double &yd, double &ydd, double t);
 
     double calc_time(double value);
 

@@ -26,6 +26,8 @@
 
 #define VERBOSE 0
 
+namespace OWD {
+
 MacJointTraj::~MacJointTraj() {
   for (unsigned int i=0; i<macpieces.size(); ++i) {
     delete macpieces[i];
@@ -39,12 +41,11 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
 			   double max_jerk,
 			   bool bWaitForStart,
 			   bool bHoldOnStall,
-			   bool bHoldOnForceInput,
-			   int trajid) :
-  max_joint_vel(mjv), max_joint_accel(mja)
+			   bool bHoldOnForceInput) :
+  OWD::Trajectory("MacJointTraj"), max_joint_vel(mjv), max_joint_accel(mja)
 {
   // initialize the base class members
-  id = trajid;
+  id = 0;
   WaitForStart=bWaitForStart;
   HoldOnStall=bHoldOnStall;
   HoldOnForceInput=bHoldOnForceInput;
@@ -226,11 +227,12 @@ void MacJointTraj::get_limits(double *max_path_vel, double *max_path_accel) cons
   *max_path_accel = (*current_piece)->MaxPathAcceleration();
 }
 
-void MacJointTraj::evaluate(double y[], double yd[], double ydd[], double dt) {
-  // shift the pointers to be 1-based (only if they're non-NULL)
-  if (y) y++;
-  if (yd) yd++;
-  if (ydd) ydd++;
+void MacJointTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+
+  if (tc.q.size() < DOF) {
+    runstate = DONE;
+    return;
+  }
 
   // if we're running, then increment the time.  Otherwise, stay where we are
   if ((runstate == RUN) || (runstate == LOG)) {
@@ -247,16 +249,16 @@ void MacJointTraj::evaluate(double y[], double yd[], double ydd[], double dt) {
     // even though time is past the end, the piece will return the ending
     // values
     current_piece--;
-    (*current_piece)->evaluate(y,yd,ydd,time);
+    (*current_piece)->evaluate(tc,time);
     runstate = DONE;
   } else {
-    (*current_piece)->evaluate(y,yd,ydd,time);
+    (*current_piece)->evaluate(tc,time);
   }
   if (runstate == STOP) {
     // if we're supposed to be stationary, keep the position values we
     // calculated, but zero out the vel and accel
-    for (int j=0; j < DOF; j++) {
-      yd[j]=ydd[j]=0.0;
+    for (int j=0; j < DOF; ++j) {
+      tc.qd[j]=tc.qdd[j]=0.0;
     }
   }
   return;
@@ -285,22 +287,24 @@ void MacJointTraj::log(char *trajname) {
     sprintf(simfname,"%s_sim.csv",trajname);
     FILE *csv = fopen(simfname,"w");
     if (csv) {
-        double y[8],yd[8],ydd[8];
+      OWD::Trajectory::TrajControl tc(DOF);
         runstate=LOG;
         time=0.0;
         while (runstate == LOG) {
-            evaluate(y,yd,ydd,0.01);
+            evaluate(tc,0.01);
             fprintf(csv,"%3.8f, ",time);
-            for (int j=1; j<=DOF; ++j) {
-                fprintf(csv,"%2.8f, ",y[j]);
+            for (int j=0; j<DOF; ++j) {
+                fprintf(csv,"%2.8f, ",tc.q[j]);
             }
-            for (int j=1; j<=DOF; ++j) {
-                fprintf(csv,"%2.8f, ",yd[j]);
+            for (int j=0; j<DOF; ++j) {
+                fprintf(csv,"%2.8f, ",tc.qd[j]);
             }
-            for (int j=1; j<=DOF; ++j) {
-                fprintf(csv,"%2.8f, ",ydd[j]);
+            for (int j=0; j<DOF; ++j) {
+                fprintf(csv,"%2.8f, ",tc.qdd[j]);
             }
-            fprintf(csv,"0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0\n"); // torq
+            for (int j=0; j<DOF; ++j) {
+                fprintf(csv,"%2.8f, ",tc.t[j]);
+            }
         }
         fclose(csv);
     }
@@ -323,3 +327,4 @@ void MacJointTraj::reset(double t) {
   current_piece=macpieces.begin();
 }
 
+}; // namespace OWD

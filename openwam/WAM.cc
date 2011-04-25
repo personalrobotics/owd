@@ -38,11 +38,11 @@ extern int MODE;  // puck parameter
  */
 
 WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile) :
-    check_safety_torques(true),rec(false),wsdyn(false),jsdyn(false),
-    holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
-    pid_count(0),safety_hold(false),bus(cb),ctrl_loop(cb->id, &control_loop_rt, this),
-    motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000),
-    BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile)
+  check_safety_torques(true),tc(Joint::Jn),rec(false),wsdyn(false),
+  jsdyn(false), holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
+  pid_count(0),safety_hold(false),bus(cb),ctrl_loop(cb->id, &control_loop_rt, this),
+  motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000),
+  BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile)
 {
 
 #ifdef OWD_RT
@@ -206,6 +206,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile) :
 
   for (unsigned int i=0; i<7; ++i) {
     safetytorquecount[i]=safetytorquesum[i]=0;
+    pid_torq[i+1]=dyn_torq[i+1]=sim_torq[i+1]=traj_torq[i+1]=0;
   }
     
   if (Link::Ln == Link::L7) {
@@ -431,7 +432,7 @@ int WAM::set_jpos(double pos[]){
 }
 
 
-void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *simtrq){
+void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *simtrq,double *trajtrq){
     this->lock("get_current_data");
     if (pos) {
       // joint positions
@@ -455,6 +456,12 @@ void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *sim
       // mass properties)
       for(int j=Joint::J1; j<=Joint::Jn; j++)
         simtrq[ joints[j].id() ] = sim_torq[j];
+    }
+    if (trajtrq) {
+      // torques output by the current trajectory
+      for (int j=Joint::J1; j<=Joint::Jn; ++j) {
+	trajtrq[joints[j].id()] = traj_torq[j];
+      }
     }
     this->unlock();
 }
@@ -852,11 +859,9 @@ bool WAM::check_for_idle_rt() {
 //   6. apply jsdynamics torq plus control torq
 // question: will control torque be trying to do more than necessary?
 void WAM::newcontrol_rt(double dt){
-  static double   q[Joint::Jn+1];
-  static double   q_target[Joint::Jn+1];
-  static double  qd_target[Joint::Jn+1];
-  static double qdd_target[Joint::Jn+1];
-  static double dyn_torq[Joint::Jn+1];
+  //  static double   q_target[Joint::Jn+1];
+  //  static double  qd_target[Joint::Jn+1];
+  //  static double qdd_target[Joint::Jn+1];
   R6 F;
     
   static int tc1=0;
@@ -883,10 +888,10 @@ void WAM::newcontrol_rt(double dt){
   mpos2jpos();    // convert to joint positions
     
   for(int j=Joint::J1; j<=Joint::Jn; j++){
-    q_target[j] = q[j] = joints[j].q; // set q_target for traj->eval
+    tc.q[j-1] = q[j] = joints[j].q; // set tc.y for traj->eval
     links[j].theta(q[j]);
     sim_links[j].theta(q[j]);
-    qd_target[j] = qdd_target[j] = 0.0; // zero out
+    tc.qd[j-1] = tc.qdd[j-1] = tc.t[j-1] = 0.0; // zero out
   }
   std::vector<double> data;
   bool data_recorded=false;
@@ -917,14 +922,19 @@ void WAM::newcontrol_rt(double dt){
   if(jointstraj != NULL){
     try {
       RTIME t3 = ControlLoop::get_time_ns_rt();        
-      jointstraj->evaluate(q_target, qd_target, qdd_target, traj_timestep * timestep_factor);
-      RTIME t4 = ControlLoop::get_time_ns_rt();        
-      trajtime += (t4-t3) / 1e6;
-      for(int j=Joint::J1; j<=Joint::Jn; j++){
-	qd_target[j] *= timestep_factor;
-	qdd_target[j] *= timestep_factor * timestep_factor;
+      jointstraj->evaluate(tc, traj_timestep * timestep_factor);
+      RTIME t4 = ControlLoop::get_time_ns_rt();
+      for (int j=0; j<Joint::Jn; ++j) {
+	traj_torq[j+1] = tc.t[j];
       }
-      if(jointstraj->state() == Trajectory::DONE){
+      trajtime += (t4-t3) / 1e6;
+      for(int j=0; j<Joint::Jn; j++){
+	// if we're running at less than real-time (due to a stall
+	// condition), scale back the vel and accel accordingly
+	tc.qd[j] *= timestep_factor;
+	tc.qdd[j] *= timestep_factor * timestep_factor;
+      }
+      if(jointstraj->state() == OWD::Trajectory::DONE){
 	// we've gone past the last time in the trajectory,
 	// so set up to hold at the final position.  we'll let
 	// the trajectory control values persist for the rest of this
@@ -934,20 +944,18 @@ void WAM::newcontrol_rt(double dt){
 	holdpos = true;  // should have been true already, but just making sure
 	delete jointstraj;
 	jointstraj = NULL;
+	for (int j=Joint::J1; j<Joint::Jn; ++j) {
+	  traj_torq[j]=0;  // make sure we don't leave these non-zero
+	}
 	//ROS_INFO("Trajectory done");
       }
             
       // ask the controllers to compute the correction torques.
       RTIME t1 = ControlLoop::get_time_ns_rt();
-      newJSControl_rt(q_target,q,dt,pid_torq);
+      newJSControl_rt((&tc.q[0])-1,q,dt,pid_torq);
       RTIME t2 = ControlLoop::get_time_ns_rt();
       jscontroltime += (t2-t1) / 1e6;
             
-      // inform the trajectory of how much torque it's causing
-      if (jointstraj) { // make sure it wasn't deleted, above
-	jointstraj->update_torques(pid_torq);
-      }
-
       data_recorded=true;
       data.push_back(t1); // record the current time
       data.push_back(timestep_factor);  // time factor
@@ -957,7 +965,7 @@ void WAM::newcontrol_rt(double dt){
 	data.push_back(0);
       }
       for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
-	data.push_back(q_target[j]);  // record target position
+	data.push_back(tc.q[j-1]);  // record target position
 	data.push_back(q[j]);         // record actual position
 	data.push_back(pid_torq[j]);  // record the pid torques
       }
@@ -968,7 +976,7 @@ void WAM::newcontrol_rt(double dt){
 	// and wait until the limit condition goes away.
 	if (jointstraj  // might have ended and been cleared (above)
 	    && (jointstraj->state()
-		== Trajectory::RUN)) { // only mess with the traj if
+		== OWD::Trajectory::RUN)) { // only mess with the traj if
 	  //                              we are still running
 
 	  // just slow down the time, and take a smaller step.
@@ -1011,11 +1019,11 @@ void WAM::newcontrol_rt(double dt){
 
 	      
       for(int i = Joint::J1; i <= Joint::Jn; i++) {
-	q_target[i] = heldPositions[i];
+	tc.q[i-1] = heldPositions[i];
       }
       // ask the controllers to compute the correction torques.
       RTIME t1 = ControlLoop::get_time_ns_rt();
-      newJSControl_rt(q_target,q,dt,pid_torq);
+      newJSControl_rt((&tc.q[0])-1,q,dt,pid_torq);
       RTIME t2 = ControlLoop::get_time_ns_rt();
       jscontroltime += (t2-t1) / 1e6;
             
@@ -1023,12 +1031,12 @@ void WAM::newcontrol_rt(double dt){
   } else if (holdpos) {
 
     for(int i = Joint::J1; i <= Joint::Jn; i++) {
-      q_target[i] = heldPositions[i];
+      tc.q[i-1] = heldPositions[i];
     }
           
     // ask the controllers to compute the correction torques.
     RTIME t1 = ControlLoop::get_time_ns_rt();
-    newJSControl_rt(q_target,q,dt,pid_torq);
+    newJSControl_rt((&tc.q[0])-1,q,dt,pid_torq);
     RTIME t2 = ControlLoop::get_time_ns_rt();
     jscontroltime += (t2-t1) / 1e6;
           
@@ -1037,7 +1045,7 @@ void WAM::newcontrol_rt(double dt){
     data.push_back(0);  // time factor (zero for no traj)
     data.push_back(0); // trajectory time (zero for no traj)
     for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
-      data.push_back(q_target[j]);  // record target position
+      data.push_back(tc.q[j-1]);  // record target position
       data.push_back(q[j]);         // record actual position
       data.push_back(pid_torq[j]);  // record the pid torques
     }
@@ -1073,7 +1081,7 @@ void WAM::newcontrol_rt(double dt){
      
   // compute the torque required to meet the desired qd and qdd
   // always calculate simulated dynamics (we'll overwrite dyn_torq later)
-  JSdynamics(sim_torq, sim_links, qd_target, qdd_target); 
+  JSdynamics(sim_torq, sim_links,(& tc.qd[0])-1, (&tc.qdd[0])-1); 
   if (data_recorded) {
     for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
       data.push_back(sim_torq[j]); // torques from sim model
@@ -1081,7 +1089,7 @@ void WAM::newcontrol_rt(double dt){
   }
   if(jsdyn){
     RTIME t4 = ControlLoop::get_time_ns_rt();
-    JSdynamics(dyn_torq, links, qd_target, qdd_target); 
+    JSdynamics(dyn_torq, links, (&tc.qd[0])-1, (&tc.qdd[0])-1); 
     RTIME t5 = ControlLoop::get_time_ns_rt();
     dyntime += (t5-t4) / 1e6;
     if (++dyncount == 1000) {
@@ -1098,13 +1106,17 @@ void WAM::newcontrol_rt(double dt){
     for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
       data.push_back(dyn_torq[j]); // dynamic torques
     }
+    for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+      data.push_back(tc.t[j-1]); // trajectory torques
+    }
     recorder.add(data);
   }
 
         
-  // finally, sum the control torq and dynamics torq
+  // finally, sum the control, dynamics, and trajectory torques
   for(int j=Joint::J1; j<=Joint::Jn; j++){
-    joints[j].trq(stiffness*pid_torq[j] + dyn_torq[j]);  // send to the joints
+    // set the joint torques
+    joints[j].trq(stiffness*pid_torq[j] + dyn_torq[j] + tc.t[j-1]);
   }
         
   jtrq2mtrq();         // results in motor::torque
@@ -1116,7 +1128,7 @@ void WAM::newcontrol_rt(double dt){
     // If we're running in simulation mode, then set the joint positions
     // as if they instantly moved to where we wanted.
     this->unlock();
-    set_jpos(q_target);
+    set_jpos((&tc.q[0])-1);
     this->lock_rt("newcontrol2");
   }
 
@@ -1178,23 +1190,7 @@ void WAM::newJSControl_rt(double q_target[],double q[],double dt,double pid_torq
   }
 }
 
-void WAM::JSControl(double qdd[Joint::Jn+1], double dt){
-  double q[Joint::Jn+1], qd[Joint::Jn+1];
-
-  for(int j=Joint::J1; j<=Joint::Jn; j++){
-    qdd[j] = qd[j] = 0.0;
-    q[j] = joints[j].q;   // initialize the position to the current values
-  }                           // in case that no trajectory is running and the
-                              // controllers are
-  // if no trajectory is running, then all values are left intact
-  jointstraj->evaluate(q, qd, qdd, dt);     // feedforward acceleration
-
-  // if the controllers aren't running the values are left intact
-  for(int j=Joint::J1; j<=Joint::Jn; j++)   // + feedback
-    qdd[j] = qdd[j] + jointsctrl[j].evaluate( q[j], joints[j].q, dt );
-}
-
-int WAM::run_trajectory(Trajectory *traj) {
+int WAM::run_trajectory(OWD::Trajectory *traj) {
   if (jointstraj) {
     // we still have a previous active trajectory
     ROS_WARN("Previous trajectory (id=%d) still active; cannot run new one (id=%d)",jointstraj->id,traj->id);
