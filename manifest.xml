@@ -4,7 +4,7 @@
      dynamically loaded into OWD at runtime.
   </description>
   <author>Mike Vande Weghe (vandeweg@cmu.edu)</author>
-  <url>http://personalrobotics.intel-research.net/intel-pkg/owd/html/index.html</url>
+  <url>http://personalrobotics.intel-research.net/intel-pkg/owd_plugin_example</url>
   <license>LGPL</license>
   <depend package="owd"/>
   <depend package="std_msgs"/>
