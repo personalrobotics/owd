@@ -2117,26 +2117,37 @@ bool WamDriver::SetSpeed(pr_msgs::SetSpeed::Request &req,
 bool WamDriver::SetExtraMass(pr_msgs::SetExtraMass::Request &req,
 			     pr_msgs::SetExtraMass::Response &res) {
   owam->lock("SetExtraMass");
-
+  if ((req.m.link < Link::L1) ||
+      (req.m.link > Link::Ln)) {
+    res.ok=false;
+    res.reason="Specified link is out of range";
+    return true; // always return true if we received the request
+  }
+  
   // add the masses
-  owam->links[Link::Ln].mass = owam->link_ln_empty.mass + req.m.mass;
+  owam->links[req.m.link].mass = 
+    owam->original_links[req.m.link].mass
+    + req.m.mass;
 
   // Weight the new CG by the individual masses
-  owam->links[Link::Ln].cog.x[0] = 
-    (owam->link_ln_empty.cog.x[0] * owam->link_ln_empty.mass
-     + req.m.cog_x * req.m.mass) / owam->links[Link::Ln].mass;
+  owam->links[req.m.link].cog.x[0] = 
+    (owam->original_links[req.m.link].cog.x[0] * owam->original_links[req.m.link].mass
+     + req.m.cog_x * req.m.mass)
+    / owam->links[req.m.link].mass;
 
-  owam->links[Link::Ln].cog.x[1] =
-    (owam->link_ln_empty.cog.x[1] * owam->link_ln_empty.mass
-     + req.m.cog_y * req.m.mass) / owam->links[Link::Ln].mass;
+  owam->links[req.m.link].cog.x[1] =
+    (owam->original_links[req.m.link].cog.x[1] * owam->original_links[req.m.link].mass
+     + req.m.cog_y * req.m.mass) 
+    / owam->links[req.m.link].mass;
 
-  owam->links[Link::Ln].cog.x[2] = 
-    (owam->link_ln_empty.cog.x[2] * owam->link_ln_empty.mass
-     + req.m.cog_z * req.m.mass) / owam->links[Link::Ln].mass;
+  owam->links[req.m.link].cog.x[2] = 
+    (owam->original_links[req.m.link].cog.x[2] * owam->original_links[req.m.link].mass
+     + req.m.cog_z * req.m.mass)
+    / owam->links[req.m.link].mass;
 
   // add the inertias
-  owam->links[Link::Ln].inertia =
-    owam->link_ln_empty.inertia 
+  owam->links[req.m.link].inertia =
+    owam->original_links[req.m.link].inertia 
     + Inertia(  req.m.inertia_xx, req.m.inertia_xy, req.m.inertia_xz,
                 req.m.inertia_yy, req.m.inertia_yz, req.m.inertia_zz);
 

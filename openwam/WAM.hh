@@ -119,12 +119,13 @@ public:
   Joint joints[Joint::Jn+1];               // Array of joints
   Motor motors[Motor::Mn+1];               // Array of motors
   Link links[Link::Ln+1];                  // Array of links
-  Link sim_links[Link::Ln+1];                  // Array of links (simulated)
+  Link original_links[Link::Ln+1];         // holds values before extra
+                                           //   mass props are set
+  Link sim_links[Link::Ln+1];              // Array of links (simulated)
   Link L7_with_260_hand,
     L7_with_280_hand,
     L7_with_280FT_hand,
-    L7_without_hand,
-    link_ln_empty;
+    L7_without_hand;
   Link L4_without_wrist_with_260_hand,
     L4_without_wrist_without_hand;
   double heldPositions[Joint::Jn+1];
