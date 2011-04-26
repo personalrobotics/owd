@@ -123,7 +123,8 @@ public:
   Link L7_with_260_hand,
     L7_with_280_hand,
     L7_with_280FT_hand,
-    L7_without_hand;
+    L7_without_hand,
+    link_ln_empty;
   Link L4_without_wrist_with_260_hand,
     L4_without_wrist_without_hand;
   double heldPositions[Joint::Jn+1];

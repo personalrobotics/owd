@@ -107,6 +107,7 @@ require V=0 at each segment intersection.
 A few additional service calls are provided for manipulating OWD:
  - \b SetStiffness: Controls how firmly OWD will try to hold the current position, on a scale from 0 (no holding at all) to 1 (firmly holding).
  - \b SetSpeed: Sets the max speed of each joint.  Note that there are compiled-in joint velocity limits which prevent the speed from being set to an unsafe value.
+ - \b SetExtraMass: Adds the specified mass properties (mass, COG, and inertia) to the end link, so that OWD can better compensate for a heavy object that is held by the hand.  When the object is released this call should be repeated with mass and inertia of zero.
  - \b GetArmDOF: Returns the number of joints
  - \b CalibrateJoints: Puts the arm into <b>Calibration Mode</b>, so that the joints can be calibrated using the text interface on stdin/stdout.
 

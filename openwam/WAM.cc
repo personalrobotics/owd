@@ -232,6 +232,9 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile) :
       links[Link::L4] = L4_without_wrist_with_260_hand;
     }
   }
+  // remember the link properties for just the empty hand without
+  // anything added
+  link_ln_empty=links[Link::Ln];
 }
 
 int WAM::init(){

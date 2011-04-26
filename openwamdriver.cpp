@@ -435,6 +435,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n, int publish_frequency)
     n.advertiseService("ReplaceTrajectory",&WamDriver::ReplaceTrajectory,this);
   ss_SetSpeed =
     n.advertiseService("SetSpeed",&WamDriver::SetSpeed,this);
+  ss_SetExtraMass = 
+    n.advertiseService("SetExtraMass",&WamDriver::SetExtraMass,this);
   ss_GetArmDOF =
     n.advertiseService("GetArmDOF",&WamDriver::GetDOF,this);
   ss_CalibrateJoints =
@@ -2111,6 +2113,39 @@ bool WamDriver::SetSpeed(pr_msgs::SetSpeed::Request &req,
   res.ok=true;
   return true;
 }
+
+bool WamDriver::SetExtraMass(pr_msgs::SetExtraMass::Request &req,
+			     pr_msgs::SetExtraMass::Response &res) {
+  owam->lock("SetExtraMass");
+
+  // add the masses
+  owam->links[Link::Ln].mass = owam->link_ln_empty.mass + req.m.mass;
+
+  // Weight the new CG by the individual masses
+  owam->links[Link::Ln].cog.x[0] = 
+    (owam->link_ln_empty.cog.x[0] * owam->link_ln_empty.mass
+     + req.m.cog_x * req.m.mass) / owam->links[Link::Ln].mass;
+
+  owam->links[Link::Ln].cog.x[1] =
+    (owam->link_ln_empty.cog.x[1] * owam->link_ln_empty.mass
+     + req.m.cog_y * req.m.mass) / owam->links[Link::Ln].mass;
+
+  owam->links[Link::Ln].cog.x[2] = 
+    (owam->link_ln_empty.cog.x[2] * owam->link_ln_empty.mass
+     + req.m.cog_z * req.m.mass) / owam->links[Link::Ln].mass;
+
+  // add the inertias
+  owam->links[Link::Ln].inertia =
+    owam->link_ln_empty.inertia 
+    + Inertia(  req.m.inertia_xx, req.m.inertia_xy, req.m.inertia_xz,
+                req.m.inertia_yy, req.m.inertia_yz, req.m.inertia_zz);
+
+  owam->unlock("SetExtraMass");
+  res.ok=true;
+  return true;
+}
+
+
  
 void WamDriver::MassProperties_callback(const boost::shared_ptr<const pr_msgs::MassProperties> &mass) {
   if ((mass->link < Link::L1) || (mass->link > Link::Ln)) {
