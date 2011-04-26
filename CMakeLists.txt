@@ -6,4 +6,3 @@ rosbuild_init()
 rosbuild_gensrv()
 
 rosbuild_add_library(myplugin MyPlugin.cpp)
-#add_library(mytraj SHARED MyTraj.cpp)
