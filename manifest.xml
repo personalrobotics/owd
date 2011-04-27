@@ -1,0 +1,8 @@
+<package>
+  <description brief="OWD plugin for Darpa REARM team">
+     Includes services for pure force and torque applications
+  </description>
+  <author>Mike Vande Weghe (vandeweg@cmu.edu)</author>
+  <license>LGPL</license>
+  <depend package="owd"/>
+</package>
