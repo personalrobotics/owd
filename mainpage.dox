@@ -23,8 +23,10 @@ The Peak Linux driver can be obtained from
 
 Build it as follows:
 \verbatim
+  sudo apt-get install libpopt-dev
   make NET=NO RT=NO_RT
   sudo make install
+  sudo modprobe pcan
 \endverbatim
 (if you are trying to build the RT version of %OWD, substitute
 RT=XENOMAI in place of RT=NO_RT)
@@ -83,7 +85,7 @@ roslaunch.  The following parameters are supported:
 
  - \b ~/hold_starting_position If set to \e true will hold the current
    position immediately at startup.  Defaults to \e false, in which case
-   it will start up with only gravity compensation with the arm free
+   it will start up with only gravity compensation leaving the arm free
    to move.
 
  - \b ~/modified_j1 If set to \e true %OWD expects that joint 1 has been

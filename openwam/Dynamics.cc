@@ -513,6 +513,6 @@ void JSdynamics(double trq[Link::Ln+1],
   double F[Link::Ln+1];  // array to hold friction torques
   Friction(qd,F);        // calculate friction torques based on velocities
   for(int j=Joint::J1; j<=Joint::Jn; j++) {
-      trq[j] += ccg[j] + F[j];  
+    trq[j] += ccg[j] + F[j];   // add in the ccg and friction torques
   }
 }

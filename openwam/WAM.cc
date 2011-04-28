@@ -1421,9 +1421,9 @@ void WAMstats::rosprint(int recorder_count) const {
                   loopctrl,
                   loopsend);
   if (slowcount > 0) {
-    ROS_INFO_NAMED("times","Slow cycles %2.1f%% of the time (avg=%2.1fms, max=%2.1fms)",
+    ROS_DEBUG_NAMED("times","Slow cycles %2.1f%% of the time (avg=%2.1fms, max=%2.1fms)",
                    slowcount, slowavg, slowmax);
-    ROS_INFO_NAMED("times",
+    ROS_DEBUG_NAMED("times",
                    "  Slow breakdown: read %2.1fms, ctrl %2.1fms, send %2.1fms",
                    slowreadtime,
                    slowctrltime,
@@ -1434,7 +1434,7 @@ void WAMstats::rosprint(int recorder_count) const {
     }
   }
   if (missed_reads > 0) {
-    ROS_INFO_NAMED("times","Incomplete read cycles %d",missed_reads);
+    ROS_DEBUG_NAMED("times","Incomplete read cycles %d",missed_reads);
   }
   ROS_DEBUG_NAMED("times",
                   "trajectory eval %2.2fms, jscontrol %2.2fms, safetycount=%d, recordercount=%d",
