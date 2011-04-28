@@ -730,6 +730,7 @@ void control_loop_rt(void* argv){
 	  // fault by now, so give up!
 	  ROS_FATAL("Missed CANbus replies from 50 cycles in a row");
 	  missing_data_cycles=0; // reset
+	  ros::shutdown();
 	  return;
 	}
       } else {

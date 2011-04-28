@@ -5,6 +5,10 @@
   <param name="owd/canbus_number" type="int" value="0" />
   <param name="owd/hand_type" type="string" value="280+TACT" />
   <param name="owd/forcetorque_sensor" type="bool" value="true" />
+  <param name="owd/owd_plugins" type="string" value=""/>
+  <param name="owd/hold_starting_position" type="bool" value="false" />
+  <param name="owd/modified_j1" type="bool" value="false" />
+  <param name="owd/publish_frequency" type="int" value="10" />
 
   <!--  home position for DARPA arm 
          param name="owd/home_position" type="string"

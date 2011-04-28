@@ -56,14 +56,14 @@ ConstrainedForceTrajectory::ConstrainedForceTrajectory(
 
 void ConstrainedForceTrajectory::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   
-  if (tc.q.size() < DOF) {
+  if (tc.q.size() < (unsigned int) DOF) {
     runstate = DONE;  // can't do anything
     return;
   }
 
   // compute the joint movement since last call
   static double *y_diff=(double *)malloc(DOF*sizeof(double));
-  for (unsigned int i=0; i<DOF; ++i) {
+  for (int i=0; i<DOF; ++i) {
     y_diff[i]=tc.q[i]-old_y[i];
     old_y[i]=tc.q[i]; // save the y for next time
   }
@@ -102,7 +102,7 @@ void ConstrainedForceTrajectory::evaluate(OWD::Trajectory::TrajControl &tc, doub
 	  && (distance_moved > end_cond.value))) {
     stop();
     // don't need to change y[]; just leave it as is.
-    for (unsigned int i=0; i<DOF; ++i) {
+    for (int i=0; i<DOF; ++i) {
       tc.qd[i]=tc.qdd[i]=0;
     }
     return;

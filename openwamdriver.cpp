@@ -349,6 +349,13 @@ bool WamDriver::Init(const char *joint_cal_file)
     } while (!good_home);
     Dynamics::g=9.81; // turn on Gravity
   }
+
+  bool hold_starting_position;
+  n.param("hold_starting_position",hold_starting_position,false);
+  if (hold_starting_position) {
+    owam->hold_position();
+  }
+  
   owam->exit_on_pendant_press=true; // from now on, exit if the user hits e-stop or idle
   
 
