@@ -12,35 +12,12 @@ Currently scheduled tasks:
       <th align="left">Description and estimate</th>
     </tr>
     <tr>
-      <td>25-Feb-2011</td>
+      <td>06-May-2011</td>
       <td>vandeweg</td>
 
-      <td><b>transmission ratio parameterization</b> [1 day] Allow the
-          transmission ratios to be set via ROS parameters or from a file
-          so that they can be calibrated for each individual WAM.</td>
-
-    </tr>
-    <tr>
-      <td>25-Feb-2011</td>
-      <td>vandeweg</td>
-
-      <td><b>auto-calibration</b> [3 days] Determine startup calibration for
-          J5/J6/J7 automatically by moving the joints to their limits
-          in a safe way.  Requires resurrecting code that Mike had
-          working on the previous Herb configuration.</td>
-
-    </tr>
-    <tr>
-      <td>04-Mar-2011</td>
-      <td>vandeweg</td>
-
-      <td><b>force-based trajectories</b> [2-3 weeks] Make a new subclass of
-          trajectories that specify forces over time instead of joint
-          positions.  Need to figure out the way it's specified and
-          the way that the configuration is bounded, as well as what
-          happens in different runtime cases.  Need to enhance WAM.cc
-          to allow trajectories to output desired torques in addition
-          to pos/vel/accel.</td>
+      <td><b>breakaway positions</b> publish breakaway detection
+          settings for the three fingers.  Requires querying
+          additional finger puck parameters.</td>
 
     </tr>
   </table>
@@ -51,6 +28,25 @@ Additional unscheduled tasks:
       <th width="120" align="left">Date</th>
       <th width="120" align="left">Assigned to</th>
       <th align="left">Description and estimate</th>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+
+      <td><b>auto-calibration</b> Determine startup calibration for
+          J5/J6/J7 automatically by moving the joints to their limits
+          in a safe way.  Requires resurrecting code that Mike had
+          working on the previous Herb configuration.</td>
+
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+
+      <td><b>transmission ratio parameterization</b> Allow the
+          transmission ratios to be set via ROS parameters or from a file
+          so that they can be calibrated for each individual WAM.</td>
+
     </tr>
     <tr>
       <td></td>
@@ -80,39 +76,12 @@ Additional unscheduled tasks:
       <td></td>
       <td></td>
 
-      <td><b>strain gauges</b> Get the strain gauge values from the
-          finger pucks.  Similar to getting the tactile data.</td>
-
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-
-      <td><b>breakaway positions</b> publish breakaway detection
-          settings for the three fingers.  Requires querying
-          additional finger puck parameters.</td>
-
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-
       <td><b>update dynamic model based on finger positions</b> The
           link7 model assumes the CG of the hand is always on-axis,
           without regard for the finger positions.  Most of the
           groundwork is in place for the link7 model to update based
           on the actual finger positions, but it still needs final
           testing.</td>
-
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-
-      <td><b>update link7 mass with grabbed object properties</b>
-          Allow clients to inform the WAM of the mass of what the hand
-          is holding for better dynamic performance.  Some of this was
-          in place earlier and may just need to be resurrected.</td>
 
     </tr>
     <tr>

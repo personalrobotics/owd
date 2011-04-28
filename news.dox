@@ -1,5 +1,17 @@
 /**
 \page news OWD News
+<b>SetExtraMass service call added</b>
+Clients can call the SetExtraMass function to add mass properties to
+any of the WAM links.  This allows for better control when the WAM is
+picking up a heavy object, for instance.  [26-April-2011]
+
+<b>OWD Plugins</b>
+OWD now supports runtime-loadable plugins (r8821).  Now you can
+define custom interfaces and behaviors for OWD without having to
+modify the core code.  This speeds your development time while also
+making it easier to keep abreast of OWD changes.  See the \subpage
+plugins page for more details.  [25-Apr-2011]
+
 <b>Model 280 Hand now keeps squeezing grasped objects</b>
 The behavior of the MoveHand service call has been improved for users
 with a model 280 Hand.  Previously, the hand would try to move the
