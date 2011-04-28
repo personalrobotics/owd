@@ -90,7 +90,7 @@ Additional unscheduled tasks:
 
       <td><b>calibrate dynamic model</b> write a system-ID routine to
           improve the inertial parameters of each link.  This could be
-          done outside of OWD, either online or offline.  Currently
+          done outside of %OWD, either online or offline.  Currently
           we're just using data calculated from the CAD mass
           models.</td>
 

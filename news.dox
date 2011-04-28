@@ -2,15 +2,15 @@
 \page news OWD News
 <b>SetExtraMass service call added</b>
 Clients can call the SetExtraMass function to add mass properties to
-any of the WAM links.  This allows for better control when the WAM is
+any of the %WAM links.  This allows for better control when the %WAM is
 picking up a heavy object, for instance.  [26-April-2011]
 
-<b>OWD Plugins</b>
-OWD now supports runtime-loadable plugins (r8821).  Now you can
-define custom interfaces and behaviors for OWD without having to
+<b>%OWD Plugins</b>
+%OWD now supports runtime-loadable plugins (r8821).  Now you can
+define custom interfaces and behaviors for %OWD without having to
 modify the core code.  This speeds your development time while also
-making it easier to keep abreast of OWD changes.  See the \subpage
-plugins page for more details.  [25-Apr-2011]
+making it easier to keep abreast of %OWD changes.  See the
+\subpage plugins page for more details.  [25-Apr-2011]
 
 <b>Model 280 Hand now keeps squeezing grasped objects</b>
 The behavior of the MoveHand service call has been improved for users
@@ -19,8 +19,8 @@ fingers to the commanded position, and stop once the fingers stalled
 or when the end position was reached, whichever came first.  This
 posed a problem when grasping, because if the object shifted while
 being lifted, the fingers did not close further in order to hold it
-tight.  Starting in revision 8086 of OWD, once the fingers stop moving
-the first time, OWD will begin reporting their state as "state_done"
+tight.  Starting in revision 8086 of %OWD, once the fingers stop moving
+the first time, %OWD will begin reporting their state as "state_done"
 (value 1), but will turn off the TSTOP flag on the three fingers and
 reissue the move command with a much lower maximum torque value.  This
 will cause the fingers to keep applying moderate pressure in the same
@@ -32,22 +32,22 @@ this condition indefinitely.  This change affects F1-F3 only; the
 spread behavior is unchanged.  [23-Mar-2011]
 
 <b>Corrected finger transforms</b>
-Some of the transforms that OWD published for the fingers on the 280
+Some of the transforms that %OWD published for the fingers on the 280
 hand were incorrect.  The code has been rewritten and is now behaving
 correctly in rev. 8011.  Associated with this change is a modification
 to the origin of the link1.iv file used in OpenRAVE, and the
 bh_link1.stl file used in RViz.  New versions of both files have been
 checked in to pr/public/data/ormodels/robots/barrett. [17-Mar-2011]
 
-<b>Reorganized Tactile messages</b>
-Tactile data message is now broken into 4 arrays: finger1, finger2,
+<b>Reorganized %Tactile messages</b>
+%Tactile data message is now broken into 4 arrays: finger1, finger2,
 finger3, and palm.  This was requested by a user to make it easier to
 identify particular tactile pads.  The arrays are still all sent in a
 single message (pr_msgs/BHTactile).  [15-Mar-2011]
 
 <b>Improved WAMState and TrajInfo state values</b>
 The state values in WAMState and TrajInfo messages have changed
-slightly in order to make it easier to infer what OWD is currently
+slightly in order to make it easier to infer what %OWD is currently
 doing.  Instead of having to look at WAMState.state to see that a
 trajectory is active (state_moving) and then having to examine the
 TrajInfo.state to see what's going on (running vs. paused), all the
@@ -66,14 +66,14 @@ in a future release. [15-Mar-2011]
 
 <b>Improved routine for saving calibration values</b>
 The calibration routine has been changed so that after the arm is returned to
-home with grav-comp on, OWD waits for \<return\> and then turns the motors
+home with grav-comp on, %OWD waits for \<return\> and then turns the motors
 off so that the user can readjust the home position before pressing
 shift-idle.  This helps to avoid the sudden relaxation of the arm that
 can throw off the saved home position values. [15-Mar-2011]
 
-<b>Support for 280 Tactile Sensors</b>
-Can now read the full 96-cell Tactile data from a model 280 Hand.
-Along the way made many improvements in the CANbus communication code
+<b>Support for 280 %Tactile Sensors</b>
+Can now read the full 96-cell %Tactile data from a model 280 Hand.
+Along the way made many improvements in the %CANbus communication code
 in order to handle multiple simultaneous requests on the bus. [23-Feb-2011]
 
 <b>Method to lock individual joints</b>
@@ -84,8 +84,8 @@ SetJointStiffness service call. [23-Feb-2011]
 <b>Faster stops when palm touches goal</b><br>
 Trajectories can now be automatically paused by inputs sensed by the wrist-mounted force/torque sensor.  The result is a much faster stop with less force applied than when relying on the error torques.  Currently the stop condition is a Z-force of less than -3N, but in the future this will be configurable by ROS parameters for both the hand frame and the workspace frame.  To use this functionality, tare the sensor before the beginning of the trajectory, and then call the AddTrajectory service with a trajectory that has the HoldOnForceInput flag set to true.  [11-Feb-2011]
 
-<b>More robust CANbus communication</b><br>
-In light of ongoing difficulties with the Peak CANbus card, some critical startup parts of the code are now wrapped in retry blocks, and timeout thresholds have been extended. [04-Feb-2011]
+<b>More robust %CANbus communication</b><br>
+In light of ongoing difficulties with the Peak %CANbus card, some critical startup parts of the code are now wrapped in retry blocks, and timeout thresholds have been extended. [04-Feb-2011]
 
 <b>Better finger movements</b><br>
 Finger gains have been tuned for better performance. [03-Feb-2011]
