@@ -32,7 +32,7 @@ SE3 forward_kinematics(Link* link){
  * Body manipulator Jacobian
  * Paul IEEE SMC 11(6) 1981
  * 
- * BIG FAT FUCKIN' WARNIN': The jacobian is in column major (for Fortran)
+ * BIG FAT WARNING: The jacobian is in column major (for Fortran)
  */
 
 void JacobianNF(double J[][6], Link *links){

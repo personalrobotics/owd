@@ -894,7 +894,7 @@ void WAM::newcontrol_rt(double dt){
   mpos2jpos();    // convert to joint positions
     
   for(int j=Joint::J1; j<=Joint::Jn; j++){
-    tc.q[j-1] = q[j] = joints[j].q; // set tc.y for traj->eval
+    tc.q[j-1] = q[j] = joints[j].q; // set tc.q for traj->eval
     links[j].theta(q[j]);
     sim_links[j].theta(q[j]);
     tc.qd[j-1] = tc.qdd[j-1] = tc.t[j-1] = 0.0; // zero out
@@ -902,7 +902,6 @@ void WAM::newcontrol_rt(double dt){
   std::vector<double> data;
   bool data_recorded=false;
 
-  // is there a joint trajectory running
   static int skipped_locks=0;
     
   if (! this->lock_rt("newcontrol") ) {
@@ -925,6 +924,7 @@ void WAM::newcontrol_rt(double dt){
 
   skipped_locks=0;
 
+  // is there a joint trajectory running?
   if(jointstraj != NULL){
     try {
       RTIME t3 = ControlLoop::get_time_ns_rt();        
