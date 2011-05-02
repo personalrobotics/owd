@@ -321,7 +321,7 @@ void WSinertia(double Ac[6][6], Link links[Link::Ln+1]){
 
   double J [Joint::Jn][6];              // Column major Jacobian
   int LDJ = 6;
-  JacobianNF(J, links);
+  OWD::Kinematics::JacobianNF(J, links);
 
   // A^-1
   // Factorize the symmetric positive definite matrix
@@ -432,7 +432,7 @@ void WSdynamics(double trq[Link::Ln+1],
     */
 
 
-    JacobianDB(J, links);
+    OWD::Kinematics::JacobianDB(J, links);
     
     //J'*F
     dgemv_(&TRANST, &NEQS,  &NJOINTS, &ALPHA,

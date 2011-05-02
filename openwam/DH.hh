@@ -17,7 +17,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <SE3.hh>
+#include "../openmath/SE3.hh"
 
 #ifndef __DH_HH__
 #define __DH_HH__

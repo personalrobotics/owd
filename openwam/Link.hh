@@ -19,9 +19,9 @@
 
 #include "DH.hh"
 
-#include <R3.hh>
-#include <SE3.hh>
-#include <Inertia.hh>
+#include "../openmath/R3.hh"
+#include "../openmath/SE3.hh"
+#include "../openmath/Inertia.hh"
 
 #ifndef __LINK_HH__
 #define __LINK_HH__

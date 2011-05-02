@@ -22,15 +22,22 @@
 #ifndef __KINEMATICS_HH__
 #define __KINEMATICS_HH__
 
-SE3 forward_kinematics(Link* link);
+namespace OWD {
 
-// body Jacobian for Fortran (column major)
-void JacobianNF(double J[][6], Link *links);
+  class Kinematics {
+  public:
+    static SE3 forward_kinematics(Link* link);
 
-// body Jacobian (column major) but hopefully this one works
-void JacobianDB(double J[][6], Link *links);
+    // body Jacobian for Fortran (column major)
+    void static JacobianNF(double J[][6], Link *links);
 
-// body Jacobian for C (row major) 
-void JacobianN(double J[][7], Link *links);
+    // body Jacobian (column major) but hopefully this one works
+    void static JacobianDB(double J[][6], Link *links);
 
-#endif
+    // body Jacobian for C (row major) 
+    void static JacobianN(double J[][7], Link *links);
+  };
+
+}; // namespace OWD
+
+#endif // __KINEMATICS_HH__

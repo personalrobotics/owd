@@ -286,6 +286,10 @@ bool WamDriver::Init(const char *joint_cal_file)
   // initialize the Plugin pointers
   Plugin::wam = owam;
   Plugin::wamdriver = this;
+  //  this code doesn't compile
+  //  for (int i=0; i<=Link::Ln; ++i) {
+  //    Plugin::links.push_back(owam->links[i]);
+  //  }
 
   std::stringstream ss(wamhome_list);
   std::string jval;
@@ -1564,38 +1568,6 @@ bool WamDriver::Publish() {
     wamstate.state = pr_msgs::WAMState::state_fixed;
   } else {
     wamstate.state = pr_msgs::WAMState::state_free;
-  }
-
-  // update the values in the Plugin base class
-  for (unsigned int i=0; i<nJoints; ++i) {
-    OWD::Plugin::_arm_position[i]=owam->q[i+1];
-    OWD::Plugin::_target_arm_position[i]=owam->tc.q[i];
-    OWD::Plugin::_pid_torque[i]=owam->pid_torq[i+1];
-    OWD::Plugin::_dynamic_torque[i]=owam->dyn_torq[i+1];
-    OWD::Plugin::_trajectory_torque[i]=owam->traj_torq[i+1];
-  }
-  if (owam->bus->forcetorque_data) {
-    for (unsigned int i=0; i<3; ++i) {
-      OWD::Plugin::_ft_force[i]=owam->bus->forcetorque_data[i];
-      OWD::Plugin::_ft_torque[i]=owam->bus->forcetorque_data[i+3];
-    }
-  }
-  if (owam->bus->BH280_installed) {
-    for (int j=0; j<3; ++j) {
-      OWD::Plugin::_hand_position[j]=owam->bus->finger_encoder_to_radians(owam->bus->hand_positions[j+1]);
-      OWD::Plugin::_target_hand_position[j]=owam->bus->finger_encoder_to_radians(owam->bus->hand_goal_positions[j+1]);
-      OWD::Plugin::_strain[j]=owam->bus->hand_strain[j];
-    }
-    OWD::Plugin::_hand_position[3]=owam->bus->spread_encoder_to_radians(owam->bus->hand_positions[4]);
-    OWD::Plugin::_target_hand_position[3]=owam->bus->finger_encoder_to_radians(owam->bus->hand_goal_positions[4]);
-  }
-  if (owam->bus->tactile_data) {
-    for (unsigned int i=0; i<24; ++i) {
-      OWD::Plugin::_tactile_f1[i]=owam->bus->tactile_data[i];
-      OWD::Plugin::_tactile_f2[i]=owam->bus->tactile_data[i+24];
-      OWD::Plugin::_tactile_f3[i]=owam->bus->tactile_data[i+48];
-      OWD::Plugin::_tactile_palm[i]=owam->bus->tactile_data[i+72];
-    }
   }
   owam->unlock();
 

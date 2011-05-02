@@ -240,6 +240,7 @@ public:
   int BH_model;
   bool ForceTorque;
   bool Tactile;
+  SE3 SE3_endpoint; // result of forward kinematics calculation
 };
 
 #endif

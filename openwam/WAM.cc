@@ -24,6 +24,8 @@
 */
 
 #include "WAM.hh"
+#include "Plugin.hh"
+#include "Kinematics.hh"
 #include <ros/ros.h>
 #include <stdio.h>
 
@@ -677,6 +679,7 @@ void control_loop_rt(void* argv){
 	if (!torques_sent && ((wam->bus->received_position_flags & 0xFE) == 0xFE)) {
 	  // we've received the 7 arm joint values, so compute and
 	  // send out the torques
+
 	  control_start_time = ControlLoop::get_time_ns_rt();
 	  // tell the control function how long it was between successive
 	  // request_position_rt() calls.  
@@ -923,6 +926,42 @@ void WAM::newcontrol_rt(double dt){
   }
 
   skipped_locks=0;
+
+  // update the forward kinematics
+  SE3_endpoint = OWD::Kinematics::forward_kinematics(links);
+
+  // update the values in the Plugin base class
+  OWD::Plugin::_endpoint = SE3_endpoint;
+  for (unsigned int i=0; i<Joint::Jn; ++i) {
+    OWD::Plugin::_arm_position[i]=q[i+1];
+    OWD::Plugin::_target_arm_position[i]=tc.q[i];
+    OWD::Plugin::_pid_torque[i]=pid_torq[i+1];
+    OWD::Plugin::_dynamic_torque[i]=dyn_torq[i+1];
+    OWD::Plugin::_trajectory_torque[i]=traj_torq[i+1];
+  }
+  if (bus->forcetorque_data) {
+    for (unsigned int i=0; i<3; ++i) {
+      OWD::Plugin::_ft_force[i]=bus->forcetorque_data[i];
+      OWD::Plugin::_ft_torque[i]=bus->forcetorque_data[i+3];
+    }
+  }
+  if (bus->BH280_installed) {
+    for (int j=0; j<3; ++j) {
+      OWD::Plugin::_hand_position[j]=bus->finger_encoder_to_radians(bus->hand_positions[j+1]);
+      OWD::Plugin::_target_hand_position[j]=bus->finger_encoder_to_radians(bus->hand_goal_positions[j+1]);
+      OWD::Plugin::_strain[j]=bus->hand_strain[j];
+    }
+    OWD::Plugin::_hand_position[3]=bus->spread_encoder_to_radians(bus->hand_positions[4]);
+    OWD::Plugin::_target_hand_position[3]=bus->finger_encoder_to_radians(bus->hand_goal_positions[4]);
+  }
+  if (bus->tactile_data) {
+    for (unsigned int i=0; i<24; ++i) {
+      OWD::Plugin::_tactile_f1[i]=bus->tactile_data[i];
+      OWD::Plugin::_tactile_f2[i]=bus->tactile_data[i+24];
+      OWD::Plugin::_tactile_f3[i]=bus->tactile_data[i+48];
+      OWD::Plugin::_tactile_palm[i]=bus->tactile_data[i+72];
+    }
+  }
 
   // is there a joint trajectory running?
   if(jointstraj != NULL){

@@ -26,6 +26,7 @@
 #include <vector>
 #include <string>
 #include <stdint.h>
+#include "Link.hh"
 
 class WAM;
 
@@ -214,9 +215,10 @@ namespace OWD {
     /// sensors are not present
     static const std::vector<float> &tactile_palm;
 
+    static const SE3 &endpoint;
 
   private:
-    friend class WAM;
+    friend class ::WAM;
     friend class WamDriver;
 
     static void PublishAll();
@@ -237,6 +239,7 @@ namespace OWD {
     static std::vector<float> _tactile_f2;
     static std::vector<float> _tactile_f3;
     static std::vector<float> _tactile_palm;
+    static SE3 _endpoint;
 
     static std::vector<Plugin *> children;
 

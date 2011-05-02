@@ -70,7 +70,7 @@ void ConstrainedForceTrajectory::evaluate(OWD::Trajectory::TrajControl &tc, doub
 
   // compute the current Jacobian
   static double J[Joint::Jn][6];
-  JacobianDB(J, links);
+  OWD::Kinematics::JacobianDB(J, links);
 
   // compute the workspace movement of the hand
   static double *ws_diff = (double *)malloc(6*sizeof(double));
