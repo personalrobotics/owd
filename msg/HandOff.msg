@@ -13,6 +13,6 @@ int16 mode_follow=1
 int16 mode_advance=2
 
 int16 object_none=0
-int16 object_unknown=1
-int16 object_poptarts=2
-int16 object_fuze=3
+int16 object_poptarts=1
+int16 object_fuze=2
+int16 object_unknown=3
