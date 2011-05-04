@@ -7,3 +7,6 @@ int16[] convex_hull_y
 
 float32 mean_quality
 int16 used_points
+
+NameTypeValue[] properties
+
