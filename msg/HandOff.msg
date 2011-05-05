@@ -1,5 +1,6 @@
 Header header
 geometry_msgs/Point point
+geometry_msgs/Point point_world
 geometry_msgs/Point offset
 int16 status
 int16 mode
