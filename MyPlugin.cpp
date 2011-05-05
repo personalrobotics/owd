@@ -105,6 +105,7 @@ bool MyTraj::AddTrajectory(owd_plugin_example::AddMyTrajectory::Request &req,
     if (res.id > 0) {
       res.ok=true;
     } else {
+      delete newtraj;
       res.ok=false;
     }
   } catch (const char *err) {
