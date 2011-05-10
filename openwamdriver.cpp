@@ -1889,9 +1889,13 @@ bool WamDriver::DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
       for (tl_it = trajectory_list.begin(),
              ws_it=wamstate.trajectory_queue.begin();
            tl_it != trajectory_list.end(); ++tl_it,++ws_it) {
-        if ((*tl_it)->id == delete_id) {
-          trajectory_list.erase(tl_it);
-          wamstate.trajectory_queue.erase(ws_it);
+	if (tl_it != trajectory_list.end()) {
+	  if ((*tl_it)->id == delete_id) {
+	    trajectory_list.erase(tl_it);
+	    if (ws_it != wamstate.trajectory_queue.end()) {
+	      wamstate.trajectory_queue.erase(ws_it);
+	    }
+	  }
         }
       }
     }
