@@ -68,19 +68,15 @@ void ConstrainedForceTrajectory::evaluate(OWD::Trajectory::TrajControl &tc, doub
     old_y[i]=tc.q[i]; // save the y for next time
   }
 
-  // compute the current Jacobian
-  static double J[Joint::Jn][6];
-  OWD::Kinematics::JacobianDB(J, links);
-
   // compute the workspace movement of the hand
   static double *ws_diff = (double *)malloc(6*sizeof(double));
   // calculate ws_diff = J*y_vel
   char TRANSN = 'N';  int NEQS = 6; int LDJ = 6; int INC = 1;
   double ALPHA =  1.0;  double BETA  =  0.0;
   dgemv_(&TRANSN, &NEQS,&DOF, &ALPHA,
-	   &J[0][0],        &LDJ,
-	   y_diff,    &INC, &BETA,
-	   ws_diff, &INC);
+	 &OWD::Kinematics::Jacobian0[0][0],        &LDJ,
+	 y_diff,    &INC, &BETA,
+	 ws_diff, &INC);
   JointPos WSdiff;
   WSdiff.SetFromArray(DOF,ws_diff);
 

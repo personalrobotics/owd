@@ -49,6 +49,9 @@ public:
   double norm() const {return sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2] +
 				   x[3]*x[3] + x[4]*x[4] + x[5]*x[5]);}
 
+  R3 v() const { return R3(x[0],x[1],x[2]);  }
+  R3 w() const { return R3(x[3],x[4],x[5]);  }
+
   void  clear(){bzero(x, 6*sizeof(double));}
   
   operator       double* ()        {return x;}

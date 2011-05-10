@@ -202,7 +202,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile) :
   links[Link::L7] = L7_without_hand;
 #endif // !BH8
 
-  for (unsigned int i=Link::L1; i<=Link::Ln; ++i) {
+  for (int i=Link::L1; i<=Link::Ln; ++i) {
     sim_links[i] = links[i];
   }
 
@@ -236,7 +236,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile) :
   }
   // remember the original link properties so that we can restore them
   // after someone has added extra mass via the SetExtraMass call.
-  for (unsigned int l=Link::L1; l<=Link::Ln; ++l) {
+  for (int l=Link::L1; l<=Link::Ln; ++l) {
     original_links[l] = links[l];
   }
 }
@@ -281,7 +281,7 @@ int WAM::init(){
 }
 
 
-bool WAM::set_gains(unsigned int joint,
+bool WAM::set_gains(int joint,
 		    pr_msgs::PIDgains &gains) {
   if ((joint < Joint::J1) || (joint >> Joint::Jn)) {
     return false;
@@ -292,7 +292,7 @@ bool WAM::set_gains(unsigned int joint,
 
 bool WAM::get_gains(std::vector<pr_msgs::PIDgains > &gains) {
   gains.resize(Joint::Jn);
-  for (unsigned int j=1; j<=Joint::Jn; ++j) {
+  for (int j=1; j<=Joint::Jn; ++j) {
     jointsctrl[j].get_gains(gains[j-1].kp, gains[j-1].kd, gains[j-1].ki);
   }
   return true;
@@ -527,8 +527,6 @@ void control_loop_rt(void* argv){
 #endif
 
 
-  unsigned int slowcounts(0);
-  unsigned int fastcounts(0);
   double readtime(0.0f);
   double controltime(0.0f);
   double sendtime(0.0f);
@@ -545,6 +543,7 @@ void control_loop_rt(void* argv){
 
   RTIME last_sendtorque_time = ControlLoop::get_time_ns_rt() - ControlLoop::PERIOD * 1e9;  // first-time initialization
   RTIME last_loopstart_time = last_sendtorque_time;
+
   ROS_DEBUG("Control loop started");
 
   int hand_cycles=12;  // we need 12 cycles to get everything we need
@@ -581,7 +580,6 @@ void control_loop_rt(void* argv){
 	  //	  wam->bus->request_positions_rt(13);
 	  //	  wam->bus->request_positions_rt(14);
 	}
-	static int strain_cycles(9);
 	if (hand_counter==2) {
 	  wam->bus->request_strain_rt();
 	}
@@ -873,7 +871,6 @@ void WAM::newcontrol_rt(double dt){
   //  static double qdd_target[Joint::Jn+1];
   R6 F;
     
-  static int tc1=0;
   static double jscontroltime=0.0f;
   static int dyncount=0;
   static int trajcount=0;
@@ -930,9 +927,12 @@ void WAM::newcontrol_rt(double dt){
   // update the forward kinematics
   SE3_endpoint = OWD::Kinematics::forward_kinematics(links);
 
+  // update the Jacobian and related values
+  OWD::Kinematics::update_jacobians(links);
+
   // update the values in the Plugin base class
   OWD::Plugin::_endpoint = SE3_endpoint;
-  for (unsigned int i=0; i<Joint::Jn; ++i) {
+  for (int i=0; i<Joint::Jn; ++i) {
     OWD::Plugin::_arm_position[i]=q[i+1];
     OWD::Plugin::_target_arm_position[i]=tc.q[i];
     OWD::Plugin::_pid_torque[i]=pid_torq[i+1];
@@ -1009,7 +1009,7 @@ void WAM::newcontrol_rt(double dt){
       } else {
 	data.push_back(0);
       }
-      for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+      for (int j=Joint::J1; j<=Joint::Jn; ++j) {
 	data.push_back(tc.q[j-1]);  // record target position
 	data.push_back(q[j]);         // record actual position
 	data.push_back(pid_torq[j]);  // record the pid torques
@@ -1089,7 +1089,7 @@ void WAM::newcontrol_rt(double dt){
     data.push_back(t1); // record the current time
     data.push_back(0);  // time factor (zero for no traj)
     data.push_back(0); // trajectory time (zero for no traj)
-    for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+    for (int j=Joint::J1; j<=Joint::Jn; ++j) {
       data.push_back(tc.q[j-1]);  // record target position
       data.push_back(q[j]);         // record actual position
       data.push_back(pid_torq[j]);  // record the pid torques
@@ -1128,7 +1128,7 @@ void WAM::newcontrol_rt(double dt){
   // always calculate simulated dynamics (we'll overwrite dyn_torq later)
   JSdynamics(sim_torq, sim_links,(& tc.qd[0])-1, (&tc.qdd[0])-1); 
   if (data_recorded) {
-    for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+    for (int j=Joint::J1; j<=Joint::Jn; ++j) {
       data.push_back(sim_torq[j]); // torques from sim model
     }
   }
@@ -1148,10 +1148,10 @@ void WAM::newcontrol_rt(double dt){
     }
   }
   if (data_recorded) {
-    for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+    for (int j=Joint::J1; j<=Joint::Jn; ++j) {
       data.push_back(dyn_torq[j]); // dynamic torques
     }
-    for (unsigned int j=Joint::J1; j<=Joint::Jn; ++j) {
+    for (int j=Joint::J1; j<=Joint::Jn; ++j) {
       data.push_back(tc.t[j-1]); // trajectory torques
     }
     recorder.add(data);
@@ -1406,13 +1406,13 @@ void WAM::lock(const char *name) {
 #endif // ! OWD_RT
   strncpy(last_locked_by,name,100);
   last_locked_by[99]=0; // just in case it was more than 99 chars long
-  if (name) {
-    static char msg[200];
+  //if (name) {
+    //static char msg[200];
     //      sprintf(msg,"OPENWAM locked by %s",name);
     //      syslog(LOG_ERR,msg);
     //    } else {
     //        syslog(LOG_ERR,"OPENWAM locked by (unknown)");
-  }
+  //  }
 }
 
 bool WAM::lock_rt(const char *name) {

@@ -197,7 +197,7 @@ public:
 
   int  set_targ_jpos(double* pos);          // set the target joint positions online 
   int  set_jpos(double pos[]);   // set the joint positions offline
-  bool set_gains(unsigned int joint, pr_msgs::PIDgains &gains);
+  bool set_gains(int joint, pr_msgs::PIDgains &gains);
   bool get_gains(std::vector<pr_msgs::PIDgains> &gains);
 
   void get_current_data(double *pos, double *trq, double *nettrq, 

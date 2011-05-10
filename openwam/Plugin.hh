@@ -27,6 +27,8 @@
 #include <string>
 #include <stdint.h>
 #include "Link.hh"
+#include "../openmath/R6.hh"
+#include "TrajType.hh"
 
 class WAM;
 
@@ -92,6 +94,22 @@ namespace OWD {
     ///
     /// \returns True on success, false otherwise
     static bool ft_tare();
+
+    /// \brief Multiply a vector by the current base-frame Jacobian
+    ///
+    /// \param v A JointPos (vector of doubles) containing the joint angles
+    ///
+    /// \returns The calculated workspace movement (translation and rotation)
+    static const R6 Jacobian_times_vector(JointPos v);
+
+    /// \brief Multiply the Jacobian Transpose by the supplied vector
+    ///
+    /// \param v an R6 vector of workspace positions and rotations
+    /// \returns a JointPos vector of length NJOINTS
+    ///
+    /// This function is typically used to compute the joint torques
+    /// that will yield the requested workspace forces/torques
+    static const JointPos JacobianTranspose_times_vector(R6 &v);
 
     /// \brief Current position
     ///
@@ -215,6 +233,7 @@ namespace OWD {
     /// sensors are not present
     static const std::vector<float> &tactile_palm;
 
+    /// \brief The pose of the WAM end effector (link 7 origin)
     static const SE3 &endpoint;
 
   private:

@@ -37,11 +37,24 @@ public:
 
   double norm() const {return sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2]);}
 
+  void normalize() {
+    double d=norm();
+    x[0] /= d;
+    x[1] /= d;
+    x[2] /= d;
+  }
+
   operator       double* ()        {return x;}
   operator const double* ()  const {return x;}
   
   double operator [] (int i) const {return x[i];}
   
+  /// \brief Scale by a double
+  inline R3 &operator *= (const double d) {
+    x[0]*=d; x[1]*=d; x[2]*=d;
+    return *this;
+  }
+
   friend R3     operator * (double s, const R3& r)
   {return R3(r[0]*s, r[1]*s, r[2]*s);}
   friend R3     operator * (const R3& r, double s) {return s*r;}

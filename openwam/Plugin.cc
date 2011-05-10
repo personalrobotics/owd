@@ -87,6 +87,38 @@ namespace OWD {
     return (wam->bus->ft_tare() == OW_SUCCESS);
   }
 
+  //  const double* Plugin::Jacobian0() {
+  //    return (double *) OWD::Kinematics::Jacobian0;
+  //  }
+
+  //  const double* Plugin::JacobianEE() {
+  //    return (double *) OWD::Kinematics::JacobianEE;
+  //  }
+
+  const R6 Plugin::Jacobian_times_vector(JointPos v) {
+    R6 result;
+    OWD::Kinematics::Jacobian0_times_vector(&v[0], (double *)result);
+    return result;
+  }
+
+  /*
+  const JointPos Plugin::JacobianPseudoInverse_times_vector(R6 &v) {
+    double result[OWD::Kinematics::NJOINTS];
+    OWD::Kinematics::JacobianPseudoInverse_times_vector(v,result);
+    JointPos jp;
+    jp.SetFromArray(OWD::Kinematics::NJOINTS,result);
+    return jp;
+  }
+  */
+
+  const JointPos Plugin::JacobianTranspose_times_vector(R6 &v) {
+    double result[OWD::Kinematics::NJOINTS];
+    OWD::Kinematics::Jacobian0Transpose_times_vector(v,result);
+    JointPos jp;
+    jp.SetFromArray(OWD::Kinematics::NJOINTS,result);
+    return jp;
+  }
+
   std::vector<double> Plugin::_arm_position;
   std::vector<double> Plugin::_target_arm_position;
   std::vector<double> Plugin::_pid_torque;
