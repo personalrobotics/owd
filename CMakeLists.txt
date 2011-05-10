@@ -3,6 +3,7 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 set(ROS_BUILD_TYPE Debug)
 rosbuild_init()
+rosbuild_genmsg()
 rosbuild_gensrv()
 
 rosbuild_add_library(gfe_owd_plugin GfePlugin.cpp)
