@@ -71,6 +71,8 @@ int main(int argc, char** argv)
     }
   } else if (! hand_type.compare(0,3,"260")) {
     BH_model=260;
+  } else if (! hand_type.compare(0,29,"darpa_arms_calibration_target")) {
+    BH_model=999;
   }
 
   OWD::WamDriver *wamdriver = new OWD::WamDriver(canbus_number,BH_model,forcetorque,tactile);
