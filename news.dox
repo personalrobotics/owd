@@ -1,5 +1,26 @@
 /**
 \page news OWD News
+<b>bhd/SetSpeed service</b>
+OWD now lets you set the speed of the hand joints for subsequent
+MoveHand commands.  It reuses the same service message used for
+owd/SetSpeed.  In the case of the hand, the velocities vector should
+have four values in units of radians per second (three for the
+fingers, one for the spread).  The default values for the 280 hand are
+2.5 for the fingers and 4.3 for the spread.  The min_accel_time field
+in the service message is ignored for the hand. [11-May-2011]
+
+<b>Jacobian support added to Plugin interface</b>
+Two functions have been added to the OWD::Plugin interface to assist
+with writing trajectories that operate in workspace coordinates.  The
+function Jacobian_times_vector multiplies the Jacobian for the current
+configuration by the supplied vector in order to transform jointspace
+values (velocities or torques) into workspace values (linear/angular
+velocities or forces/torques).  The function
+JacobianTranspose_times_vector helps you go in the other direction
+(but of course the standard qualifications about using the
+JacobianTranspose apply).  Also, the full transformation matrix of the
+end-effector frame (link7) is now available as OWD::Plugin::endpoint.
+
 <b>SetExtraMass service call added</b>
 Clients can call the SetExtraMass function to add mass properties to
 any of the %WAM links.  This allows for better control when the %WAM is
