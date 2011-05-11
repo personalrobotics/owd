@@ -32,29 +32,19 @@ set (CANBUS_DEFS "")
 set (CANBUS_LIBS "")
 endif (CANBUS_TYPE STREQUAL "ESD")
 
-rosbuild_add_executable(owd owd.cpp openwamdriver.cpp bhd280.cc ft.cc tactile.cc)
+rosbuild_add_executable(owd owd.cpp openwamdriver.cpp bhd280.cc
+                            ft.cc tactile.cc)
 target_link_libraries(owd wamcan openwam openmath lapack blas
 			  gfortran ${CANBUS_LIBS})
 rosbuild_add_compile_flags(owd "${CANBUS_DEFS}")
 rosbuild_add_link_flags(owd "${CANBUS_LDFLAGS}")
 
-rosbuild_add_executable(owdrt owd.cpp openwamdriver.cpp bhd280.cc ft.cc tactile.cc)
-target_link_libraries(owdrt wamcanrt openwam openmath lapack blas
-			  gfortran ${CANBUS_LIBS} ${RT_LIBS})
-rosbuild_add_compile_flags(owdrt "${CANBUS_DEFS} ${RT_DEFS}")
-rosbuild_add_link_flags(owdrt "${CANBUS_LDFLAGS}")
-
-rosbuild_add_executable(canbhd owd.cpp openwamdriver.cpp bhd280.cc ft.cc tactile.cc)
+rosbuild_add_executable(canbhd owd.cpp openwamdriver.cpp bhd280.cc
+                               ft.cc tactile.cc)
 target_link_libraries(canbhd bhdcan openwam openmath lapack blas
 			     gfortran ${CANBUS_LIBS})
 rosbuild_add_compile_flags(canbhd "-DBH280 -DBH280_ONLY ${CANBUS_DEFS}")
 rosbuild_add_link_flags(canbhd "${CANBUS_LDFLAGS}")
-
-rosbuild_add_executable(canbhdrt owd.cpp openwamdriver.cpp bhd280.cc ft.cc tactile.cc)
-target_link_libraries(canbhdrt bhdcanrt openwam openmath lapack blas
-			     gfortran ${CANBUS_LIBS} ${RT_LIBS})
-rosbuild_add_compile_flags(canbhdrt "-DBH280 -DBH280_ONLY ${CANBUS_DEFS} ${RT_DEFS}")
-rosbuild_add_link_flags(canbhdrt "${CANBUS_LDFLAGS}")
 
 rosbuild_add_executable(owdsim owd.cpp openwamdriver.cpp)
 target_link_libraries(owdsim openwamsim openmath lapack blas gfortran)
@@ -66,6 +56,22 @@ rosbuild_add_executable(puck_update puck_update.cpp)
 target_link_libraries(puck_update wamcan openwam ${CANBUS_LIBS})
 rosbuild_add_compile_flags(puck_update "${CANBUS_DEFS}")
 rosbuild_add_link_flags(puck_update "${CANBUS_LDFLAGS}")
+
+if (RT_BUILD)
+  rosbuild_add_executable(owdrt owd.cpp openwamdriver.cpp bhd280.cc
+                                ft.cc tactile.cc)
+  target_link_libraries(owdrt wamcanrt openwam openmath lapack blas
+                              gfortran ${CANBUS_LIBS} ${RT_LIBS})
+  rosbuild_add_compile_flags(owdrt "${CANBUS_DEFS} ${RT_DEFS}")
+  rosbuild_add_link_flags(owdrt "${CANBUS_LDFLAGS}")
+
+  rosbuild_add_executable(canbhdrt owd.cpp openwamdriver.cpp bhd280.cc
+                                   ft.cc tactile.cc)
+  target_link_libraries(canbhdrt bhdcanrt openwam openmath lapack blas
+      	                         gfortran ${CANBUS_LIBS} ${RT_LIBS})
+  rosbuild_add_compile_flags(canbhdrt "-DBH280 -DBH280_ONLY ${CANBUS_DEFS} ${RT_DEFS}")
+  rosbuild_add_link_flags(canbhdrt "${CANBUS_LDFLAGS}")
+endif (RT_BUILD)
 
 include(detect_cpu.cmake)
 

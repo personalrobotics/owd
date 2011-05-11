@@ -58,18 +58,18 @@ rosbuild_add_library(wamcan ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)
 rosbuild_add_compile_flags(wamcan "${CANBUS_DEFS}")
 rosbuild_add_link_flags(wamcan "${CANBUS_LIBS}")
 
-rosbuild_add_library(wamcanrt ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)
-rosbuild_add_compile_flags(wamcanrt "${CANBUS_DEFS} ${RT_DEFS}")
-rosbuild_add_link_flags(wamcanrt "${CANBUS_LIBS} ${RT_LIBS}")
-
 rosbuild_add_library(bhdcan ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)
 rosbuild_add_compile_flags(bhdcan "${CANBUS_DEFS} -DBH280_ONLY")
 rosbuild_add_link_flags(bhdcan "${CANBUS_LIBS}")
 
-rosbuild_add_library(bhdcanrt ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)
-rosbuild_add_compile_flags(bhdcanrt "${CANBUS_DEFS} ${RT_DEFS} -DBH280_ONLY")
-rosbuild_add_link_flags(bhdcanrt "${CANBUS_LIBS} ${RT_LIBS}")
+if (RT_BUILD)
+  rosbuild_add_library(wamcanrt ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)
+  rosbuild_add_compile_flags(wamcanrt "${CANBUS_DEFS} ${RT_DEFS}")
+  rosbuild_add_link_flags(wamcanrt "${CANBUS_LIBS} ${RT_LIBS}")
 
-# target_link_libraries(openwam positionInterface)
-# include_directories (../openmath positionInterface)
+  rosbuild_add_library(bhdcanrt ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)
+  rosbuild_add_compile_flags(bhdcanrt "${CANBUS_DEFS} ${RT_DEFS} -DBH280_ONLY")
+  rosbuild_add_link_flags(bhdcanrt "${CANBUS_LIBS} ${RT_LIBS}")
+endif (RT_BUILD)
+
 include_directories (../openmath)
