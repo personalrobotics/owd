@@ -551,7 +551,7 @@ WamDriver::~WamDriver() {
   TrajType traj;
   try {
     traj=ros2owd_traj(jt);
-  } catch (char *error) {
+  } catch (const char *error) {
     snprintf(last_trajectory_error,200,"Could not extract valid trajectory: %s",error);
     ROS_ERROR_NAMED("BuildTrajectory","%s",last_trajectory_error);
     return NULL;
