@@ -30,6 +30,7 @@
 #include <pr_msgs/RelaxHand.h>
 #include <pr_msgs/SetHandProperty.h>
 #include <pr_msgs/GetHandProperty.h>
+#include <pr_msgs/SetSpeed.h>
 
 class BHD_280 {
 public:
@@ -41,7 +42,8 @@ public:
     ss_resethand,
     ss_sethandprop,
     ss_gethandprop,
-    ss_relaxhand;
+    ss_relaxhand,
+    ss_setspeed;
 
   ros::NodeHandle node;
   CANbus *bus;
@@ -68,7 +70,8 @@ public:
 		pr_msgs::SetHandProperty::Response &res);
   bool GetHandProperty(pr_msgs::GetHandProperty::Request &req,
 		pr_msgs::GetHandProperty::Response &res);
-  
+  bool SetSpeed(pr_msgs::SetSpeed::Request &req,
+		pr_msgs::SetSpeed::Response &res); 
 private:
   void AdvertiseAndSubscribe(ros::NodeHandle &n);
   void GetParameters(ros::NodeHandle &n);

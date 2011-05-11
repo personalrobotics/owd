@@ -346,6 +346,7 @@ public:
   int hand_get_distal_positions(double &p1, double &p2, double &p3);
   int hand_get_strain(double &s1, double &s2, double &s3);
   int hand_get_state(int32_t *state);
+  int hand_set_speed(const std::vector<double> &v);
 
   int ft_get_data(double *values);
   int ft_tare();

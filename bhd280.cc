@@ -78,6 +78,8 @@ void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 				       &BHD_280::SetHandProperty,this);
   ss_sethandprop = n.advertiseService("GetProperty",
 				       &BHD_280::GetHandProperty,this);
+  ss_setspeed = n.advertiseService("SetSpeed",
+				   &BHD_280::SetSpeed,this);
 }
 
 void BHD_280::GetParameters(ros::NodeHandle &n) {
@@ -90,6 +92,7 @@ void BHD_280::Unadvertise() {
   ss_movehand.shutdown();
   ss_resethand.shutdown();
   ss_relaxhand.shutdown();
+  ss_setspeed.shutdown();
 }
 
 void BHD_280::Pump(ros::TimerEvent const& e) {
@@ -381,6 +384,18 @@ bool BHD_280::GetHandProperty(pr_msgs::GetHandProperty::Request &req,
 		   req.property,req.nodeid);
     res.ok=false;
     res.reason="Failed to get property";
+  } else {
+    res.ok=true;
+  }
+  return true;
+}
+
+bool BHD_280::SetSpeed(pr_msgs::SetSpeed::Request &req,
+		       pr_msgs::SetSpeed::Response &res) {
+  if (bus->hand_set_speed(req.velocities) != OW_SUCCESS) {
+    ROS_WARN_NAMED("bhd280","BHD280 SetSpeed failed");
+    res.ok=false;
+    res.reason="Failed to call CANbus::hand_set_speed";
   } else {
     res.ok=true;
   }

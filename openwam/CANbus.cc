@@ -2516,6 +2516,23 @@ int CANbus::hand_relax() {
   return OW_SUCCESS;
 }
 
+int CANbus::hand_set_speed(const std::vector<double> &v) {
+  if (v.size() != 4) {
+    return OW_FAILURE;
+  }
+  // three fingers
+  for (unsigned int i=0; i<3; ++i) {
+    if (hand_set_property(11+i,MV,finger_radians_to_encoder(v[i])/1000) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  }
+  // spread
+  if (hand_set_property(14,MV,spread_radians_to_encoder(v[3])/1000) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  return OW_SUCCESS;
+}
+
 int CANbus::hand_get_positions(double &p1, double &p2, double &p3, double &p4) {
   p1 = finger_encoder_to_radians(hand_positions[1]);
   p2 = finger_encoder_to_radians(hand_positions[2]);
