@@ -39,7 +39,7 @@ namespace OWD {
     /// The column-major Jacobian matrix in the EE frame (NJOINTS x 6)
     static double JacobianEE[][NDIMS];
 
-    /// The column-major Jacobian matrix in the Link 0 frame (NJOINTS x 6)
+    /// The column-major Jacobian matrix in the %Link 0 frame (NJOINTS x 6)
     static double Jacobian0[][NDIMS];
 
     /// \brief Multiply the base-frame Jacobian by the supplied vector
@@ -52,7 +52,8 @@ namespace OWD {
     /// resulting from the supplied joint velocities
     static void Jacobian0_times_vector(double *q, double *out);
 
-    /// \brief Multiply the Jacobian Transpose by the supplied vector
+    /// \brief Multiply the base-frame Jacobian Transpose by the
+    /// supplied vector
     ///
     /// \param v an R6 vector
     /// \param {out} out A pointer to a previously-allocated array of
