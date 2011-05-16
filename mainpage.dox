@@ -92,9 +92,19 @@ roslaunch.  The following parameters are supported:
    remounted at 180 degrees from the original, as is done for Herb's
    configuration.  Defaults to \e false (factory configuration).
 
- - \b ~/publish_frequency Rate at which the wamstate and waminternals
+ - \b ~/wam_publish_frequency Rate at which the wamstate and waminternals
    messages are published, in hertz.  Also governs the rate at which
    a plugin's Publish() function is called.  Default is 10.
+
+ - \b ~/hand_publish_frequency Rate at which the handstate messages
+   are published, in hertz, if a model 280 hand is installed.
+   Default is 10.
+
+ - \b ~/ft_publish_frequency Rate at which the forcetorque
+   messages are published, in hertz.  Default is 10.
+
+ - \b ~/tactile_publish_frequency Rate at which the tactile
+   messages are published, in hertz.  Default is 10.
 
  - \b ~/owd_plugins A comma-separated list of shared library files to
    be loaded.  See the \subpage plugins documentation for more info.
