@@ -75,6 +75,23 @@ int main(int argc, char** argv)
   n.param("ft_publish_frequency",ft_pub_freq,10);
   n.param("tactile_publish_frequency",tactile_pub_freq,10);
 
+  if (wam_pub_freq > 500) {
+    ROS_WARN("value of wam_publish_frequency exceeds maximum sensor rate; capping to 500Hz");
+    wam_pub_freq = 500;
+  }
+  if (hand_pub_freq > 40) {
+    ROS_WARN("value of hand_publish_frequency exceeds maximum sensor rate; capping to 40Hz");
+    hand_pub_freq = 40;
+  }
+  if (ft_pub_freq > 80) {
+    ROS_WARN("value of ft_publish_frequency exceeds maximum sensor rate; capping to 80Hz");
+    ft_pub_freq = 80;
+  }
+  if (tactile_pub_freq > 40) {
+    ROS_WARN("value of tactile_publish_frequency exceeds maximum sensor rate; capping to 40Hz");
+    tactile_pub_freq = 40;
+  }
+  
   ROS_DEBUG("Using CANbus number %d",canbus_number);
 
   int BH_model(0);
