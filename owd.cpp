@@ -51,13 +51,29 @@ int main(int argc, char** argv)
   std::string hand_type;
   bool forcetorque;
   bool modified_j1;
-  int pub_freq;
+  int pub_freq;  // DEPRECATED
+  int wam_pub_freq;
+  int hand_pub_freq;
+  int ft_pub_freq;
+  int tactile_pub_freq;
   n.param("calibration_file",calibration_filename,std::string("wam_joint_calibrations"));
   n.param("canbus_number",canbus_number,0);
   n.param("hand_type",hand_type,std::string("none"));
   n.param("forcetorque_sensor",forcetorque,false);
   n.param("modified_j1",modified_j1,false);
-  n.param("publish_frequency",pub_freq,10);
+  int wam_freq_default=10;
+  int hand_freq_default=10;
+  if (n.getParam("publish_frequency",pub_freq)) {
+    ROS_WARN("Parameter publish_frequency has been deprecated.  Please use wam_publish_frequency, hand_publish_frequency, ft_publish_frequency, and tactile_publish_frequency.");
+    // we'll use the deprecated value to set the defaults for the
+    // individual hand and wam frequencies, so that it will only be
+    // used if the newer params are not specified
+    wam_freq_default=hand_freq_default=pub_freq;
+  }
+  n.param("wam_publish_frequency",wam_pub_freq,wam_freq_default);
+  n.param("hand_publish_frequency",hand_pub_freq,hand_freq_default);
+  n.param("ft_publish_frequency",ft_pub_freq,10);
+  n.param("tactile_publish_frequency",tactile_pub_freq,10);
 
   ROS_DEBUG("Using CANbus number %d",canbus_number);
 
@@ -107,7 +123,7 @@ int main(int argc, char** argv)
     exit(1);
   }
   try {
-    wamdriver->AdvertiseAndSubscribe(n, pub_freq);
+    wamdriver->AdvertiseAndSubscribe(n);
   } catch (int error) {
     ROS_FATAL("Error during WamDriver::AdvertiseAndSubscribe(); exiting.");
 #ifdef CAN_RECORD
@@ -142,19 +158,19 @@ int main(int argc, char** argv)
 #endif // BUILD_FOR_SEA
 
   ROS_DEBUG("Creating timer and spinner threads");
-  ros::Timer wam_timer = n.createTimer(ros::Duration(0.1), &OWD::WamDriver::Pump, wamdriver);
+  ros::Timer wam_timer = n.createTimer(ros::Rate(wam_pub_freq).expectedCycleTime(), &OWD::WamDriver::Pump, wamdriver);
 #ifndef OWDSIM
   ros::Timer bhd_timer;
   if (bhd) {
-    bhd_timer = n.createTimer(ros::Duration(0.1), &BHD_280::Pump, bhd);
+    bhd_timer = n.createTimer(ros::Rate(hand_pub_freq).expectedCycleTime(), &BHD_280::Pump, bhd);
   }
   ros::Timer ft_timer;
   if (ft) {
-    ft_timer = n.createTimer(ros::Duration(0.1), &FT::Pump, ft);
+    ft_timer = n.createTimer(ros::Rate(ft_pub_freq).expectedCycleTime(), &FT::Pump, ft);
   }
   ros::Timer tactile_timer;
   if (tact) {
-    tactile_timer = n.createTimer(ros::Duration(0.1), &Tactile::Pump, tact);
+    tactile_timer = n.createTimer(ros::Rate(tactile_pub_freq).expectedCycleTime(), &Tactile::Pump, tact);
   }
 #endif // OWDSIM
   ros::MultiThreadedSpinner s(3);

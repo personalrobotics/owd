@@ -1,24 +1,65 @@
 <launch>
 
+  <!-- A string specifying a file to keep on disk of the joint calibration 
+       values.  This file is read during startup if the encoder values have
+       been lost and need to be reset, and it is written to once a
+       calibration is successfully performed.  If this file is not present
+       then the values from the "home_position" parameter, below, are used.
+       -->
   <param name="owd/calibration_file" type="string"
-    value="wam_joint_calibrations" />
-  <param name="owd/canbus_number" type="int" value="0" />
-  <param name="owd/hand_type" type="string" value="280+TACT" />
-  <param name="owd/forcetorque_sensor" type="bool" value="true" />
-  <param name="owd/owd_plugins" type="string" value=""/>
-  <param name="owd/hold_starting_position" type="bool" value="false" />
-  <param name="owd/modified_j1" type="bool" value="false" />
-  <param name="owd/publish_frequency" type="int" value="10" />
-
-  <!--  home position for DARPA arm 
-         param name="owd/home_position" type="string"
-               value="0, -1.57, 0, 0, 1.309, 0, 3.02" />
-  -->
-
-  <!-- home position for Herb -->
+         value="wam_joint_calibrations" />
+  
+  <!-- A comma-separated list of joint values, in radians, of the 
+       configuration of the arm when the encoder values have been lost 
+       and calibration file does not yet exist.  These are ignored when
+       the calibration file is present. -->
   <param name="owd/home_position" type="string"
-         value="3.14, -1.97, 0, -0.83, 1.309, 0, 3.02" />
+         value="0, -1.629, 0, 0.164, 0, 0, 0" />
 
+  <!-- Numeric id of the canbus device, appended to "/dev/pcan" for Peak cards
+       or "/dev/can" for ESD cards. -->
+  <param name="owd/canbus_number" type="int" value="0" />
+  
+  <!-- Type of hand installed. Should be one of:
+         * "260" For a BH260 Hand (serial communication)
+         * "280" For a BH280 Hand (CANbus communication)
+         * "280+TACT" For a BH280 Hand with the fingertip tactile arrays
+         * "darpa_arms_calibration_target" For the DARPA-supplied
+                    calibration target from the ARM-S program installed
+                    in place of the hand
+         * "none" For no hand installed -->
+  <param name="owd/hand_type" type="string" value="280+TACT" />
+  
+  <!-- Whether the Barrett Force/Torque sensor is installed (true/false) -->
+  <param name="owd/forcetorque_sensor" type="bool" value="true" />
+  
+  <!-- A comma-separated list of shared library files to be loaded.
+       See the OWD Plugins documentation for more info. -->
+  <param name="owd/owd_plugins" type="string" value=""/>
+  
+  <!-- Start with stiffness = 1 -->
+  <param name="owd/hold_starting_position" type="bool" value="false" />
+  
+  <!-- Whether or not joint 1 has been remounted at 180 degrees -->
+  <param name="owd/modified_j1" type="bool" value="false" />
+  
+  <!-- How fast to publish owd wam info (in hertz) -->
+  <param name="owd/wam_publish_frequency" type="int" value="100" />
+
+  <!-- How fast to publish hand info (in hertz) -->
+  <param name="owd/hand_publish_frequency" type="int" value="40" />
+
+  <!-- How fast to publish force torque data (in hertz) -->
+  <param name="owd/ft_publish_frequency" type="int" value="80" />
+
+  <!-- How fast to publish tactile data (in hertz) -->
+  <param name="owd/tactile_publish_frequency" type="int" value="40" />
+
+  <!-- If set to True will only report 4-bit values for the 10 ten pressures
+       in each tactile array. Default is false (all values are reported as 
+       12-bit numbers). Setting to true reduces the communication demands on
+       the CAN bus, but does not increase the upper frequency limit. -->
+  <param name="tactile_top10" type="bool" value="false" />
 
   <node pkg="owd" type="owd" output="screen" respawn="false"
         cwd="node" name="owd">

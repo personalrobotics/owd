@@ -117,7 +117,7 @@ public:
     bool SetGains(owd::SetGains::Request &req,
 		  owd::SetGains::Response &res);
 
-    void AdvertiseAndSubscribe(ros::NodeHandle &n, int publish_frequency);
+    void AdvertiseAndSubscribe(ros::NodeHandle &n);
 
     pr_msgs::AddTrajectory::Response AddTrajectory(
 						   pr_msgs::AddTrajectory::Request *);

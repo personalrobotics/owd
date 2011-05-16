@@ -425,11 +425,11 @@ bool WamDriver::Init(const char *joint_cal_file)
   return true;
 }
 
-void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n, int publish_frequency) {
+void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
   pub_wamstate = 
-    n.advertise<pr_msgs::WAMState>("wamstate", publish_frequency);
+    n.advertise<pr_msgs::WAMState>("wamstate", 1);
   pub_waminternals = 
-    n.advertise<pr_msgs::WAMInternals>("waminternals", publish_frequency);
+    n.advertise<pr_msgs::WAMInternals>("waminternals", 1);
   ss_AddTrajectory = 
     n.advertiseService("AddTrajectory",&WamDriver::AddTrajectory,this);
   ss_SetStiffness =
