@@ -63,6 +63,13 @@ public:
   friend R3     operator + (const R3& r1, const R3& r2)
   {return R3(r1[0]+r2[0], r1[1]+r2[1], r1[2]+r2[2]);}
   
+  R3 &operator += (const R3 &rhs) {
+    x[0] += rhs.x[0];
+    x[1] += rhs.x[1];
+    x[2] += rhs.x[2];
+    return *this;
+  }
+
   friend R3     operator - (const R3& r1, const R3& r2)
   {return R3(r1[0]-r2[0], r1[1]-r2[1], r1[2]-r2[2]);}
   // cross product

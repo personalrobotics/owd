@@ -83,9 +83,9 @@ int main(int argc, char** argv)
     ROS_WARN("value of hand_publish_frequency exceeds maximum sensor rate; capping to 40Hz");
     hand_pub_freq = 40;
   }
-  if (ft_pub_freq > 80) {
-    ROS_WARN("value of ft_publish_frequency exceeds maximum sensor rate; capping to 80Hz");
-    ft_pub_freq = 80;
+  if (ft_pub_freq > 500) {
+    ROS_WARN("value of ft_publish_frequency exceeds maximum sensor rate; capping to 500Hz");
+    ft_pub_freq = 500;
   }
   if (tactile_pub_freq > 40) {
     ROS_WARN("value of tactile_publish_frequency exceeds maximum sensor rate; capping to 40Hz");

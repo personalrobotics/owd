@@ -566,6 +566,13 @@ void control_loop_rt(void* argv){
 	break;
       }
 
+#ifndef BH280_ONLY
+      if (wam->bus->forcetorque_data) {
+	// REQUEST F/T DATA (every cycle)
+	wam->bus->request_forcetorque_rt();
+      }
+#endif
+
       // While the pucks are receiving and processing the position request,
       // send out our secondary request for retrieval afterwards.
       // Each of these use a unique counter, so their update rates need
@@ -580,10 +587,6 @@ void control_loop_rt(void* argv){
 	}
 	if (hand_counter==1) {
 	  wam->bus->request_positions_rt(GROUPID(5));
-	  //	  wam->bus->request_positions_rt(11);
-	  //	  wam->bus->request_positions_rt(12);
-	  //	  wam->bus->request_positions_rt(13);
-	  //	  wam->bus->request_positions_rt(14);
 	}
 	if (hand_counter==2) {
 	  wam->bus->request_strain_rt();
@@ -595,13 +598,13 @@ void control_loop_rt(void* argv){
 	}
       }
 #ifndef BH280_ONLY
-      if (wam->bus->forcetorque_data) {
-	// we'll grab the forcetorque data twice as fast as the hand
-	// data, on specific cycles when the bus is not too busy
-	if ((hand_counter==4) || (hand_counter==4 + hand_cycles/2)) {
-	  wam->bus->request_forcetorque_rt();
-	}
-      }
+      //      if (wam->bus->forcetorque_data) {
+      // we'll grab the forcetorque data twice as fast as the hand
+      // data, on specific cycles when the bus is not too busy
+      //	if ((hand_counter==4) || (hand_counter==4 + hand_cycles/2)) {
+      //	  wam->bus->request_forcetorque_rt();
+      //	}
+      //      }
       static int state_cycles(0);
       if (hand_counter==0) {
 	if (++state_cycles==10) { // once every 10 hand cycles
