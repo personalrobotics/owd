@@ -1,5 +1,17 @@
 /**
 \page news OWD News
+<b>Higher data rate from Force/Torque sensor</b>
+OWD now requests values from the Force/Torque sensor every CANbus
+cycle for a data rate of 500Hz. [19-May-2011]
+
+<b>New parameters for setting publish rates of OWD topics</b>
+OWD now has four individual parameters to set the rate of the various
+topics being published: wam_publish_frequency, hand_publish_frequency,
+ft_publish_frequency, and tactile_publish_frequency.  Each one
+defaults to 10Hz and can be set up to the upper limit that the
+particular data type is read from the CANbus (see the documentation
+for more details).
+
 <b>bhd/SetSpeed service</b>
 OWD now lets you set the speed of the hand joints for subsequent
 MoveHand commands.  It reuses the same service message used for
