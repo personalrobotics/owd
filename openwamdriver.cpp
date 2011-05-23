@@ -757,18 +757,36 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
 
 int WamDriver::get_puck_offset(int puckid, int32_t *mechout, int32_t *apout) {
     int32_t p,mech;
-    if (bus->get_property_rt(bus->pucks[puckid].id(), AP, &p, 10000,4) == OW_FAILURE){
-        cerr << "Failed to get AP" << endl;
-        throw -1;
+    int retry=6;
+    while (bus->get_property_rt(bus->pucks[puckid].id(), AP, &p, 10000,4) == OW_FAILURE) {
+      if (retry-- > 0) {
+	ROS_WARN("Failed to get AP from puck %d, retrying",puckid);
+      } else {
+	ROS_FATAL("Unable to get AP from puck %d; cannot proceed", puckid);
+	throw -1;
+      }
     }
-    if(bus->set_property_rt(bus->pucks[puckid].id(), ADDR, 0x84D7, false) == OW_FAILURE){
-        cerr << "Failed to set address of MECH" << endl;
-        throw -1;
+
+    retry=6;
+    while (bus->set_property_rt(bus->pucks[puckid].id(), ADDR, 0x84D7, false) == OW_FAILURE) {
+      if (retry-- > 0) {
+	ROS_WARN("Failed to set address of MECH on puck %d, retrying",puckid);
+      } else {
+	ROS_FATAL("Failed to set address of MECH on puck %d; cannot proceed",puckid);
+	throw -1;
+      }
     }
-    if(bus->get_property_rt(bus->pucks[puckid].id(), VALUE, &mech, 10000,4) == OW_FAILURE) {
-        cerr << "Failed to get MECH" << endl;
-        throw -1;
+
+    retry=6;
+    while (bus->get_property_rt(bus->pucks[puckid].id(), VALUE, &mech, 10000,4) == OW_FAILURE) {
+      if (retry-- > 0) {
+	ROS_WARN("Failed to get MECH from puck %d, retrying",puckid);
+      } else {
+	ROS_FATAL("Failed to get MECH from puck %d; cannot proceed",puckid);
+	throw -1;
+      }
     }
+
     ROS_DEBUG("Puck %d  AP=%d  OFFSET=%d  MECH=%d",puckid,p,p-mech,mech);
     if (mechout) {
         // return the value of MECH, too
@@ -1241,14 +1259,14 @@ void WamDriver::start_control_loop() {
     // get the position from the WAM, so that the safety module knows
     // where it's starting from
 #ifndef BH280_ONLY
-  if(bus->set_property_rt(SAFETY_MODULE, IFAULT, 4, true, 10000) == OW_FAILURE){
+  if(bus->set_property_rt(SAFETY_MODULE, IFAULT, 4, false, 10000) == OW_FAILURE){
         ROS_FATAL("Unable to suppress safety module faults.");
         throw -1;
     }
     double jointpos[nJoints+1];
     owam->get_current_data(jointpos,NULL,NULL); // update the joint positions
     // Re-activate the tip velocity-limit checking.
-    if(bus->set_property_rt(SAFETY_MODULE, ZERO, 1, true, 10000) == OW_FAILURE){
+    if(bus->set_property_rt(SAFETY_MODULE, ZERO, 1, false, 10000) == OW_FAILURE){
         ROS_FATAL("Unable to re-activate safety module.");
         throw -1;
     }
