@@ -21,7 +21,7 @@ MyPlugin::MyPlugin() {
   ros::NodeHandle n("~");
 
   // Advertise our ROS topic for publishing data
-  pub_info = n.advertise<std_msgs::String>("MyPluginInfo",10);
+  pub_info = n.advertise<std_msgs::String>("MyPluginInfo",1);
 
   // Let our Trajectory class register itself
   if (!MyTraj::Register()) {
