@@ -2307,11 +2307,6 @@ int CANbus::hand_reset() {
     }
   }
 
-  /* Trying MT=1700 on puck firmware version 174 */
-  if (hand_set_property(GROUPID(5),MT,1700) != OW_SUCCESS) {
-    return OW_FAILURE;
-  }
-  
   if (tactile_data) {
     if (configure_tactile_sensors() != OW_SUCCESS) {
       ROS_ERROR("Could not initialize Tactile Sensors");
