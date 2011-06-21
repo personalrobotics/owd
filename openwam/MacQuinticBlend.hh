@@ -32,16 +32,16 @@ class MacQuinticBlend : public MacQuinticElement {
 
 protected:
   // directions are n-dof unit vectors
-  JointPos start_direction, end_direction;
+  OWD::JointPos start_direction, end_direction;
 
   // velocity is the starting and ending tangential jointspace velocity
   double velocity;
 
   // Dynamic limits stored by the constructor
-  JointPos max_joint_vel, max_joint_accel;
+  OWD::JointPos max_joint_vel, max_joint_accel;
 
   // Blend constants used by the evaluate function
-  JointPos b1,b2,m1,m2,m2_minus_m1;
+  OWD::JointPos b1,b2,m1,m2,m2_minus_m1;
 
   double blend_radius;
   double current_path_vel, current_path_accel;
@@ -78,8 +78,8 @@ public:
   MacQuinticBlend(MacQuinticSegment *seg1,
 		  MacQuinticSegment *seg2,
 		  double blend_rad,
-		  JointPos max_joint_vel,
-		  JointPos max_joint_accel,
+		  OWD::JointPos max_joint_vel,
+		  OWD::JointPos max_joint_accel,
 		  double max_jerk);
 
   // functions required by the base class
@@ -103,7 +103,7 @@ public:
   }
   
   void evaluate(OWD::Trajectory::TrajControl &tc, double t);
-  double calc_time(JointPos value) const;
+  double calc_time(OWD::JointPos value) const;
   double PathVelocity() const;
   double PathAcceleration() const;
 

@@ -41,8 +41,6 @@
 #ifndef __CONTROL_LOOP_H__
 #define __CONTROL_LOOP_H__
 
-using namespace std;
-
 enum CONTROLLOOP_STATE{CONTROLLOOP_STOP, CONTROLLOOP_RUN};
 
 #ifdef OWD_RT
@@ -52,39 +50,38 @@ enum CONTROLLOOP_STATE{CONTROLLOOP_STOP, CONTROLLOOP_RUN};
 typedef unsigned long long RTIME; // usually defined in xenomai types.h
 #endif // ! OWD_RT
 
-class ControlLoop {
-private:
+namespace OWD {
+  class ControlLoop {
+  private:
 #ifdef OWD_RT
-  RT_TASK task;
+    RT_TASK task;
 #else // ! OWD_RT
-  pthread_t ctrlthread;
-  static void *start_thread(void *data);
+    pthread_t ctrlthread;
+    static void *start_thread(void *data);
 #endif // ! OWD_RT
-
-  pthread_mutex_t mutex;
-  CONTROLLOOP_STATE cls;
-  char taskname[20];
-
-public:
-  //static const double PERIOD = 0.002;
-  static const double PERIOD = 0.002;
-  int task_number; // must be unique on the machine
-  void (*ctrl_fnc)(void*);
-  void* ctrl_argv;
-
-  void lock(){pthread_mutex_lock(&mutex);}
-  void unlock(){pthread_mutex_unlock(&mutex);}
-
-  ControlLoop(int tasknum, void (*fnc)(void*), void* argv);
-  ~ControlLoop();
-  
-  int start();
-  int stop();
-  int state_rt();
-  void wait_rt(int32_t usecs);
-  static RTIME get_time_ns_rt();
-
-};
-
-#endif
-
+    
+    pthread_mutex_t mutex;
+    CONTROLLOOP_STATE cls;
+    char taskname[20];
+    
+  public:
+    static const double PERIOD = 0.002;
+    int task_number; // must be unique on the machine
+    void (*ctrl_fnc)(void*);
+    void* ctrl_argv;
+    
+    void lock(){pthread_mutex_lock(&mutex);}
+    void unlock(){pthread_mutex_unlock(&mutex);}
+    
+    ControlLoop(int tasknum, void (*fnc)(void*), void* argv);
+    ~ControlLoop();
+    
+    int start();
+    int stop();
+    int state_rt();
+    void wait_rt(int32_t usecs);
+    static RTIME get_time_ns_rt();
+    
+  };
+}; // namespace OWD
+#endif // __CONTROL_LOOP_H__

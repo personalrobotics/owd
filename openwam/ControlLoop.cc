@@ -34,6 +34,8 @@
 
 #include <ros/ros.h>
 
+namespace OWD {
+
 ControlLoop::ControlLoop(int tasknum, void (*fnc)(void*), void* argv) : 
   task_number(tasknum), ctrl_fnc(fnc), ctrl_argv(argv) {
   
@@ -213,3 +215,5 @@ ControlLoop::~ControlLoop() {
   stop();
 #endif // ! OWD_RT
 }
+
+}; // namespace OWD

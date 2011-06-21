@@ -23,6 +23,7 @@
 #include "TrajType.hh"
 #include <string.h>
 
+namespace OWD {
 
 TrajPoint& TrajPoint::operator=(const TrajPoint &rhs) {
     *(JointPos*)this = *(const JointPos*)&rhs;
@@ -93,3 +94,4 @@ void JointPos::SetFromArray(const unsigned int arraysize, const double *p) {
   }
 }
 
+}; // namespace OWD

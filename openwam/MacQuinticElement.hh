@@ -31,7 +31,7 @@ class MacQuinticElement {
 protected:
 
   // positions are n-dof vectors of joint angles
-  JointPos start_pos, end_pos;
+  OWD::JointPos start_pos, end_pos;
 
   // times are with respect to the start of the full trajectory
   double start_time, duration;
@@ -65,9 +65,9 @@ public:
     }
   }
   virtual void evaluate(OWD::Trajectory::TrajControl &tc, double t)=0;
-  virtual double calc_time(JointPos value) const =0;
+  virtual double calc_time(OWD::JointPos value) const =0;
 
-  MacQuinticElement(JointPos start, JointPos end)
+  MacQuinticElement(OWD::JointPos start, OWD::JointPos end)
     : start_pos(start), end_pos(end), start_time(0), duration(-1) {
     reason = strdup("initial limits");
   }

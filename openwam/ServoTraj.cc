@@ -92,13 +92,13 @@ void ServoTraj::stop() {
 }
 
 void ServoTraj::evaluate(Trajectory::TrajControl &tc, double dt) {
-  if (tc.q.size() < nDOF) {
+  if (tc.q.size() < (unsigned int)nDOF) {
     runstate=DONE;
     return;
   }
   time += dt;
   bool active = false;
-  for (unsigned int i = 0; i<nDOF; ++i) {
+  for (unsigned int i = 0; i<(unsigned int)nDOF; ++i) {
     if (time < stoptime[i]) {
       // check for approaching joint limits
       if ((target_velocity[i] > 0) &&

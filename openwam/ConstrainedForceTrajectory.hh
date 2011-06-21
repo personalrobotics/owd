@@ -43,8 +43,8 @@ public:
     double stall_vel;
   };
     
-  ConstrainedForceTrajectory(const JointPos &start,
-			     const JointPos &staring_force_vector,
+  ConstrainedForceTrajectory(const OWD::JointPos &start,
+			     const OWD::JointPos &staring_force_vector,
 			     const EndCondition end_condition,
 			     Link wam_links[],
 			     double max_velocity,
@@ -57,7 +57,7 @@ public:
 
 private:
   int DOF;
-  JointPos initial_force_vector, current_force_vector;
+  OWD::JointPos initial_force_vector, current_force_vector;
   EndCondition end_cond;
   double max_vel;
   double *old_y;

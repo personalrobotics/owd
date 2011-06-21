@@ -34,6 +34,7 @@ public:
   DataRecorder(int records);
   void add(const std::vector<T> &v);
   void reset();
+  void resize(unsigned int s);
   bool dump(const char *fname);
 
   unsigned int recsize, bufsize, count;
@@ -44,12 +45,38 @@ template<class T> inline DataRecorder<T>::DataRecorder (int records) : recsize(0
   // just take an initial guess at number of fields (32) in order
   // to size the initial buffer.  During the add() we'll make sure
   // we don't go past the end.
-  bufsize=32*sizeof(T)*records;
-  data=(T *)malloc(bufsize);
+  if (records > 0) {
+    bufsize=32*sizeof(T)*records;
+    data=(T *)malloc(bufsize);
+    if (!data) {
+      throw "out of memory";
+    }
+  } else {
+    data=NULL;
+  }
+}
+
+template<class T> inline void DataRecorder<T>::resize(unsigned int s) {
+  if (s==0) {
+    if (data) {
+      delete data;
+      data=NULL;
+    }
+    bufsize=0;
+    return;
+  }
+  bufsize=32*sizeof(T)*s;
+  if (data) {
+    data=(T *)realloc(data,bufsize);
+  } else {
+    data=(T *)malloc(bufsize);
+  }
   if (!data) {
     throw "out of memory";
   }
-}
+  return;
+}  
+      
 
 template<class T> inline void DataRecorder<T>::add(const std::vector<T> &v) {
   if (v.size() == 0) {

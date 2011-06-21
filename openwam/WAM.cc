@@ -29,6 +29,8 @@
 #include <ros/ros.h>
 #include <stdio.h>
 
+using namespace OWD;
+
 static void control_loop_rt(void* argv);
 
 extern int MODE;  // puck parameter
@@ -39,10 +41,13 @@ extern int MODE;  // puck parameter
  * Create a new WAM that uses the CAN bus cb;
  */
 
-WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile) :
+WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
+	 bool log_ctrl_data, bool log_cb_data) :
   check_safety_torques(true),tc(Joint::Jn),rec(false),wsdyn(false),
   jsdyn(false), holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
-  pid_count(0),safety_hold(false),bus(cb),ctrl_loop(cb->id, &control_loop_rt, this),
+  pid_count(0),safety_hold(false),
+  log_controller_data(log_ctrl_data), 
+  bus(cb),ctrl_loop(cb->id, &control_loop_rt, this),
   motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile)
 {
@@ -162,42 +167,36 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile) :
 
   //new inertias
   L7_with_260_hand 
-    = Link( DH(  0.0000,   0.0000,   0.0600,   0.0000), 1.3754270,
-	    R3(  0.0000,   0.0000,  45.0000)*0.001,
+    = Link( DH(  0.0000,   0.0000,   0.1800,   0.0000), 1.3754270,
+	    R3(  0.0000,   0.0000,  -75.0000)*0.001,
 	    Inertia(   2558.1007,   0.0000,      0.0000,
 		       2558.1007,   0.0000,   1242.1825, M2_MM2) );
   L7_with_280_hand  // same as 260 but with closer CG
-    = Link( DH(  0.0000,   0.0000,   0.0600,   0.0000), 1.27548270,
-	    R3(  0.0000,   0.0000,  36.0000)*0.001,
+    = Link( DH(  0.0000,   0.0000,   0.1800,   0.0000), 1.27548270,
+	    R3(  0.0000,   0.0000,  -84.0000)*0.001,
 	    Inertia(   2558.1007,   0.0000,      0.0000,
 		       2558.1007,   0.0000,   1242.1825, M2_MM2) );
   L7_with_280FT_hand // FT sensor adds 0.13kg more mass and 0.012m more length
-    = Link( DH(  0.0000,   0.0000,   0.0600,   0.0000), 1.40548270,
-	    R3(  0.0000,   0.0000,  44.0000)*0.001,
+    = Link( DH(  0.0000,   0.0000,   0.1800,   0.0000), 1.40548270,
+	    R3(  0.0000,   0.0000,  -76.0000)*0.001,
 	    Inertia(   2558.1007,   0.0000,      0.0000,
 		       2558.1007,   0.0000,   1242.1825, M2_MM2) );
  
 
   L7_without_hand 
-    = Link( DH(  0.0000,   0.0000,   0.0600,   0.0000), 0.06864753,
-	    R3( 0.00014836,0.00007252,-0.00323552),
+    = Link( DH(  0.0000,   0.0000,   0.1800,   0.0000), 0.06864753,
+	    R3( 0.00014836,0.00007252, -0.1232352),
 	    Inertia(   0.00003911,    0.00000019,      0.0000,
 		       0.00003877,     0.00000,     0.00007614, M2_MM2) );
 
   // for the Darpa ARM-S program
-  // target adds 0.839kg of mass at a point 8mm out from L7 origin
+  // target adds 0.839kg of mass at a point 8mm out from L7 end plate
+  // net CG is the L7_without_hand mass combined with the target mass
   L7_with_ARMS_calibration_target 
-    = Link( DH(  0.0000,   0.0000,   0.0600,   0.0000), 0.90765,
-	    R3( 0.00014836, 0.00007252, 0.007153),
+    = Link( DH(  0.0000,   0.0000,   0.1800,   0.0000), 0.90765,
+	    R3( 0.00014836, 0.00007252, -0.112847),
 	    Inertia(   0.00003911,    0.00000019,      0.0000,
 		       0.00003877,     0.00000,     0.00007614, M2_MM2) );
-
-/*old wrist
-  links[Link::L7]=Link( DH(  0.0000,   0.0000,   0.0620,   0.0000), 0.0557,
-                        R3( -0.0001,  -0.1823,-284.7431)*0.001,
-                        Inertia(   21.4102,    -0.0001,      0.0000,
-                                   21.6157,     0.0040,     42.1975, M2_MM2) );
-*/
 
 #ifdef BH8
   links[Link::L7] = L7_with_280FT_hand;
@@ -584,39 +583,44 @@ void control_loop_rt(void* argv){
       if (wam->bus->BH280_installed) {
 	if (hand_counter==0) {
 	  wam->bus->request_hand_state_rt();
+#ifndef BH280_ONLY
+	  static int state_cycles(0);
+	  if (++state_cycles==10) { // once every 10 hand cycles
+	    wam->bus->request_puck_state_rt(1);
+	    state_cycles=0;
+	  }
+#endif // ! BH280_ONLY
 	}
-	if (hand_counter==1) {
-	  wam->bus->request_positions_rt(GROUPID(5));
-	}
-	if (hand_counter==2) {
-	  wam->bus->request_strain_rt();
-	}
-	if (wam->bus->tactile_data) {
-	  if (hand_counter==3) {
-	    wam->bus->request_tactile_rt();
+
+	// if one or more fingers are in the process of performing a
+	// HI command, we cannot interrupt them by sending any non-MODE
+	// requests, so we'll skip all the other finger requests
+	bool pending_hi = false;
+	for (int f=0; f<4; ++f) {
+	  if (wam->bus->finger_hi_pending[f]) {
+	    pending_hi=true;
+	    hand_counter=0; // keep checking MODE
+	    break;
 	  }
 	}
-      }
-#ifndef BH280_ONLY
-      //      if (wam->bus->forcetorque_data) {
-      // we'll grab the forcetorque data twice as fast as the hand
-      // data, on specific cycles when the bus is not too busy
-      //	if ((hand_counter==4) || (hand_counter==4 + hand_cycles/2)) {
-      //	  wam->bus->request_forcetorque_rt();
-      //	}
-      //      }
-      static int state_cycles(0);
-      if (hand_counter==0) {
-	if (++state_cycles==10) { // once every 10 hand cycles
-	  wam->bus->request_puck_state_rt(1);
-	  state_cycles=0;
-	}
-      }
-#endif // ! BH280_ONLY
-
-      // increment our counter
-      if (++hand_counter > hand_cycles) {
-	hand_counter=0;
+	if (!pending_hi) {
+	  if (hand_counter==1) {
+	    wam->bus->request_positions_rt(GROUPID(5));
+	  }
+	  if (hand_counter==2) {
+	    wam->bus->request_strain_rt();
+	  }
+	  if (wam->bus->tactile_data) {
+	    if (hand_counter==3) {
+	      wam->bus->request_tactile_rt();
+	    }
+	  }
+	  
+	  // increment our counter
+	  if (++hand_counter > hand_cycles) {
+	    hand_counter=0;
+	  }
+	} // ! pending_hi
       }
 
       // Now just read the response packets for as much time as we have
@@ -638,7 +642,7 @@ void control_loop_rt(void* argv){
 	// process the response
 	uint32_t TO_GROUP = msgid & 0x41F;
 	uint32_t FROM_NODE = (msgid & 0x3E0) >> 5;
-	if ((msgid & 0x41F) == 0x403) { // group 3
+	if (TO_GROUP == 0x403) { // group 3
 	  // 22-bit AP response
 	  wam->bus->process_positions_rt(msgid, msg, msglen);
 	} else if (FROM_NODE == 8) {
@@ -739,8 +743,7 @@ void control_loop_rt(void* argv){
 	  // fault by now, so give up!
 	  ROS_FATAL("Missed CANbus replies from 50 cycles in a row");
 	  missing_data_cycles=0; // reset
-	  ros::shutdown();
-	  return;
+	  goto CONTROL_DONE;
 	}
       } else {
 	missing_data_cycles = 0;
@@ -827,8 +830,17 @@ void control_loop_rt(void* argv){
 
 
 
-  if (wam->exit_on_pendant_press) {
-    // have to tell the other threads that it's time to shut down
+  // have to tell the other threads that it's time to shut down,
+  // but only if we were the ones to detect the shutdown.  If
+  // an outside function told us to stop the control loop by setting
+  // the state to CONTROLLOOP_STOP, then we will let that function
+  // take care of shutting down the CANbus and ROS.
+  if ((wam->exit_on_pendant_press) && 
+      (ctrl_loop->state_rt() == CONTROLLOOP_RUN)) {
+    // delete the WAM object so that it has the opportunity to 
+    // write any accumulated activity logs
+    delete wam->bus;
+    wam->bus=NULL;
     ros::shutdown();
   }
   return;
@@ -1009,18 +1021,20 @@ void WAM::newcontrol_rt(double dt){
       RTIME t2 = ControlLoop::get_time_ns_rt();
       jscontroltime += (t2-t1) / 1e6;
             
-      data_recorded=true;
-      data.push_back(t1); // record the current time
-      data.push_back(timestep_factor);  // time factor
-      if (jointstraj) {
-	data.push_back(jointstraj->curtime());  // traj time
-      } else {
-	data.push_back(0);
-      }
-      for (int j=Joint::J1; j<=Joint::Jn; ++j) {
-	data.push_back(tc.q[j-1]);  // record target position
-	data.push_back(q[j]);         // record actual position
-	data.push_back(pid_torq[j]);  // record the pid torques
+      if (log_controller_data) {
+	data_recorded=true;
+	data.push_back(t1); // record the current time
+	data.push_back(timestep_factor);  // time factor
+	if (jointstraj) {
+	  data.push_back(jointstraj->curtime());  // traj time
+	} else {
+	  data.push_back(0);
+	}
+	for (int j=Joint::J1; j<=Joint::Jn; ++j) {
+	  data.push_back(tc.q[j-1]);  // record target position
+	  data.push_back(q[j]);         // record actual position
+	  data.push_back(pid_torq[j]);  // record the pid torques
+	}
       }
 
 #ifndef OWDSIM
@@ -1093,14 +1107,16 @@ void WAM::newcontrol_rt(double dt){
     RTIME t2 = ControlLoop::get_time_ns_rt();
     jscontroltime += (t2-t1) / 1e6;
           
-    data_recorded=true;
-    data.push_back(t1); // record the current time
-    data.push_back(0);  // time factor (zero for no traj)
-    data.push_back(0); // trajectory time (zero for no traj)
-    for (int j=Joint::J1; j<=Joint::Jn; ++j) {
-      data.push_back(tc.q[j-1]);  // record target position
-      data.push_back(q[j]);         // record actual position
-      data.push_back(pid_torq[j]);  // record the pid torques
+    if (log_controller_data) {
+      data_recorded=true;
+      data.push_back(t1); // record the current time
+      data.push_back(0);  // time factor (zero for no traj)
+      data.push_back(0); // trajectory time (zero for no traj)
+      for (int j=Joint::J1; j<=Joint::Jn; ++j) {
+	data.push_back(tc.q[j-1]);  // record target position
+	data.push_back(q[j]);         // record actual position
+	data.push_back(pid_torq[j]);  // record the pid torques
+      }
     }
 
     if (safety_torques_exceeded(pid_torq)) {

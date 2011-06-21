@@ -55,6 +55,14 @@ public:
     return *this;
   }
 
+  /// \brief Subtract another R3 in place
+  inline R3 &operator -=(const R3 &rhs) {
+    x[0] -= rhs.x[0];
+    x[1] -= rhs.x[1];
+    x[2] -= rhs.x[2];
+    return *this;
+  }
+
   friend R3     operator * (double s, const R3& r)
   {return R3(r[0]*s, r[1]*s, r[2]*s);}
   friend R3     operator * (const R3& r, double s) {return s*r;}

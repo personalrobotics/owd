@@ -30,8 +30,8 @@ extern "C" {
 }
 
 ConstrainedForceTrajectory::ConstrainedForceTrajectory(
-      const JointPos &startpos,
-      const JointPos &starting_force_vector,
+      const OWD::JointPos &startpos,
+      const OWD::JointPos &starting_force_vector,
       const EndCondition end_condition,
       Link wam_links[],
       double max_velocity,
@@ -77,7 +77,7 @@ void ConstrainedForceTrajectory::evaluate(OWD::Trajectory::TrajControl &tc, doub
 	 &OWD::Kinematics::Jacobian0[0][0],        &LDJ,
 	 y_diff,    &INC, &BETA,
 	 ws_diff, &INC);
-  JointPos WSdiff;
+  OWD::JointPos WSdiff;
   WSdiff.SetFromArray(DOF,ws_diff);
 
   // calculate motion since last call

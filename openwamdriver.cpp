@@ -89,12 +89,17 @@ namespace OWD {
 WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tactile) :
   cmdnum(0), nJoints(Joint::Jn),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
+  owam(NULL),
   modified_j1(false)
 {
+  ros::NodeHandle n("~");
+  bool log_canbus_data;
+  n.param("log_canbus_data",log_canbus_data,false);
+
 #ifndef BH280_ONLY
-  bus=new CANbus(canbus_number, Joint::Jn, bh_model==280, forcetorque, tactile);
+  bus=new CANbus(canbus_number, Joint::Jn, bh_model==280, forcetorque, tactile, log_canbus_data);
 #else
-  bus=new CANbus(canbus_number, 0, bh_model==280, forcetorque, tactile);
+  bus=new CANbus(canbus_number, 0, bh_model==280, forcetorque, tactile, log_canbus_data);
 #endif // BH280_ONLY
 
   // motion limits
@@ -258,6 +263,7 @@ bool WamDriver::Init(const char *joint_cal_file)
   // if true will only report the top 10 values in each array
   n.param("tactile_top10",bus->tactile_top10,false);
   n.param("owd_plugins",plugin_list,std::string());
+  n.param("log_controller_data",log_controller_data,false);
 
 #ifndef OWDSIM
   if (BH_model == 280) {
@@ -363,7 +369,11 @@ bool WamDriver::Init(const char *joint_cal_file)
   owam->exit_on_pendant_press=true; // from now on, exit if the user hits e-stop or idle
   
 
+  load_plugins(plugin_list);
+  return true;
+}
 
+void WamDriver::load_plugins(std::string plugin_list) {
   // try to load any specified plugins
   std::stringstream pp(plugin_list);
   std::string pname;
@@ -420,9 +430,26 @@ bool WamDriver::Init(const char *joint_cal_file)
       loaded_plugins.push_back(thisplugin);
     }
   }
+}
 
-
-  return true;
+void WamDriver::unload_plugins() {
+  // shut down and unload all of the plugins
+  for (unsigned int i=0; i<loaded_plugins.size(); ++i) {
+    void *plib = loaded_plugins[i].first;
+    bool (*pl_unregister)() = loaded_plugins[i].second;
+    // call the plugin's unregister_owd_plugin() function
+    (*pl_unregister)();
+    // unload the plugin
+    dlerror(); // clear any previous error
+    if (dlclose(plib)) {
+      ROS_ERROR("Error while unloading user plugin");
+      char *perr = dlerror();
+      if (perr) {
+	ROS_ERROR("Last system error: %s",perr);
+      }
+    }
+  }
+  loaded_plugins.clear();
 }
 
 void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
@@ -460,6 +487,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("StepJoint", &WamDriver::StepJoint, this);
   ss_SetGains =
     n.advertiseService("SetGains", &WamDriver::SetGains, this);
+  ss_ReloadPlugins = 
+    n.advertiseService("ReloadPlugins", &WamDriver::ReloadPlugins, this);
 
 #ifdef BUILD_FOR_SEA
   sub_wam_joint_targets = 
@@ -498,7 +527,10 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 
 
 WamDriver::~WamDriver() {
-  owam->jsdynamics() = false;
+  ROS_FATAL("Destroying class WamDriver");
+  if (owam) {
+    owam->jsdynamics() = false;
+  }
   
 #ifdef AUTO_SHUTDOWN // (not quite working)
   for (int p=1; p<8; p++) {
@@ -513,26 +545,27 @@ WamDriver::~WamDriver() {
   }
 #endif  // AUTO_SHUTDOWN
 
-  // shut down and unload all of the plugins
-  for (unsigned int i=0; i<loaded_plugins.size(); ++i) {
-    void *plib = loaded_plugins[i].first;
-    bool (*pl_unregister)() = loaded_plugins[i].second;
-    // call the plugin's unregister_owd_plugin() function
-    (*pl_unregister)();
-    // unload the plugin
-    dlerror(); // clear any previous error
-    if (dlclose(plib)) {
-      ROS_ERROR("Error while unloading user plugin");
-      char *perr = dlerror();
-      if (perr) {
-	ROS_ERROR("Last system error: %s",perr);
-      }
-    }
+  ROS_FATAL("~WamDriver: shutting down plugins");
+
+  unload_plugins();
+
+  if (owam) {
+    // owam isn't created until the ::Init function, so we need to check
+    // that we have one before trying to delete it.
+    ROS_FATAL("~WamDriver: stopping class WAM control loop");
+    owam->stop();
+    ROS_FATAL("~WamDriver: deleting owam");
+    delete owam;
   }
-  owam->stop();
-  delete owam;
-  delete bus;
-  ROS_INFO("WAM driver exiting normally");
+  // make sure the bus is still around before we delete it (depending on
+  // how we started shutting down, another function may have deleted it
+  // first)
+  if (bus) {
+    ROS_FATAL("~WamDriver: deleting bus");
+    delete bus;
+  }
+
+  ROS_INFO("~WamDriver: WAM driver exiting normally");
 }
 
 
@@ -684,8 +717,8 @@ void WamDriver::apply_joint_offsets(double *joint_offsets) {
 
     ROS_ERROR("\n  Return the WAM to the initial position.");
     ROS_ERROR("  Press RETURN when you are ready to disable the motors.");
-    ROS_ERROR("  WARNING: the arms will lose all power when you hit RETURN,");
-    ROS_ERROR("  so be sure they are well-supported or they will drop quickly.");
+    ROS_ERROR("  WARNING: the arm will lose all power when you hit RETURN,");
+    ROS_ERROR("  so be sure it is well-supported or it will drop quickly.");
     char *line=NULL;
     size_t linelen = 0;
     linelen = getline(&line,&linelen,stdin);
@@ -2319,6 +2352,22 @@ bool WamDriver::StepJoint(owd::StepJoint::Request &req,
 bool WamDriver::SetGains(owd::SetGains::Request &req,
 			 owd::SetGains::Response &res) {
   return owam->set_gains(req.joint,req.gains);
+}
+
+bool WamDriver::ReloadPlugins(pr_msgs::Reset::Request &req,
+			      pr_msgs::Reset::Response &res) {
+  if (owam->jointstraj) {
+    res.reason="Cannot reload plugins while a trajectory is active";
+    res.ok=false;
+    return true;
+  }
+  unload_plugins();
+  std::string plugin_list;
+  ros::NodeHandle n;
+  n.param("owd_plugins",plugin_list,std::string());
+  load_plugins(plugin_list);
+  res.ok=true;
+  return true;
 }
 
 #ifdef BUILD_FOR_SEA

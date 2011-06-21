@@ -13,7 +13,7 @@ particular data type is read from the CANbus (see the documentation
 for more details).
 
 <b>bhd/SetSpeed service</b>
-OWD now lets you set the speed of the hand joints for subsequent
+%OWD now lets you set the speed of the hand joints for subsequent
 MoveHand commands.  It reuses the same service message used for
 owd/SetSpeed.  In the case of the hand, the velocities vector should
 have four values in units of radians per second (three for the
@@ -24,12 +24,12 @@ in the service message is ignored for the hand. [11-May-2011]
 <b>Jacobian support added to Plugin interface</b>
 Two functions have been added to the OWD::Plugin interface to assist
 with writing trajectories that operate in workspace coordinates.  The
-function Jacobian_times_vector multiplies the Jacobian for the current
-configuration by the supplied vector in order to transform jointspace
-values (velocities or torques) into workspace values (linear/angular
-velocities or forces/torques).  The function
-JacobianTranspose_times_vector helps you go in the other direction
-(but of course the standard qualifications about using the
+function OWD::Plugin::Jacobian_times_vector multiplies the Jacobian
+for the current configuration by the supplied vector in order to
+transform jointspace values (velocities or torques) into workspace
+values (linear/angular velocities or forces/torques).  The function
+OWD::Plugin::JacobianTranspose_times_vector helps you go in the other
+direction (but of course the standard qualifications about using the
 JacobianTranspose apply).  Also, the full transformation matrix of the
 end-effector frame (link7) is now available as OWD::Plugin::endpoint.
 

@@ -29,10 +29,10 @@
 
 #define VERBOSE 0
 
-MacQuinticSegment::MacQuinticSegment( TrajPoint first_p,
-				      TrajPoint second_p,
-				      JointPos max_joint_vel,
-				      JointPos max_joint_accel,
+MacQuinticSegment::MacQuinticSegment( OWD::TrajPoint first_p,
+				      OWD::TrajPoint second_p,
+				      OWD::JointPos max_joint_vel,
+				      OWD::JointPos max_joint_accel,
 				      double max_jerk):
   MacQuinticElement(first_p,second_p), // sets start_pos, end_pos
   jmax(max_jerk) 
@@ -999,7 +999,7 @@ void MacQuinticSegment::evaluate(OWD::Trajectory::TrajControl &tc, double t) {
   double path_pos;
   accel_elements[i]->eval(path_pos,current_path_vel,current_path_accel,t);
   // now, compute the n-D values
-  JointPos pos, vel, accel;
+  OWD::JointPos pos, vel, accel;
   pos = start_pos + direction * path_pos;
   vel = direction * current_path_vel;
   accel = direction * current_path_accel;
@@ -1011,7 +1011,7 @@ void MacQuinticSegment::evaluate(OWD::Trajectory::TrajControl &tc, double t) {
   return;
 }
 
-double MacQuinticSegment::calc_time(JointPos value) const {
+double MacQuinticSegment::calc_time(OWD::JointPos value) const {
   return 0;
 }
 
@@ -1029,7 +1029,7 @@ void MacQuinticSegment::dump() {
   printf("  eval at t=%2.3f: ",start_time+duration);
   OWD::Trajectory::TrajControl tc(direction.size());
   evaluate(tc,start_time+duration);
-  JointPos jpy = tc.q;
+  OWD::JointPos jpy = tc.q;
   jpy.dump();
 
   printf("  start_vel=%2.3f  end_vel=%2.3f\n",start_vel,end_vel);

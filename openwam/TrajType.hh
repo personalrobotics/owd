@@ -27,6 +27,8 @@
 #include <math.h>
 #include <stdio.h>
 
+namespace OWD {
+
 // a vector of joint angles defines a single Wam position
 class JointPos : public std::vector<double> {
 public:
@@ -113,7 +115,7 @@ public:
     return *this;
   }
 
-  // multiply by a scalar
+  // multiply by a scalar on the right
   inline JointPos operator*(const double &rhs) const {
     JointPos jp(*this);
     for (unsigned int i=0; i<jp.size(); ++i) {
@@ -180,5 +182,14 @@ class TrajPoint : public JointPos {
 
 // a trajectory is a vector of trajectory points
 typedef std::vector<TrajPoint> TrajType;
+
+  // multiply by a scalar on the left
+inline JointPos operator*(const double &lhs, const JointPos &rhs) {
+  JointPos jp(rhs);
+  jp *= lhs;
+  return jp;
+}
+
+}; // namespace OWD
 
 #endif //TRAJTYPE_H

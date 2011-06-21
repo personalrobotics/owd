@@ -169,7 +169,7 @@ namespace OWD {
       /// and the control torques will be zero.
       ///
       /// \attention vector will be of size 4 or 7 depending on the arm model
-      std::vector<double> q;
+      JointPos q;
 
       /// \brief joint velocities
       ///
@@ -181,7 +181,7 @@ namespace OWD {
       /// velocity contribution to the dynamic torques.
       ///
       /// \attention vector will be of size 4 or 7 depending on the arm model
-      std::vector<double> qd;
+      JointPos qd;
 
       /// \brief joint accelerations
       ///
@@ -194,7 +194,7 @@ namespace OWD {
       /// contribution to the dynamic torques.
       ///
       /// \attention vector will be of size 4 or 7 depending on the arm model
-      std::vector<double> qdd;
+      JointPos qdd;
 
       /// \brief additional joint torques
       ///
@@ -206,7 +206,7 @@ namespace OWD {
       /// qdd) before being sent to the motors.
       ///
       /// \attention vector will be of size 4 or 7 depending on the arm model
-      std::vector<double> t;
+      JointPos t;
     };
 
     // static WAM *wam;

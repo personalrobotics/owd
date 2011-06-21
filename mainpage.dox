@@ -109,6 +109,15 @@ roslaunch.  The following parameters are supported:
  - \b ~/owd_plugins A comma-separated list of shared library files to
    be loaded.  See the \subpage plugins documentation for more info.
 
+ - \b ~/log_controller_data If set to \e true %OWD will create log files
+   of the position, torques, etc in /tmp anytime it is holding position
+   or executing a trajectory.  Default is \e false.
+
+ - \b ~/log_canbus_data If set to \e true %OWD will log all the messages
+   sent and received on the CANbus and dump them to the file candata%%.log
+   in the current directory at the end of the run, where %% is the
+   canbus_number.  Defaults to \e false.
+
 \section running Running
 
 At this time %OWD should be launched on the same machine it will run

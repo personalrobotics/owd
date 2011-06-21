@@ -229,7 +229,7 @@ void MacJointTraj::get_limits(double *max_path_vel, double *max_path_accel) cons
 
 void MacJointTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
-  if (tc.q.size() < DOF) {
+  if (tc.q.size() < (unsigned int) DOF) {
     runstate = DONE;
     return;
   }

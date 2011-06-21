@@ -58,6 +58,7 @@ public:
   operator const double* ()  const {return x;}
   
   double operator [] (int i) const {return x[i];}
+  double &operator [] (int i) {return x[i];}
   
   friend R6 operator * (double s, const R6& x)
   {return R6(s*x[0],  s*x[1],  s*x[2],  s*x[3],  s*x[4],  s*x[5]);}

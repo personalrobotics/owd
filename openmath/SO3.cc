@@ -119,11 +119,11 @@ SO3 operator * (const SO3& r1, const SO3& r2){
 
 ostream& operator <<  (ostream& s, const SO3& r){
   int p;
-  p = cout.precision();
-  cout.precision(12);
-  cout.setf(ios::fixed, ios::floatfield);
-  cout.setf(ios::right, ios::adjustfield);
-  cout << setw(17) << r[SO3::R11] 
+  p = s.precision();
+  s.precision(12);
+  s.setf(ios::fixed, ios::floatfield);
+  s.setf(ios::right, ios::adjustfield);
+  s << setw(17) << r[SO3::R11] 
        << setw(17) << r[SO3::R12] 
        << setw(17) << r[SO3::R13] << endl
        << setw(17) << r[SO3::R21] 
@@ -132,8 +132,8 @@ ostream& operator <<  (ostream& s, const SO3& r){
        << setw(17) << r[SO3::R31] 
        << setw(17) << r[SO3::R32] 
        << setw(17) << r[SO3::R33];
-  cout.setf(ios::left, ios::adjustfield);
-  cout.precision(p);
+  s.setf(ios::left, ios::adjustfield);
+  s.precision(p);
   return s;
 }
 

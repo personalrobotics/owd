@@ -160,6 +160,8 @@ public:
   double pid_sum;
   int pid_count;
   bool safety_hold;
+  bool log_controller_data; // will log joint positions, torques, etc while
+                            // holding a position or running a trajectory
 
   WAMstats stats;
   inline void rosprint_stats() { stats.rosprint(recorder.count); bus->rosprint_stats();}
@@ -172,7 +174,7 @@ public:
   void jtrq2mtrq();
 
   R6 WSControl(double dt);
-  void newJSControl_rt(double q_target[], double q[], double dt, double pid_torq[]); // Mike
+  void newJSControl_rt(double q_target[], double q[], double dt, double pid_torq[]);
   bool check_for_idle_rt();
 
   void lock(const char *name="unspecified");
@@ -180,9 +182,10 @@ public:
   void unlock(const char *name=NULL);
 
   CANbus* bus;                             // pointer to the CAN bus
-  ControlLoop ctrl_loop;            // control loop object
+  OWD::ControlLoop ctrl_loop;            // control loop object
 
-  WAM(CANbus* cb, int BH_model, bool forcetorque, bool tactile);
+  WAM(CANbus* cb, int BH_model, bool forcetorque, bool tactile,
+      bool log_ctrl_data=false, bool log_cb_data=false);
   ~WAM();
  
   int init();                       // initialise the WAM

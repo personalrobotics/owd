@@ -31,8 +31,8 @@
 MacQuinticBlend::MacQuinticBlend(MacQuinticSegment *seg1,
 				 MacQuinticSegment *seg2,
 				 double blend_rad,
-				 JointPos max_joint_v,
-				 JointPos max_joint_a,
+				 OWD::JointPos max_joint_v,
+				 OWD::JointPos max_joint_a,
 				 double max_jerk) 
   : MacQuinticElement(seg1->end_pos,seg2->start_pos),
     start_direction(seg1->direction),
@@ -51,7 +51,7 @@ MacQuinticBlend::MacQuinticBlend(MacQuinticSegment *seg1,
   max_path_velocity = seg1->max_path_velocity > seg2->max_path_velocity?
     seg2->max_path_velocity : seg1->max_path_velocity;
 
-  JointPos peak_joint_accel = (end_direction - start_direction) * 
+  OWD::JointPos peak_joint_accel = (end_direction - start_direction) * 
     (pow(max_path_velocity/2/blend_radius,2)*2.5*blend_radius);
   double peak_path_accel=peak_joint_accel.length();
   if (peak_path_accel > max_path_acceleration) {
@@ -83,7 +83,7 @@ MacQuinticBlend::MacQuinticBlend(MacQuinticSegment *seg1,
   }
   */
   double cos_theta=(start_direction*end_direction)/(-pow(blend_radius,2));
-  JointPos dir_diff = end_direction - start_direction;
+  OWD::JointPos dir_diff = end_direction - start_direction;
   double theta=acos(cos_theta);
   double jerk_limited_s=pow(2*max_jerk*pow(blend_radius,2)
 				   /(15*cos(theta/2)),1/3);
@@ -131,8 +131,8 @@ void MacQuinticBlend::setStartVelocity(double v) {
   // their max values at the beginning and end of the blend, so we only
   // have to run through the joints and check them at each end.
   double max_vel_ratio = 0.0;
-  JointPos starting_joint_vel = start_direction * velocity;
-  JointPos ending_joint_vel = end_direction * velocity;
+  OWD::JointPos starting_joint_vel = start_direction * velocity;
+  OWD::JointPos ending_joint_vel = end_direction * velocity;
   int limiting_joint = -1;
   for (unsigned int j=0; j<max_joint_vel.size(); ++j) {
     if (fabs(starting_joint_vel[j])/max_joint_vel[j] > max_vel_ratio) {
@@ -161,7 +161,7 @@ void MacQuinticBlend::setStartVelocity(double v) {
   // check acceleration limits
   // based on Equation E.28 of MacFarlane thesis, and scaled to real-world
   // value by multiplying by (v/(2*blend_radius))^2
-  JointPos peak_joint_accel = (end_direction - start_direction) * 
+  OWD::JointPos peak_joint_accel = (end_direction - start_direction) * 
     (pow(velocity/2/blend_radius,2)*2.5*blend_radius);
 
   double max_accel_ratio = 0.0;
@@ -239,19 +239,19 @@ void MacQuinticBlend::evaluate(OWD::Trajectory::TrajControl &tc, double t) {
   double betadotdot = 30 * sigma4 - 60 * sigma3 + 36 * sigma2 - 6 * sigma;
   static const double k=7.5;
 
-  JointPos x2_minus_x1 = b2 - b1 + m2_minus_m1*sigma;
+  OWD::JointPos x2_minus_x1 = b2 - b1 + m2_minus_m1*sigma;
   
-  JointPos x = b1
+  OWD::JointPos x = b1
     + m1*sigma 
     + x2_minus_x1*alpha
     - m2_minus_m1*(k*beta);
 
-  JointPos xdot = (m1 + x2_minus_x1*alphadot
+  OWD::JointPos xdot = (m1 + x2_minus_x1*alphadot
 		   + m2_minus_m1*alpha
 		   - m2_minus_m1*k*betadot)
     * velocity/(2*blend_radius);
 
-  JointPos xdotdot = (x2_minus_x1*alphadotdot
+  OWD::JointPos xdotdot = (x2_minus_x1*alphadotdot
 		      + m2_minus_m1*2*alphadot
 		      - m2_minus_m1*k*betadotdot)
     * pow(velocity/(2*blend_radius),2);
@@ -267,7 +267,7 @@ void MacQuinticBlend::evaluate(OWD::Trajectory::TrajControl &tc, double t) {
   return;
 }
 
-double MacQuinticBlend::calc_time(JointPos value) const {
+double MacQuinticBlend::calc_time(OWD::JointPos value) const {
   if (velocity <0) {
     throw "Error: must set blend velocity before calling calc_time";
   }

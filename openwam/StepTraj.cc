@@ -42,7 +42,7 @@ StepTraj::~StepTraj() {
 }
     
 void StepTraj::evaluate(Trajectory::TrajControl &tc, double dt) {
-  if (tc.q.size() < nDOF) {
+  if (tc.q.size() < (unsigned int)nDOF) {
     runstate=DONE;
     return;
   }

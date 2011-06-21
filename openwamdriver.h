@@ -42,6 +42,7 @@
 #include <pr_msgs/WAMInternals.h>
 #include <pr_msgs/GetDOF.h>
 #include <pr_msgs/Servo.h>
+#include <pr_msgs/Reset.h>
 #include <owd/CalibrateJoints.h>
 #include <owd/StepJoint.h>
 #include <owd/SetGains.h>
@@ -116,8 +117,11 @@ public:
 		   owd::StepJoint::Response &res);
     bool SetGains(owd::SetGains::Request &req,
 		  owd::SetGains::Response &res);
+    bool ReloadPlugins(pr_msgs::Reset::Request &req,
+		       pr_msgs::Reset::Response &res);
 
     void AdvertiseAndSubscribe(ros::NodeHandle &n);
+
 
     pr_msgs::AddTrajectory::Response AddTrajectory(
 						   pr_msgs::AddTrajectory::Request *);
@@ -186,6 +190,7 @@ private:
     int BH_model; /// model number of the hand, either 260, 280, or 0 (no hand)
     bool ForceTorque; /// whether the Force/Torque sensor is installed
     bool Tactile;  /// whether the Tactile sensors are installed (280 hand only)
+    bool log_controller_data;
     typedef pair<void *,bool (*)()> PluginPointers;
     std::vector<PluginPointers> loaded_plugins;
 
@@ -212,6 +217,8 @@ private:
     double get_nearest_joint_value(double jointval, double tolerance);
     void apply_joint_offsets(double *joint_offsets);
     TrajType ros2owd_traj (pr_msgs::JointTraj &jt);
+    void load_plugins(std::string plugin_list);
+    void unload_plugins();
 
  public: // make this public so that it can be shared with BHD_280
     CANbus *bus;
@@ -243,7 +250,8 @@ private:
       ss_GetArmDOF,
       ss_CalibrateJoints,
       ss_StepJoint,
-      ss_SetGains;
+      ss_SetGains,
+      ss_ReloadPlugins;
 
     tf::TransformBroadcaster tf_broadcaster;
     btTransform wam_tf_base[7];

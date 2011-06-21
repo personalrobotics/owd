@@ -101,7 +101,6 @@ namespace OWD {
     return result;
   }
 
-  /*
   const JointPos Plugin::JacobianPseudoInverse_times_vector(R6 &v) {
     double result[OWD::Kinematics::NJOINTS];
     OWD::Kinematics::JacobianPseudoInverse_times_vector(v,result);
@@ -109,13 +108,20 @@ namespace OWD {
     jp.SetFromArray(OWD::Kinematics::NJOINTS,result);
     return jp;
   }
-  */
 
   const JointPos Plugin::JacobianTranspose_times_vector(R6 &v) {
     double result[OWD::Kinematics::NJOINTS];
     OWD::Kinematics::Jacobian0Transpose_times_vector(v,result);
     JointPos jp;
     jp.SetFromArray(OWD::Kinematics::NJOINTS,result);
+    return jp;
+  }
+
+  const JointPos Plugin::Nullspace_projection(JointPos v) {
+    double result[OWD::Kinematics::NJOINTS];
+    OWD::Kinematics::Nullspace_projection(&v[0], result);
+    JointPos jp;
+    jp.SetFromArray(OWD::Kinematics::NJOINTS, result);
     return jp;
   }
 

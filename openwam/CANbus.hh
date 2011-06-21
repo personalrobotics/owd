@@ -62,9 +62,7 @@ typedef unsigned long long RTIME; // usually defined in xenomai types.h
 #include "Group.hh"
 #include "globals.h"
 
-#ifdef CAN_RECORD
 #include "DataRecorder.cc"
-#endif // CAN_RECORD
 
 #ifndef __CANBUS_H__
 #define __CANBUS_H__
@@ -139,7 +137,9 @@ public:
   static std::map<int,std::string> propname; // reverse number-to-name lookup
 
 #ifndef OWDSIM
-#ifdef CAN_RECORD
+
+bool log_canbus_data;
+
 typedef struct {
   int32_t secs;
   int32_t usecs;
@@ -149,7 +149,6 @@ typedef struct {
   int32_t msgdata[8];
 } canio_data;
 DataRecorder<canio_data> candata;
-#endif // CAN_RECORD
 
   int unread_packets;
   HANDLE handle;
@@ -249,7 +248,8 @@ DataRecorder<canio_data> candata;
 	 int number_of_arm_pucks,
 	 bool bh280=false,
 	 bool ft=false,
-	 bool tactile=false);
+	 bool tactile=false,
+	 bool log_canbus_data=false);
 
   ~CANbus();
 
@@ -325,8 +325,6 @@ private:
   int32_t endpoint[4];
   bool apply_squeeze[4];
 
-  int finger_reset(int32_t id);
-
 public:
   double finger_encoder_to_radians(int32_t enc);
   int32_t finger_radians_to_encoder(double radians);
@@ -347,6 +345,8 @@ public:
   int hand_get_strain(double &s1, double &s2, double &s3);
   int hand_get_state(int32_t *state);
   int hand_set_speed(const std::vector<double> &v);
+  int send_finger_reset(int32_t id);
+  int wait_for_finger_reset(int32_t id);
 
   int ft_get_data(double *values);
   int ft_tare();
@@ -356,6 +356,9 @@ public:
 
   int limits(double jointVel, double tipVel, double elbowVel);
   friend void* canbus_handler(void* argv);
+
+  bool finger_hi_pending[4];
+  int hand_puck_mode[4];
 };
 
 #endif // __CANBUS_H__

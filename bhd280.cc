@@ -32,6 +32,7 @@ BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   bhstate.secondary_positions.resize(3, 0.0f);
   bhstate.strain.resize(3, 0.0f);
   bhstate.internal_state.resize(4);
+  bhstate.puck_mode.resize(4);
   
   const double PI=3.14159;
   const double LINK2_OFFSET=2.46/180.0*PI;
@@ -68,10 +69,8 @@ void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 					&BHD_280::GetDOF,this);
   ss_movehand = n.advertiseService("MoveHand",
 				      &BHD_280::MoveHand,this);
-  // DON'T ALLOW RESET HAND WITH THE 280 MODEL; IT SEEMS LIKE IT'S
-  // UPSETTING THE SAFETY PUCK
-  //  ss_resethand = n.advertiseService("ResetHand",
-  //				       &BHD_280::ResetHand,this);
+  ss_resethand = n.advertiseService("ResetHand",
+				    &BHD_280::ResetHand,this);
   ss_relaxhand = n.advertiseService("RelaxHand",
 				       &BHD_280::RelaxHand,this);
   ss_gethandprop = n.advertiseService("SetProperty",
@@ -148,6 +147,7 @@ bool BHD_280::Publish() {
     } else {
       bhstate.internal_state[i] = 0;
     }
+    bhstate.puck_mode[i] = bus->hand_puck_mode[i];
   }
 
   for (unsigned int i=0; i<4; ++i) {
@@ -257,13 +257,13 @@ bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
 // Reset command
 bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
 			pr_msgs::ResetHand::Response &res) {
-  if (bus->hand_reset() == OW_SUCCESS) {
-    bhstate.state = pr_msgs::BHState::state_done;
-    res.ok=true;
-  } else {
-    bhstate.state = pr_msgs::BHState::state_uninitialized;
-    res.ok=false;
-    res.reason="Failed";
+  res.ok=true;
+  for (int i=11; i<=14; ++i) {
+    if (bus->send_finger_reset(i) != OW_SUCCESS) {
+      res.ok=false;
+      res.reason="Failed to reset a finger";
+      break;
+    }
   }
   return true;
 }

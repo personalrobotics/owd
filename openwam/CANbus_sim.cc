@@ -30,7 +30,7 @@
 #define PUCK_IDLE 0 
 
 CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
-	       bool ft, bool tactile) : 
+	       bool ft, bool tactile,bool log_cb_data) : 
   puck_state(2),BH280_installed(bh280),id(bus_id),trq(NULL),
   pos(NULL),jpos(NULL), forcetorque_data(NULL), tactile_data(NULL),
   valid_forcetorque_data(NULL), valid_tactile_data(NULL),

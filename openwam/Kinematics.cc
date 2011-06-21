@@ -20,31 +20,47 @@
 #include "Kinematics.hh"
 #include <stdlib.h>
 #include "Plugin.hh" // for debugging the Jacobian
+// #define ADD_
+//#include <cblas_f77.h>
 
 extern "C" {
-  void dpotrf_(char *uplo, int *n, double *a, int *lda, int *info);
-  void dpotri_(char *uplo, int *n, double *a, int *lda, int *info);
   void dgemm_(char *transa, char *transb, int *m, int *n, int *k,double *alpha,
 	      double *a, int *lda, double *b, int *ldb, double *beta,double *c,
 	      int *ldc);
   void dgemv_(char *trans, int *m, int *n, double *alpha, double *a, int *lda,
 	      double *x, int *incx, double *beta, double *y, int *incy);
+  void dgesvd_(char *jobu, char *jobvt, int *m, 
+	      int *n, double *a, int *lda, 
+	      double *s, double *u, int *ldu, double *vt,
+	      int *ldvt, double *work, int *lwork, int *info);
 }
 
 namespace OWD {
 
   // allocate and initialize the static members
+  //
+  // note: use of the TRANST flag basically says to blas that the
+  // input matrix has been transposed, and it should be "untransposed"
+  // before the operation.  So the number of rows/columns reflect the
+  // native size of the matrix before it was transposed, or
+  // after it is untransposed.
   char Kinematics::TRANST = 'T';  
   char Kinematics::TRANSN = 'N';
   double Kinematics::ALPHA = 1.0; 
   double Kinematics::BETA = 0.0;
   char Kinematics::UPLO = 'L';
   int Kinematics::LD_Jacobian=NDIMS;
-  int Kinematics::LD_JacobianPseudoInverse=7;
+  int Kinematics::LD_JacobianPseudoInverse=NJOINTS;
+  int Kinematics::LD_Nullspace_matrix=NJOINTS;
   int Kinematics::INC=1;
   bool Kinematics::valid_Jacobian(false);
+  bool Kinematics::valid_JacobianPseudoInverse(false);
+  bool Kinematics::valid_Nullspace_matrix(false);
   double Kinematics::JacobianEE[NJOINTS][NDIMS];
   double Kinematics::Jacobian0[NJOINTS][NDIMS];
+  double Kinematics::Jacobian0PseudoInverse[NDIMS][NJOINTS];
+  double Kinematics::Nullspace_matrix[NJOINTS][NJOINTS];
+  std::stringstream Kinematics::last_error;
 
   void Kinematics::Jacobian0_times_vector(double *q, double *out) {
     if (!valid_Jacobian) {
@@ -54,25 +70,30 @@ namespace OWD {
     int M=NDIMS;
     int N=NJOINTS;
     dgemv_(&TRANSN, &M,  &N, &ALPHA,
-	   &Jacobian0[0][0], &LD_Jacobian,
-	   (double*)q,  &INC, &BETA,
-	   out, &INC);
+	      &Jacobian0[0][0], &LD_Jacobian,
+	      (double*)q, &INC,
+	      &BETA, out, &INC);
   }
 
-  /*
   void Kinematics::JacobianPseudoInverse_times_vector(R6 &v, double *out) {
     if (!valid_Jacobian) {
       throw "Current Jacobian matrix not available";
+    }
+    if (!valid_JacobianPseudoInverse) {
+      // must be at a singularity, so cannot use the Pseudo Inverse.
+      // calling function can catch this as a const char *.
+      std::string error = "No valid Jacobian Pseudo Inverse available: ";
+      error += last_error.str();
+      throw (const char *) error.c_str();
     }
     // multiply by the supplied vector
     int M=NJOINTS;
     int N=NDIMS;
     dgemv_(&TRANSN, &M,  &N, &ALPHA,
-	   &JacobianPseudoInverse[0][0], &LD_JacobianPseudoInverse,
-	   (double*)v,  &INC, &BETA,
-	   out, &INC);
+	      &Jacobian0PseudoInverse[0][0], &LD_JacobianPseudoInverse,
+	      (double*)v,  &INC, &BETA,
+	      out, &INC);
   }
-  */
 
   void Kinematics::Jacobian0Transpose_times_vector(R6 &v, double *out) {
     if (!valid_Jacobian) {
@@ -81,9 +102,9 @@ namespace OWD {
     int M=NDIMS;
     int N=NJOINTS;
     dgemv_(&TRANST, &M,  &N, &ALPHA,
-	   &Jacobian0 [0][0], &LD_Jacobian,
-	   (double*)v,  &INC, &BETA,
-	   out, &INC);
+	      &Jacobian0 [0][0], &LD_Jacobian,
+	      (double*)v, &INC,
+	      &BETA, out, &INC);
   }
     
   SE3 Kinematics::forward_kinematics(Link* link){
@@ -98,60 +119,122 @@ namespace OWD {
   void Kinematics::update_jacobians(Link *links) {
     // all the matrices are in column-major order, for Fortran
 
+    // as soon as we start changing the Jacobians, the Pseudo-Inverse
+    // be out of date, so go ahead and mark it now
+    valid_JacobianPseudoInverse=false;
+    valid_Nullspace_matrix=false;
+
+    // calculate the Jacobian in the End-Effector frame and
+    // the Link 0 frame
     Jacobians(JacobianEE, Jacobian0, links);
+    valid_Jacobian=true;
 
-    /*
+    PseudoInverse(Jacobian0PseudoInverse,Jacobian0);
 
+    Nullspace_Matrix(Nullspace_matrix,Jacobian0PseudoInverse,Jacobian0);
+  }
 
-    double inv_J_JT[NDIMS][NDIMS];
-    int LD_inv_J_JT=6;
-    
-    // compute J * Jtranspose, factorize, and invert
-    {
-      int M=NDIMS;
-      int N=NDIMS;
-      int K=NJOINTS;
-      dgemm_(&TRANSN, &TRANST, &M, &N, &K, &ALPHA, 
-	     &Jacobian [0][0], &LD_Jacobian, 
-	     &Jacobian [0][0], &LD_Jacobian, &BETA, 
-	     &inv_J_JT [0][0], &LD_inv_J_JT);
+  void Kinematics::PseudoInverse(double JPI[][Kinematics::NJOINTS],
+				 double J0[][Kinematics::NDIMS]) {
+
+    static double A[NJOINTS][NDIMS];
+    static double S[NDIMS];
+    static int LD_U=NDIMS;
+    static int LD_VT=NJOINTS;
+    static int LD_DUT=NJOINTS;
+    static int L_WORK=5*NDIMS;
+    static double U[NDIMS][NDIMS];
+    static double VT[NJOINTS][NJOINTS];
+    static double DUT[NDIMS][NJOINTS];
+    static double WORK[5*NDIMS];
+    int INFO;
+    static const double maxConditionNumber = 24;
+
+    last_error.str() = std::string("");
+
+    // copy over the Jacobian (since the A matrix will be changed)
+    memcpy(A,Jacobian0,NJOINTS*NDIMS*sizeof(double));
+
+    // find SVD of Jacobian
+    char JOBU='A';
+    char JOBVT='A';
+    int M=NDIMS;
+    int N=NJOINTS;
+    dgesvd_(&JOBU, &JOBVT, &M, &N,
+	   &A[0][0], &LD_Jacobian,
+	   &S[0],
+	   &U[0][0], &LD_U,
+	   &VT[0][0], &LD_VT,
+	   &WORK[0], &L_WORK,
+	   &INFO);
+    if (INFO<0) {
+      last_error.str() = std::string("Bad argument number ");
+      last_error << -INFO;
+      last_error << " to dgesvd call";
+    } else if (INFO > 0) {
+      last_error.str() = std::string("dgesvd:  ");
+      last_error << INFO;
+      last_error << " superdiagonals did not converge to zero";
     }
-    {
-      int INFO;
-      int N=NDIMS;
-      dpotrf_(&UPLO, &N, &inv_J_JT[0][0], &LD_inv_J_JT, &INFO);
-      if(INFO<0) {
-	valid_Jacobian=false;
-	throw "update_jacobian: bad argument to dpotrf";
-      } else if(0<INFO) {
-	valid_Jacobian=false;
-	throw "update_jacobian: matrix passed to dpotrf is not positive definite";
+    // Calculate the pseudo-inverse of D by inverting the S values,
+    // thresholding them as we go.  We'll calculate them in-place,
+    // reusing the same storage.
+    thresholded_count=0;
+    zero_count=0;
+    double max_eigen = S[0];
+    for (int i=0; i<NDIMS; ++i) {
+      if (S[i] > 0) {
+	if ((i>0) && (max_eigen / S[i] > maxConditionNumber)) {
+	  S[i] = maxConditionNumber / max_eigen;
+	} else {
+	  S[i] = 1.0/S[i];
+	}
+	max_condition=max_eigen * S[i];
+      } else {
+	zero_count++;
       }
-      dpotri_(&UPLO, &N, &inv_J_JT[0][0], &LD_Jacobian, &INFO);
-      if(INFO<0) {
-	valid_Jacobian=false;
-	throw "update_jacobian: bad argument to dpotri";
-      } else if(0<INFO) {
-	valid_Jacobian=false;
-	throw "update_jacobian: matrix passed to dpotrf is singular";
+    }
+	
+    // Calculate D * U**T
+    // top rows come from U
+    for (int r=0; r<NDIMS; ++r) {
+      for (int c=0; c<NDIMS; ++c) {
+	DUT[c][r] = U[r][c] * S[r];
+      }
+    }
+    // remaining rows are all zero
+    for (int r=NDIMS; r<NJOINTS; ++r) {
+      for (int c=0; c<NDIMS; ++c) {
+	DUT[c][r] = 0;
       }
     }
 
-    // compute pseudo-inverse = Jtranspose * inv(J*Jtranspose)
+    // finally, we calculate  V * DUT
     {
       int M=NJOINTS;
       int N=NDIMS;
-      int K=NDIMS;
-      dgemm_(&TRANST, &TRANSN, &M, &N, &K, &ALPHA, 
-	     &Jacobian              [0][0], &LD_Jacobian,
-	     &inv_J_JT              [0][0], &LD_inv_J_JT, &BETA, 
-	     &JacobianPseudoInverse [0][0], &LD_JacobianPseudoInverse);
+      int K=NJOINTS;
+      dgemm_(&TRANST, &TRANSN, &M, &N, &K,
+		&ALPHA, &VT[0][0], &LD_VT,
+		&DUT[0][0], &LD_DUT, &BETA,
+		&Jacobian0PseudoInverse[0][0], &LD_JacobianPseudoInverse);
     }
-
-*/
-    valid_Jacobian=true;
+    
+    valid_JacobianPseudoInverse=true;
+    return;
   }
 
+  void Kinematics::Nullspace_projection(double *v, double *result) {
+    if (!valid_Nullspace_matrix) {
+      throw "No valid nullspace matrix available";
+    }
+    int M=NJOINTS;
+    int N=NJOINTS;
+    dgemv_(&TRANSN, &M, &N, &ALPHA,
+	   &Nullspace_matrix[0][0], &LD_Nullspace_matrix,
+	   v, &INC, &BETA,
+	   result, &INC);
+  }
 
   /*
    * Body manipulator Jacobian
@@ -189,6 +272,36 @@ namespace OWD {
 	J0[i][5] = JN[i][3]*U[SE3::R31] + JN[i][4]*U[SE3::R32] + JN[i][5]*U[SE3::R33];
       }
     }
+  }
+
+  void Kinematics::Nullspace_Matrix(double Nullspace_matrix[][NJOINTS],
+				    double JPI[][NJOINTS],
+				    double J[][NDIMS]) {
+    if (!valid_Jacobian) {
+      throw "No valid Jacobian available";
+    } else if (!valid_JacobianPseudoInverse) {
+      throw "No valid Jacobian Pseudo-Inverse available";
+    }
+    int M=NJOINTS;
+    int N=NJOINTS;
+    int K=NDIMS;
+    dgemm_(&TRANSN, &TRANSN, &M, &N, &K,
+	   &ALPHA, &JPI[0][0], &LD_JacobianPseudoInverse,
+	   &J[0][0], &LD_Jacobian, &BETA,
+	   &Nullspace_matrix[0][0], &LD_Nullspace_matrix);
+    // subtract the result from the identity matrix
+    for (int r=0; r<NJOINTS; ++r) {
+      for (int c=0; c<NJOINTS; ++c) {
+	if (r==c) {
+	  // diagonal term
+	  Nullspace_matrix[c][r] = 1-Nullspace_matrix[c][r];
+	} else {
+	  // off-diagonal term
+	  Nullspace_matrix[c][r] = 0-Nullspace_matrix[c][r];
+	}
+      }
+    }
+    valid_Nullspace_matrix = true;
   }
 
   void Kinematics::JacobianDB(double J[][6], Link *links){
@@ -230,7 +343,7 @@ namespace OWD {
 
   // row-major version of the EE Jacobian
 
-  void Kinematics::JacobianN(double J[][7], Link *links){
+  void Kinematics::JacobianN(double J[][NJOINTS], Link *links){
     SE3 U;
 
     for(int l=Link::Ln; Link::L1<=l; l--){
@@ -244,5 +357,11 @@ namespace OWD {
       J[5][l-1] = U[SE3::AZ];
     }
   }
+
+  int Kinematics::thresholded_count=0;
+  int Kinematics::zero_count=0;
+  double Kinematics::max_condition=0;
+  double Kinematics::thresholded_values[NJOINTS];
+
 
 }; // namespace OWD

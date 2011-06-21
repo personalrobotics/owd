@@ -38,7 +38,7 @@ elseif (VENDOR_ID STREQUAL "CentaurHauls")
     add_definitions("-march=c3-2")
 endif (DEFINED ENV{OWD_MARCH_FLAGS})
 
-add_definitions("-ggdb3 -DWRIST -DBH8 -DRT_STATS -DCAN_RECORD")
+add_definitions("-ggdb3 -DWRIST -DBH8 -DRT_STATS")
 
 rosbuild_add_library(openwam Joint.cc Motor.cc Puck.cc Group.cc
                             Sigmoid.cc Kinematics.cc Dynamics.cc

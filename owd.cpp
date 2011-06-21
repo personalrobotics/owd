@@ -115,39 +115,23 @@ int main(int argc, char** argv)
   try {
     if (! wamdriver->Init(calibration_filename.c_str())) {
       ROS_FATAL("WamDriver::Init() returned false; exiting.");
-#ifdef CAN_RECORD
-      ROS_FATAL("dumping CANbus logs to candata.log");
       delete wamdriver;
-      ROS_FATAL("log dump complete");
-#endif
       exit(1);
     }
   } catch (int error) {
     ROS_FATAL("Error during WamDriver::Init(); exiting.");
-#ifdef CAN_RECORD
-    ROS_FATAL("dumping CANbus logs to candata.log");
     delete wamdriver;
-    ROS_FATAL("log dump complete");
-#endif
     exit(1);
   } catch (char *errmsg) {
     ROS_FATAL("Error during WamDriver::Init(): %s",errmsg);
-#ifdef CAN_RECORD
-    ROS_FATAL("dumping CANbus logs to candata.log");
     delete wamdriver;
-    ROS_FATAL("log dump complete");
-#endif
     exit(1);
   }
   try {
     wamdriver->AdvertiseAndSubscribe(n);
   } catch (int error) {
     ROS_FATAL("Error during WamDriver::AdvertiseAndSubscribe(); exiting.");
-#ifdef CAN_RECORD
-    ROS_FATAL("dumping CANbus logs to candata.log");
     delete wamdriver;
-    ROS_FATAL("log dump complete");
-#endif
     exit(1);
   }
   
@@ -194,8 +178,6 @@ int main(int argc, char** argv)
   ROS_DEBUG("Spinning");
   ros::spin(s);
   ROS_DEBUG("Done spinning; exiting");
-  ROS_FATAL("dumping CANbus logs to candata.log");
-  delete wamdriver;
-  ROS_FATAL("log dump complete");
+  //  delete wamdriver;
   exit(0);
 }

@@ -102,7 +102,7 @@ namespace OWD {
     /// \returns The calculated workspace movement (translation and rotation)
     static const R6 Jacobian_times_vector(JointPos v);
 
-    /// \brief Multiply the Jacobian Transpose by the supplied vector
+    /// \brief Multiply the supplied vector by the Jacobian Transpose
     ///
     /// \param v an R6 vector of workspace positions and rotations
     /// \returns a JointPos vector of length NJOINTS
@@ -110,6 +110,14 @@ namespace OWD {
     /// This function is typically used to compute the joint torques
     /// that will yield the requested workspace forces/torques
     static const JointPos JacobianTranspose_times_vector(R6 &v);
+
+    /// \brief Multiply the supplied vector by the Jacobian Pseudo_Inverse
+    ///
+    static const JointPos JacobianPseudoInverse_times_vector(R6 &v);
+
+    /// \brief Project a vector of joint motions into the nullspace
+    ///
+    static const JointPos Nullspace_projection(JointPos v);
 
     /// \brief Current position
     ///

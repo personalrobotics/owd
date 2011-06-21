@@ -36,7 +36,7 @@ class MacQuinticSegment:public MacQuinticElement {
 
 protected:
   // direction is an n-dof unit vector pointing from start to end
-  JointPos direction;
+  OWD::JointPos direction;
 
   double jmax;  // maximum path jerk
 
@@ -63,10 +63,10 @@ protected:
   std::vector<MacAccelElement *> accel_elements;
 
 public:
-  MacQuinticSegment( TrajPoint first_p,
-                     TrajPoint second_p,
-		     JointPos max_joint_vel,
-		     JointPos max_joint_accel,
+  MacQuinticSegment( OWD::TrajPoint first_p,
+                     OWD::TrajPoint second_p,
+		     OWD::JointPos max_joint_vel,
+		     OWD::JointPos max_joint_accel,
 		     double max_jerk);
 
   // functions required by the base class
@@ -78,13 +78,13 @@ public:
   double EndVelocity() const;
   
   void evaluate(OWD::Trajectory::TrajControl &tc, double t);
-  double calc_time(JointPos value) const;
+  double calc_time(OWD::JointPos value) const;
   double PathVelocity() const;
   double PathAcceleration() const;
 
   // extra functions specific to a segment
   void setVelocity(double v1, double v2);  // both start and end at once
-  JointPos Direction() const;
+  OWD::JointPos Direction() const;
 
   static double accel_rise_dist(double v, double amax, double jmax);
   static double accel_fall_dist(double v, double amax, double jmax);

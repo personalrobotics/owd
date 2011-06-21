@@ -35,6 +35,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
+#include <errno.h>
 
 #define MODE_IDLE      0
 #define MODE_TORQUE    2
@@ -46,17 +48,15 @@
 #define CMD_M 19
 
 
-CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, bool tactile) : 
+CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, bool tactile, bool log_cb_data) : 
   puck_state(-1),BH280_installed(bh280),id(bus_id),trq(NULL),
   pos(NULL), jpos(NULL), forcetorque_data(NULL), tactile_data(NULL),
   valid_forcetorque_data(false), valid_tactile_data(false),
   tactile_top10(false), pucks(NULL),n_arm_pucks(number_of_arm_pucks),
   simulation(false), received_position_flags(0), received_state_flags(0),
   hand_motion_state_sequence(0),
-
-#ifdef CAN_RECORD
-  candata(100000),
-#endif // CAN_RECORD
+  log_canbus_data(log_cb_data),
+  candata(0),
   unread_packets(0)
 {
 
@@ -75,6 +75,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   hand_distal_positions[1]=hand_distal_positions[2]=hand_distal_positions[3]=hand_distal_positions[4]=0;
   encoder_changed[0]=encoder_changed[1]=encoder_changed[2]=encoder_changed[3] = 0;
   apply_squeeze[0]=apply_squeeze[1]=apply_squeeze[2]=apply_squeeze[3] = false;
+  finger_hi_pending[0]=finger_hi_pending[1]=finger_hi_pending[2]=finger_hi_pending[3] = false;
 
   // the fourth finger finger puck also returns a strain value when we 
   // ask group 5 for strain, but it is meaningless and is not used
@@ -105,6 +106,9 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   if (tactile) {
     // allocate with calloc so that the values are initialized to zero
     tactile_data = (float *) calloc(96, sizeof(float));
+  }
+  if (log_canbus_data) {
+    candata.resize(100000);
   }
   for(int p=1; p<=n_arm_pucks; p++){
     pos[p] = 0.0;
@@ -1227,11 +1231,9 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
   int retrycount = usecs / sleeptime + 0.5; // round to nearest int
   
 
-#ifdef CAN_RECORD
   std::vector<canio_data> crecord;
   canio_data cdata;
   struct timeval tv;
-#endif // CAN_RECORD
 
 
 #ifdef PEAK_CAN
@@ -1254,40 +1256,40 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
 	    return OW_FAILURE;
 	  }
 	}
-#ifdef CAN_RECORD
-	// record the sleep event
-	gettimeofday(&tv,NULL);
-	cdata.secs = tv.tv_sec;
-	cdata.usecs = tv.tv_usec;
-	cdata.send=false;
-	cdata.msgid = -1;  // key value for SLEEP
-	cdata.msglen = 1;
-	cdata.msgdata[0] = sleeptime;
-	for (unsigned int i=1; i<8; ++i) {
-	  cdata.msgdata[i] = 0; // must pad the extra space with zeros
+	if (log_canbus_data) {
+	  // record the sleep event
+	  gettimeofday(&tv,NULL);
+	  cdata.secs = tv.tv_sec;
+	  cdata.usecs = tv.tv_usec;
+	  cdata.send=false;
+	  cdata.msgid = -1;  // key value for SLEEP
+	  cdata.msglen = 1;
+	  cdata.msgdata[0] = sleeptime;
+	  for (unsigned int i=1; i<8; ++i) {
+	    cdata.msgdata[i] = 0; // must pad the extra space with zeros
+	  }
+	  crecord.push_back(cdata);
+	  candata.add(crecord);
+	  crecord.clear();
 	}
-	crecord.push_back(cdata);
-	candata.add(crecord);
-	crecord.clear();
-#endif // CAN_RECORD
       } else {
 	snprintf(last_error,200,"timeout during read after %d microseconds",usecs);
-#ifdef CAN_RECORD
-	// record the timeout event
-	gettimeofday(&tv,NULL);
-	cdata.secs = tv.tv_sec;
-	cdata.usecs = tv.tv_usec;
-	cdata.send=false;
-	cdata.msgid = -2;  // key value for TIMEOUT
-	cdata.msglen = 1;
-	cdata.msgdata[0] = usecs;
-	for (unsigned int i=1; i<8; ++i) {
-	  cdata.msgdata[i] = 0; // must pad the extra space with zeros
+	if (log_canbus_data) {
+	  // record the timeout event
+	  gettimeofday(&tv,NULL);
+	  cdata.secs = tv.tv_sec;
+	  cdata.usecs = tv.tv_usec;
+	  cdata.send=false;
+	  cdata.msgid = -2;  // key value for TIMEOUT
+	  cdata.msglen = 1;
+	  cdata.msgdata[0] = usecs;
+	  for (unsigned int i=1; i<8; ++i) {
+	    cdata.msgdata[i] = 0; // must pad the extra space with zeros
+	  }
+	  crecord.push_back(cdata);
+	  candata.add(crecord);
+	  crecord.clear();
 	}
-	crecord.push_back(cdata);
-	candata.add(crecord);
-	crecord.clear();
-#endif // CAN_RECORD
 	return OW_FAILURE;
       }
     }
@@ -1342,41 +1344,40 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
 #else // ! OWD_RT
 	usleep(sleeptime);	// give time for the CAN message to arrive
 #endif // ! OWD_RT
-#ifdef CAN_RECORD
-	// record the sleep event
-	gettimeofday(&tv,NULL);
-	cdata.secs = tv.tv_sec;
-	cdata.usecs = tv.tv_usec;
-	cdata.send=false;
-	cdata.msgid = -1;  // key value for SLEEP
-	cdata.msglen = 1;
-	cdata.msgdata[0] = sleeptime;
-	for (unsigned int i=1; i<8; ++i) {
-	  cdata.msgdata[i] = 0; // must pad the extra space with zeros
+	if (log_canbus_data) {
+	  // record the sleep event
+	  gettimeofday(&tv,NULL);
+	  cdata.secs = tv.tv_sec;
+	  cdata.usecs = tv.tv_usec;
+	  cdata.send=false;
+	  cdata.msgid = -1;  // key value for SLEEP
+	  cdata.msglen = 1;
+	  cdata.msgdata[0] = sleeptime;
+	  for (unsigned int i=1; i<8; ++i) {
+	    cdata.msgdata[i] = 0; // must pad the extra space with zeros
+	  }
+	  crecord.push_back(cdata);
+	  candata.add(crecord);
+	  crecord.clear();
 	}
-	crecord.push_back(cdata);
-	candata.add(crecord);
-	crecord.clear();
-#endif // CAN_RECORD
-	
 	len=1; // make sure we pass in the right len each time
       } else {
-#ifdef CAN_RECORD
-	// record the timeout event
-	gettimeofday(&tv,NULL);
-	cdata.secs = tv.tv_sec;
-	cdata.usecs = tv.tv_usec;
-	cdata.send=false;
-	cdata.msgid = -2;  // key value for TIMEOUT
-	cdata.msglen = 1;
-	cdata.msgdata[0] = usecs;
-	for (unsigned int i=1; i<8; ++i) {
-	  cdata.msgdata[i] = 0; // must pad the extra space with zeros
+	if (log_canbus_data) {
+	  // record the timeout event
+	  gettimeofday(&tv,NULL);
+	  cdata.secs = tv.tv_sec;
+	  cdata.usecs = tv.tv_usec;
+	  cdata.send=false;
+	  cdata.msgid = -2;  // key value for TIMEOUT
+	  cdata.msglen = 1;
+	  cdata.msgdata[0] = usecs;
+	  for (unsigned int i=1; i<8; ++i) {
+	    cdata.msgdata[i] = 0; // must pad the extra space with zeros
+	  }
+	  crecord.push_back(cdata);
+	  candata.add(crecord);
+	  crecord.clear();
 	}
-	crecord.push_back(cdata);
-	candata.add(crecord);
-	crecord.clear();
-#endif // CAN_RECORD
 	snprintf(last_error,200,"timeout during read after %d microseconds",usecs);
 	return OW_FAILURE;
       }
@@ -1401,23 +1402,23 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
  
 #endif // ESD_CAN
 
-#ifdef CAN_RECORD
-  gettimeofday(&tv,NULL);
-  cdata.secs = tv.tv_sec;
-  cdata.usecs = tv.tv_usec;
-  cdata.send=false;
-  cdata.msgid = *msgid;
-  cdata.msglen = *msglen;
-  for (unsigned int i=0; i<8; ++i) {
-    if (i < *msglen) {
-      cdata.msgdata[i] = msgdata[i];
-    } else {
-      cdata.msgdata[i] = 0; // must pad the extra space with zeros
+  if (log_canbus_data) {
+    gettimeofday(&tv,NULL);
+    cdata.secs = tv.tv_sec;
+    cdata.usecs = tv.tv_usec;
+    cdata.send=false;
+    cdata.msgid = *msgid;
+    cdata.msglen = *msglen;
+    for (unsigned int i=0; i<8; ++i) {
+      if (i < *msglen) {
+	cdata.msgdata[i] = msgdata[i];
+      } else {
+	cdata.msgdata[i] = 0; // must pad the extra space with zeros
+      }
     }
+    crecord.push_back(cdata);
+    candata.add(crecord);
   }
-  crecord.push_back(cdata);
-  candata.add(crecord);
-#endif // CAN_RECORD
 
   return OW_SUCCESS;
 }
@@ -1436,29 +1437,29 @@ int CANbus::send_rt(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t use
   }
   int retrycount = usecs / sleeptime + 0.5;
 
-#ifdef CAN_RECORD
-  std::vector<canio_data> crecord;
-  canio_data cdata;
-  //  RTIME t1 = time_now_ns();
-  //  cdata.secs = t1 / 1e9;
-  //  cdata.usecs = (t1 - cdata.secs*1e9) / 1e3;
-  struct timeval tv;
-  gettimeofday(&tv,NULL);
-  cdata.secs = tv.tv_sec;
-  cdata.usecs = tv.tv_usec;
-  cdata.send=true;
-  cdata.msgid = msgid;
-  cdata.msglen = msglen;
-  for (unsigned int i=0; i<8; ++i) {
-    if (i < msglen) {
-      cdata.msgdata[i] = msgdata[i];
-    } else {
-      cdata.msgdata[i] = 0; // must pad the extra space with zeros
+  if (log_canbus_data) {
+    std::vector<canio_data> crecord;
+    canio_data cdata;
+    //  RTIME t1 = time_now_ns();
+    //  cdata.secs = t1 / 1e9;
+    //  cdata.usecs = (t1 - cdata.secs*1e9) / 1e3;
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    cdata.secs = tv.tv_sec;
+    cdata.usecs = tv.tv_usec;
+    cdata.send=true;
+    cdata.msgid = msgid;
+    cdata.msglen = msglen;
+    for (unsigned int i=0; i<8; ++i) {
+      if (i < msglen) {
+	cdata.msgdata[i] = msgdata[i];
+      } else {
+	cdata.msgdata[i] = 0; // must pad the extra space with zeros
+      }
     }
+    crecord.push_back(cdata);
+    candata.add(crecord);
   }
-  crecord.push_back(cdata);
-  candata.add(crecord);
-#endif // CAN_RECORD
   
   
 #ifdef PEAK_CAN
@@ -1803,6 +1804,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
   }
 
 #ifdef OWD_RT
+
   int bytes = ::write(handpipe_fd,&msg,sizeof(CANmsg));
   if (bytes < sizeof(CANmsg)) {
     if (bytes < 0) {
@@ -1816,6 +1818,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
   }
   // now read from the pipe; the read will return as soon as the data is available
   bytes = ::read(handpipe_fd, &msg, sizeof(CANmsg));
+
   if (bytes < 0) {
     ROS_ERROR_NAMED("can_bh280","Error reading data from hand message pipe: %d", errno);
     mutex_unlock(&hand_cmd_mutex);
@@ -1827,6 +1830,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
     mutex_unlock(&hand_cmd_mutex);
     return OW_FAILURE;
   }
+
 #else // ! OWD_RT
   mutex_lock(&hand_queue_mutex);
   hand_command_queue.push(msg);
@@ -1834,6 +1838,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
 
   // wait for the response
   bool done=false;
+  int retry=10;
   do {
     usleep(1000);
     mutex_lock(&hand_queue_mutex);
@@ -1843,8 +1848,13 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
       done=true;
     }
     mutex_unlock(&hand_queue_mutex);
-  } while (!done && ros::ok());
+  } while (!done && ros::ok() && (--retry > 0));
   if (!ros::ok()) {
+    mutex_unlock(&hand_cmd_mutex);
+    return OW_FAILURE;
+  }
+  if (retry == 0) {
+    mutex_unlock(&hand_cmd_mutex);
     return OW_FAILURE;
   }
 #endif // ! OWD_RT
@@ -1948,15 +1958,23 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     }
     received_state_flags |= (1 << nodeid);
     int32_t mode=value;
+    hand_puck_mode[nodeid-11]=mode;
 
     switch (mode) {
-    case MODE_IDLE:
+    case MODE_IDLE: // fall through
     case MODE_PID:
+      if (finger_hi_pending[nodeid-11]) {
+	// we had been waiting for the finger to finish its HI
+	finger_hi_pending[nodeid-11]=false;
+	handstate[nodeid-11] = HANDSTATE_DONE;
+	break;
+      }
       if (nodeid == 14) {
 	handstate[nodeid-11] = HANDSTATE_DONE;
 	break;
       }
-      if ((apply_squeeze[nodeid-11]) && (labs(hand_positions[nodeid-10] - hand_goal_positions[nodeid-10]) > 600)) {
+      if (labs(hand_positions[nodeid-10] - hand_goal_positions[nodeid-10]) > 600) {
+	// we are still far from our goal
 	if (hand_goal_positions[nodeid-10] == 0) {
 	  // If the original goal was zero (completely open), then we
 	  // need to repeat the command with the same torque setting so
@@ -1964,9 +1982,8 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 	  if (hand_set_property(nodeid,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
 	    return OW_FAILURE;
 	  }
-	} else {
-	  // our target was not zero, but we got stuck more than 600 encoder
-	  // ticks away from the goal, so reapply the command with no torque
+	} else if (apply_squeeze[nodeid-11]) {
+	  // Reapply the command with no torque
 	  // stopping and with a torque limit low enough that it can keep
 	  // applying the force indefinitely without overheating.
 	  handstate[nodeid-11] = HANDSTATE_MOVING;
@@ -1980,8 +1997,10 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 	  if (hand_set_property(nodeid,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
 	    return OW_FAILURE;
 	  }
+	  apply_squeeze[nodeid-11]=false;
+	} else {
+	  handstate[nodeid-11] = HANDSTATE_DONE;
 	}
-	apply_squeeze[nodeid-11]=false;
       } else {
 	handstate[nodeid-11] = HANDSTATE_DONE;
 	apply_squeeze[nodeid-11]=false;
@@ -2155,15 +2174,35 @@ int CANbus::request_strain_rt() {
   return OW_SUCCESS;
 }
 
-int CANbus::finger_reset(int32_t nodeid) {
+int CANbus::send_finger_reset(int32_t nodeid) {
+  if ((nodeid < 11) || (nodeid > 14)) {
+    return OW_FAILURE;
+  }
+  
+  // note the fact that a state change is in progress and we should ignore
+  // any old state messages until a new request is sent
+  hand_motion_state_sequence = 1;
+
+  // set a flag so that the process_hand_response_rt function knows what
+  // to look for
+  finger_hi_pending[nodeid-11] = true;
+
+  // set the state
+  handstate[nodeid-11] = HANDSTATE_UNINIT;
+
   // send the HI to this finger
   if (set_property_rt(nodeid,CMD,CMD_HI) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280","Error sending HI to hand puck %d",nodeid);
     return OW_FAILURE;
   }
+  
+  return OW_SUCCESS;
+}
+
+int CANbus::wait_for_finger_reset(int32_t nodeid) {
   // now wait for the change in mode
   int32_t mode = MODE_VELOCITY;
-   usleep(50000); // give it a chance
+  usleep(50000); // give it a chance
   int32_t sleepcount=0;
   // wait until the puck returns to MODE_IDLE (normal for pucks 11-13) or
   //   MODE_PID (normal for puck 14)
@@ -2171,19 +2210,24 @@ int CANbus::finger_reset(int32_t nodeid) {
 	 (mode != MODE_IDLE) && (mode != MODE_PID) &&
 	 ros::ok()) {
     usleep(50000);
-    if (++sleepcount ==35) {
+    if (++sleepcount ==100) {
       ROS_WARN_NAMED("can_bh280","Still waiting for finger %d to finish HI; mode is %d", nodeid, mode);
       sleepcount=0;
     }
   }
+  finger_hi_pending[nodeid-11] = false;
+  hand_motion_state_sequence = 0;
+
   if (!ros::ok()) {
     return OW_FAILURE;
   }
-  if (mode == MODE_VELOCITY) {
-    ROS_WARN_NAMED("can_bh280","No response with 1s from finger puck %d while waiting for HI",nodeid);
+  if ((mode != MODE_IDLE) && (mode != MODE_PID)) {
+    ROS_WARN_NAMED("can_bh280","No response within 5s from finger puck %d while waiting for HI",nodeid);
     return OW_FAILURE;
   }
-  
+
+  // set the state
+  handstate[nodeid-11] = HANDSTATE_DONE;
   return OW_SUCCESS;
 }
 
@@ -2243,20 +2287,27 @@ int CANbus::hand_reset() {
   for (unsigned int attempts =0; attempts < 3; ++attempts) {
     // F1-F3
     for (int32_t nodeid=11; nodeid<14; ++nodeid) {
-      ROS_INFO_NAMED("can_bh280", "Resetting finger puck %d", nodeid-10);
-      if ((finger_reset(nodeid) != OW_SUCCESS) &&
+      ROS_INFO_NAMED("can_bh280", "Resetting finger puck %d", nodeid);
+      if ((send_finger_reset(nodeid) != OW_SUCCESS) &&
 	  (attempts == 2)) {
-	ROS_WARN_NAMED("can_bh280","Failed to reset finger puck %d",nodeid-10);
+	ROS_WARN_NAMED("can_bh280","Failed to send reset to finger puck %d",nodeid);
 	handstate[nodeid-11] = HANDSTATE_UNINIT;
 	return OW_FAILURE;
       }
+      if (wait_for_finger_reset(nodeid) != OW_SUCCESS) {
+	return OW_FAILURE;
+      }
+	
     }
   }
   // F4
-  ROS_INFO_NAMED("can_bh280", "Resetting finger puck 4");
-  if (finger_reset(14) != OW_SUCCESS) {
-    ROS_WARN_NAMED("can_bh280","Failed to reset finger puck 4");
+  ROS_INFO_NAMED("can_bh280", "Resetting finger puck 14");
+  if (send_finger_reset(14) != OW_SUCCESS) {
+    ROS_WARN_NAMED("can_bh280","Failed to send reset to finger puck 14");
     handstate[3] = HANDSTATE_UNINIT;
+    return OW_FAILURE;
+  }
+  if (wait_for_finger_reset(14) != OW_SUCCESS) {
     return OW_FAILURE;
   }
 
@@ -2753,10 +2804,10 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
   }
 }
 
-#ifdef CAN_RECORD 
- template<> inline bool DataRecorder<CANbus::canio_data>::dump(const char *fname) {
+template<> inline bool DataRecorder<CANbus::canio_data>::dump(const char *fname) {
   FILE *csv = fopen(fname,"w");
   if (csv) {
+    ROS_FATAL("Dumping CANbus log to %s",fname);
     for (unsigned int i=0; i<count; ++i) {
       CANbus::canio_data cdata = data[i];
       char timestring[100];
@@ -2879,24 +2930,26 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
       fprintf(csv,"\n");
     }
     fclose(csv);
+    ROS_FATAL("  ...done dumping CANbus log");
     return true;
   } else {
+    ROS_FATAL("Unable to dump CANbus log to %s: %s",
+	      fname,strerror(errno));
     return false;
   }
 }
-#endif // CAN_RECORD
 
  CANbus::~CANbus(){
+   ROS_FATAL("Destroying class CANbus");
    //   rt_intr_delete(&rt_can_intr);   
    if(pucks!=NULL) delete pucks; 
    if(trq!=NULL) delete trq; 
    if(pos!=NULL) delete pos;
-#ifdef CAN_RECORD
-   char dumpname[200];
-   snprintf(dumpname,200,"candata%d.log",id);
-   candata.dump(dumpname);
-   ROS_DEBUG("dumped CANbus logs to %s",dumpname);
-#endif    
+   if (log_canbus_data) {
+     char dumpname[200];
+     snprintf(dumpname,200,"candata%d.log",id);
+     candata.dump(dumpname);
+   }
  }
  
 std::map <int, std::string> CANbus::propname;
