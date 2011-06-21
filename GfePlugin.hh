@@ -10,14 +10,20 @@
 
 #include <openwam/Plugin.hh>
 #include <openwam/Trajectory.hh>
+#include <openwam/MacJointTraj.hh>
 #include <gfe_owd_plugin/ApplyForce.h>
 #include <gfe_owd_plugin/StopForce.h>
+#include <gfe_owd_plugin/OpenDoor.h>
+#include <pr_msgs/SetStiffness.h> // for debugging the force control
+#include <pr_msgs/Reset.h> // for debugging the Jacobian Pseudo-Inverse
+#include <std_msgs/Float64MultiArray.h>
+#include <ros/ros.h>
+
+// #define SIMULATION
 #ifdef SIMULATION
 #include <gfe_owd_plugin/ApplyForceDebug.h>
-#include <gfe_owd_plugin/Jacobian.h>
 #include <pr_msgs/Joints.h> // for debugging the Jacobian
 #endif // SIMULATION
-#include <ros/ros.h>
 
 
 class GfePlugin : public OWD::Plugin {
@@ -29,54 +35,12 @@ public:
 
   virtual void Publish();
 
-private:
-  ros::Publisher  pub_jacobian;
-#ifdef SIMULATION
-  gfe_owd_plugin::Jacobian jacobian_msg;
-#endif // SIMULATION
-};
-
-
-class ApplyForceTraj : public OWD::Trajectory {
-public:
-
-  /// Holds the endpoint at the current position while applying
-  /// force in the specified direction.  Endpoint is free to move
-  /// in the direction of the force
-  ApplyForceTraj(R3 direction, double force);
-  ~ApplyForceTraj();
-
-  virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
-
-  static bool ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
-			 gfe_owd_plugin::ApplyForce::Response &res);
-
-  bool StopForce(gfe_owd_plugin::StopForce::Request &req,
-		 gfe_owd_plugin::StopForce::Response &res);
-
-
-  /// functions for starting up and shutting down the service
-  static bool Register();
-  static void Shutdown();
+  static std_msgs::Float64MultiArray net_force;
 
 private:
-  SE3 endpoint_target;
-  R3 force_direction;
-  R6 forcetorque_vector;
-  bool stopforce;
-  ros::ServiceServer ss_StopForce;
-#ifdef SIMULATION
-  gfe_owd_plugin::ApplyForceDebug afdebug_msg;
-  ros::Subscriber sub_setjoints;
-  std::vector<double> joints;
-  void setjoints_callback(const boost::shared_ptr<const pr_msgs::Joints> &newjoints);
-  static ros::Publisher pub_AFDebug;
-#endif // SIMULATION
-  
-  /// Static members for handling the ROS service calls
-  static ros::ServiceServer ss_ApplyForce;
-  
+  ros::Publisher  pub_net_force;
 };
 
+extern GfePlugin *gfeplug;
 
 #endif // GFEPLUGIN_HH

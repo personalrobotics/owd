@@ -1,0 +1,6 @@
+pr_msgs/JointTraj traj
+geometry_msgs/Vector3 pull_direction
+---
+bool ok
+string reason
+uint32 id
