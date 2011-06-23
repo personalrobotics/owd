@@ -25,8 +25,9 @@
 
 #define TRAJ_TOLERANCE 0.003f
 
-class ParabolicSegment {
-public:
+namespace OWD {
+  class ParabolicSegment {
+  public:
     int start_index, end_index;
     double start_pos, end_pos;
     double start_time, end_time;
@@ -49,14 +50,14 @@ public:
     void refit_curve(double max_v, double max_a, double new_end_time, double new_accel_time);
 
     void evaluate(double &y, double &yd, double &ydd, double t);
-
+    
     double calc_time(double value);
-
+    
     bool inflection(double current_pos, double next_pos);
-
+    
     void dump();
-};
-
+  };
+}; // namespace OWD
 
 #endif // PARABOLICSEGMENT_H
 

@@ -30,6 +30,8 @@
 #ifndef __PARAJOINTTRAJ_HH__
 #define __PARAJOINTTRAJ_HH__
 
+using namespace OWD;
+
 namespace OWD {
 
 class ParaJointTraj : public Trajectory {
