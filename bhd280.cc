@@ -279,8 +279,8 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
   }
 
   if (req.positions.size() != 4) {
-    std::stringstream s("Expected 4 joints for MoveHand but received ");
-    s << req.positions.size();
+    std::stringstream s;
+    s << "Expected 4 joints for MoveHand but received " << req.positions.size();
     ROS_ERROR_NAMED("bhd280","%s",s.str().c_str());
     res.ok=false;
     res.reason=s.str().c_str();
