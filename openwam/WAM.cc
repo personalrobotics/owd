@@ -580,16 +580,16 @@ void control_loop_rt(void* argv){
       //          are not multiple requests in the same cycle, and
       //      (2) no additional requests are made from the hand for several
       //          cycles after the tactile data is requested.
+#ifndef BH280_ONLY
+      static int state_cycles(0);
+      if (++state_cycles==50) { // once every 50 cycles
+	wam->bus->request_puck_state_rt(1);
+	state_cycles=0;
+      }
+#endif // ! BH280_ONLY
       if (wam->bus->BH280_installed) {
 	if (hand_counter==0) {
 	  wam->bus->request_hand_state_rt();
-#ifndef BH280_ONLY
-	  static int state_cycles(0);
-	  if (++state_cycles==10) { // once every 10 hand cycles
-	    wam->bus->request_puck_state_rt(1);
-	    state_cycles=0;
-	  }
-#endif // ! BH280_ONLY
 	}
 
 	// if one or more fingers are in the process of performing a
