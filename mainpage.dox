@@ -243,6 +243,12 @@ Additionally, %OWD publishes a TF frame for every link, defining \b
 wam1 in terms of \b wam0, \b wam2 in terms of \b wam1, etc, all the
 way up to \b wam7 in terms of \b wam6.
 
+\section barretthand Barrett Hand
+
+%OWD has integrated support for controlling a model 280 Barrett Hand
+attached to the arm.  See the \subpage bhand page for more
+information.
+
 \section customizing Customizing
 
 %OWD allows users to add new features via run-time loadable plugins.
