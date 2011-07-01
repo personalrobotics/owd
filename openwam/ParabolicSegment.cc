@@ -30,6 +30,7 @@ namespace OWD {
 				     double first_p,
 				     double second_p):
     start_index(start_i), start_pos(first_p),
+    end_pos(second_p),
     start_time(start_t), end_time(-1.0f),
     time_a(0.0f), time_v(0.0f) {
     if (second_p > first_p + TRAJ_TOLERANCE) {
