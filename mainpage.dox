@@ -38,7 +38,8 @@ rosdep install owd
 \endverbatim
 
 \section building Building
-Make sure you have both the owd and pr_msgs directories in your ROS_PACKAGE_PATH, and then build owd using rosmake:
+Make sure you have both the owd and pr_msgs directories in your
+ROS_PACKAGE_PATH, and then build owd using rosmake:
 \verbatim
 rosmake owd
 \endverbatim
@@ -149,12 +150,24 @@ or environment collision checking, so that responsibility lies with
 the client sending the trajectory.  The following ROS Service Calls
 are supported for manipulating trajectories:
 
- - \b AddTrajectory: Adds a new joint trajectory to the queue (note:
-   trajectories can only be added when %OWD is already holding
-   position (call SetStiffness 1), and the first point must match the
-   current position)
+ - \b AddTrajectory: Adds a new joint trajectory to the queue.  Options:
+   - opt_WaitForStart: Initializes the trajectory in the Paused state;
+     you can start the trajectory by calling PauseTrajectory with a
+     value of zero.
+   - opt_HoldOnStall: Pauses trajectory if the arm stalls (normally
+     %OWD will try to resume a stalled trajectory automatically).
+   - opt_HoldOnForceInput: Pauses trajectory if the force/torque
+     sensor reports a force value along the -Z axis that exceeds the
+     threshold.
+\note If the arm is idle (has 0 stiffness), and %OWD receives a
+      trajectory, then the stiffness will be set to 1 and the
+      trajectory will be run, as long as the starting point matches.
+      There is no "get stiffness" call.  However, the state field in
+      the wamstate message gives an indication of whether stiffness
+      is zero (state_free) or non-zero (state_fixed or one of the
+      trajectory states).
 
- - \b PauseTrajectory: Pauses the currently-running trajectory
+ - \b PauseTrajectory: Pauses / unpauses the currently-running trajectory
 
  - \b DeleteTrajectory: Deletes the specified trajectory from the
    queue.  If the current trajectory is deleted then the arm will stop
@@ -195,6 +208,26 @@ A few additional service calls are provided for manipulating %OWD:
  - \b SetStiffness: Controls how firmly %OWD will try to hold the
    current position, on a scale from 0 (no holding at all) to 1
    (firmly holding).
+\attention Stiffness values between 0 and 1 are still kind of
+      experimental.  The stiffness basically just scales back the
+      amount of %PID torque being added in.  It is not recommended
+      trying to run trajectories with anything other than stiffness 1.
+      However, a stiffness of 0.2 or so may be useful when holding
+      position if you expect people to be interacting with the arm
+      (like taking an object from the closed hand).
+\note %OWD has a feature that lets you "override" the held position of
+      any of the joints by physically moving the arm.  Some of them
+      take more force than others, but basically it comes down to the
+      safety torque thresholds set in the
+      WAM::safety_torques_exceeded() function in openwam/WAM.cc.
+      During hold position mode if %OWD notices that any of the %PID
+      torques exceed their threshold it will "slide" the target
+      position towards the current position until the torques are back
+      under the threshold.  Basically, %OWD trys to keep from ever
+      exerting a lot of force in order to keep things safe for people
+      nearby, so held positions will yield to force, and trajectories
+      will slow down or stop instead of pushing harder.
+
 
  - \b SetSpeed: Sets the max speed of each joint.  Note that there are
    compiled-in joint velocity limits which prevent the speed from
@@ -319,24 +352,64 @@ To accurately calibrate each of the joints so that their positions can be recall
 
 <b>Calibration Details:</b>
 
-- The WAM has encoders only on the motors, and the transmissions between the motors and the joints mean that the motor rotates multiple times (between 10 and 42 times) for a single revolution of a joint.  The pucks on each motor keep track of both the motor's actual rotor position (14-bit property MECH) and the estimated joint position (22-bit property AP ("absolute position")).
+- The WAM has encoders only on the motors, and the transmissions
+  between the motors and the joints mean that the motor rotates
+  multiple times (between 10 and 42 times) for a single revolution of
+  a joint.  The pucks on each motor keep track of both the motor's
+  actual rotor position (14-bit property MECH) and the estimated joint
+  position (22-bit property AP ("absolute position")).
 
-- The MECH property value cannot be set; it is the absolute position of the rotor, and only changes when the rotor turns.  The AP value can be set to whatever we want, and thereafter it will increment or decrement by the same amount that MECH changes.  As the MECH value wraps around, AP keeps going without wrapping (at least when it has been set to a reasonable initial value).
+- The MECH property value cannot be set; it is the absolute position
+  of the rotor, and only changes when the rotor turns.  The AP value
+  can be set to whatever we want, and thereafter it will increment or
+  decrement by the same amount that MECH changes.  As the MECH value
+  wraps around, AP keeps going without wrapping (at least when it has
+  been set to a reasonable initial value).
 
-- The correct mapping between MECH and AP is unique for each WAM, and is a function of how the encoder and pinion were mounted on the rotor as well as the cable length and tension.  But once the mapping between MECH and AP is measured for a particular joint on a particular WAM, it is relatively constant.
+- The correct mapping between MECH and AP is unique for each WAM, and
+  is a function of how the encoder and pinion were mounted on the
+  rotor as well as the cable length and tension.  But once the mapping
+  between MECH and AP is measured for a particular joint on a
+  particular WAM, it is relatively constant.
 
-- The "wam_joint_calibrations" file records the mapping between MECH and AP for each joint, taken at a particular WAM position.  The format of the file is:
+- The "wam_joint_calibrations" file records the mapping between MECH
+  and AP for each joint, taken at a particular WAM position.  The
+  format of the file is:
 \verbatim
 <joint number> = <distance> <MECH>
 where distance = AP-MECH
 \endverbatim
 
-- As long as a WAM joint motor is within half a revolution of of the position that the mapping was recorded, the mapping can be restored by setting AP equal to the current MECH plus the distance in the calibration file.  This restores the joint value to the resolution of the precise encoder tick as what it was when last calibrated.  The MECH value is recorded in the file so that OWD can be sure of using the right starting position even if we are near the roll-over point for the motor encoder.  For example, if the mapping was measured with MECH equal to 4020, and the current MECH is 63, it realizes that it's more likely we've rotated 139 ticks \e past the original spot (4096 - 4020 + 63) than
-3957 ticks \e before (4020 - 63).
+- As long as a WAM joint motor is within half a revolution of of the
+position that the mapping was recorded, the mapping can be restored by
+setting AP equal to the current MECH plus the distance in the
+calibration file.  This restores the joint value to the resolution of
+the precise encoder tick as what it was when last calibrated.  The
+MECH value is recorded in the file so that %OWD can be sure of using
+the right starting position even if we are near the roll-over point
+for the motor encoder.  For example, if the mapping was measured with
+MECH equal to 4020, and the current MECH is 63, it realizes that it's
+more likely we've rotated 139 ticks \e past the original spot (4096 -
+4020 + 63) than 3957 ticks \e before (4020 - 63).
 
-- If the calibration file exists, then OWD will use it exclusively, and will not use the home_position values at all.  OWD just assumes you have moved the joints to the right position when it asks you to, and once it applies the offsets from the calibration file the right joint values come about automatically.  The only time that the home_position values are required is when there is no calibration file at all.  In that case, after OWD asks you to move to the home position it will set the joints to be exactly those values.
+- If the calibration file exists, then %OWD will use it exclusively,
+  and will not use the home_position values at all.  %OWD just assumes
+  you have moved the joints to the right position when it asks you to,
+  and once it applies the offsets from the calibration file the right
+  joint values come about automatically.  The only time that the
+  home_position values are required is when there is no calibration
+  file at all.  In that case, after %OWD asks you to move to the home
+  position it will set the joints to be exactly those values.
 
-- The right way to start OWD on a new WAM is to set the home_position parameter to the startup configuration you are going to use, and set the wam_joint_calibrations so that it has a valid pathname but points to a file that does not yet exist.  The WAM will start up with your home position values and should be reasonably good (it certainly should not velocity-fault because of gravity compensation errors).  Once you perform a calibration, the results will be saved to the specified pathname, and thereafter OWD will just use the mapping in the file, ignoring the home_position value.
+- The right way to start %OWD on a new WAM is to set the home_position
+  parameter to the startup configuration you are going to use, and set
+  the wam_joint_calibrations so that it has a valid pathname but
+  points to a file that does not yet exist.  The WAM will start up
+  with your home position values and should be reasonably good (it
+  certainly should not velocity-fault because of gravity compensation
+  errors).  Once you perform a calibration, the results will be saved
+  to the specified pathname, and thereafter %OWD will just use the
+  mapping in the file, ignoring the home_position value.
 
 
 
