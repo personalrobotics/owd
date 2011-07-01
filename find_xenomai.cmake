@@ -5,14 +5,14 @@ if (XENO-CONFIG)
                    OUTPUT_VARIABLE RT_DEFS
                    OUTPUT_STRIP_TRAILING_WHITESPACE)
    if (XENOMAI_NOTFOUND)
-       message (SEND_ERROR "Could not find Xenomai include files (command xeno-config --xeno-cflags failed)\n")
+       message (SEND_WARN "Could not find Xenomai include files (command xeno-config --xeno-cflags failed); building non-RT versions only\n")
    else (XENOMAI_NOTFOUND)
      execute_process(COMMAND ${XENO-CONFIG} --xeno-ldflags
                      RESULT_VARIABLE XENOMAI_NOTFOUND2
 		     OUTPUT_VARIABLE RT_LIBS
                      OUTPUT_STRIP_TRAILING_WHITESPACE)
      if (XENOMAI_NOTFOUND2)
-       message (SEND_ERROR "Could not find Xenomai libs (command xeno-config --xeno-ldflags failed)\n")
+       message (SEND_WARN "Could not find Xenomai libs (command xeno-config --xeno-ldflags failed); building non-RT versions only\n")
      else (XENOMAI_NOTFOUND2)
        set (RT_BUILD "true")
      endif (XENOMAI_NOTFOUND2)
