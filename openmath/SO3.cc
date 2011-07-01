@@ -51,7 +51,14 @@ void SO3::eye(){
 }
 
 SO3::operator so3() const{
-  double theta = acos( (this->R[0][0]+this->R[1][1]+this->R[2][2] - 1.0)/2);
+  double sum=(this->R[0][0]+this->R[1][1]+this->R[2][2] - 1.0)/2.0;
+  if (sum > 1.0) {
+    // ocassionally happens due to floating point imprecision
+    sum = 1.0;
+  } else if (sum < -1.0) {
+    sum = -1.0;
+  }
+  double theta = acos(sum);
 
   if(so3::EPSILON < fabs(theta)){
     return so3(R3( (R[2][1]-R[1][2])/(2.0*sin(theta)),
