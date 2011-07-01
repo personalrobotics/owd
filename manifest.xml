@@ -7,4 +7,5 @@
   <depend package="owd"/>
   <depend package="pr_msgs"/>
   <depend package="std_msgs"/>
+  <depend package="bullet"/>
 </package>

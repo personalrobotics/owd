@@ -14,6 +14,7 @@
 #include "ApplyForceTraj.h"
 #include "DoorTraj.h"
 #include "JacobianTest.h"
+#include "WSTraj.h"
 
 GfePlugin::GfePlugin() {
   // ROS has already been initialized by OWD, so we can just
@@ -32,9 +33,11 @@ GfePlugin::GfePlugin() {
     throw "JacobianTestTraj trajectory failed to register";
   }
 #endif // SIMULATION
+  if (!WSTraj::Register()) {
+    throw "WSTraj trajectory failed to register";
+  }
 
   pub_net_force = n.advertise<std_msgs::Float64MultiArray>("net_force",1);
-
 }
 
 GfePlugin::~GfePlugin() {
@@ -42,6 +45,7 @@ GfePlugin::~GfePlugin() {
   ApplyForceTraj::Shutdown();
   DoorTraj::Shutdown();
   JacobianTestTraj::Shutdown();
+  WSTraj::Shutdown();
 }
 
 void GfePlugin::Publish() {
@@ -56,13 +60,6 @@ std_msgs::Float64MultiArray GfePlugin::net_force;
 // function can tell whether or not one has already been allocated.
 GfePlugin *gfeplug = NULL;
 
-
-// Have to allocate storage for our ROS service handlers
-ros::ServiceServer ApplyForceTraj::ss_ApplyForce,
-  ApplyForceTraj::ss_SetForcePGain, 
-  ApplyForceTraj::ss_SetForceDGain,
-  DoorTraj::ss_OpenDoor,
-  JacobianTestTraj::ss_JacobianTest;
 
 // The register_owd_plugin() is the only function that OWD will call when
 // the plugin is loaded.  It has to initialize our custom Plugin and 

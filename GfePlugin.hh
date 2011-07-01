@@ -9,13 +9,6 @@
 #define GFEPLUGIN_HH
 
 #include <openwam/Plugin.hh>
-#include <openwam/Trajectory.hh>
-#include <openwam/MacJointTraj.hh>
-#include <gfe_owd_plugin/ApplyForce.h>
-#include <gfe_owd_plugin/StopForce.h>
-#include <gfe_owd_plugin/OpenDoor.h>
-#include <pr_msgs/SetStiffness.h> // for debugging the force control
-#include <pr_msgs/Reset.h> // for debugging the Jacobian Pseudo-Inverse
 #include <std_msgs/Float64MultiArray.h>
 #include <ros/ros.h>
 

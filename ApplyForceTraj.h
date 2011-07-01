@@ -9,6 +9,10 @@
 #define APPLYFORCETRAJ_HH
 
 #include "GfePlugin.hh"
+#include <openwam/Trajectory.hh>
+#include <gfe_owd_plugin/ApplyForce.h>
+#include <gfe_owd_plugin/StopForce.h>
+#include <pr_msgs/SetStiffness.h> // for debugging the force control
 #include <queue>
 
 class ApplyForceTraj : public OWD::Trajectory {

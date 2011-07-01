@@ -146,3 +146,4 @@ JacobianTestTraj::~JacobianTestTraj() {
   ss_StopTraj.shutdown();
 }
 
+ros::ServiceServer JacobianTestTraj::ss_JacobianTest;

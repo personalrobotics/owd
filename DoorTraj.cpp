@@ -58,4 +58,4 @@ void DoorTraj::Shutdown() {
 
 std::vector<double> DoorTraj::max_j_vel;
 std::vector<double> DoorTraj::max_j_accel;
-
+ros::ServiceServer  DoorTraj::ss_OpenDoor;

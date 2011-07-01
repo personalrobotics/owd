@@ -9,6 +9,8 @@
 #define JACOBIANTEST_HH
 
 #include "GfePlugin.hh"
+#include <openwam/Trajectory.hh>
+#include <pr_msgs/Reset.h> // for debugging the Jacobian Pseudo-Inverse
 
 class JacobianTestTraj : public OWD::Trajectory {
 public:

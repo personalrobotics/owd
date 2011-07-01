@@ -9,6 +9,8 @@
 #define DOORTRAJ_HH
 
 #include "GfePlugin.hh"
+#include <openwam/MacJointTraj.hh>
+#include <gfe_owd_plugin/OpenDoor.h>
 
 class DoorTraj : public OWD::MacJointTraj {
 public:

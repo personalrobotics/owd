@@ -12,8 +12,6 @@
 // Process our ApplyForce service calls from ROS
 bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
 				gfe_owd_plugin::ApplyForce::Response &res) {
-  ROS_INFO("GfePlugin: received ApplyForce service call");
-
   // compute a new trajectory
   try {
     ApplyForceTraj *newtraj = new ApplyForceTraj(R3(req.x,req.y,req.z),req.f);
@@ -249,7 +247,9 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     joint_correction = 
       gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
   } catch (const char *err) {
-    // no valid Jacobian, for whatever reason, so do nothing
+    // no valid Jacobian, for whatever reason, so just leave the joint
+    // values unchanged.  Maybe someone will move us back to a more
+    // favorable configuration
     return;
   }
 
@@ -373,6 +373,9 @@ bool ApplyForceTraj::SetForceDGain(pr_msgs::SetStiffness::Request &req,
 
 double ApplyForceTraj::force_gain_kp = 2.0e-3;
 double ApplyForceTraj::force_gain_kd = 1.6e-4;
+ros::ServiceServer ApplyForceTraj::ss_ApplyForce,
+  ApplyForceTraj::ss_SetForcePGain, 
+  ApplyForceTraj::ss_SetForceDGain;
 
 // Set up our ROS service for receiving trajectory requests.
 bool ApplyForceTraj::Register() {
@@ -394,3 +397,4 @@ void ApplyForceTraj::Shutdown() {
 ApplyForceTraj::~ApplyForceTraj() {
   ss_StopForce.shutdown();
 }
+

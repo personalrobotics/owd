@@ -1,0 +1,11 @@
+geometry_msgs/Pose endpoint_change
+float64[] starting_config
+float64[] ending_config
+geometry_msgs/Wrench wrench
+float32 max_linear_velocity
+float32 max_angular_velocity
+float32 min_accel_time
+---
+uint32 id
+bool ok
+string reason
