@@ -26,6 +26,8 @@
 #include <time.h>
 
 
+namespace OWD {
+
 ControlLoop::ControlLoop(int tasknum, void (*fnc)(void*), void* argv) :
   task_number(tasknum), ctrl_fnc(fnc), ctrl_argv(argv) {
 
@@ -99,3 +101,5 @@ RTIME ControlLoop::get_time_ns_rt() {
 ControlLoop::~ControlLoop() {
   stop();
 }
+
+}; // namespace OWD

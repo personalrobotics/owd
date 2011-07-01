@@ -134,8 +134,8 @@ namespace OWD {
     Nullspace_Matrix(Nullspace_matrix,Jacobian0PseudoInverse,Jacobian0);
   }
 
-  void Kinematics::PseudoInverse(double JPI[][Kinematics::NJOINTS],
-				 double J0[][Kinematics::NDIMS]) {
+  void Kinematics::PseudoInverse(double JPI[][NJOINTS],
+				 double J0[][NDIMS]) {
 
     static double A[NJOINTS][NDIMS];
     static double S[NDIMS];
@@ -242,7 +242,7 @@ namespace OWD {
    * 
    * BIG FAT WARNING: The jacobians are in column major (for Fortran)
    */
-  void Kinematics::Jacobians(double JN[][Kinematics::NDIMS], double J0[][Kinematics::NDIMS], Link *links){
+  void Kinematics::Jacobians(double JN[][NDIMS], double J0[][NDIMS], Link *links){
     SE3 U;
 
     for(int l=Link::Ln; l>=Link::L1; --l){
@@ -304,7 +304,7 @@ namespace OWD {
     valid_Nullspace_matrix = true;
   }
 
-  void Kinematics::JacobianDB(double J[][6], Link *links){
+  void Kinematics::JacobianDB(double J[][NDIMS], Link *links){
     SE3 U,EE;
     R3 v,axis,anchor,tEE;
 

@@ -244,6 +244,8 @@ DataRecorder<canio_data> candata;
   /// \param bh280 set to true if the CANbus hand (model BH280) is installed
   /// \param ft set to true if the CANbus force/torque sensor is installed
   /// \param tactile set to true if the hand has tactile sensors installed
+  /// \param log_canbus_data set to true if CANbus traffic should be
+  ///               recorded and dumped to file at end of run
   CANbus(int32_t bus_id,
 	 int number_of_arm_pucks,
 	 bool bh280=false,

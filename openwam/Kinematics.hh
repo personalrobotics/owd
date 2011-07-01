@@ -106,7 +106,7 @@ namespace OWD {
     /// Runs through the current links, multiplying their
     /// transformation matrices by one another.
     ///
-    /// \param link A pointer to the first element in the array of links
+    /// \param links A pointer to the first element in the array of links
     /// \returns The transformation matrix of link7 in terms of link0
     static SE3 forward_kinematics(Link* links);
 
@@ -136,10 +136,10 @@ namespace OWD {
 				 double Jacobian0[][NDIMS]);
 
     /// \brief 3DOF body Jacobian (column major)
-    static void JacobianDB(double J[][6], Link *links);
+    static void JacobianDB(double J[][NDIMS], Link *links);
 
     /// \brief body Jacobian for C (row major) 
-    static void JacobianN(double J[][7], Link *links);
+    static void JacobianN(double J[][NJOINTS], Link *links);
 
     static char TRANST;
     static char TRANSN;
