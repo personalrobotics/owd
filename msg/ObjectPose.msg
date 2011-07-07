@@ -10,3 +10,4 @@ int16 used_points
 
 NameTypeValue[] properties
 
+geometry_msgs/Pose[] pose_uncertainty_list
