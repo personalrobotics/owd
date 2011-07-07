@@ -31,7 +31,7 @@ FT::~FT() {
 }
 
 void FT::AdvertiseAndSubscribe(ros::NodeHandle &n) {
-  pub_ft = n.advertise<geometry_msgs::Wrench>("forcetorque", 40);
+  pub_ft = n.advertise<geometry_msgs::WrenchStamped>("forcetorque", 40);
   ss_tare = n.advertiseService("ft_tare",&FT::Tare,this);
 }
 
@@ -52,12 +52,13 @@ bool FT::Publish() {
     return false;
   }
 
-  wrench.force.x=ft_values[0];
-  wrench.force.y=ft_values[1];
-  wrench.force.z=ft_values[2];
-  wrench.torque.x=ft_values[3];
-  wrench.torque.y=ft_values[4];
-  wrench.torque.z=ft_values[5];
+  wrench.header.stamp = ros::Time::now();
+  wrench.wrench.force.x=ft_values[0];
+  wrench.wrench.force.y=ft_values[1];
+  wrench.wrench.force.z=ft_values[2];
+  wrench.wrench.torque.x=ft_values[3];
+  wrench.wrench.torque.y=ft_values[4];
+  wrench.wrench.torque.z=ft_values[5];
   pub_ft.publish(wrench);
   
   return true;

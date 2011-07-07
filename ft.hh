@@ -22,7 +22,7 @@
 
 #include <ros/ros.h>
 #include <CANbus.hh>
-#include <geometry_msgs/Wrench.h>
+#include <geometry_msgs/WrenchStamped.h>
 #include <pr_msgs/Reset.h>
 
 class FT {
@@ -32,7 +32,7 @@ public:
   CANbus *bus;
 
   ros::NodeHandle node;
-  geometry_msgs::Wrench wrench;
+  geometry_msgs::WrenchStamped wrench;
   bool valid_data;
 
   FT(CANbus *cb);
