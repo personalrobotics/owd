@@ -1,0 +1,8 @@
+sensor_msgs/JointState joint_state
+---
+bool current_self_collision
+bool current_env_collision
+bool future_self_collision
+bool future_env_collision
+
+bool joint_limits_exceeded
