@@ -5,4 +5,5 @@ bool current_env_collision
 bool future_self_collision
 bool future_env_collision
 
-bool joint_limits_exceeded
+bool current_joint_limits_exceeded
+bool future_joint_limits_exceeded
