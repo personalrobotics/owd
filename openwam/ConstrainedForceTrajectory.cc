@@ -47,7 +47,7 @@ ConstrainedForceTrajectory::ConstrainedForceTrajectory(
   start_position=startpos;
   id=trajid;
   WaitForStart=false;
-  HoldOnStall=false;
+  CancelOnStall=false;
   
   DOF=start_position.size();
   old_y = (double *) malloc (DOF*sizeof(double));

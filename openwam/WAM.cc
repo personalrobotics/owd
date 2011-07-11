@@ -1012,7 +1012,19 @@ void WAM::newcontrol_rt(double dt){
 	for (int j=Joint::J1; j<Joint::Jn; ++j) {
 	  traj_torq[j]=0;  // make sure we don't leave these non-zero
 	}
-	//ROS_INFO("Trajectory done");
+      }
+      if(jointstraj->state() == OWD::Trajectory::ABORT){
+	// The trajectory wants us to end right where we are,
+	// so hold the current position and delete the trajectory.
+	for(int i = Joint::J1; i<=Joint::Jn; i++) {
+	  heldPositions[i] = joints[i].q;
+	}
+	holdpos = true;  // should have been true already, but just making sure
+	delete jointstraj;
+	jointstraj = NULL;
+	for (int j=Joint::J1; j<Joint::Jn; ++j) {
+	  traj_torq[j]=0;  // make sure we don't leave these non-zero
+	}
       }
             
       // ask the controllers to compute the correction torques.
@@ -1056,8 +1068,14 @@ void WAM::newcontrol_rt(double dt){
 	  }
 	  safety_torque_count++;
 	  safety_hold=true; // let the app know that we're hitting something
-	  if (jointstraj->HoldOnStall) {
+	  if (jointstraj->CancelOnStall) {
 	    jointstraj->stop();  // still have to stop if the app wants to
+	    for(int i = Joint::J1; i<=Joint::Jn; i++) {
+	      heldPositions[i] = joints[i].q;
+	    }
+	    holdpos = true;  // should have been true already, but just making sure
+	    delete jointstraj;
+	    jointstraj = NULL;
 	  }
 	}
       } else if (timestep_factor < 1.0f) {
@@ -1068,9 +1086,7 @@ void WAM::newcontrol_rt(double dt){
 	  timestep_factor = 1.0f;
 	}
 	if (jointstraj != NULL) {
-	  if (!jointstraj->HoldOnStall) {
-	    jointstraj->run();
-	  }
+	  jointstraj->run();
 	}
 	safety_hold=false;
       }

@@ -73,13 +73,14 @@ namespace OWD {
     // simplistic check to see if greater than 3N of force towards palm
     static int forcecount(0);
     if ((runstate==RUN) &&
-	HoldOnForceInput &&
+	CancelOnForceInput &&
 	(forcetorque[2] < -6.0)) {
       if (++forcecount == 8) {
-	// only stop if we have four cycles in a row that exceed the threshold
-	stop();
-	forcecount=0;
+	// only stop if we have eight cycles in a row that exceed the threshold
+	runstate=ABORT;
       }
+    } else {
+      forcecount=0;
     }
   }
 

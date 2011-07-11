@@ -40,15 +40,15 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
 			   const JointPos &mja,
 			   double max_jerk,
 			   bool bWaitForStart,
-			   bool bHoldOnStall,
-			   bool bHoldOnForceInput) :
+			   bool bCancelOnStall,
+			   bool bCancelOnForceInput) :
   OWD::Trajectory("MacJointTraj"), max_joint_vel(mjv), max_joint_accel(mja)
 {
   // initialize the base class members
   id = 0;
   WaitForStart=bWaitForStart;
-  HoldOnStall=bHoldOnStall;
-  HoldOnForceInput=bHoldOnForceInput;
+  CancelOnStall=bCancelOnStall;
+  CancelOnForceInput=bCancelOnForceInput;
 
   // unlike previous trajectory code, this package assumes that
   // extraneous co-linear points have already been removed, so that

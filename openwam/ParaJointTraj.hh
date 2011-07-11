@@ -58,8 +58,8 @@ public:
 		const std::vector<double> &max_joint_vel, 
 		const std::vector<double> &max_joint_accel,
 		bool bWaitForStart,
-		bool bHoldOnStall,
-		bool bHoldOnForceInput);
+		bool bCancelOnStall,
+		bool bCancelOnForceInput);
   virtual ~ParaJointTraj();
   
   virtual void lock(){pthread_mutex_lock(&mutex);}

@@ -590,15 +590,15 @@ WamDriver::~WamDriver() {
     return NULL;
   }
   bool bWaitForStart=(jt.options & jt.opt_WaitForStart);
-  bool bHoldOnStall=(jt.options & jt.opt_HoldOnStall);
-  bool bHoldOnForceInput=(jt.options & jt.opt_HoldOnForceInput);
-  ROS_DEBUG_NAMED("BuildTrajectory","Building trajectory with options WaitForStart=%d HoldOnStall=%d HoldOnForceInput=%d",int(bWaitForStart), int(bHoldOnStall), int(bHoldOnForceInput));
+  bool bCancelOnStall=(jt.options & jt.opt_CancelOnStall);
+  bool bCancelOnForceInput=(jt.options & jt.opt_CancelOnForceInput);
+  ROS_DEBUG_NAMED("BuildTrajectory","Building trajectory with options WaitForStart=%d CancelOnStall=%d CancelOnForceInput=%d",int(bWaitForStart), int(bCancelOnStall), int(bCancelOnForceInput));
 
   if (!blended_traj) {
     ROS_WARN_NAMED("BuildTrajectory","No blends found; using ParaJointTraj");
 
     try {
-      ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,bHoldOnForceInput);
+      ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bCancelOnStall,bCancelOnForceInput);
       ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
       ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
       
@@ -614,8 +614,8 @@ WamDriver::~WamDriver() {
       MacJointTraj *mactraj = new MacJointTraj(traj,joint_vel, joint_accel,
 					       max_jerk,
 					       bWaitForStart,
-					       bHoldOnStall,
-					       bHoldOnForceInput);
+					       bCancelOnStall,
+					       bCancelOnForceInput);
       ROS_DEBUG_NAMED("BuildTrajectory","MacFarlane blended trajectory built");
       return mactraj;
     } catch (const char *error) {
@@ -630,7 +630,7 @@ WamDriver::~WamDriver() {
       // can usually still succeed with a non-blended traj
       ROS_ERROR_NAMED("BuildTrajectory","Trying to use a ParaJointTraj instead");
       try {
-	ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bHoldOnStall,bHoldOnForceInput);
+	ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bCancelOnStall,bCancelOnForceInput);
 	ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
 	ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
 	return paratraj;

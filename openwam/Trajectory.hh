@@ -79,6 +79,7 @@ namespace OWD {
     static const int RUN  = 1;
     static const int DONE = 2;
     static const int LOG  = 3;
+    static const int ABORT =4;
 
     /// \brief ID number
     ///
@@ -92,14 +93,14 @@ namespace OWD {
     /// the trajectory queue that is part of the WAMState message.
     std::string type;
 
-    /// \brief Automatically pause a trajectory when the arm stalls
+    /// \brief Automatically cancel a trajectory when the arm stalls
     ///
-    /// If true, OWD will change the trajectory to runstate=STOP if
+    /// If true, OWD will cancel the trajectory if
     /// the PID torques exceed the safety thresholds while the
     /// trajectory is executing (usually an indication that the arm
     /// has run into something).  Defaults to false, in which case
     /// OWD will keep trying to complete the trajectory.
-    bool HoldOnStall;
+    bool CancelOnStall;
 
     /// \brief Do not start the trajectory when queued
     ///
@@ -109,14 +110,14 @@ namespace OWD {
     /// trajectory in the RUN state.
     bool WaitForStart;
 
-    /// \brief Automatically pause a trajectory based on sensed force
+    /// \brief Automatically cancel a trajectory based on sensed force
     ///
-    /// If true, OWD will change the trajectory to runstate=STOP if
+    /// If true, OWD will cancel the trajectory if
     /// the force/torque sensor reports a Z value below the internal
     /// threshold (for detecting normal force on the palm).  Defaults
     /// to false, in which case values from the force/torque sensor
     /// are ignored).
-    bool  HoldOnForceInput;
+    bool  CancelOnForceInput;
 
     double forcetorque[6];
     bool valid_ft;
@@ -131,8 +132,8 @@ namespace OWD {
     /// order to set the name.
     Trajectory(std::string name) :
       runstate(STOP),time(0.0),id(0), type(name),
-      HoldOnStall(false),WaitForStart(false),
-      HoldOnForceInput(false),valid_ft(false)
+      CancelOnStall(false),WaitForStart(false),
+      CancelOnForceInput(false),valid_ft(false)
     {
       pthread_mutex_init(&mutex, NULL);
     }

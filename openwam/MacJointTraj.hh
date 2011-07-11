@@ -59,8 +59,8 @@ public:
 	       const JointPos &max_joint_accel,
 	       double max_jerk,
 	       bool bWaitForStart,
-	       bool bHoldOnStall,
-	       bool bHoldOnForceInput);
+	       bool bCancelOnStall,
+	       bool bCancelOnForceInput);
 
   virtual ~MacJointTraj();
     

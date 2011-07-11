@@ -172,7 +172,7 @@ public:
     traj_req.traj.blend_radius.push_back(0.0);
     
     if (StopOnForce) {
-      traj_req.traj.options = traj_req.traj.opt_HoldOnForceInput;
+      traj_req.traj.options = traj_req.traj.opt_CancelOnForceInput;
     }
     if (ros::service::call("owd/AddTrajectory",traj_req,traj_res)) {
       ROS_DEBUG("Added Trajectory %d",traj_res.id);
