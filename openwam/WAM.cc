@@ -1012,8 +1012,7 @@ void WAM::newcontrol_rt(double dt){
 	for (int j=Joint::J1; j<Joint::Jn; ++j) {
 	  traj_torq[j]=0;  // make sure we don't leave these non-zero
 	}
-      }
-      if(jointstraj->state() == OWD::Trajectory::ABORT){
+      } else if(jointstraj->state() == OWD::Trajectory::ABORT){
 	// The trajectory wants us to end right where we are,
 	// so hold the current position and delete the trajectory.
 	for(int i = Joint::J1; i<=Joint::Jn; i++) {
