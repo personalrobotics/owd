@@ -49,7 +49,7 @@
 
 
 CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, bool tactile, bool log_cb_data) : 
-  puck_state(-1),BH280_installed(bh280),id(bus_id),trq(NULL),
+  puck_state(-1),BH280_installed(bh280),id(bus_id),fw_vers(0),trq(NULL),
   pos(NULL), jpos(NULL), forcetorque_data(NULL), tactile_data(NULL),
   valid_forcetorque_data(false), valid_tactile_data(false),
   tactile_top10(false), pucks(NULL),n_arm_pucks(number_of_arm_pucks),
@@ -497,7 +497,7 @@ int CANbus::wake_puck(int32_t puck_id){
       ROS_WARN("CANbus::wake_puck: set_property failed for puck %d.",puck_id);
         return OW_FAILURE;
     }
-    usleep(750000); // Wait 500ms for puck to initialize    
+    usleep(750000); // Wait 750ms for puck to initialize    
     return OW_SUCCESS;
 }
 
@@ -518,7 +518,6 @@ int CANbus::status(int32_t* nodes){
   unsigned char msg[8];
   int32_t msgid, msglen, nodeid, property;
   int firstFound = 0;
-  int32_t fw_vers;
 
   ROS_INFO_NAMED("canstatus","Probing for nodes on the CAN bus");
 
@@ -1987,7 +1986,7 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 	  // stopping and with a torque limit low enough that it can keep
 	  // applying the force indefinitely without overheating.
 	  handstate[nodeid-11] = HANDSTATE_MOVING;
-	  if (hand_set_property(nodeid,MT,800) != OW_SUCCESS) {
+	  if (hand_set_property(nodeid,MT,1100) != OW_SUCCESS) {
 	    return OW_FAILURE;
 	  }
 	  if (hand_set_property(nodeid,TSTOP,0) != OW_SUCCESS) {
@@ -2270,7 +2269,7 @@ int CANbus::hand_reset() {
 
     if (tactile_data) {
       if (configure_tactile_sensors() != OW_SUCCESS) {
-	ROS_ERROR("Could not initialized Tactile Sensors");
+	ROS_ERROR("Could not initialize Tactile Sensors");
 	return OW_FAILURE;
       }
     }
@@ -2419,10 +2418,10 @@ int CANbus::hand_move(std::vector<double> p) {
   // First set the finger pucks back to the higher-torque threshold
   // with TSTOP enabled so that they stop when done/stalled
   for (int32_t node=11; node<=13; ++node) {
-    if (hand_set_property(node,TSTOP,50) != OW_SUCCESS) {
+    if (hand_set_property(node,TSTOP,150) != OW_SUCCESS) {
       return OW_FAILURE;
     }
-    if (hand_set_property(node,MT,1700) != OW_SUCCESS) {
+    if (hand_set_property(node,MT,2200) != OW_SUCCESS) {
       return OW_FAILURE;
     }
   }
@@ -2666,7 +2665,7 @@ void CANstats::rosprint() {
 void CANbus::initPropertyDefs(int32_t firmwareVersion){
   if(firmwareVersion < 40){
     throw "Unsupported early firmware version";
-  } else { // (firmwareVersion >= 40)
+  } else {
     /* Common */
     DEFPROP(VERS , 0);
     DEFPROP(ROLE , 1); /* P=PRODUCT, R=ROLE: XXXX PPPP XXXX RRRR */
@@ -2766,7 +2765,7 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
     DEFPROP(IOFF , 74); /* 32-Bit */
     DEFPROP(IOFF2, 75);
     DEFPROP(MPE  , 76);
-    DEFPROP(HOLD , 77);
+    // property 77 varies with firmware version
     DEFPROP(TSTOP, 78);
     DEFPROP(KP   , 79);
     DEFPROP(KD   , 80);
@@ -2783,21 +2782,36 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
     DEFPROP(IKP  , 91);
     DEFPROP(IKI  , 92);
     DEFPROP(IKCOR, 93);
-    DEFPROP(EN   , 94);
-    DEFPROP(EN2  , 95);
-    DEFPROP(JP   , 96);
-    DEFPROP(JP2  , 97);
-    DEFPROP(JOFST, 98);
-    DEFPROP(JOFST2,99);
-    DEFPROP(TIE  , 100);
     DEFPROP(ECMAX, 101);
     DEFPROP(ECMIN, 102);
     DEFPROP(LFLAGS,103);
     DEFPROP(LCTC , 104);
-    DEFPROP(LCVC , 105);
-    DEFPROP(TACT , 106);
-    DEFPROP(TACTID,107);
-    PROP_END=107;
+
+    if (firmwareVersion < 132) {
+      DEFPROP(EN ,  77);
+      DEFPROP(HOLD ,94);
+      DEFPROP(TIE  ,95);
+      DEFPROP(LCVC ,100);
+      PROP_END=101;
+    } else { // firmwareVersion >= 132
+      DEFPROP(HOLD , 77);
+      DEFPROP(EN   , 94);
+      DEFPROP(EN2  , 95);
+      DEFPROP(JP   , 96);
+      DEFPROP(JP2  , 97);
+      DEFPROP(JOFST, 98);
+      DEFPROP(JOFST2,99);
+      DEFPROP(TIE  , 100);
+      DEFPROP(LCVC , 105);
+      DEFPROP(TACT , 106);
+      DEFPROP(TACTID,107);
+      PROP_END=108;
+    }
+
+    if(firmwareVersion >=175){
+      DEFPROP(IHIT , 108);
+      PROP_END=109;
+    }
 
     /* Force/Torque sensor */
     DEFPROP(FT   , 54);
@@ -2953,3 +2967,159 @@ template<> inline bool DataRecorder<CANbus::canio_data>::dump(const char *fname)
  }
  
 std::map <int, std::string> CANbus::propname;
+
+int VERS=-10;
+int ROLE=-10;
+int SN=-10;
+int ID=-10;
+int ERROR=-10;
+int STAT=-10;
+int ADDR=-10;
+int VALUE=-10;
+int MODE=-10;
+int TEMP=-10;
+int PTEMP=-10;
+int OTEMP=-10;
+int BAUD=-10;
+int _LOCK=-10;
+int DIG0=-10;
+int DIG1=-10;
+int FET0=-10;
+int FET1=-10;
+int ANA0=-10;
+int ANA1=-10;
+int THERM=-10;
+int VBUS=-10;
+int IMOTOR=-10;
+int VLOGIC=-10;
+int ILOGIC=-10;
+int SG=-10;
+int GRPA=-10;
+int GRPB=-10;
+int GRPC=-10;
+int CMD=-10;
+int SAVE=-10;
+int LOAD=-10;
+int DEF=-10;
+int FIND=-10;
+int X0=-10;
+int X1=-10;
+int X2=-10;
+int X3=-10;
+int X4=-10;
+int X5=-10;
+int X6=-10;
+int X7=-10;
+int T=-10;
+int MT=-10;
+int V=-10;
+int MV=-10;
+int MCV=-10;
+int MOV=-10;
+int P=-10;
+int P2=-10;
+int DP=-10;
+int DP2=-10;
+int E=-10;
+int E2=-10;
+int OT=-10;
+int OT2=-10;
+int CT=-10;
+int CT2=-10;
+int M=-10;
+int M2=-10;
+int _DS=-10;
+int MOFST=-10;
+int IOFST=-10;
+int UPSECS=-10;
+int OD=-10;
+int MDS=-10;
+int MECH=-10;
+int MECH2=-10;
+int CTS=-10;
+int CTS2=-10;
+int PIDX=-10;
+int HSG=-10;
+int LSG=-10;
+int IVEL=-10;
+int IOFF=-10;
+int IOFF2=-10;
+int MPE=-10;
+int HOLD=-10;
+int TSTOP=-10;
+int KP=-10;
+int KD=-10;
+int KI=-10;
+int ACCEL=-10;
+int TENST=-10;
+int TENSO=-10;
+int JIDX=-10;
+int IPNM=-10;
+int HALLS=-10;
+int HALLH=-10;
+int HALLH2=-10;
+int POLES=-10;
+int IKP=-10;
+int IKI=-10;
+int IKCOR=-10;
+int EN=-10;
+int EN2=-10;
+int JP=-10;
+int JP2=-10;
+int JOFST=-10;
+int JOFST2=-10;
+int TIE=-10;
+int ECMAX=-10;
+int ECMIN=-10;
+int LFLAGS=-10;
+int LCTC=-10;
+int LCVC=-10;
+int TACT=-10;
+int TACTID=-10;
+int IHIT=-10;
+int PROP_END=-10;
+int AP=-10;
+int TENSION=-10;
+int BRAKE=-10;
+
+/* Safety puck properties */
+int ZERO=-10;
+int PEN=-10;
+int SAFE=-10;
+int VL1=-10;
+int VL2=-10;
+int TL1=-10;
+int TL2=-10;
+int VOLTL1=-10;
+int VOLTL2=-10;
+int VOLTH1=-10;
+int VOLTH2=-10;
+int PWR=-10;
+int MAXPWR=-10;
+int IFAULT=-10;
+int VNOM=-10;
+
+/* Force/Torque properties */
+int FT=-10;
+
+// older properties (firmware < 40)
+int D=-10;
+int TORQ=-10;
+int B=-10;
+int MD=-10;
+int AP2=-10;
+int SAMPLE=-10;
+int UNITS=-10;
+int RATIO=-10;
+int LOG=-10;
+int DUMP=-10;
+int LOG1=-10;
+int LOG2=-10;
+int LOG3=-10;
+int LOG4=-10;
+int GAIN1=-10;
+int GAIN2=-10;
+int GAIN3=-10;
+int OFFSET1=-10;
+int OFFSET2=-10;
+int OFFSET3=-10;

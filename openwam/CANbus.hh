@@ -117,6 +117,7 @@ public:
   CANstats stats;
   bool BH280_installed;
   int32_t id;
+  int32_t fw_vers;
   Group groups[NUM_GROUPS+1];
   int32_t* trq;
   double* pos;

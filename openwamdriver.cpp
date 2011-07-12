@@ -800,26 +800,41 @@ int WamDriver::get_puck_offset(int puckid, int32_t *mechout, int32_t *apout) {
       }
     }
 
-    retry=6;
-    while (bus->set_property_rt(bus->pucks[puckid].id(), ADDR, 0x84D7, false) == OW_FAILURE) {
-      if (retry-- > 0) {
-	ROS_WARN("Failed to set address of MECH on puck %d, retrying",puckid);
-      } else {
-	ROS_FATAL("Failed to set address of MECH on puck %d; cannot proceed",puckid);
-	throw -1;
+    if (bus->fw_vers < 119) {
+      // prior to puck firmware version 119 we have to get MECH by
+      // setting an address and then querying the VALUE property.
+      retry=6;
+      while (bus->set_property_rt(bus->pucks[puckid].id(), ADDR, 0x84D7, false) == OW_FAILURE) {
+	if (retry-- > 0) {
+	  ROS_WARN("Failed to set address of MECH on puck %d, retrying",puckid);
+	} else {
+	  ROS_FATAL("Failed to set address of MECH on puck %d; cannot proceed",puckid);
+	  throw -1;
+	}
+      }
+      
+      retry=6;
+      while (bus->get_property_rt(bus->pucks[puckid].id(), VALUE, &mech, 10000,4) == OW_FAILURE) {
+	if (retry-- > 0) {
+	  ROS_WARN("Failed to get MECH from puck %d, retrying",puckid);
+	} else {
+	  ROS_FATAL("Failed to get MECH from puck %d; cannot proceed",puckid);
+	  throw -1;
+	}
+      }
+    } else {
+      // starting with puck firmware version 119 we can just ask for
+      // MECH by name
+      retry=6;
+      while (bus->get_property_rt(bus->pucks[puckid].id(), MECH, &mech, 10000,4) == OW_FAILURE) {
+	if (retry-- > 0) {
+	  ROS_WARN("Failed to get MECH from puck %d, retrying",puckid);
+	} else {
+	  ROS_FATAL("Failed to get MECH from puck %d; cannot proceed",puckid);
+	  throw -1;
+	}
       }
     }
-
-    retry=6;
-    while (bus->get_property_rt(bus->pucks[puckid].id(), VALUE, &mech, 10000,4) == OW_FAILURE) {
-      if (retry-- > 0) {
-	ROS_WARN("Failed to get MECH from puck %d, retrying",puckid);
-      } else {
-	ROS_FATAL("Failed to get MECH from puck %d; cannot proceed",puckid);
-	throw -1;
-      }
-    }
-
     ROS_DEBUG("Puck %d  AP=%d  OFFSET=%d  MECH=%d",puckid,p,p-mech,mech);
     if (mechout) {
         // return the value of MECH, too
