@@ -154,9 +154,9 @@ are supported for manipulating trajectories:
    - opt_WaitForStart: Initializes the trajectory in the Paused state;
      you can start the trajectory by calling PauseTrajectory with a
      value of zero.
-   - opt_HoldOnStall: Pauses trajectory if the arm stalls (normally
+   - opt_CancelOnStall: Aborts the trajectory if the arm stalls (normally
      %OWD will try to resume a stalled trajectory automatically).
-   - opt_HoldOnForceInput: Pauses trajectory if the force/torque
+   - opt_CancelOnForceInput: Aborts the trajectory if the force/torque
      sensor reports a force value along the -Z axis that exceeds the
      threshold.
 \note If the arm is idle (has 0 stiffness), and %OWD receives a
