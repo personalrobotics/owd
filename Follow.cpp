@@ -24,7 +24,9 @@ Follow::Follow(int mode_in): OWD::Trajectory("Follow"), mode(mode_in) {
       break;
     default:
       mode = 0;
-      ROS_ERROR("Follow::Follow: unknown mode integer %d (None=0, Joy=%d). Stopping trajectory.", mode, gfe_owd_plugin::StartFollow::Request::mode_joy);
+      ROS_ERROR("Follow::Follow: unknown mode integer %d (None=0, Joy=%d). Stopping trajectory.",
+                    mode,
+                    gfe_owd_plugin::StartFollow::Request::mode_joy);
       runstate=OWD::Trajectory::DONE;
   }
   
@@ -88,7 +90,9 @@ void Follow::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
       tc.qd  = zeros;
       tc.qdd = zeros;
       tc.t   = zeros;
-      ROS_ERROR("Follow::evaluate: unknown mode integer %d (None=0, Joy=%d). Stopping trajectory.", mode, gfe_owd_plugin::StartFollow::Request::mode_joy);
+      ROS_ERROR("Follow::evaluate: unknown mode integer %d (None=0, Joy=%d). Stopping trajectory.",
+                    mode,
+                    gfe_owd_plugin::StartFollow::Request::mode_joy);
       runstate=OWD::Trajectory::DONE;
       return;
   }
@@ -130,7 +134,7 @@ void Follow::TrajForJoyTeleop(OWD::Trajectory::TrajControl &tc, double dt) {
     tc.qd  = zeros;
     tc.qdd = zeros;
     tc.t   = zeros;
-    prev_pos = zeros;
+    prev_pos = tc.q;
     prev_vel = zeros;
     prev_acc = zeros;
     return;
