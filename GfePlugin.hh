@@ -12,6 +12,12 @@
 #include <std_msgs/Float64MultiArray.h>
 #include <ros/ros.h>
 
+// Added for Kyle's Follow trajectory
+#include <openwam/Trajectory.hh>
+#include <std_msgs/String.h>
+#include <math.h>
+#include <LinearMath/btQuaternion.h>
+
 // #define SIMULATION
 #ifdef SIMULATION
 #include <gfe_owd_plugin/ApplyForceDebug.h>
