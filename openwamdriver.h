@@ -60,7 +60,8 @@
 
 // forward declaration of a few classes we keep pointers to, 
 // so that we don't have to include their .hh files right now
-class WAM;
+#include "openwam/WAM.hh"
+//class WAM;
 class CANbus;
 
 namespace OWD {
@@ -222,8 +223,10 @@ private:
 
  public: // make this public so that it can be shared with BHD_280
     CANbus *bus;
- private:
+    bool running;
     WAM *owam;
+
+ private:
     boost::mutex queue_mutex;
     boost::mutex wscb_mutex;
     bool modified_j1;

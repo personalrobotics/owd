@@ -87,6 +87,7 @@ extern double fs[8];  // static friction from Dynamics.cc
 namespace OWD {
 
 WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tactile) :
+  running(true),
   cmdnum(0), nJoints(Joint::Jn),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
   owam(NULL),
@@ -326,7 +327,9 @@ bool WamDriver::Init(const char *joint_cal_file)
     owam->jsdynamics() = true; // turn on feed-forward dynamics
 
   } else if (WamWasZeroed) {
+#ifndef BH280_ONLY
     ROS_DEBUG("Wam was already zeroed from a previous run; motor offsets unchanged.");
+#endif // BH280_ONLY
     start_control_loop();
     Dynamics::g=9.81; // turn on Gravity
     owam->jsdynamics() = true; // turn on feed-forward dynamics
@@ -566,6 +569,7 @@ WamDriver::~WamDriver() {
   }
 
   ROS_INFO("~WamDriver: WAM driver exiting normally");
+  running=false;
 }
 
 

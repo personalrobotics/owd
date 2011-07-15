@@ -558,6 +558,7 @@ void control_loop_rt(void* argv){
   while((ctrl_loop->state_rt() == CONTROLLOOP_RUN) && (ros::ok())){
       RTIME loopstart_time = ControlLoop::get_time_ns_rt(); // record the time
 
+#ifndef BH280_ONLY
       // REQUEST POSITIONS
       if(wam->bus->request_positions_rt(GROUPID(4)) == OW_FAILURE){
         ROS_FATAL("control_loop: request_positions failed");
@@ -565,7 +566,6 @@ void control_loop_rt(void* argv){
 	break;
       }
 
-#ifndef BH280_ONLY
       if (wam->bus->forcetorque_data) {
 	// REQUEST F/T DATA (every cycle)
 	wam->bus->request_forcetorque_rt();
@@ -599,7 +599,7 @@ void control_loop_rt(void* argv){
 	for (int f=0; f<4; ++f) {
 	  if (wam->bus->finger_hi_pending[f]) {
 	    pending_hi=true;
-	    hand_counter=0; // keep checking MODE
+	    hand_cycles=100; // don't send requests as frequently
 	    break;
 	  }
 	}
@@ -616,11 +616,12 @@ void control_loop_rt(void* argv){
 	    }
 	  }
 	  
-	  // increment our counter
-	  if (++hand_counter > hand_cycles) {
-	    hand_counter=0;
-	  }
 	} // ! pending_hi
+
+	// increment our counter
+	if (++hand_counter > hand_cycles) {
+	  hand_counter=0;
+	}
       }
 
       // Now just read the response packets for as much time as we have
@@ -727,12 +728,19 @@ void control_loop_rt(void* argv){
 	}
 #endif // ! BH280_ONLY
 
+	// spend some time checking the F/T sensor and BH280 hand
+	if (wam->bus->BH280_installed || wam->bus->forcetorque_data) {
+	  if (wam->bus->extra_bus_commands() != OW_SUCCESS) {
+	    ROS_WARN("control_loop: extra_bus_commands failed.");
+	  }
+	}
 
 	time_to_wait = ControlLoop::PERIOD * 1e6  // sec to usecs
 	  - (ControlLoop::get_time_ns_rt() - loopstart_time) * 1e-3;  // nsecs to usecs
       } // END OF READ LOOP
 
       static int total_missed_data_cycles=0;
+#ifndef BH280_ONLY
       if (! torques_sent) {
 	// we must have not received all 7 joint values before the
 	// time expired
@@ -748,6 +756,7 @@ void control_loop_rt(void* argv){
       } else {
 	missing_data_cycles = 0;
       }
+#endif // BH280_ONLY
       
       // save time stats
       if (++loopcount == 1000) {
@@ -784,6 +793,12 @@ void control_loop_rt(void* argv){
     }
     wam->send_mtrq();
     wam->bus->send_torques_rt();
+#ifdef BH280_ONLY
+    // turn off the hand pucks
+    for (int p=11; p<=14; ++p) {
+      wam->bus->set_property_rt(p,MODE,MODE_IDLE,false,15000);
+    }
+#endif // BH280_ONLY
   }
   ROS_DEBUG("Control loop finished");
 
@@ -805,23 +820,23 @@ void control_loop_rt(void* argv){
   // Now idle all of the pucks
   /*
   for(int p=1; p<=wam->bus->n_arm_pucks; p++){
-    if(wam->bus->set_property_rt(wam->bus->pucks[p].id(), MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
+    if(wam->bus->set_property_rt(wam->bus->pucks[p].id(), MODE, MODE_IDLE, false, 10000) == OW_FAILURE){
       ROS_WARN("set_property MODE=IDLE failed for puck %d",p);
     }
   }
   if (wam->bus->BH280_installed) {
     for(int p=11; p<=14; p++){
-      if(wam->bus->set_property_rt(p, MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
+      if(wam->bus->set_property_rt(p, MODE, MODE_IDLE, false, 10000) == OW_FAILURE){
 	ROS_WARN("set_property MODE=IDLE failed for puck %d",p);
       }
     }
   }
   if (wam->bus->forcetorque_data) {
-    if(wam->bus->set_property_rt(8, MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
+    if(wam->bus->set_property_rt(8, MODE, MODE_IDLE, false, 10000) == OW_FAILURE){
       ROS_WARN("set_property MODE=IDLE failed for puck 8");
     }
   }
-  if(wam->bus->set_property_rt(10, MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
+  if(wam->bus->set_property_rt(10, MODE, MODE_IDLE, false, 10000) == OW_FAILURE){
       ROS_WARN("set_property MODE=IDLE failed for safety puck 10");
       }
 
@@ -839,8 +854,8 @@ void control_loop_rt(void* argv){
       (ctrl_loop->state_rt() == CONTROLLOOP_RUN)) {
     // delete the WAM object so that it has the opportunity to 
     // write any accumulated activity logs
-    delete wam->bus;
-    wam->bus=NULL;
+    delete wam;
+    wam=NULL;
     ros::shutdown();
   }
   return;
@@ -1538,6 +1553,10 @@ WAM::~WAM() {
     char filename[200];
     snprintf(filename,200,"/tmp/wamstats%02d-final.csv",bus->id);
     recorder.dump(filename);
+  }
+  if (bus) {
+    delete bus;
+    bus=NULL;
   }
 #endif // ! OWDSIM
 }

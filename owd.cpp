@@ -127,6 +127,7 @@ int main(int argc, char** argv)
     delete wamdriver;
     exit(1);
   }
+#ifndef BH280_ONLY
   try {
     wamdriver->AdvertiseAndSubscribe(n);
   } catch (int error) {
@@ -134,6 +135,7 @@ int main(int argc, char** argv)
     delete wamdriver;
     exit(1);
   }
+#endif // BH280_ONLY
   
 #ifndef OWDSIM
   BHD_280 *bhd(NULL);
@@ -159,7 +161,11 @@ int main(int argc, char** argv)
 #endif // BUILD_FOR_SEA
 
   ROS_DEBUG("Creating timer and spinner threads");
+
+#ifndef BH280_ONLY
   ros::Timer wam_timer = n.createTimer(ros::Rate(wam_pub_freq).expectedCycleTime(), &OWD::WamDriver::Pump, wamdriver);
+#endif // BH280_ONLY
+
 #ifndef OWDSIM
   ros::Timer bhd_timer;
   if (bhd) {
@@ -174,10 +180,13 @@ int main(int argc, char** argv)
     tactile_timer = n.createTimer(ros::Rate(tactile_pub_freq).expectedCycleTime(), &Tactile::Pump, tact);
   }
 #endif // OWDSIM
+
   ros::MultiThreadedSpinner s(3);
   ROS_DEBUG("Spinning");
   ros::spin(s);
   ROS_DEBUG("Done spinning; exiting");
-  //  delete wamdriver;
-  exit(0);
+  while (wamdriver->owam->bus) {
+    usleep(10000);
+  }
+  return(0);
 }

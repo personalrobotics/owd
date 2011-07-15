@@ -38,15 +38,6 @@
 #include <string.h>
 #include <errno.h>
 
-#define MODE_IDLE      0
-#define MODE_TORQUE    2
-#define MODE_PID       3
-#define MODE_VELOCITY  4
-#define MODE_TRAPEZOID 5
-
-#define CMD_HI 13
-#define CMD_M 19
-
 
 CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, bool tactile, bool log_cb_data) : 
   puck_state(-1),BH280_installed(bh280),id(bus_id),fw_vers(0),trq(NULL),
@@ -76,7 +67,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   encoder_changed[0]=encoder_changed[1]=encoder_changed[2]=encoder_changed[3] = 0;
   apply_squeeze[0]=apply_squeeze[1]=apply_squeeze[2]=apply_squeeze[3] = false;
   finger_hi_pending[0]=finger_hi_pending[1]=finger_hi_pending[2]=finger_hi_pending[3] = false;
-
+  hand_puck_mode[0]=hand_puck_mode[1]=hand_puck_mode[2]=hand_puck_mode[3]=-1;
   // the fourth finger finger puck also returns a strain value when we 
   // ask group 5 for strain, but it is meaningless and is not used
   // outside of OWD, so even though we have a four position in the array it
@@ -276,7 +267,12 @@ int CANbus::check(){
    
   //count number of live pucks
   online_pucks = 0;
-  for(int n=NODE_MIN; n<=NODE_MAX; n++){
+  int low=NODE_MIN, high=NODE_MAX;
+#ifdef BH280_ONLY
+  low=11; high=14;
+#endif // BH280_ONLY
+
+  for(int n=low; n<=high; n++){
     
     if(nodes[n] != STATUS_OFFLINE){      // display online nodes
       ROS_DEBUG_NAMED("cancheck","Node (id, status): (%d,%s)",n,(nodes[n] == STATUS_RESET)?"reset":"running");
@@ -300,6 +296,7 @@ int CANbus::check(){
   }
   if(online_pucks < n_expected_pucks){
     ROS_INFO_NAMED("cancheck","Bus has %d pucks. We expected %d",online_pucks,n_expected_pucks);
+    send_puck_reset(low,high);
     return OW_FAILURE;
   }  
 
@@ -343,7 +340,7 @@ int CANbus::check(){
     } else {
       ROS_DEBUG_NAMED("cancheck"," (running)");
       ROS_DEBUG_NAMED("cancheck","setting idle mode...");
-      if(set_property_rt(pucks[p].id(), MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
+      if(set_property_rt(pucks[p].id(), MODE, MODE_IDLE, false, 10000) == OW_FAILURE){
 	ROS_WARN("set_property failed (MODE)");
 	return OW_FAILURE;
       }
@@ -458,6 +455,13 @@ int CANbus::check(){
   return OW_SUCCESS;
 }
 
+void CANbus::send_puck_reset(int32_t low, int32_t high) {
+  for (int32_t i=low; i<=high; ++i) {
+    set_property_rt(i,MODE,0,false,15000);
+    //set_property_rt(i,STAT,0,false,15000);
+  }
+}
+
 void CANbus::dump(){
   //  ROS_DEBUG("Printing bus information.");
   for(int g=GROUP_ID_MIN; g<=GROUP_ID_MAX; g++){
@@ -521,8 +525,12 @@ int CANbus::status(int32_t* nodes){
 
   ROS_INFO_NAMED("canstatus","Probing for nodes on the CAN bus");
 
-
-  for(int n=NODE_MIN; n<=NODE_MAX; n++){
+  int low=NODE_MIN;
+  int high=NODE_MAX;
+#ifdef BH280_ONLY
+  low=11; high=14;
+#endif // BH280_ONLY
+  for(int n=low; n<=high; ++n){
     msg[0] = (unsigned char) 5;   // STAT = 5 for all firmware versions
     nodes[n] = STATUS_OFFLINE;      // Initialize node as offline
 
@@ -545,7 +553,7 @@ int CANbus::status(int32_t* nodes){
 	if (!firstFound) {
 	  ROS_DEBUG_NAMED("canstatus","trying to wake node %d",n);
 	  if ((wake_puck(NODE2ADDR(n)) == OW_SUCCESS) &&
-	      (get_property_rt(NODE2ADDR(n), 0, &fw_vers) == OW_SUCCESS)){
+	      (get_property_rt(NODE2ADDR(n), 0, &fw_vers, 40000) == OW_SUCCESS)){
 	    ROS_DEBUG_NAMED("canstatus","puck %d firmware version %d",n,fw_vers);
 	    initPropertyDefs(fw_vers);
 	    firstFound = 1;
@@ -564,6 +572,7 @@ int CANbus::status(int32_t* nodes){
       // the property definitions.
     ROS_WARN_NAMED("canstatus","Could not determine puck firmware version");
     ROS_WARN_NAMED("canstatus","Unable to continue");
+    send_puck_reset(low,high);
     return OW_FAILURE;
   }
   
@@ -693,11 +702,6 @@ int CANbus::send_torques_rt(){
 
   memcpy(mytorqs,trq,NUM_NODES*sizeof(int32_t));
 
-  static int DEBUGCOUNT=0;
-  if (++DEBUGCOUNT == 1000) {
-    DEBUGCOUNT = 0;
-  }
-
 #ifdef RT_STATS
   RTIME bt1 = time_now_ns();
 #endif
@@ -747,69 +751,70 @@ int CANbus::send_torques_rt(){
   }
 #endif // RT_STATS
 
+  return OW_SUCCESS;
+}
 
-  if (BH280_installed || forcetorque_data) {
-    static uint8_t msgbuf[20];
-    CANmsg handmsg;
-    bool message_received(false);
+int CANbus::extra_bus_commands() {
+  static uint8_t msgbuf[20];
+  CANmsg handmsg;
+  bool message_received(false);
 #ifdef OWD_RT
-    ssize_t bytecount = rt_pipe_read(&handpipe,&handmsg,sizeof(CANmsg),TM_NONBLOCK);
-    if (bytecount > 0) {
-      if (bytecount < sizeof(CANmsg)) {
-	snprintf(last_error,200,"Incomplete read of CANmsg from RT message pipe");
-	return OW_FAILURE;
-      }
+  ssize_t bytecount = rt_pipe_read(&handpipe,&handmsg,sizeof(CANmsg),TM_NONBLOCK);
+  if (bytecount > 0) {
+    if (bytecount < sizeof(CANmsg)) {
+      snprintf(last_error,200,"Incomplete read of CANmsg from RT message pipe");
+      return OW_FAILURE;
+    }
+    message_received=true;
+  }
+#else // ! OWD_RT
+  bool mutex_locked=false;
+  if (!mutex_trylock(&hand_queue_mutex)) {
+    mutex_locked=true;
+    if (hand_command_queue.size() > 0) {
+      handmsg = hand_command_queue.front();
+      hand_command_queue.pop();
       message_received=true;
     }
-#else // ! OWD_RT
-    bool mutex_locked=false;
-    if (!mutex_trylock(&hand_queue_mutex)) {
-      mutex_locked=true;
-      if (hand_command_queue.size() > 0) {
-	handmsg = hand_command_queue.front();
-	hand_command_queue.pop();
-	message_received=true;
-      }
-    }
+  }
 #endif // ! OWD_RT
-    if (message_received) {
-      if (handmsg.property & 0x80) {
-	// if bit 7 is 1 it's a set
-	
-	if (set_property_rt(handmsg.nodeid,handmsg.property & 0x7F,handmsg.value,false)
-	    != OW_SUCCESS) {
+  if (message_received) {
+    if (handmsg.property & 0x80) {
+      // if bit 7 is 1 it's a set
+      
+      if (set_property_rt(handmsg.nodeid,handmsg.property & 0x7F,handmsg.value,false)
+	  != OW_SUCCESS) {
 	  snprintf(last_error,200,"Error setting property %d = %d on hand puck %d",
 		   handmsg.property, handmsg.value, handmsg.nodeid);
 #ifndef OWD_RT
 	  mutex_unlock(&hand_queue_mutex);
 #endif // ! OWD_RT
 	  return OW_FAILURE;
-	}
-	if ((handmsg.property & 0x7F)== MODE) {
-	  if ((handmsg.value == MODE_TRAPEZOID)
-	      || (handmsg.value == MODE_VELOCITY)
+      }
+      if ((handmsg.property & 0x7F)== MODE) {
+	if ((handmsg.value == MODE_TRAPEZOID)
+	    || (handmsg.value == MODE_VELOCITY)
 	      || (handmsg.value == MODE_TORQUE)) {
-	    // record the fact that the motion command has actually been sent
-	    hand_motion_state_sequence=2;
-	  }
-	}
-      } else {
-	if (request_property_rt(handmsg.nodeid, handmsg.property) != OW_SUCCESS) {
-	  snprintf(last_error,200,"Error getting property %d from hand puck %d",
-		   handmsg.property, handmsg.nodeid);
-#ifndef OWD_RT
-	  mutex_unlock(&hand_queue_mutex);
-#endif // ! OWD_RT
-	  return OW_FAILURE;
+	  // record the fact that the motion command has actually been sent
+	  hand_motion_state_sequence=2;
 	}
       }
-    }
+    } else {
+      if (request_property_rt(handmsg.nodeid, handmsg.property) != OW_SUCCESS) {
+	snprintf(last_error,200,"Error getting property %d from hand puck %d",
+		 handmsg.property, handmsg.nodeid);
 #ifndef OWD_RT
-    if (mutex_locked) {
-      mutex_unlock(&hand_queue_mutex);
-    }
+	mutex_unlock(&hand_queue_mutex);
 #endif // ! OWD_RT
+	return OW_FAILURE;
+      }
+    }
   }
+#ifndef OWD_RT
+  if (mutex_locked) {
+    mutex_unlock(&hand_queue_mutex);
+  }
+#endif // ! OWD_RT
   return OW_SUCCESS;
 }
 
@@ -1886,8 +1891,8 @@ int CANbus::hand_activate(int32_t *nodes) {
     } else {
       ROS_DEBUG_NAMED("can_bh280","setting puck %d to idle mode...",nodeid);
       // this was set to CONTROLLER_IDLE originally
-      if(set_property_rt(nodeid, MODE, PUCK_IDLE, false, 10000) == OW_FAILURE){
-	ROS_WARN("Failed to set MODE=PUCK_IDLE on puck %d",nodeid);
+      if(set_property_rt(nodeid, MODE, MODE_IDLE, false, 10000) == OW_FAILURE){
+	ROS_WARN("Failed to set MODE=MODE_IDLE on puck %d",nodeid);
 	return OW_FAILURE;
       }
       ROS_DEBUG_NAMED("can_bh280","done");
@@ -2180,7 +2185,7 @@ int CANbus::send_finger_reset(int32_t nodeid) {
   
   // note the fact that a state change is in progress and we should ignore
   // any old state messages until a new request is sent
-  hand_motion_state_sequence = 1;
+  hand_motion_state_sequence = 2;
 
   // set a flag so that the process_hand_response_rt function knows what
   // to look for
@@ -2412,8 +2417,6 @@ int CANbus::hand_move(std::vector<double> p) {
     return OW_FAILURE;
   }
   ROS_DEBUG_NAMED("bhd280", "executing hand_move");
-  // We 
-
 
   // First set the finger pucks back to the higher-torque threshold
   // with TSTOP enabled so that they stop when done/stalled
@@ -2552,7 +2555,7 @@ int CANbus::hand_torque(const std::vector<double> &t) {
 }
 
 int CANbus::hand_relax() {
-  if (hand_set_property(GROUPID(5),MODE,PUCK_IDLE) != OW_SUCCESS) {
+  if (hand_set_property(GROUPID(5),MODE,MODE_IDLE) != OW_SUCCESS) {
     return OW_FAILURE;
   }
   for (unsigned int i=0; i<4; ++i) {
@@ -2968,15 +2971,15 @@ template<> inline bool DataRecorder<CANbus::canio_data>::dump(const char *fname)
  
 std::map <int, std::string> CANbus::propname;
 
-int VERS=-10;
-int ROLE=-10;
+int VERS=0; // always
+int ROLE=0; // always
 int SN=-10;
 int ID=-10;
 int ERROR=-10;
-int STAT=-10;
+int STAT=5; // always
 int ADDR=-10;
 int VALUE=-10;
-int MODE=-10;
+int MODE=8; // always
 int TEMP=-10;
 int PTEMP=-10;
 int OTEMP=-10;

@@ -26,6 +26,7 @@
 #include <pr_msgs/BHState.h>
 #include <pr_msgs/MoveHand.h>
 #include <pr_msgs/ResetHand.h>
+#include <pr_msgs/ResetFinger.h>
 #include <pr_msgs/GetDOF.h>
 #include <pr_msgs/RelaxHand.h>
 #include <pr_msgs/SetHandProperty.h>
@@ -40,6 +41,7 @@ public:
     ss_gethanddof,
     ss_movehand,
     ss_resethand,
+    ss_resetfinger,
     ss_sethandprop,
     ss_gethandprop,
     ss_relaxhand,
@@ -64,6 +66,8 @@ public:
 		 pr_msgs::RelaxHand::Response &res);
   bool ResetHand(pr_msgs::ResetHand::Request &req,
 		 pr_msgs::ResetHand::Response &res);
+  bool ResetFinger(pr_msgs::ResetFinger::Request &req,
+		   pr_msgs::ResetFinger::Response &res);
   bool MoveHand(pr_msgs::MoveHand::Request &req,
 		pr_msgs::MoveHand::Response &res);
   bool SetHandProperty(pr_msgs::SetHandProperty::Request &req,

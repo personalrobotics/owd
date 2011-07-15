@@ -27,8 +27,6 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define PUCK_IDLE 0 
-
 CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
 	       bool ft, bool tactile,bool log_cb_data) : 
   puck_state(2),BH280_installed(bh280),id(bus_id),trq(NULL),
@@ -127,6 +125,14 @@ int CANbus::send_torques(int32_t* torques){
 
 int CANbus::send_torques_rt(){
   return OW_SUCCESS;
+}
+
+int CANbus::extra_bus_commands() {
+  return OW_SUCCESS;
+}
+
+void CANbus::send_puck_reset(int32_t low, int32_t high) {
+  return;
 }
 
 #ifdef NDEF

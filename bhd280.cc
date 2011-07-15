@@ -71,6 +71,8 @@ void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 				      &BHD_280::MoveHand,this);
   ss_resethand = n.advertiseService("ResetHand",
 				    &BHD_280::ResetHand,this);
+  ss_resetfinger = n.advertiseService("ResetFinger",
+				      &BHD_280::ResetFinger,this);
   ss_relaxhand = n.advertiseService("RelaxHand",
 				       &BHD_280::RelaxHand,this);
   ss_gethandprop = n.advertiseService("SetProperty",
@@ -90,6 +92,7 @@ void BHD_280::Unadvertise() {
   ss_gethanddof.shutdown();
   ss_movehand.shutdown();
   ss_resethand.shutdown();
+  ss_resetfinger.shutdown();
   ss_relaxhand.shutdown();
   ss_setspeed.shutdown();
 }
@@ -254,16 +257,65 @@ bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
   return true;
 }
 
-// Reset command
 bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
 			pr_msgs::ResetHand::Response &res) {
   res.ok=true;
-  for (int i=11; i<=14; ++i) {
-    if (bus->send_finger_reset(i) != OW_SUCCESS) {
-      res.ok=false;
-      res.reason="Failed to reset a finger";
-      break;
+  for (int cycles=0; cycles<3; ++cycles) {
+    for (int i=11; i<=13; ++i) {
+      if (bus->send_finger_reset(i) != OW_SUCCESS) {
+	res.ok=false;
+	res.reason="Failed to reset a finger";
+	return true;
+      }
+      int waitcount = 0;
+      while (bus->finger_hi_pending[i-11]) {
+	if (++waitcount > 100) {
+	  res.ok=false;
+	  res.reason="Finger failed to reset after 10 seconds";
+	  return true;
+	}
+	usleep(100000);
+      }
     }
+  }
+  if (bus->send_finger_reset(14) != OW_SUCCESS) {
+    res.ok=false;
+    res.reason="Failed to reset spread";
+    return true;
+  }
+  int waitcount=0;
+  while (bus->finger_hi_pending[3]) {
+    if (++waitcount > 100) {
+      res.ok=false;
+      res.reason="Spread failed to reset after 10 seconds";
+      return true;
+    }
+    usleep(100000);
+  }
+  return true;
+}
+
+bool BHD_280::ResetFinger(pr_msgs::ResetFinger::Request &req,
+			  pr_msgs::ResetFinger::Response &res) {
+  res.ok=true;
+  if ((req.finger < 1) || (req.finger > 4)) {
+    res.ok=false;
+    res.reason="Finger not in range 1-4";
+    return true;
+  }
+  if (bus->send_finger_reset(req.finger + 10) != OW_SUCCESS) {
+    res.ok=false;
+    res.reason="Error sending reset command to finger";
+    return true;
+  }
+  int waitcount=0;
+  while (bus->finger_hi_pending[req.finger - 1]) {
+    if (++waitcount > 100) {
+      res.ok=false;
+      res.reason="Finger failed to reset after 10 seconds";
+      return true;
+    }
+    usleep(100000);
   }
   return true;
 }

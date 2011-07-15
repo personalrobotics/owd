@@ -74,7 +74,15 @@ using namespace std;
 // it looks like NUM_NODES is 1 too many, since +1 seems to be added elsewhere.
 #define NUM_NODES (NODE_MAX - NODE_MIN + 2)
 
-#define PUCK_IDLE 0 
+#define MODE_IDLE      0
+#define MODE_TORQUE    2
+#define MODE_PID       3
+#define MODE_VELOCITY  4
+#define MODE_TRAPEZOID 5
+
+#define CMD_HI 13
+#define CMD_M 19
+
 
 class CANstats{
 public:
@@ -209,6 +217,8 @@ DataRecorder<canio_data> candata;
 
   int send_torques_rt();
   int read_positions_rt();
+  int extra_bus_commands();
+  void send_puck_reset(int32_t low, int32_t high);
 
   int request_positions_rt(int32_t groupid);
   int request_puck_state_rt(int32_t nodeid);

@@ -66,8 +66,11 @@ bool FT::Publish() {
   
 bool FT::Tare(pr_msgs::Reset::Request &req,
 	      pr_msgs::Reset::Response &res) {
+  res.ok=true;
   if (bus->ft_tare() != OW_SUCCESS) {
     ROS_WARN_NAMED("ft","Unable to tare the sensor");
+    res.ok=false;
+    res.reason="Unable to tare the sensor";
   }
   return true; // the service call still succeeded, even though action did not
 }
