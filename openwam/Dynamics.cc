@@ -42,10 +42,16 @@ extern "C" {
 
 namespace Dynamics {
    double g = 9.81;
+   R3 z0(0,0,1);
+   R3 up(0,0,1);
 }
-static R3 z0(0,0,1);
-static R3 up(1,0,0);  // arms turned upright on Herb 2.0
+
+#ifdef WRIST
 int dyn_active_link=7;
+#else
+int dyn_active_link=4;
+#endif // WRIST
+
 /*
  * Recursive Newton-Euler method (Luh, Walker, Paul)
  */
@@ -57,7 +63,7 @@ void RNE(double tau[Link::Ln+1],
   R3 w, wd, v, vd, vdhat;
   R3 n, f, N[Link::Ln+1], F[Link::Ln+1];
 
-  vd = Dynamics::g*up;
+  vd = Dynamics::g*Dynamics::up;
 
   for(int i=Link::L1; i<=Link::Ln; i++){
 
@@ -67,8 +73,8 @@ void RNE(double tau[Link::Ln+1],
     R3 s       =        links[i].s();
     double m   =        links[i].m();
     
-    wd = A*( wd + (z0*qdd[i]) + (w^(z0*qd[i])) );
-    w  = A*( w  + (z0*qd [i]) );
+    wd = A*( wd + (Dynamics::z0*qdd[i]) + (w^(Dynamics::z0*qd[i])) );
+    w  = A*( w  + (Dynamics::z0*qd [i]) );
     vd = (wd^ps) + (w^(w^ps)) + A*vd;
 
     vdhat = (wd^s) + (w^(w^s)) + vd;
@@ -99,7 +105,7 @@ void RNE(double tau[Link::Ln+1],
     f = A*f + F[i];
     n = A*n + (ps^f) + (s^F[i]) + N[i];  // ask me for this simplification
     A = !((SO3)links[i]);
-    tau[i] = n*(A*z0);
+    tau[i] = n*(A*Dynamics::z0);
   }
 }
 
@@ -122,7 +128,7 @@ void CCG(double ccg[Link::Ln+1], Link links[Link::Ln+1],double qd[Link::Ln+1]){
     R3 N[Link::Ln+1]; //torques applied to links (forward recursing)
     R3 F[Link::Ln+1]; //forces applied to links (forward recursing)
   
-  vd = Dynamics::g*up; //acceleration from gravity
+    vd = Dynamics::g*Dynamics::up; //acceleration from gravity
 
   //forward recursive computation for kinematic variables
   for(int i=Link::L1; i<=Link::Ln; i++){
@@ -133,8 +139,8 @@ void CCG(double ccg[Link::Ln+1], Link links[Link::Ln+1],double qd[Link::Ln+1]){
       R3 s       = links[i].s(); //position vector from this link origin to cog of this link
       double m   = links[i].m(); //mass of this link
 
-      wd = A*( wd + (w^(z0*qd[i])) ); //calculate angular acceleration on this link
-      w  = A*( w  + (z0*qd [i]) ); //calculate angular velocity on this link
+      wd = A*( wd + (w^(Dynamics::z0*qd[i])) ); //calculate angular acceleration on this link
+      w  = A*( w  + (Dynamics::z0*qd [i]) ); //calculate angular velocity on this link
       vd = (wd^ps) + (w^(w^ps)) + A*vd; //calculate linear acceleration on this link
 
       vdhat = (wd^s) + (w^(w^s)) + vd; //calculate linear acceleration at the cog
@@ -168,7 +174,7 @@ void CCG(double ccg[Link::Ln+1], Link links[Link::Ln+1],double qd[Link::Ln+1]){
     //n = A*(n + (ps)^f_ip1) + (ps+s)^F[i] + N[i]; //from Luh, Walker, Paul '80 eq 44 (doesn't work)
     A = !((SO3)links[i]);
     if (i<=7) {
-        ccg[i] = n*(A*z0);
+        ccg[i] = n*(A*Dynamics::z0);
     } else {
         ccg[i]=0.0;
     }
@@ -188,8 +194,8 @@ R6 acceleration( Link links[Link::Ln+1],
     SO3 A      = !((SO3)links[i]);
     R3 ps      =        links[i].ps();
     
-    wd = A*( wd + (z0*qdd[i]) + (w^(z0*qd[i])) );
-    w  = A*( w  + (z0*qd [i]) );
+    wd = A*( wd + (Dynamics::z0*qdd[i]) + (w^(Dynamics::z0*qd[i])) );
+    w  = A*( w  + (Dynamics::z0*qd [i]) );
     vd = (wd^ps) + (w^(w^ps)) + A*vd;
   }
 
@@ -207,8 +213,8 @@ R6 bias_acceleration(Link links[Link::Ln+1], double qd[Link::Ln+1]){
     SO3 A      = !((SO3)links[i]);
     R3 ps      =        links[i].ps();
     
-    wd = A*( wd + ( w^(z0*qd[i]) ) );
-    w  = A*( w  + (    z0*qd[i]  ) );
+    wd = A*( wd + ( w^(Dynamics::z0*qd[i]) ) );
+    w  = A*( w  + (    Dynamics::z0*qd[i]  ) );
     vd = (wd^ps) + (w^(w^ps)) + A*vd;
   }
 
@@ -235,8 +241,8 @@ void JSinertia(double A[Link::Ln][Link::Ln], Link links[Link::Ln+1]){
 
   Inertia iEj = iAj*jEj*(!iAj);
 
-  R3 iFj = z0^(Mj*icj);
-  R3 iNj = iEj*z0;
+  R3 iFj = Dynamics::z0^(Mj*icj);
+  R3 iNj = iEj*Dynamics::z0;
   
   R3 ifj = iFj;
   R3 inj = iNj + (icj^iFj);
@@ -279,8 +285,8 @@ void JSinertia(double A[Link::Ln][Link::Ln], Link links[Link::Ln+1]){
     iEj = iAj * ( jEk + Mk*( I*(v1*v1) - J1 ) + 
 		  jJj + mj*( I*(v2*v2) - J2 ) ) * (!iAj);
     
-    iFj = z0^(Mj*icj);
-    iNj = iEj*z0;
+    iFj = Dynamics::z0^(Mj*icj);
+    iNj = iEj*Dynamics::z0;
 
     ifj = iFj;
     inj = iNj + (icj^iFj);

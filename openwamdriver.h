@@ -223,8 +223,8 @@ private:
 
  public: // make this public so that it can be shared with BHD_280
     CANbus *bus;
-    bool running;
     WAM *owam;
+    bool running;
 
  private:
     boost::mutex queue_mutex;

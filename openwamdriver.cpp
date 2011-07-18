@@ -87,10 +87,10 @@ extern double fs[8];  // static friction from Dynamics.cc
 namespace OWD {
 
 WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tactile) :
-  running(true),
   cmdnum(0), nJoints(Joint::Jn),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
   owam(NULL),
+  running(true),
   modified_j1(false)
 {
   ros::NodeHandle n("~");
@@ -256,7 +256,7 @@ bool WamDriver::Init(const char *joint_cal_file)
 
   ros::NodeHandle n("~");
 
-  std::string wamhome_list, plugin_list;
+  std::string wamhome_list, plugin_list, gravity_vector;
   // default value is the one used for Herb
   n.param("home_position",
 	  wamhome_list,
@@ -265,6 +265,7 @@ bool WamDriver::Init(const char *joint_cal_file)
   n.param("tactile_top10",bus->tactile_top10,false);
   n.param("owd_plugins",plugin_list,std::string());
   n.param("log_controller_data",log_controller_data,false);
+  n.param("gravity_vector",gravity_vector,std::string("-1,0,0"));
 
 #ifndef OWDSIM
   if (BH_model == 280) {
@@ -299,10 +300,10 @@ bool WamDriver::Init(const char *joint_cal_file)
   //  }
 
   std::stringstream ss(wamhome_list);
-  std::string jval;
+  std::string item;
   unsigned int j=0;
-  while (std::getline(ss,jval,',')) {
-    wamhome[++j]=strtod(jval.c_str(),NULL);
+  while (std::getline(ss,item,',')) {
+    wamhome[++j]=strtod(item.c_str(),NULL);
   }
   if (j < nJoints) {
     ROS_FATAL("Could not extract %d joint values from ROS parameter \"home_position\"",nJoints);
@@ -313,6 +314,22 @@ bool WamDriver::Init(const char *joint_cal_file)
     ROS_WARN("Warning: OWD configured for only %d joints; extra values in parameter \"home_position\" ignored",nJoints);
   }
   
+  std::vector<double> elements;
+  std::stringstream ss2(gravity_vector);
+  while (std::getline(ss2,item,',')) {
+    // The "up" direction that we maintain is the opposite of the
+    // gravity direction that the user specifies
+    elements.push_back(- strtod(item.c_str(),NULL));
+  }
+  if (elements.size() != 3) {
+    ROS_ERROR("Could not parse value of ROS parameter \"gravity_vector\" into three components; ignoring");
+  } else {
+    Dynamics::up = R3(elements[0],elements[1],elements[2]);
+    if (Dynamics::up.norm() != 1.0) {
+      Dynamics::up.normalize();
+    }
+  }
+
   // Read our motor offsets from file (if found) and apply them
   // to the encoder values
   if (bus->simulation) {

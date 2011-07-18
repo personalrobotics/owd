@@ -119,6 +119,13 @@ roslaunch.  The following parameters are supported:
    in the current directory at the end of the run, where %% is the
    canbus_number.  Defaults to \e false.
 
+ - \b ~/gravity_vector The vector describing the direction that gravity
+   is acting on the arm, expressed as a string of three comma-separated
+   floating-point numbers in the wam0 frame.  Default is "-1,0,0", which
+   is the configuration used on Herb and the Darpa ARM-S arms, with the
+   base mounted vertically so the cables exit down.  For a WAM arm
+   mounted horizontally on a tabletop, use "0,0,-1".
+
 \section running Running
 
 At this time %OWD should be launched on the same machine it will run

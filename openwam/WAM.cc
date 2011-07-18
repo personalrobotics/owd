@@ -198,17 +198,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 	    Inertia(   0.00003911,    0.00000019,      0.0000,
 		       0.00003877,     0.00000,     0.00007614, M2_MM2) );
 
-#ifdef BH8
-  links[Link::L7] = L7_with_280FT_hand;
-#else // !BH8
-  links[Link::L7] = L7_without_hand;
-#endif // !BH8
-
-  for (int i=Link::L1; i<=Link::Ln; ++i) {
-    sim_links[i] = links[i];
-  }
-
-  for (unsigned int i=0; i<7; ++i) {
+  for (unsigned int i=0; i<Joint::Jn; ++i) {
     safetytorquecount[i]=safetytorquesum[i]=0;
     pid_torq[i+1]=dyn_torq[i+1]=sim_torq[i+1]=traj_torq[i+1]=0;
   }
@@ -243,6 +233,14 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   for (int l=Link::L1; l<=Link::Ln; ++l) {
     original_links[l] = links[l];
   }
+
+  // set up the sim_links for comparing our experimental dynamic
+  // simulation improvement
+  for (int i=Link::L1; i<=Link::Ln; ++i) {
+    sim_links[i] = links[i];
+  }
+
+
 }
 
 int WAM::init(){

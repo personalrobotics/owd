@@ -409,6 +409,10 @@ int CANbus::check(){
   }
 
   for (int nodeid=1; nodeid <=14; ++nodeid) {
+    if ((nodeid > n_arm_pucks) && (nodeid < 8)) {
+      // if 4 dof arm, skip to puck 8 after when done enumerating the 4 arm pucks
+      nodeid = 8;
+    }
     if ((nodeid ==8) && !forcetorque_data) {
       nodeid=11; // skip to the hand
     }

@@ -33,6 +33,10 @@
 
 #include "Kinematics.hh"
 
+namespace Dynamics {
+  extern R3 up; // direction of gravity vector
+}
+
 #ifndef __DYNAMICS_HH__
 #define __DYNAMICS_HH__
 
