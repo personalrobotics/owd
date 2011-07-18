@@ -685,8 +685,13 @@ void control_loop_rt(void* argv){
 	}
 
 #ifndef BH280_ONLY
-	if (!torques_sent && ((wam->bus->received_position_flags & 0xFE) == 0xFE)) {
-	  // we've received the 7 arm joint values, so compute and
+#ifdef WRIST
+	int8_t all_pucks = 0xFE;
+#else // !WRIST
+	int8_t all_pucks = 0x1E;
+#endif // WRIST
+	if (!torques_sent && ((wam->bus->received_position_flags & 0xFE) == all_pucks)) {
+	  // we've received all of the arm joint values, so compute and
 	  // send out the torques
 
 	  control_start_time = ControlLoop::get_time_ns_rt();
