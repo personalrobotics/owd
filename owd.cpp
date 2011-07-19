@@ -185,8 +185,10 @@ int main(int argc, char** argv)
   ROS_DEBUG("Spinning");
   ros::spin(s);
   ROS_DEBUG("Done spinning; exiting");
+#ifndef OWDSIM
   while (wamdriver->owam->bus) {
     usleep(10000);
   }
+#endif
   return(0);
 }

@@ -686,9 +686,9 @@ void control_loop_rt(void* argv){
 
 #ifndef BH280_ONLY
 #ifdef WRIST
-	int8_t all_pucks = 0xFE;
+	int all_pucks = 0xFE;
 #else // !WRIST
-	int8_t all_pucks = 0x1E;
+	int all_pucks = 0x1E;
 #endif // WRIST
 	if (!torques_sent && ((wam->bus->received_position_flags & 0xFE) == all_pucks)) {
 	  // we've received all of the arm joint values, so compute and
