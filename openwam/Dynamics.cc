@@ -173,11 +173,7 @@ void CCG(double ccg[Link::Ln+1], Link links[Link::Ln+1],double qd[Link::Ln+1]){
 
     //n = A*(n + (ps)^f_ip1) + (ps+s)^F[i] + N[i]; //from Luh, Walker, Paul '80 eq 44 (doesn't work)
     A = !((SO3)links[i]);
-    if (i<=7) {
-        ccg[i] = n*(A*Dynamics::z0);
-    } else {
-        ccg[i]=0.0;
-    }
+    ccg[i] = n*(A*Dynamics::z0);
   }
 }
 
@@ -501,7 +497,7 @@ void JSdynamics(double trq[Link::Ln+1],
   if(0.0 < ssq){
     char UPLO = 'L';
     int N = Joint::Jn;
-    int LDA = 7;
+    int LDA = Joint::Jn;
     int INC = 1;
     double ALPHA = 1.0;
     double BETA = 0.0;

@@ -21,6 +21,7 @@
  ***********************************************************************/
 
 #include "StepTraj.hh"
+#include "Joint.hh"
 
 namespace OWD {
 
@@ -32,8 +33,10 @@ StepTraj::StepTraj(int trajid, int dof, unsigned int joint,
   id=trajid;
   start_position.SetFromArray(nDOF,start_pos);
   end_position = start_position;
-  if ((joint<1) || (joint>7)) {
-    throw "Joint must be between 1 and 7";
+  if ((joint<1) || (joint>Joint::Jn)) {
+    char msg[200];
+    snprintf(msg,200,"Joint must be between 1 and %d",Joint::Jn);
+    throw((const char *)msg);
   }
   end_position[joint-1] += step_size;
 }

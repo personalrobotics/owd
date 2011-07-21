@@ -931,7 +931,7 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
   }
 
   // convert the result
-  if ((nodeid >= 1) && (nodeid <=7)) {
+  if ((nodeid >= 1) && (nodeid <=n_arm_pucks)) {
     pos[ pucks[nodeid].motor() ] = 2.0*M_PI*( (double) value )/ 
       ( (double) pucks[nodeid].CPR() );
     if (msglen==6) {
