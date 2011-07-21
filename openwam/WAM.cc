@@ -745,7 +745,7 @@ void control_loop_rt(void* argv){
       static int total_missed_data_cycles=0;
 #ifndef BH280_ONLY
       if (! torques_sent) {
-	// we must have not received all 7 joint values before the
+	// we must have not received all the joint values before the
 	// time expired
 	++total_missed_data_cycles;
 	if (++missing_data_cycles == 50) {
@@ -1171,7 +1171,7 @@ void WAM::newcontrol_rt(double dt){
     stats.trajtime = trajtime/1000.0;
     stats.jsctrltime=jscontroltime/1000.0;
     stats.safetycount=safety_torque_count;
-    for (unsigned int i=0; i<7; ++i) {
+    for (unsigned int i=0; i<Joint::Jn; ++i) {
       stats.hitorquecount[i]=safetytorquecount[i];
       stats.hitorqueavg[i]=safetytorquesum[i] / safetytorquecount[i];
       safetytorquesum[i]=safetytorquecount[i]=0;
@@ -1538,7 +1538,7 @@ void WAMstats::rosprint(int recorder_count) const {
   if (safetycount > 0) {
     ROS_DEBUG_NAMED("times",
 		    "Safety torque exception counts and averages:\n");
-    for (unsigned int i=0; i<7; ++i) {
+    for (unsigned int i=0; i<Joint::Jn; ++i) {
       if (hitorquecount[i]>0) {
 	ROS_DEBUG_NAMED("times",
 			"J%d: %4d %2.2f", i+1, hitorquecount[i],
