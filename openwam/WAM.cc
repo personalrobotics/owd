@@ -43,7 +43,8 @@ extern int MODE;  // puck parameter
 
 WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 	 bool log_ctrl_data, bool log_cb_data) :
-  check_safety_torques(true),tc(Joint::Jn),rec(false),wsdyn(false),
+  check_safety_torques(true),stall_sensitivity(1.0),
+  tc(Joint::Jn), rec(false),wsdyn(false),
   jsdyn(false), holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
   pid_count(0),safety_hold(false),
   log_controller_data(log_ctrl_data), 
@@ -1243,16 +1244,10 @@ bool WAM::safety_torques_exceeded(double t[]) {
   //static double safety_torqs[8]={0.0,50.0,75.0,75.0,60.0,15.0,15.0,15.0};
   bool bExceeded = false;
   if (!check_safety_torques) {
-    return bExceeded;
+    return false;
   }
   for (int i = 1; i <= Joint::Jn; i++) {
-    if (stiffness * fabs(t[i])>safety_torqs[i]) {
-      //          ROS_WARN("SAFETY TORQUE EXCEEDED: J%d, %2.2f>%2.2f\n",
-      //                                   i,fabs(t[i]),safety_torqs[i]);
-      // set s.t. it will not exceed
-      if (stiffness != 0.0) {
-	//t[i] = safety_torqs[i]/stiffness *  t[i]/fabs(t[i]);
-      }
+    if (stiffness * stall_sensitivity * fabs(t[i])>safety_torqs[i]) {
       bExceeded = true;
       safetytorquecount[i-1]++;
       safetytorquesum[i-1] += fabs(t[i]);

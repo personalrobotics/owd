@@ -38,6 +38,7 @@
 #include <pr_msgs/SetJointStiffness.h>
 #include <pr_msgs/SetSpeed.h>
 #include <pr_msgs/SetExtraMass.h>
+#include <pr_msgs/SetStallSensitivity.h>
 #include <pr_msgs/WAMState.h>
 #include <pr_msgs/WAMInternals.h>
 #include <pr_msgs/GetDOF.h>
@@ -110,6 +111,8 @@ public:
                   pr_msgs::SetSpeed::Response &res);
     bool SetExtraMass(pr_msgs::SetExtraMass::Request &req,
 		      pr_msgs::SetExtraMass::Response &res);
+    bool SetStallSensitivity(pr_msgs::SetStallSensitivity::Request &req,
+			     pr_msgs::SetStallSensitivity::Response &res);
     bool GetDOF(pr_msgs::GetDOF::Request &req,
                 pr_msgs::GetDOF::Response &res);
     bool CalibrateJoints(owd::CalibrateJoints::Request &req,
@@ -250,6 +253,7 @@ private:
       ss_ReplaceTrajectory,
       ss_SetSpeed,
       ss_SetExtraMass,
+      ss_SetStallSensitivity,
       ss_GetArmDOF,
       ss_CalibrateJoints,
       ss_StepJoint,

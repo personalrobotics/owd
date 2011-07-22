@@ -132,6 +132,7 @@ public:
   double heldPositions[Joint::Jn+1];
   bool suppress_controller[Joint::Jn+1];    // flag to disable PID control
   bool check_safety_torques;
+  double stall_sensitivity;
   double pid_torq[Joint::Jn+1];
   double sim_torq[Joint::Jn+1];
   double dyn_torq[Joint::Jn+1];
