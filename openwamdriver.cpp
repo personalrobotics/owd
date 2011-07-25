@@ -285,7 +285,7 @@ bool WamDriver::Init(const char *joint_cal_file)
   int32_t WamWasZeroed=1;
 #endif // BH280_ONLY
   
-  owam = new WAM(bus, BH_model, ForceTorque, Tactile);
+  owam = new WAM(bus, BH_model, ForceTorque, Tactile, log_controller_data);
   if (owam->init() == OW_FAILURE) {
     ROS_FATAL("Failed to initialize WAM instance");
     return false;

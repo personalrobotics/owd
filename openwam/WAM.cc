@@ -42,7 +42,7 @@ extern int MODE;  // puck parameter
  */
 
 WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
-	 bool log_ctrl_data, bool log_cb_data) :
+	 bool log_ctrl_data) :
   check_safety_torques(true),stall_sensitivity(1.0),
   tc(Joint::Jn), rec(false),wsdyn(false),
   jsdyn(false), holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 

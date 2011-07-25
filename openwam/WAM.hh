@@ -186,7 +186,7 @@ public:
   OWD::ControlLoop ctrl_loop;            // control loop object
 
   WAM(CANbus* cb, int BH_model, bool forcetorque, bool tactile,
-      bool log_ctrl_data=false, bool log_cb_data=false);
+      bool log_ctrl_data=false);
   ~WAM();
  
   int init();                       // initialise the WAM
