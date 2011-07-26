@@ -323,9 +323,12 @@ DataRecorder<canio_data> candata;
   int32_t hand_positions[4+1];
   int32_t last_hand_positions[4+1];
   int encoder_changed[4];
-  int32_t hand_distal_positions[4+1];
+  int32_t hand_secondary_positions[4+1];
   int32_t hand_goal_positions[4+1];
+  double hand_inner_links[3+1];
+  double hand_outer_links[3+1];
   double hand_strain[4+1];
+  bool hand_breakaway[3+1];
 private:
 #ifdef OWD_RT
   RT_MUTEX hand_queue_mutex;
@@ -343,7 +346,7 @@ public:
   int32_t finger_radians_to_encoder(double radians);
   double spread_encoder_to_radians(int32_t enc);
   int32_t spread_radians_to_encoder(double radians);
-  double finger_innerlink_encoder_to_radians(int32_t enc);
+  void update_link_positions(unsigned int finger);
   int hand_get_property(int32_t id, int32_t prop, int32_t *val);
   int hand_set_property(int32_t id, int32_t prop, int32_t val);
   int hand_set_state_rt();
@@ -354,7 +357,9 @@ public:
   int hand_torque(const std::vector<double> &t);
   int hand_relax();
   int hand_get_positions(double &p1, double &p2, double &p3, double &p4);
-  int hand_get_distal_positions(double &p1, double &p2, double &p3);
+  int hand_get_inner_links(double &l1, double &l2, double &l3);
+  int hand_get_outer_links(double &l1, double &l2, double &l3);
+  int hand_get_breakaway(bool &b1, bool &b2, bool &b3);
   int hand_get_strain(double &s1, double &s2, double &s3);
   int hand_get_state(int32_t *state);
   int hand_set_speed(const std::vector<double> &v);

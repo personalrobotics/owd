@@ -63,7 +63,9 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   }
   hand_positions[1]=hand_positions[2]=hand_positions[3]=hand_positions[4]=0;
   last_hand_positions[1]=last_hand_positions[2]=last_hand_positions[3]=last_hand_positions[4]=0;
-  hand_distal_positions[1]=hand_distal_positions[2]=hand_distal_positions[3]=hand_distal_positions[4]=0;
+  hand_secondary_positions[1]=hand_secondary_positions[2]=hand_secondary_positions[3]=hand_secondary_positions[4]=0;
+  hand_inner_links[1]=hand_inner_links[2]=hand_inner_links[3]=0;
+  hand_outer_links[1]=hand_outer_links[2]=hand_outer_links[3]=0;
   encoder_changed[0]=encoder_changed[1]=encoder_changed[2]=encoder_changed[3] = 0;
   apply_squeeze[0]=apply_squeeze[1]=apply_squeeze[2]=apply_squeeze[3] = false;
   finger_hi_pending[0]=finger_hi_pending[1]=finger_hi_pending[2]=finger_hi_pending[3] = false;
@@ -73,6 +75,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   // outside of OWD, so even though we have a four position in the array it
   // is not necessary to initialize it.
   hand_strain[1]=hand_strain[2]=hand_strain[3]=0.0f;
+  hand_breakaway[1]=hand_breakaway[2]=hand_breakaway[3]=false;
 
 #ifdef OWD_RT
   int err = rt_pipe_create(&handpipe,"HANDPIPE",P_MINOR_AUTO,0);
@@ -952,8 +955,21 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
     }
     last_hand_positions[nodeid-10] = value;
     if (msglen==6) {
-      // this puck also sent a value for the distal joint
-      hand_distal_positions[nodeid-10] = value2;
+      // this puck also sent a value for the secondary encoder
+      hand_secondary_positions[nodeid-10] = value2;
+
+      update_link_positions(nodeid-10);
+
+      // If the finger has not gone into breakaway, then the outer link angle
+      // should always be approx. 1/3 of the inner link angle.  If it
+      // strays from this ratio by more than 9,500 (5% of full range) we
+      // mark the finger as being in breakaway
+      if (nodeid < 14) { // no breakaway for spread joint
+	if ((hand_positions[nodeid-10]
+	     - 2.5*hand_secondary_positions[nodeid-10]) > 9500) {
+	  hand_breakaway[nodeid-10] = true;
+	}
+      }
     }
   }
 
@@ -1975,6 +1991,9 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 	// we had been waiting for the finger to finish its HI
 	finger_hi_pending[nodeid-11]=false;
 	handstate[nodeid-11] = HANDSTATE_DONE;
+	if (nodeid != 14) {
+	  hand_breakaway[nodeid-10] = false;
+	}
 	break;
       }
       if (nodeid == 14) {
@@ -1982,15 +2001,16 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 	break;
       }
       if (labs(hand_positions[nodeid-10] - hand_goal_positions[nodeid-10]) > 600) {
-	// we are still far from our goal
-	if (hand_goal_positions[nodeid-10] == 0) {
-	  // If the original goal was zero (completely open), then we
-	  // need to repeat the command with the same torque setting so
-	  // that the breakaway torque is properly set
-	  if (hand_set_property(nodeid,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
-	    return OW_FAILURE;
+	if (apply_squeeze[nodeid-11]) {
+	  apply_squeeze[nodeid-11]=false;
+
+	  if (hand_breakaway[nodeid-10]) {
+	    // don't apply the squeeze if we're in breakaway, because it
+	    // just causes the distal link to press against its stop if
+	    // we're closing, or can cause repeated failures if opening.
+	    return OW_SUCCESS;
 	  }
-	} else if (apply_squeeze[nodeid-11]) {
+
 	  // Reapply the command with no torque
 	  // stopping and with a torque limit low enough that it can keep
 	  // applying the force indefinitely without overheating.
@@ -2005,7 +2025,6 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
 	  if (hand_set_property(nodeid,MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
 	    return OW_FAILURE;
 	  }
-	  apply_squeeze[nodeid-11]=false;
 	} else {
 	  handstate[nodeid-11] = HANDSTATE_DONE;
 	}
@@ -2593,10 +2612,38 @@ int CANbus::hand_get_positions(double &p1, double &p2, double &p3, double &p4) {
   return OW_SUCCESS;
 }
  
-int CANbus::hand_get_distal_positions(double &p1, double &p2, double &p3) {
-  p1 = finger_innerlink_encoder_to_radians(hand_distal_positions[1]);
-  p2 = finger_innerlink_encoder_to_radians(hand_distal_positions[2]);
-  p3 = finger_innerlink_encoder_to_radians(hand_distal_positions[3]);
+int CANbus::hand_get_inner_links(double &l1, double &l2, double &l3) {
+  /***************************
+    RAW ENCODER VALUES (for debugging)
+  l1 = hand_secondary_positions[1];
+  l2 = hand_secondary_positions[2];
+  l3 = hand_secondary_positions[3];
+  ******************************/
+
+  l1 = hand_inner_links[1];
+  l2 = hand_inner_links[2];
+  l3 = hand_inner_links[3];
+  return OW_SUCCESS;
+}
+
+int CANbus::hand_get_outer_links(double &l1, double &l2, double &l3) {
+  /**************************
+    RAW ENCODER VALUES (for debugging)
+  l1 = hand_positions[1];
+  l2 = hand_positions[2];
+  l3 = hand_positions[3];
+  ***************************/
+
+  l1 = hand_outer_links[1];
+  l2 = hand_outer_links[2];
+  l3 = hand_outer_links[3];
+  return OW_SUCCESS;
+}
+
+int CANbus::hand_get_breakaway(bool &b1, bool &b2, bool &b3) {
+  b1 = hand_breakaway[1];
+  b2 = hand_breakaway[2];
+  b3 = hand_breakaway[3];
   return OW_SUCCESS;
 }
 
@@ -2618,17 +2665,9 @@ int CANbus::hand_get_state(int32_t *state) {
 }
 
 double CANbus::finger_encoder_to_radians(int32_t enc) {
-  // encoder range: 0 to -199,111.1
+  // encoder range: 0 to 199,111.1
   // degree range: 0 to 140
   return  ((double)enc / 199111.1) * 140.0 * 3.1416/180.0;
-}
-
-double CANbus::finger_innerlink_encoder_to_radians(int32_t enc) {
-  // encoder range: 0 to 4096
-  // degree range: 360
-
-  //  return ((double)enc / 4096) * 3.1416 * 2.0;
-  return (double) enc;  // for debugging, send the raw encoder val
 }
 
 int32_t CANbus::finger_radians_to_encoder(double radians) {
@@ -2636,13 +2675,31 @@ int32_t CANbus::finger_radians_to_encoder(double radians) {
 }
 
 double CANbus::spread_encoder_to_radians(int32_t enc) {
-  // encoder range: 0 to -35950
+  // encoder range: 0 to 35840
   // degree range: 0 to 180
-  return ((double)enc / 35950.0) * 180.0 * 3.1416/180.0;
+  return ((double)enc / 35840.0) * 180.0 * 3.1416/180.0;
 }
 
 int32_t CANbus::spread_radians_to_encoder(double radians) {
   return(radians * 180.0/3.1416 / 180.0 * 35950.0);
+}
+
+
+void CANbus::update_link_positions(unsigned int f) {
+  // INNER LINK
+  // encoder range: 0 to 199,111.1
+  // degree range: 0 to 140
+  // need a mysterious 2.5 factor
+  hand_inner_links[f] = (double)hand_secondary_positions[f] / 199111.1 * 140.0 * 3.1416/180.0 * 2.50;
+
+  // OUTER LINK
+  // Use formula from Barrett documentation that calculates link angle
+  // relative to the palm plane, then subtract out the inner link angle to
+  // get the angle of the outer link relative to the inner link
+  const double outer_offset = 42.0 * 3.1416 / 180.0; // 42-degrees
+  hand_outer_links[f] = (double)hand_positions[f] / (4096.0*375/4) * 360.0 * 3.1416 / 180.0 + outer_offset - hand_inner_links[f];
+
+  return;
 }
 
 void CANstats::rosprint() {

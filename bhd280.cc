@@ -20,6 +20,12 @@
 
  ***********************************************************************/
 
+// TODO:
+//   add get_inner_links and get_outer_links to CANbus
+//   check for breakaway in CANbus and set flag
+//   clear breakaway flag when going to zero or resetting finger
+
+
 #include "bhd280.hh"
 
 BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
@@ -29,7 +35,9 @@ BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   bhstate.state = pr_msgs::BHState::state_done;
   bhstate.temperature=0.0f;
   bhstate.positions.resize(4, 0.0f);
-  bhstate.secondary_positions.resize(3, 0.0f);
+  bhstate.inner_links.resize(3, 0.0f);
+  bhstate.outer_links.resize(3, 0.0f);
+  bhstate.breakaway.resize(3, false);
   bhstate.strain.resize(3, 0.0f);
   bhstate.internal_state.resize(4);
   bhstate.puck_mode.resize(4);
@@ -122,9 +130,17 @@ bool BHD_280::Publish() {
 		       bhstate.strain[1],
 		       bhstate.strain[2]);
 
-  bus->hand_get_distal_positions(bhstate.secondary_positions[0],
-				 bhstate.secondary_positions[1],
-				 bhstate.secondary_positions[2]);
+  bus->hand_get_inner_links(bhstate.inner_links[0],
+			    bhstate.inner_links[1],
+			    bhstate.inner_links[2]);
+
+  bus->hand_get_outer_links(bhstate.outer_links[0],
+			    bhstate.outer_links[1],
+			    bhstate.outer_links[2]);
+
+  bus->hand_get_breakaway((bool&)bhstate.breakaway[0],
+			  (bool&)bhstate.breakaway[1],
+			  (bool&)bhstate.breakaway[2]);
 
   bus->hand_get_state(state);
   // combine all the individual states into one
@@ -132,8 +148,6 @@ bool BHD_280::Publish() {
   // MOVING has priority over STALLED
   // STALLED has priority over DONE
 
-  // set the default case
-  bhstate.state=pr_msgs::BHState::state_done;
 
 
   // the internal_state field will eventually become the regular
@@ -153,6 +167,8 @@ bool BHD_280::Publish() {
     bhstate.puck_mode[i] = bus->hand_puck_mode[i];
   }
 
+  // set the default case
+  bhstate.state=pr_msgs::BHState::state_done;
   for (unsigned int i=0; i<4; ++i) {
     if (state[i] == CANbus::HANDSTATE_UNINIT) {
       bhstate.state = pr_msgs::BHState::state_uninitialized;

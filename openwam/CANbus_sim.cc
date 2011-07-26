@@ -226,14 +226,6 @@ double CANbus::finger_encoder_to_radians(int32_t enc) {
   return  ((double)enc / 199111.1) * 140.0 * 3.1416/180.0;
 }
 
-double CANbus::finger_innerlink_encoder_to_radians(int32_t enc) {
-  // encoder range: 0 to 4096
-  // degree range: 360
-
-  //  return ((double)enc / 4096) * 3.1416 * 2.0;
-  return (double) enc;  // for debugging, send the raw encoder val
-}
-
 int32_t CANbus::finger_radians_to_encoder(double radians) {
   return(radians * 180.0/3.1416 / 140.0 * 199111.1);
 }
