@@ -64,8 +64,10 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   hand_positions[1]=hand_positions[2]=hand_positions[3]=hand_positions[4]=0;
   last_hand_positions[1]=last_hand_positions[2]=last_hand_positions[3]=last_hand_positions[4]=0;
   hand_secondary_positions[1]=hand_secondary_positions[2]=hand_secondary_positions[3]=hand_secondary_positions[4]=0;
-  hand_inner_links[1]=hand_inner_links[2]=hand_inner_links[3]=0;
-  hand_outer_links[1]=hand_outer_links[2]=hand_outer_links[3]=0;
+  // initialize the inner and outer links to crazy values, so that we
+  // can tell if they've been set
+  hand_inner_links[1]=hand_inner_links[2]=hand_inner_links[3]=-12345;
+  hand_outer_links[1]=hand_outer_links[2]=hand_outer_links[3]=-12345;
   encoder_changed[0]=encoder_changed[1]=encoder_changed[2]=encoder_changed[3] = 0;
   apply_squeeze[0]=apply_squeeze[1]=apply_squeeze[2]=apply_squeeze[3] = false;
   finger_hi_pending[0]=finger_hi_pending[1]=finger_hi_pending[2]=finger_hi_pending[3] = false;
@@ -964,6 +966,9 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
       // should always be approx. 1/3 of the inner link angle.  If it
       // strays from this ratio by more than 9,500 (5% of full range) we
       // mark the finger as being in breakaway
+      // Note that this check only happens if we received the
+      // secondary encoder values.  Some 280 hands still don't have
+      // working inner-link encoders.
       if (nodeid < 14) { // no breakaway for spread joint
 	if ((hand_positions[nodeid-10]
 	     - 2.5*hand_secondary_positions[nodeid-10]) > 9500) {
@@ -2619,7 +2624,12 @@ int CANbus::hand_get_inner_links(double &l1, double &l2, double &l3) {
   l2 = hand_secondary_positions[2];
   l3 = hand_secondary_positions[3];
   ******************************/
-
+  for (int i=0; i<3; ++i) {
+    if (hand_inner_links[i] == -12345) {
+      // we haven't received data from the hand yet
+      return OW_FAILURE;
+    }
+  }
   l1 = hand_inner_links[1];
   l2 = hand_inner_links[2];
   l3 = hand_inner_links[3];
@@ -2634,6 +2644,12 @@ int CANbus::hand_get_outer_links(double &l1, double &l2, double &l3) {
   l3 = hand_positions[3];
   ***************************/
 
+  for (int i=0; i<3; ++i) {
+    if (hand_outer_links[i] == -12345) {
+      // we haven't received data from the hand yet
+      return OW_FAILURE;
+    }
+  }
   l1 = hand_outer_links[1];
   l2 = hand_outer_links[2];
   l3 = hand_outer_links[3];
@@ -2641,6 +2657,14 @@ int CANbus::hand_get_outer_links(double &l1, double &l2, double &l3) {
 }
 
 int CANbus::hand_get_breakaway(bool &b1, bool &b2, bool &b3) {
+  for (int i=0; i<3; ++i) {
+    if ((hand_inner_links[i] == -12345) ||
+	(hand_outer_links[i] == -12345)) {
+      // breakaway detection is only valid if the hand is
+      // sending secondary encoder values
+      return OW_FAILURE;
+    }
+  }
   b1 = hand_breakaway[1];
   b2 = hand_breakaway[2];
   b3 = hand_breakaway[3];

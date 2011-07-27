@@ -35,9 +35,6 @@ BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   bhstate.state = pr_msgs::BHState::state_done;
   bhstate.temperature=0.0f;
   bhstate.positions.resize(4, 0.0f);
-  bhstate.inner_links.resize(3, 0.0f);
-  bhstate.outer_links.resize(3, 0.0f);
-  bhstate.breakaway.resize(3, false);
   bhstate.strain.resize(3, 0.0f);
   bhstate.internal_state.resize(4);
   bhstate.puck_mode.resize(4);
@@ -130,25 +127,34 @@ bool BHD_280::Publish() {
 		       bhstate.strain[1],
 		       bhstate.strain[2]);
 
-  bus->hand_get_inner_links(bhstate.inner_links[0],
-			    bhstate.inner_links[1],
-			    bhstate.inner_links[2]);
+  double l1, l2, l3;
+  if (bus->hand_get_inner_links(l1, l2, l3) == OW_SUCCESS) {
+    bhstate.inner_links.resize(3);
+    bhstate.inner_links[0]=l1;
+    bhstate.inner_links[1]=l2;
+    bhstate.inner_links[2]=l3;
+  }
 
-  bus->hand_get_outer_links(bhstate.outer_links[0],
-			    bhstate.outer_links[1],
-			    bhstate.outer_links[2]);
+  if (bus->hand_get_outer_links(l1,l2,l3) == OW_SUCCESS) {
+    bhstate.outer_links.resize(3);
+    bhstate.outer_links[0]=l1;
+    bhstate.outer_links[1]=l2;
+    bhstate.outer_links[2]=l3;
+  }
 
-  bus->hand_get_breakaway((bool&)bhstate.breakaway[0],
-			  (bool&)bhstate.breakaway[1],
-			  (bool&)bhstate.breakaway[2]);
+  bool b1, b2, b3;
+  if (bus->hand_get_breakaway(b1, b2, b3) == OW_SUCCESS) {
+    bhstate.breakaway.resize(3);
+    bhstate.breakaway[0]=b1;
+    bhstate.breakaway[1]=b2;
+    bhstate.breakaway[2]=b3;
+  }
 
   bus->hand_get_state(state);
   // combine all the individual states into one
   // UNINIT has the highest priority
   // MOVING has priority over STALLED
   // STALLED has priority over DONE
-
-
 
   // the internal_state field will eventually become the regular
   // state field once herbcontroller is updated
