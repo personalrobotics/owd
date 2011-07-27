@@ -46,7 +46,12 @@ for the clients which communicate with them.
    pucks.
 
  - \b /bhd/ResetHand: type: \e pr_msgs/ResetHand.  Send the HI (Hand
-   Initialize) command to each hand puck.
+   Initialize) command to each hand puck, in the sequence 1, 2, 3, 1,
+   2, 3, 1, 2, 3, 4 (allows the hand to fully unfold if fingers are
+   blocking one-another in the worst-case configuration).
+
+ - \b /bhd/ResetFinger: type: \e pr_msgs/ResetFinger.  Send the HI
+   command to a single specified finger (1 through 4).
 
  - \b /bhd/GetProperty: type: \e pr_msgs/GetHandProperty.  Get a bhand
    property.  See CANbus::initPropertyDefs for a list of property
@@ -83,7 +88,53 @@ for the clients which communicate with them.
 
  - \b /bhd/handstate: type: \e pr_msgs/BHState.  Publishes the state
    of the hand at the frequency set by the \b ~/hand_publish_frequency
-   parameter.
-
+   parameter.  Includes the following fields:
+  - float64[] \b positions: The angle of each inner link, in radians,
+       if the finger is \e not in breakaway.  This is the same angle
+       that the motor tries to seek to when commanding positions.
+       Once the finger goes into the breakaway state, the inner link
+       stops moving, and this field no longer directly reflects any
+       physical position.  With the advent of the inner link encoders
+       on the 280 hand, the inner_links and outer_links fields have
+       superceded this field, but it has been kept for backwards
+       compatibility.  Eventually this should be changed to reflect
+       the outer link angle relative to the palm plane, which is
+       always valid even without the inner link encoders, and which
+       could be matched by the position command values.
+  - float64[] \b inner_links: The true angle of each inner link, in
+       radians, relative to the palm plane (range of 0 to 2.44).  This
+       value is accurate at all times (including the breakaway state).
+       The value is reported for the three fingers only if the hand is
+       equipped with inner-link encoders; otherwise this array will be
+       empty.
+  - float64[] \b outer_links: The angle of each outer link, in
+       radians, relative to the inner link (range of 0.73 to 1.57).
+       This value is accurate at all times (including the breakaway
+       state).  The value is reported for the three fingers only if
+       the hand is equipped with inner-link encoders; otherwise this
+       array will be empty.
+  - bool[] \b breakaway: True if the finger is in the breakaway state,
+       detected by watching the ratio of the motor encoder value to
+       the inner link encoder value.  Once the breakaway flag has been
+       set, it remains set until the finger is reset with the
+       ResetHand or ResetFinger service calls.  While this flag is
+       set, OWD will not repeat movement commands that stop short of
+       their goal, since it may be due to the reduced motion limits
+       during breakaway.  If the hand is not equipped with inner link
+       encoders this array will be empty.
+  - float64[] \b strain: The strain gauge readings for each of the
+       three fingers.
+  - float32 \b temperature: Not used.  The BHD node, which controls a
+       model 262 hand, populates this field with the temperature of
+       the controller board.  This needs to be updated for the 280
+       hand to report the temps of each of the pucks and their motors.
+  - uint8 \b state: The motion state of the hand, calculated by
+       aggregating together the states of each of the four motors.
+       Values are in the BHState.msg file.
+  - uint8[] \b internal_state: The individual state of each of the
+       motors.  Eventually this will become the only state field, and
+       the existing state field will be removed.
+  - uint8[] \b puck_mode: The MODE value for each of the pucks.
+       Useful for debugging protocol problems.
 
 */
