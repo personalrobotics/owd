@@ -2705,7 +2705,7 @@ double CANbus::spread_encoder_to_radians(int32_t enc) {
 }
 
 int32_t CANbus::spread_radians_to_encoder(double radians) {
-  return(radians * 180.0/3.1416 / 180.0 * 35950.0);
+  return(radians * 180.0/3.1416 / 180.0 * 35840.0);
 }
 
 
