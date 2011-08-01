@@ -1,6 +1,6 @@
 /***********************************************************************
 
-  Copyright 2009-2010 Carnegie Mellon University and Intel Corporation
+  Copyright 2009-2011 Carnegie Mellon University and Intel Corporation
   Author: Mike Vande Weghe <vandeweg@cmu.edu>
 
   This file is part of owd.
@@ -25,7 +25,7 @@
 #include <pr_msgs/WAMState.h>
 #include <pr_msgs/SetStiffness.h>
 #include <pr_msgs/AddTrajectory.h>
-// #include <pr_msgs/CancelTrajectory.h>
+#include <pr_msgs/Reset.h>
 #include <pr_msgs/DeleteTrajectory.h>
 #include <pr_msgs/JointTraj.h>
 #include <pr_msgs/Joints.h>
@@ -85,7 +85,8 @@ public:
     p1.j[4]=0.0;         p2.j[4]=0;
     p1.j[5]=0.4;         p2.j[5]=-1;
     p1.j[6]=0.0;         p2.j[6]=PI/2;
-*/
+
+    // thrusting test 
     p1.j[0]=4.76;      p2.j[0]=4.76;
     p1.j[1]=-1.93;        p2.j[1]=-1.16;
     p1.j[2]=0;           p2.j[2]=0;
@@ -93,7 +94,15 @@ public:
     p1.j[4]=1.25;         p2.j[4]=1.25;
     p1.j[5]=0.0;         p2.j[5]=0.0;
     p1.j[6]=0;         p2.j[6]=0;
-    
+*/
+    // take_at_tm test
+    p1.j[0]=3.77067;    p2.j[0]=3.79652;
+    p1.j[1]=-1.33427;	p2.j[1]=-0.977628;
+    p1.j[2]=0.0402953;	p2.j[2]=-0.0195862;
+    p1.j[3]=2.20108;	p2.j[3]=  1.4166;
+    p1.j[4]=-2.94934;	p2.j[4]=-2.94048;
+    p1.j[5]=0.95913;	p2.j[5]= 0.531323;
+    p1.j[6]=0.814286;	p2.j[6]= 0.750784;
   }
 
   void Subscribe() {
@@ -172,6 +181,18 @@ public:
     traj_req.traj.blend_radius.push_back(0.0);
     
     if (StopOnForce) {
+      // tare the force sensor
+      pr_msgs::Reset::Request tare_req;
+      pr_msgs::Reset::Response tare_res;
+      if (ros::service::call("owd/ft_tare",tare_req, tare_res)) {
+	if (tare_res.ok) {
+	  ROS_DEBUG("Tared force sensor");
+	} else {
+	  ROS_WARN("Unable to tare force sensor");
+	}
+      } else {
+	ROS_ERROR("Unable to call ft_tare service");
+      }
       traj_req.traj.options = traj_req.traj.opt_CancelOnForceInput;
     }
     if (ros::service::call("owd/AddTrajectory",traj_req,traj_res)) {

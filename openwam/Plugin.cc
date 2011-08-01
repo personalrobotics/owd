@@ -140,6 +140,7 @@ namespace OWD {
   std::vector<float> Plugin::_tactile_f3;
   std::vector<float> Plugin::_tactile_palm;
   SE3 Plugin::_endpoint;
+  double Plugin::gravity;
   std::vector<Plugin *> Plugin::children;
 
   const std::vector<double> &Plugin::arm_position=Plugin::_arm_position;

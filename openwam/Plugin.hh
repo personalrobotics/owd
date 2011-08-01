@@ -244,6 +244,14 @@ namespace OWD {
     /// \brief The pose of the WAM end effector (link 7 origin)
     static const SE3 &endpoint;
 
+    /// \brief The acceleration due to gravity, in m/s^2.
+    ///
+    /// The gravitational force will be multiplied by each of the
+    /// link masses to compute the gravity-compensation torque to
+    /// be sent to each joint.  Default is 9.81; gravity compensation
+    /// can be disabled by setting it to zero.
+    static double gravity;
+
   private:
     friend class ::WAM;
     friend class WamDriver;

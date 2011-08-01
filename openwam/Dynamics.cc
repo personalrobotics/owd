@@ -25,6 +25,7 @@
 
 #include <sys/time.h>
 #include "Dynamics.hh"
+#include "Plugin.hh"
 
 extern "C" {
   void dpotrf_(char *uplo, int *n, double *a, int *lda, int *info);
@@ -41,7 +42,6 @@ extern "C" {
 }
 
 namespace Dynamics {
-   double g = 9.81;
    R3 z0(0,0,1);
    R3 up(0,0,1);
 }
@@ -63,7 +63,7 @@ void RNE(double tau[Link::Ln+1],
   R3 w, wd, v, vd, vdhat;
   R3 n, f, N[Link::Ln+1], F[Link::Ln+1];
 
-  vd = Dynamics::g*Dynamics::up;
+  vd = OWD::Plugin::gravity*Dynamics::up;
 
   for(int i=Link::L1; i<=Link::Ln; i++){
 
@@ -128,7 +128,7 @@ void CCG(double ccg[Link::Ln+1], Link links[Link::Ln+1],double qd[Link::Ln+1]){
     R3 N[Link::Ln+1]; //torques applied to links (forward recursing)
     R3 F[Link::Ln+1]; //forces applied to links (forward recursing)
   
-    vd = Dynamics::g*Dynamics::up; //acceleration from gravity
+    vd = OWD::Plugin::gravity*Dynamics::up; //acceleration from gravity
 
   //forward recursive computation for kinematic variables
   for(int i=Link::L1; i<=Link::Ln; i++){

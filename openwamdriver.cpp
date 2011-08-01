@@ -65,9 +65,6 @@
 extern int MECH,AP,ZERO,IFAULT;
 extern int ADDR, VALUE, MODE;
 extern int dyn_active_link;
-namespace Dynamics {
-extern double g;
-}
 
 extern double fv[8];  // viscous friction from Dynamics.cc
 extern double fs[8];  // static friction from Dynamics.cc
@@ -340,7 +337,7 @@ bool WamDriver::Init(const char *joint_cal_file)
     }
 
     start_control_loop();
-    Dynamics::g=9.81; // turn on Gravity
+    Plugin::gravity=9.81; // turn on Gravity
     owam->jsdynamics() = true; // turn on feed-forward dynamics
 
   } else if (WamWasZeroed) {
@@ -348,7 +345,7 @@ bool WamDriver::Init(const char *joint_cal_file)
     ROS_DEBUG("Wam was already zeroed from a previous run; motor offsets unchanged.");
 #endif // BH280_ONLY
     start_control_loop();
-    Dynamics::g=9.81; // turn on Gravity
+    Plugin::gravity=9.81; // turn on Gravity
     owam->jsdynamics() = true; // turn on feed-forward dynamics
     
   } else {
@@ -361,7 +358,7 @@ bool WamDriver::Init(const char *joint_cal_file)
     do {
       set_home_position();
       start_control_loop();
-      Dynamics::g=0.0; // turn off Gravity
+      Plugin::gravity=0.0; // turn off Gravity
       owam->jsdynamics() = true; // turn on feed-forward dynamics
       
       ROS_INFO("Robot will make small movements to verify home position, and");
@@ -377,7 +374,7 @@ bool WamDriver::Init(const char *joint_cal_file)
         stop_control_loop();
       }
     } while (!good_home);
-    Dynamics::g=9.81; // turn on Gravity
+    Plugin::gravity=9.81; // turn on Gravity
   }
 
   bool hold_starting_position;
