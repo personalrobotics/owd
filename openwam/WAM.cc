@@ -61,6 +61,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 
   se3traj = NULL;
   jointstraj = NULL;
+  last_traj_state=Trajectory::DONE;
   pulsetraj = NULL;
   for(int i = Joint::J1; i<=Joint::Jn; i++) {
     heldPositions[i] = 0;
@@ -1018,6 +1019,7 @@ void WAM::newcontrol_rt(double dt){
 	tc.qd[j] *= timestep_factor;
 	tc.qdd[j] *= timestep_factor * timestep_factor;
       }
+      last_traj_state = jointstraj->state();
       if(jointstraj->state() == OWD::Trajectory::DONE){
 	// we've gone past the last time in the trajectory,
 	// so set up to hold at the final position.  we'll let

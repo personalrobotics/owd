@@ -2247,11 +2247,11 @@ void WamDriver::MassProperties_callback(const boost::shared_ptr<const pr_msgs::M
 void WamDriver::Pump(const ros::TimerEvent& e) {
     // Perform periodic tasks
 
-    // publish our state info
-    this->Publish();
-
     // let the driver update
     this->Update();
+
+    // publish our state info
+    this->Publish();
 }
 
 void WamDriver::Update() {
@@ -2280,7 +2280,11 @@ void WamDriver::Update() {
   
   if (wamstate.trajectory_queue.size() > 0) {
     wamstate.prev_trajectory = wamstate.trajectory_queue.front();
-    wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_done;
+    if (owam->last_traj_state == Trajectory::DONE) {
+      wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_done;
+    } else if (owam->last_traj_state == Trajectory::ABORT) {
+      wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_aborted;
+    }
     wamstate.trajectory_queue.erase(wamstate.trajectory_queue.begin());
   }
 
