@@ -140,29 +140,29 @@ WSTraj::~WSTraj() {
 void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
  
   if (driving_force.norm() > 0) {
-
     // increment our time by dt. 
+    time += dt;
+    if (time > parseg.end_time) {
+      time = parseg.end_time;
+      runstate = DONE;
+    }
 
     // map our current position to the closest point
     // on the trajectory.  this does not move us forward or
     // backward in time.
 
-    // calculate our endpoint correction
+    // calculate our endpoint correction to keep us on course
 
     // calculate the nullspace joint correction
+
+    // figure out if we are ahead of or behind where we are supposed
+    // to be, and adjust our force scale accordingly.  if we are behind,
+    // decrement time back to the actual position so that we don't move
+    // the setpoint too far ahead.
 
     // look up the "feedforward" amount of force we should be
     // applying based on the trajectory position.  this will give
     // us a soft start at the beginning and a soft stop at the end
-
-    // correct our velocity by computing a "feedback" force term.
-    // this will reduce the overall force if the velocity is too high,
-    // but will never increase the force over the force limit.
-
-    // our position in the reference trajectory at the current time
-    // is the farthest we should be at this point.  it's ok if we aren't
-    // as far along yet, since we're letting the force working against
-    // the environment dictate how fast we move
 
     // return the new joint positions and the feedforward force
 
