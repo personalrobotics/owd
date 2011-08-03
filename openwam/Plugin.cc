@@ -125,6 +125,20 @@ namespace OWD {
     return jp;
   }
 
+  TrajType Plugin::ros2owd_traj (pr_msgs::JointTraj &jt) {
+    TrajType traj;
+    if (jt.positions.size() != jt.blend_radius.size()) {
+      throw "Bad ROS trajectory: mismatched number of points";
+    }
+    ROS_DEBUG_NAMED("trajectory","Converting trajectory of %zd points",jt.positions.size());
+    for (unsigned int i=0; i<jt.positions.size(); ++i) {
+      JointPos jp = jt.positions[i].j;
+      TrajPoint tp(jp,jt.blend_radius[i]);
+      traj.push_back(tp);
+    }
+    return traj;
+  }
+
   std::vector<double> Plugin::_arm_position;
   std::vector<double> Plugin::_target_arm_position;
   std::vector<double> Plugin::_pid_torque;

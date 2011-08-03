@@ -588,8 +588,7 @@ WamDriver::~WamDriver() {
   running=false;
 }
 
-
-  OWD::Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
+OWD::Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
 
   // check to see if we should use a MacJointTraj based on whether
   // any of the corners have non-zero blend radii
@@ -603,7 +602,7 @@ WamDriver::~WamDriver() {
   
   TrajType traj;
   try {
-    traj=ros2owd_traj(jt);
+    traj=Plugin::ros2owd_traj(jt);
   } catch (const char *error) {
     snprintf(last_trajectory_error,200,"Could not extract valid trajectory: %s",error);
     ROS_ERROR_NAMED("BuildTrajectory","%s",last_trajectory_error);
@@ -663,22 +662,6 @@ WamDriver::~WamDriver() {
   }
 }
 
-TrajType WamDriver::ros2owd_traj (pr_msgs::JointTraj &jt) {
-  TrajType traj;
-  if (jt.positions.size() != jt.blend_radius.size()) {
-    throw "Bad ROS trajectory: mismatched number of points";
-  }
-  ROS_DEBUG_NAMED("trajectory","Converting trajectory of %zd points",jt.positions.size());
-  for (unsigned int i=0; i<jt.positions.size(); ++i) {
-    JointPos jp = jt.positions[i].j;
-    TrajPoint tp(jp,jt.blend_radius[i]);
-    traj.push_back(tp);
-  }
-  return traj;
-}
-
-
-    
 void WamDriver::save_joint_offset(double jointval, double *offset) {
 
     // get the nearest parallel/square angle

@@ -29,6 +29,7 @@
 #include "Link.hh"
 #include "../openmath/R6.hh"
 #include "TrajType.hh"
+#include <pr_msgs/JointTraj.h>
 
 class WAM;
 
@@ -118,6 +119,9 @@ namespace OWD {
     /// \brief Project a vector of joint motions into the nullspace
     ///
     static const JointPos Nullspace_projection(JointPos v);
+
+    /// \brief Convert a ROS JointTraj message to an OWD TrajType
+    static TrajType ros2owd_traj(pr_msgs::JointTraj &jt);
 
     /// \brief Current position
     ///
