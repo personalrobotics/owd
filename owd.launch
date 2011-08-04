@@ -60,7 +60,11 @@
        12-bit numbers). Setting to true reduces the communication demands on
        the CAN bus, but does not increase the upper frequency limit. -->
   <param name="tactile_top10" type="bool" value="false" />
-
+  
+  <!-- The direction of gravity in the wam0 frame.  "-1,0,0" is the default -->
+  <!-- for a vertically mounted WAM.  Use "0,0,-1" for a table mounted WAM. -->
+  <param name="owd/gravity_vector" type="string" value="-1,0,0" />
+  
   <node pkg="owd" type="owd" output="screen" respawn="false"
         cwd="node" name="owd">
   </node>
