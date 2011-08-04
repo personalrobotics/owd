@@ -85,6 +85,7 @@ namespace OWD {
 
 WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tactile) :
   cmdnum(0), nJoints(Joint::Jn),
+  joint_offsets(nJoints,0),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
   owam(NULL),
   running(true),
@@ -480,6 +481,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("SetStiffness",&WamDriver::SetStiffness,this);
   ss_SetJointStiffness =
     n.advertiseService("SetJointStiffness",&WamDriver::SetJointStiffness,this);
+  ss_SetTFOffsets =
+    n.advertiseService("SetTFOffsets",&WamDriver::SetTFOffsets,this);
   ss_DeleteTrajectory = 
     n.advertiseService("DeleteTrajectory",&WamDriver::DeleteTrajectory,this);
   ss_CancelAllTrajectories = 
@@ -1615,7 +1618,7 @@ bool WamDriver::Publish() {
     std::string jrefstring(jref);
     std::string jnamestring(jname);
     btQuaternion YAW;
-    YAW.setRPY(0,0,jointpos[i+1]);
+    YAW.setRPY(0,0,jointpos[i+1]+joint_offsets[i]);
     btTransform wam_tf = wam_tf_base[i] *  btTransform(YAW);
     tf::StampedTransform st(wam_tf,ros::Time::now(),jrefstring,jnamestring);
     tf_broadcaster.sendTransform(st);
@@ -2063,6 +2066,22 @@ bool WamDriver::SetStiffness(pr_msgs::SetStiffness::Request &req,
     owam->set_stiffness(0.0);
     ROS_INFO("Position released by SetStiffness command");
   }
+  res.ok=true;
+  return true;
+}
+
+bool WamDriver::SetTFOffsets(pr_msgs::SetTFOffsets::Request &req,
+                             pr_msgs::SetTFOffsets::Response &res) {
+  if (req.offset.size() != nJoints) {
+    char errmsg[200];
+    sprintf(errmsg,"SetTFOffsets expects a vector of %d offset values, but %zd were sent",nJoints,req.offset.size());
+    ROS_WARN("%s",errmsg);
+    res.reason=errmsg;
+    res.ok=false;
+    return true;
+  }
+  joint_offsets = req.offset;
+  res.reason="";
   res.ok=true;
   return true;
 }

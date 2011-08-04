@@ -36,6 +36,7 @@
 #include <pr_msgs/MassProperties.h>
 #include <pr_msgs/SetStiffness.h>
 #include <pr_msgs/SetJointStiffness.h>
+#include <pr_msgs/SetTFOffsets.h>
 #include <pr_msgs/SetSpeed.h>
 #include <pr_msgs/SetExtraMass.h>
 #include <pr_msgs/SetStallSensitivity.h>
@@ -107,6 +108,9 @@ public:
                       pr_msgs::SetStiffness::Response &res);
     bool SetJointStiffness(pr_msgs::SetJointStiffness::Request &req,
                       pr_msgs::SetJointStiffness::Response &res);
+    bool SetTFOffsets(pr_msgs::SetTFOffsets::Request &req,
+                      pr_msgs::SetTFOffsets::Response &res);
+
     bool SetSpeed(pr_msgs::SetSpeed::Request &req,
                   pr_msgs::SetSpeed::Response &res);
     bool SetExtraMass(pr_msgs::SetExtraMass::Request &req,
@@ -185,6 +189,7 @@ private:
     // internal structures
     char *joint_calibration_file;
     unsigned int nJoints;
+    vector<double> joint_offsets;
     int32_t puck_offsets[Joint::Jn+1];
     JointPos desiredJointPositions, vLastCommand;
     struct timeval trajstarttime;
@@ -247,6 +252,7 @@ private:
       ss_AddTrajectory,
       ss_SetStiffness,
       ss_SetJointStiffness,
+      ss_SetTFOffsets,
       ss_DeleteTrajectory, 
       ss_CancelAllTrajectories,
       ss_PauseTrajectory,
