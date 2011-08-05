@@ -259,6 +259,10 @@ A few additional service calls are provided for manipulating %OWD:
    that the joints can be calibrated using the text interface on
    stdin/stdout.
 
+ - \b SetTFOffsets: Adds the specified angles (in radians) to each
+   joint before publishing the TF link transforms.  Only the TF
+   transforms are affected; the wamstate values are unchanged.
+
 %OWD can also be controlled by sending velocities directly to one or
 more of the joints.  Once again, %OWD does not do any collision
 checking, so the responsiblity lies with the client to avoid sending
