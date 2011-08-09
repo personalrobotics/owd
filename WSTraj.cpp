@@ -43,12 +43,15 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
     endpoint_translation(wst.endpoint_change.position.x,
 			 wst.endpoint_change.position.y,
 			 wst.endpoint_change.position.z),
+    movement_direction(endpoint_translation),
     max_linear_vel(wst.max_linear_velocity),
     max_linear_accel(max_linear_vel/wst.min_accel_time),
     max_angular_vel(wst.max_angular_velocity),
     max_angular_accel(max_angular_vel/wst.min_accel_time),
-    parseg(0,0,0,1)
+    parseg(0,0,0,1),
+    force_scale(1.0)
 {
+  movement_direction.normalize();
   start_position = OWD::JointPos(wst.starting_config);
   end_position = OWD::JointPos(wst.ending_config);
   joint_change = OWD::JointPos(wst.ending_config) - start_position;
@@ -140,31 +143,129 @@ WSTraj::~WSTraj() {
 void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
  
   if (driving_force.norm() > 0) {
-    // increment our time by dt. 
+    // When we come into this function, we will ideally be exactly at
+    // the desired point on the trajectory.  We will have two kinds of
+    // errors: lateral error (normal to the driving force direction),
+    // and longitudinal error (as a result of traveling too fast or
+    // too slow).  We will correct all of the lateral error as a joint
+    // position adjustment, and we will correct the speed error by
+    // modulating the force we are applying.
+
+
+    // increment our time by dt, to figure out where we want to be
+    // based on how much time elapsed since the last call
     time += dt;
+
+    // check for ending condition
     if (time > parseg.end_time) {
       time = parseg.end_time;
       runstate = DONE;
     }
 
+    // calculate our trajectory position
+    double dist, vel, accel;
+    parseg.evaluate(dist, vel, accel, time);
+    R3 target_position = (R3)start_endpoint + endpoint_translation * dist;
+    // calculate the endpoint position error
+    R3 position_error = target_position - (R3)gfeplug->endpoint;
+
+    // calculate our trajectory rotation
+    so3 relative_rotation(endpoint_rotation.w(), endpoint_rotation.t() * dist);
+    SO3 target_rotation = (SO3)relative_rotation * (SO3)start_endpoint;
+
+    // Compute the endpoint rotation error by taking the net rotation from
+    // the current orientation to the target orientation and converting
+    // it to axis-angle format
+    so3 rotation_error1 = (so3)(target_rotation * (! (SO3)gfeplug->endpoint));
+    // represent as rotation about each of the axes
+    R3 rotation_error = rotation_error1.t() * rotation_error1.w();
+
+    // break down the position error into lateral and longitudinal components
+    R3 longitudinal_error = (position_error * movement_direction) 
+      * movement_direction;
+    R3 lateral_error = position_error - longitudinal_error;
+
     // map our current position to the closest point
     // on the trajectory.  this does not move us forward or
     // backward in time.
+    R3 traj_progress = (((R3)gfeplug->endpoint - (R3)start_endpoint) * 
+      movement_direction) * movement_direction;
+    double traj_percent = traj_progress.norm() / endpoint_translation.norm();
+    if ((traj_percent < 0) || (traj_percent > 1)) {
+      ROS_ERROR_NAMED("wstraj","Bad calculation of trajectory progress: %2.2f",traj_percent);
+      runstate=ABORT;
+      return;
+    }
+    double traj_time = parseg.calc_time(traj_percent);
 
     // calculate our endpoint correction to keep us on course
+    R6 endpos_correction(lateral_error,rotation_error);
+    OWD::JointPos joint_correction;
+    try {
+      joint_correction = 
+	gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
+      for (unsigned int j=0; j<joint_correction.size(); ++j) {
+	if (isnan(joint_correction[j])) {
+	  joint_correction[j]=0;
+	}
+      }
+    } catch (const char *err) {
+      // no valid Jacobian, for whatever reason, so abort the trajectory
+      // and leave the joint values unchanged
+      ROS_WARN_NAMED("wstraj","JacobianPseudoInverse failed when correcting endpoint");
+      runstate = ABORT;
+      return;
+    }
+    
+    // calculate the nullspace joint correction to keep the rest of
+    // the arm out of trouble
+    OWD::JointPos target_jointpos = start_position + joint_change * dist;
+    OWD::JointPos jointpos_error = target_jointpos - tc.q;
+    try {
+      OWD::JointPos configuration_correction
+	= gfeplug->Nullspace_projection(jointpos_error);
+      for (unsigned int j=0; j<configuration_correction.size(); ++j) {
+	if (isnan(configuration_correction[j])) {
+	  configuration_correction[j]=0;
+	}
+      }
+      joint_correction += configuration_correction;
+    } catch (const char *err) {
+      // abort the trajectory if we can't correct the configuration
+      ROS_WARN_NAMED("wstraj","Nullspace projection failed when correcting configuration");
+      runstate = ABORT;
+      return;
+    }
 
-    // calculate the nullspace joint correction
+    // Figure out if we are ahead of or behind where we are supposed
+    // to be, and adjust our force scale accordingly.  If we are behind,
+    // increment our force scale by an appropriate amount, and decrement
+    // time back to the actual position so that we take the right-sized
+    // step for the next iteration.  If we are ahead, decrement our
+    // force scale.
+    if (traj_time < time) {
+      force_scale += (time - traj_time) / force_scale_gain;
+      if (force_scale > 1) {
+	force_scale = 1;
+      }
+      time = traj_time;
+    } else if (time < traj_time) {
+      force_scale -= (traj_time - time) / force_scale_gain;
+      if (force_scale < -1) {
+	force_scale = -1;
+      }
+    }
 
-    // figure out if we are ahead of or behind where we are supposed
-    // to be, and adjust our force scale accordingly.  if we are behind,
-    // decrement time back to the actual position so that we don't move
-    // the setpoint too far ahead.
+    // Calculate the force to apply based on the max force, the force
+    // scale, and the trajectory's relative velocity.  By using the
+    // trajectory's velocity we will get a soft start at the beginning
+    // and a soft stop at the end.
+    R6 force = vel * vel_factor * force_scale * driving_force;
+    OWD::JointPos joint_torques = gfeplug->JacobianTranspose_times_vector(force);
 
-    // look up the "feedforward" amount of force we should be
-    // applying based on the trajectory position.  this will give
-    // us a soft start at the beginning and a soft stop at the end
-
-    // return the new joint positions and the feedforward force
+    // return the new joint positions and the force
+    tc.q += joint_correction;
+    tc.t = joint_torques;
 
   } else {
     static R3 total_endpoint_movement;
@@ -209,10 +310,9 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // Compute the endpoint rotation error by taking the net rotation from
     // the current orientation to the target orientation and converting
     // it to axis-angle format
-    
     so3 rotation_error = (so3)(target_rotation * (! (SO3)gfeplug->endpoint));
 
-    // represent as correction in world frame
+    // represent as rotation about each of the axes
     R3 rotation_correction = rotation_error.t() * rotation_error.w();
     
     // calculate the joint change required to correct the endpoint pose
@@ -258,7 +358,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     double current_linear_vel=vel * vel_factor * max_linear_vel;
     double current_linear_accel=accel * vel_factor * max_linear_accel;
     double current_angular_vel=vel * vel_factor * max_angular_vel;
-    double current_angular_accel=accel * vel_factor * max_angular_accel;
+    // double current_angular_accel=accel * vel_factor * max_angular_accel;
     R3 endpos_trans_vel(0,0,0); // default is zero vel
     if (endpoint_translation.norm() > 0) { // avoid div by zero
       endpos_trans_vel = endpoint_translation * current_linear_vel
