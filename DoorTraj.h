@@ -11,8 +11,6 @@
 #include "GfePlugin.hh"
 #include <openwam/MacJointTraj.hh>
 #include <gfe_owd_plugin/OpenDoor.h>
-#include <pthread.h>
-#include <openwam/DataRecorder.cc>
 
 class DoorTraj : public OWD::MacJointTraj {
 public:
@@ -34,12 +32,6 @@ private:
   static const double maxjerk=10.0*3.141592654;
   static ros::ServiceServer ss_OpenDoor;
   R3 PullDirection;
-  OWD::JointPos last_traj_pos;
-  R3 endpoint_goal;
-  DataRecorder<double> *recorder;
-  static void *write_recorder_data(void *);
-  static int last_traj_id;
-  static pthread_t recorder_thread;
 };
 
 
