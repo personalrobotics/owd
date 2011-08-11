@@ -80,6 +80,26 @@ namespace OWD {
     return (wam->bus->hand_torque(t) == OW_SUCCESS);
   }
 
+  bool Plugin::hand_get_state(int state[4]) {
+    if (!wam) {
+      throw "invalid WAM pointer; should have been set by openwamdriver.cpp";
+    }
+    return (wam->bus->hand_get_state((int32_t *) state) == OW_SUCCESS);
+  }
+
+  bool Plugin::hand_set_speed(const double v) {
+    std::vector<double> velocities(4);
+    velocities[0] = velocities[1] = velocities[2] = velocities[3] = v;
+    return hand_set_speed(velocities);
+  }
+
+  bool Plugin::hand_set_speed(const std::vector<double> &v) {
+    if (!wam) {
+      throw "invalid WAM pointer; should have been set by openwamdriver.cpp";
+    }
+    return (wam->bus->hand_set_speed(v) == OW_SUCCESS);
+  }    
+
   bool Plugin::ft_tare() {
     if (!wam) {
       throw "invalid WAM pointer; should have been set by openwamdriver.cpp";

@@ -272,6 +272,22 @@ int CANbus::hand_torque(const std::vector<double> &t) {
   return OW_SUCCESS;
 }
   
+int CANbus::hand_set_speed(const std::vector<double> &v) {
+  return OW_SUCCESS;
+}
+
+int CANbus::hand_get_state(int32_t *state) {
+  if (state != NULL) {
+    for (unsigned int i=0; i<4; ++i) {
+      state[i]=HANDSTATE_DONE;
+    }    
+  
+  }
+  return OW_SUCCESS;
+}
+
+
+
 void CANstats::rosprint()  {
   //  ROS_DEBUG_NAMED("times","CANbus::send %2.1fms per group (2 groups)",
   //		  cansend_time);

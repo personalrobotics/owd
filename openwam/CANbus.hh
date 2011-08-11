@@ -315,10 +315,10 @@ DataRecorder<canio_data> candata;
 #endif // ! OWD_RT
 
 
-  enum {HANDSTATE_UNINIT=0,
-	HANDSTATE_DONE,
-	HANDSTATE_MOVING,
-	HANDSTATE_STALLED};
+  // enum {HANDSTATE_UNINIT=0,
+  // 	HANDSTATE_DONE,
+  // 	HANDSTATE_MOVING,
+  // 	HANDSTATE_STALLED};
 
   int32_t hand_positions[4+1];
   int32_t last_hand_positions[4+1];

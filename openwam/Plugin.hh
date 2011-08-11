@@ -89,6 +89,31 @@ namespace OWD {
     /// \returns True on success, false otherwise
     static bool hand_torque(std::vector<double> t);
 
+    /// \brief Get the handstate
+    ///
+    /// Copies the CANbus::handstate values.  These values will be one
+    /// of the HANDSTATE_* enumeration values in CANdefs.hh
+    ///
+    /// \param t An array into which the handstate values are copied.
+    /// \returns True on success, false otherwise
+    static bool hand_get_state(int state[4]);
+
+    /// \brief Set the movement speed for all fingers and the spread
+    ///
+    /// Sets the finger/spread movement speed using CANbus::hand_set_speed
+    ///
+    /// \param t Velocity (in radians/sec?) for all fingers and the spread
+    /// \returns True on success, false otherwise
+    static bool hand_set_speed(const double v);
+
+    /// \brief Sets the speed for each finger and the spread
+    ///
+    /// Sets the finger/spread movement speed using CANbus::hand_set_speed
+    ///
+    /// \param t A vector of velocity values (in radians/sec?), one for each finger and the spread.
+    /// \returns True on success, false otherwise
+    static bool hand_set_speed(const std::vector<double> &v);
+
     /// \brief Tare the force/torque sensor
     ///
     /// Tare (zero-out) the force/torque sensor (if present)

@@ -27,6 +27,7 @@
 
 
 #include "bhd280.hh"
+#include "CANdefs.hh"		// for HANDSTATE_* enumeration
 
 BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   AdvertiseAndSubscribe(node);
@@ -159,13 +160,13 @@ bool BHD_280::Publish() {
   // the internal_state field will eventually become the regular
   // state field once herbcontroller is updated
   for (unsigned int i=0; i<4; ++i) {
-    if (state[i] == CANbus::HANDSTATE_UNINIT) {
+    if (state[i] == HANDSTATE_UNINIT) {
       bhstate.internal_state[i] = pr_msgs::BHState::state_uninitialized;
-    } else if (state[i] == CANbus::HANDSTATE_MOVING) {
+    } else if (state[i] == HANDSTATE_MOVING) {
       bhstate.internal_state[i] = pr_msgs::BHState::state_moving;
-    } else if (state[i] == CANbus::HANDSTATE_STALLED) {
+    } else if (state[i] == HANDSTATE_STALLED) {
       bhstate.internal_state[i] = pr_msgs::BHState::state_stalled;
-    } else if (state[i] == CANbus::HANDSTATE_DONE) {
+    } else if (state[i] == HANDSTATE_DONE) {
       bhstate.internal_state[i] = pr_msgs::BHState::state_done;
     } else {
       bhstate.internal_state[i] = 0;
@@ -176,10 +177,10 @@ bool BHD_280::Publish() {
   // set the default case
   bhstate.state=pr_msgs::BHState::state_done;
   for (unsigned int i=0; i<4; ++i) {
-    if (state[i] == CANbus::HANDSTATE_UNINIT) {
+    if (state[i] == HANDSTATE_UNINIT) {
       bhstate.state = pr_msgs::BHState::state_uninitialized;
       break; // don't have to check any others
-    } else if (state[i] == CANbus::HANDSTATE_MOVING) {
+    } else if (state[i] == HANDSTATE_MOVING) {
       // moving always overrides state_stalled or state_done
       bhstate.state = pr_msgs::BHState::state_moving;
       

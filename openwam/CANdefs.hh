@@ -41,6 +41,12 @@
 #define GROUPID(n)   (((mbxID + BASE_ID) << 5) | (0x0400 + (n)))
 #define BROADCAST    (GROUPID(0))
 
+// enumeration for CANbus::handstate[]
+enum {HANDSTATE_UNINIT=0,
+      HANDSTATE_DONE,
+      HANDSTATE_MOVING,
+      HANDSTATE_STALLED};
+
 // typedef unsigned long DWORD;
 
 #define TX_QUEUE_SIZE       (32)
