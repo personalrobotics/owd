@@ -209,14 +209,14 @@ bool WamDriver::Init(const char *joint_cal_file)
   joint_calibration_file = strdup(joint_cal_file);
   
   double lj[7]= {-2.60, -1.96, -2.73, -0.86, -4.79, -1.56, -2.99};
-  memcpy(lower_jlimit,lj,7*sizeof(double));
+  memcpy(&Plugin::_lower_jlimit[0],lj,7*sizeof(double));
   double uj[7]= { 2.60,  1.96,  2.73,  3.13,  1.30,  1.56,  2.99};
-  memcpy(upper_jlimit,uj,7*sizeof(double));
+  memcpy(&Plugin::_upper_jlimit[0],uj,7*sizeof(double));
 
   // The two arms on Herb have different limits for J1
   if ( modified_j1) {
-    lower_jlimit[0]=0.52;
-    upper_jlimit[0]=5.76;
+    Plugin::_lower_jlimit[0]=0.52;
+    Plugin::_upper_jlimit[0]=5.76;
   }
     
   char speedstr[200], accelstr[200];
@@ -2382,7 +2382,7 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> 
 #ifdef BUILD_FOR_SEA
     owam->posSmoother.getSmoothedPVA(owam->heldPositions);
 #endif // BUILD_FOR_SEA
-    ServoTraj *straj = new ServoTraj(nJoints, cmdnum, owam->heldPositions+1, lower_jlimit, upper_jlimit);
+    ServoTraj *straj = new ServoTraj(nJoints, cmdnum, owam->heldPositions+1, &Plugin::_lower_jlimit[0], &Plugin::_upper_jlimit[0]);
     for (unsigned int i=0; i<servo->joint.size(); ++i) {
       straj->SetVelocity(servo->joint[i],servo->velocity[i]);
     }

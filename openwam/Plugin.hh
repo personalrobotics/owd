@@ -281,6 +281,13 @@ namespace OWD {
     /// can be disabled by setting it to zero.
     static double gravity;
 
+    /// \brief The lower limit of each joint (in radians)
+    static const std::vector<double> &lower_jlimit;
+
+    /// \brief The upper limit of each joint (in radians)
+    static const std::vector<double> &upper_jlimit;
+
+
   private:
     friend class ::WAM;
     friend class WamDriver;
@@ -303,6 +310,8 @@ namespace OWD {
     static std::vector<float> _tactile_f2;
     static std::vector<float> _tactile_f3;
     static std::vector<float> _tactile_palm;
+    static std::vector<double> _lower_jlimit;
+    static std::vector<double> _upper_jlimit;
     static SE3 _endpoint;
 
     static std::vector<Plugin *> children;
