@@ -208,6 +208,8 @@ bool WamDriver::Init(const char *joint_cal_file)
   ROS_DEBUG("  Gravity comp value = %1.1fg",gravity_comp_value);
   joint_calibration_file = strdup(joint_cal_file);
   
+  Plugin::_lower_jlimit.resize(7);
+  Plugin::_upper_jlimit.resize(7);
   double lj[7]= {-2.60, -1.96, -2.73, -0.86, -4.79, -1.56, -2.99};
   memcpy(&Plugin::_lower_jlimit[0],lj,7*sizeof(double));
   double uj[7]= { 2.60,  1.96,  2.73,  3.13,  1.30,  1.56,  2.99};
