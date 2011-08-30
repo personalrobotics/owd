@@ -39,6 +39,10 @@ public:
   int    ID;
   double q;       // position
   double t;       // Nm or puck torque units
+  double offset;  // externally applied offset, in radians.  this will
+                  //    change the value stored in q as computed by
+                  //    WAM::mpos2jpos().  Used for external calibration
+                  //    of the joints while OWD is running
   
   static const int J1 = 1;
   static const int J2 = 2;
@@ -63,7 +67,7 @@ public:
   
   Joint(){
     pthread_mutex_init(&mutex, NULL);
-    q = 0.0; t = 0.0;
+    q = 0.0; t = 0.0; offset=0.0;
   }
 
   int id(){return ID;}

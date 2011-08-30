@@ -34,15 +34,10 @@ using namespace std;
  */
 
 class JointCtrl : public Controller{
-protected:
-  double qref;    // not really used during motion
-                  // mostly used when idle
 public:
 
   JointCtrl() : Controller() {}
   virtual ~JointCtrl(){}
-
-  void set(double q){ lock();  qref = q;   unlock();  }
 
   virtual double evaluate(double qs, double q, double dt) = 0;
   virtual void reset() = 0;

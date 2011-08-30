@@ -53,7 +53,6 @@ public:
   double evaluate(double qs, double q, double dt){
     if(state() == Controller::RUN){
       //      lock();
-      qref = qs; // backup the command
       double e = qs - q;
       double ed = (e - last_e)/dt;
       se += e;

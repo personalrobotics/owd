@@ -203,6 +203,7 @@ public:
 
   int  set_targ_jpos(double* pos);          // set the target joint positions online 
   int  set_jpos(double pos[]);   // set the joint positions offline
+  int  set_joint_offsets(double offsets[]); // set fixed offset for each joint
   bool set_gains(int joint, pr_msgs::PIDgains &gains);
   bool get_gains(std::vector<pr_msgs::PIDgains> &gains);
 

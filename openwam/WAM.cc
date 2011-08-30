@@ -200,7 +200,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 	    Inertia(   0.00003911,    0.00000019,      0.0000,
 		       0.00003877,     0.00000,     0.00007614, M2_MM2) );
 
-  for (unsigned int i=0; i<Joint::Jn; ++i) {
+  for (int i=0; i<Joint::Jn; ++i) {
     safetytorquecount[i]=safetytorquesum[i]=0;
     pid_torq[i+1]=dyn_torq[i+1]=sim_torq[i+1]=traj_torq[i+1]=0;
   }
@@ -369,27 +369,38 @@ int WAM::send_mtrq(){
 
 // convert motors positions to joints positions
 void WAM::mpos2jpos(){
-  joints[1].q = -motors[1].q/mN1 ;
-  joints[2].q =  motors[2].q*0.5/mN2     -motors[3].q*0.5/mN3 ;
-  joints[3].q = -motors[2].q*0.5*mn3/mN2 -motors[3].q*0.5*mn3/mN3 ;
-  joints[4].q = -motors[4].q/mN4 ;
+  joints[1].q = -motors[1].q/mN1 
+    + joints[1].offset;
+  joints[2].q =  motors[2].q*0.5/mN2     - motors[3].q*0.5/mN3
+    + joints[2].offset;
+  joints[3].q = -motors[2].q*0.5*mn3/mN2 - motors[3].q*0.5*mn3/mN3
+    + joints[3].offset;
+  joints[4].q = -motors[4].q/mN4
+    + joints[4].offset;
 #ifdef WRIST
-  joints[5].q =  motors[5].q*0.5/mN5     +motors[6].q*0.5/mN6 ;
-  joints[6].q = -motors[5].q*0.5*mn6/mN5 +motors[6].q*0.5*mn6/mN6 ;
-  joints[7].q = -motors[7].q/mN7 ;
+  joints[5].q =  motors[5].q*0.5/mN5     + motors[6].q*0.5/mN6
+    + joints[5].offset;
+  joints[6].q = -motors[5].q*0.5*mn6/mN5 + motors[6].q*0.5*mn6/mN6
+    + joints[6].offset;
+  joints[7].q = -motors[7].q/mN7
+    + joints[7].offset;
 #endif
 }
 
 // convert joints positions to motors positions
 void WAM::jpos2mpos(){
-  motors[1].q = -joints[1].q *mN1 ;
-  motors[2].q =  joints[2].q*mN2 - joints[3].q*mN2/mn3 ;
-  motors[3].q = -joints[2].q*mN3 - joints[3].q*mN3/mn3 ;
-  motors[4].q = -joints[4].q*mN4 ;
+  motors[1].q = -(joints[1].q - joints[1].offset) *mN1 ;
+  motors[2].q =  (joints[2].q - joints[2].offset) *mN2 
+    - (joints[3].q - joints[3].offset) *mN2/mn3 ;
+  motors[3].q = -(joints[2].q - joints[2].offset) *mN3
+    - (joints[3].q - joints[3].offset) *mN3/mn3 ;
+  motors[4].q = - (joints[4].q - joints[4].offset) *mN4 ;
 #ifdef WRIST
-  motors[5].q =  joints[5].q*mN5 - joints[6].q*mN5/mn6 ;
-  motors[6].q =  joints[5].q*mN6 + joints[6].q*mN6/mn6 ;
-  motors[7].q = -joints[7].q*mN7 ;
+  motors[5].q =  (joints[5].q - joints[5].offset) *mN5
+    - (joints[6].q - joints[6].offset) *mN5/mn6 ;
+  motors[6].q =  (joints[5].q - joints[5].offset) *mN6 
+    + (joints[6].q - joints[6].offset) *mN6/mn6 ;
+  motors[7].q = -(joints[7].q - joints[7].offset) *mN7 ;
 #endif
 }
 
@@ -442,7 +453,39 @@ int WAM::set_jpos(double pos[]){
   return OW_SUCCESS;
 }
 
+int WAM::set_joint_offsets(double offsets[]) {
+  // block the control loop until we update both the offsets and the
+  // new held position
+  this->lock("set_joint_offsets");
+  
+  // check for running trajectory
+  if (jointstraj != NULL) {
+    // cannot change joint offsets while a trajectory is running
+    // because it would require recomputing the trajectory vals
+    this->unlock();
+    return OW_FAILURE;
+  }
 
+  // check for held position
+  if (holdpos) {
+    // Adjust the held position to reflect the new offsets.
+    // We will add the new offset and subtract out the previous
+    // offset (if any)
+    for (int j=Joint::J1; j<Joint::Jn; ++j) {
+      heldPositions[j] += offsets[ joints[j].id() ]
+        - joints[j].offset;
+    }
+  }
+
+  // now set the new offset
+  for (int j=Joint::J1; j<Joint::Jn; ++j) {
+    joints[j].offset = offsets[ joints[j].id() ];
+  }
+
+  this->unlock();
+  return OW_SUCCESS;
+}
+   
 void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *simtrq,double *trajtrq){
     this->lock("get_current_data");
     if (pos) {
@@ -928,17 +971,6 @@ void WAM::newcontrol_rt(double dt){
 	}
   */
     
-  // read new motor positions
-  recv_mpos(); // will always succeed, since it's just a copy
-
-  mpos2jpos();    // convert to joint positions
-    
-  for(int j=Joint::J1; j<=Joint::Jn; j++){
-    tc.q[j-1] = q[j] = joints[j].q; // set tc.q for traj->eval
-    links[j].theta(q[j]);
-    sim_links[j].theta(q[j]);
-    tc.qd[j-1] = tc.qdd[j-1] = tc.t[j-1] = 0.0; // zero out
-  }
   std::vector<double> data;
   bool data_recorded=false;
 
@@ -963,6 +995,18 @@ void WAM::newcontrol_rt(double dt){
   }
 
   skipped_locks=0;
+
+  // read new motor positions
+  recv_mpos(); // will always succeed, since it's just a copy
+
+  mpos2jpos();    // convert to joint positions
+    
+  for(int j=Joint::J1; j<=Joint::Jn; j++){
+    tc.q[j-1] = q[j] = joints[j].q; // set tc.q for traj->eval
+    links[j].theta(q[j]);
+    sim_links[j].theta(q[j]);
+    tc.qd[j-1] = tc.qdd[j-1] = tc.t[j-1] = 0.0; // zero out
+  }
 
   // update the forward kinematics
   SE3_endpoint = OWD::Kinematics::forward_kinematics(links);
@@ -1397,7 +1441,6 @@ int WAM::hold_position(double jval[],bool grab_lock)
   for(int i = Joint::J1; i <= Joint::Jn; i++) {
     heldPositions[i] = joints[i].q;
     jointsctrl[i].reset();
-    jointsctrl[i].set(heldPositions[i]);
     jointsctrl[i].run();
     suppress_controller[i] = false;
 

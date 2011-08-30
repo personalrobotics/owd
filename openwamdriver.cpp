@@ -85,7 +85,6 @@ namespace OWD {
 
 WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tactile) :
   cmdnum(0), nJoints(Joint::Jn),
-  joint_offsets(nJoints,0),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
   owam(NULL),
   running(true),
@@ -483,8 +482,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("SetStiffness",&WamDriver::SetStiffness,this);
   ss_SetJointStiffness =
     n.advertiseService("SetJointStiffness",&WamDriver::SetJointStiffness,this);
-  ss_SetTFOffsets =
-    n.advertiseService("SetTFOffsets",&WamDriver::SetTFOffsets,this);
+  ss_SetJointOffsets =
+    n.advertiseService("SetJointOffsets",&WamDriver::SetJointOffsets,this);
   ss_DeleteTrajectory = 
     n.advertiseService("DeleteTrajectory",&WamDriver::DeleteTrajectory,this);
   ss_CancelAllTrajectories = 
@@ -968,7 +967,6 @@ void WamDriver::calibrate_joint_angles() {
 	  owam->heldPositions[jnum] = holdval+joint_offsets[jnum];
 	  owam->posSmoother.reset(owam->heldPositions, Joint::Jn+1);   
 #endif // BUILD_FOR_SEA
-	  owam->jointsctrl[jnum].set(holdval+joint_offsets[jnum]);
 	  owam->jointsctrl[jnum].run();
 	  owam->suppress_controller[jnum]=false;
 	}
@@ -1620,7 +1618,7 @@ bool WamDriver::Publish() {
     std::string jrefstring(jref);
     std::string jnamestring(jname);
     btQuaternion YAW;
-    YAW.setRPY(0,0,jointpos[i+1]+joint_offsets[i]);
+    YAW.setRPY(0,0,jointpos[i+1]);
     btTransform wam_tf = wam_tf_base[i] *  btTransform(YAW);
     tf::StampedTransform st(wam_tf,ros::Time::now(),jrefstring,jnamestring);
     tf_broadcaster.sendTransform(st);
@@ -2030,7 +2028,6 @@ bool WamDriver::SetJointStiffness(pr_msgs::SetJointStiffness::Request &req,
   for (unsigned int i=0; i<nJoints; ++i) {
     if (req.stiffness[i] != 0) {
       owam->jointsctrl[i+1].reset();
-      owam->jointsctrl[i+1].set(current_pos[i+1]);
       owam->jointsctrl[i+1].run();
       owam->suppress_controller[i+1]=false;
     } else {
@@ -2072,19 +2069,30 @@ bool WamDriver::SetStiffness(pr_msgs::SetStiffness::Request &req,
   return true;
 }
 
-bool WamDriver::SetTFOffsets(pr_msgs::SetTFOffsets::Request &req,
-                             pr_msgs::SetTFOffsets::Response &res) {
+bool WamDriver::SetJointOffsets(pr_msgs::SetJointOffsets::Request &req,
+                             pr_msgs::SetJointOffsets::Response &res) {
   if (req.offset.size() != nJoints) {
     char errmsg[200];
-    sprintf(errmsg,"SetTFOffsets expects a vector of %d offset values, but %zd were sent",nJoints,req.offset.size());
+    sprintf(errmsg,"SetJointOffsets expects a vector of %d offset values, but %zd were sent",nJoints,req.offset.size());
     ROS_WARN("%s",errmsg);
     res.reason=errmsg;
     res.ok=false;
     return true;
   }
-  joint_offsets = req.offset;
+  double *j_offsets = (double *)malloc((nJoints+1) * sizeof(double));
+  if (j_offsets == NULL) {
+    res.ok=false;
+    res.reason="out of memory";
+    return true;
+  }
+  memcpy(j_offsets+1, &req.offset[0], nJoints*sizeof(double));
   res.reason="";
   res.ok=true;
+  if (owam->set_joint_offsets(j_offsets) != OW_SUCCESS) {
+    res.ok=false;
+    res.reason="Cannot change joint offsets while a trajectory is active";
+  }
+  free(j_offsets);
   return true;
 }
 

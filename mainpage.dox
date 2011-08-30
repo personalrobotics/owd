@@ -259,9 +259,19 @@ A few additional service calls are provided for manipulating %OWD:
    that the joints can be calibrated using the text interface on
    stdin/stdout.
 
- - \b SetTFOffsets: Adds the specified angles (in radians) to each
-   joint before publishing the TF link transforms.  Only the TF
-   transforms are affected; the wamstate values are unchanged.
+ - \b SetJointOffsets: Adds the specified angles (in radians) to each
+   reported joint value.  This service is intended to adjust the arm
+   calibration online based on an external calibration node.  If a
+   trajectory is active, the command will fail and return ok set to
+   false.  If the SetStiffness value is nonzero, the held position
+   value will also be adjusted by the offset so that the arm does not
+   physically move.  The offset will affect everything in OWD,
+   including the gravity compensation torques, so a large sudden
+   offset will cause a jump in torques that will make the arm briefly
+   spasm until the controllers stabilize (to avoid this, apply a large
+   offset by making successive service calls with slowly increasing
+   offset values).  Set the joint offsets back to zero to restore the
+   initial calibration values.
 
 %OWD can also be controlled by sending velocities directly to one or
 more of the joints.  Once again, %OWD does not do any collision
