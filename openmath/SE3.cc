@@ -104,6 +104,31 @@ SE3 operator ^ (const SE3& E, int i){
   return SE3();
 }
 
+SE3 SE3::operator*(double a) const {
+  so3 rot = (so3)(SO3)(*this);  // get the rotation
+  // make the new SE3
+  return SE3(so3(rot.w(),a*rot.t()), // new rotation
+	     a * (R3)(*this)); // new translation
+}
+
+SE3 operator * (double a, const SE3 &s) {
+  return s*a;
+}
+
+SE3 SE3::operator +(const SE3 &rhs) {
+  R3 t = (R3)(*this) + (R3)rhs;    // add the translations
+  SO3 R = (SO3)rhs * (SO3)(*this); // multiply the rotations
+  return SE3(R, t);
+}
+
+SE3 SE3::operator -(const SE3 &rhs) {
+  R3 t = (R3)(*this) - (R3)rhs;
+  SO3 R = (SO3)(*this) * (!(SO3)rhs);
+  return SE3(R,t);
+}
+
+
+
 ostream& operator <<  (ostream& s, const SE3& h){
   int p;
   p = s.precision();

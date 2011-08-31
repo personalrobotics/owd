@@ -116,9 +116,9 @@ namespace OWD {
   //  }
 
   const R6 Plugin::Jacobian_times_vector(JointPos v) {
-    R6 result;
-    OWD::Kinematics::Jacobian0_times_vector(&v[0], (double *)result);
-    return result;
+    double result[6];
+    OWD::Kinematics::Jacobian0_times_vector(&v[0], result);
+    return R6(result[0], result[1], result[2], result[3], result[4], result[5]);
   }
 
   const JointPos Plugin::JacobianPseudoInverse_times_vector(R6 &v) {
@@ -177,6 +177,11 @@ namespace OWD {
   std::vector<double> Plugin::_upper_jlimit;
   SE3 Plugin::_endpoint;
   double Plugin::gravity;
+#ifdef OWDSIM
+  const bool Plugin::simulation=true;
+#else
+  const bool Plugin::simulation=false;
+#endif // OWDSIM
   std::vector<Plugin *> Plugin::children;
 
   const std::vector<double> &Plugin::arm_position=Plugin::_arm_position;

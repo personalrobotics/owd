@@ -20,6 +20,7 @@
 #include "Kinematics.hh"
 #include <stdlib.h>
 #include "Plugin.hh" // for debugging the Jacobian
+#include <stdio.h>
 // #define ADD_
 //#include <cblas_f77.h>
 
@@ -89,9 +90,11 @@ namespace OWD {
     // multiply by the supplied vector
     int M=NJOINTS;
     int N=NDIMS;
+    double B[6];
+    B[0]=v.v[0]; B[1]=v.v[1]; B[2]=v.v[2]; B[3]=v.w[0]; B[4]=v.w[1]; B[5]=v.w[2];
     dgemv_(&TRANSN, &M,  &N, &ALPHA,
 	      &Jacobian0PseudoInverse[0][0], &LD_JacobianPseudoInverse,
-	      (double*)v,  &INC, &BETA,
+	      B,  &INC, &BETA,
 	      out, &INC);
   }
 
@@ -101,9 +104,11 @@ namespace OWD {
     }
     int M=NDIMS;
     int N=NJOINTS;
+    double B[6];
+    B[0]=v.v[0]; B[1]=v.v[1]; B[2]=v.v[2]; B[3]=v.w[0]; B[4]=v.w[1]; B[5]=v.w[2];
     dgemv_(&TRANST, &M,  &N, &ALPHA,
 	      &Jacobian0 [0][0], &LD_Jacobian,
-	      (double*)v, &INC,
+	      B, &INC,
 	      &BETA, out, &INC);
   }
     

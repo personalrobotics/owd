@@ -69,10 +69,10 @@ public:
       // error time derivative
       R6 ed( (e-laste)/dt );
       
-      R6 Kpe(Kp[0][0]*e[0], Kp[1][1]*e[1], Kp[2][2]*e[2],
-	     Kp[3][3]*e[3], Kp[4][4]*e[4], Kp[5][5]*e[5]);
-      R6 Kved(Kv[0][0]*ed[0], Kv[1][1]*ed[1], Kv[2][2]*ed[2],
-	      Kv[3][3]*ed[3], Kv[4][4]*ed[4], Kv[5][5]*ed[5]);
+      R6 Kpe(Kp[0][0]*e.v[0], Kp[1][1]*e.v[1], Kp[2][2]*e.v[2],
+	     Kp[3][3]*e.w[0], Kp[4][4]*e.w[1], Kp[5][5]*e.w[2]);
+      R6 Kved(Kv[0][0]*ed.v[0], Kv[1][1]*ed.v[1], Kv[2][2]*ed.v[2],
+	      Kv[3][3]*ed.w[0], Kv[4][4]*ed.w[1], Kv[5][5]*ed.w[2]);
       /*
       int stride1 =   sizeof(double);
       int stride6 = 6*sizeof(double);

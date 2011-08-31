@@ -28,10 +28,9 @@
 using namespace std;
 
 class R6{
-private:
-  double x[6];
-
 public:
+  R3 v;
+  R3 w;
 
   static const int VX =  0;
   static const int VY =  1;
@@ -41,54 +40,47 @@ public:
   static const int WZ =  5;
 
   R6(){clear();}
-  R6(const R3& v, const R3& w)
-  {x[0]=v[0];  x[1]=v[1];  x[2]=v[2];  x[3]=w[0];  x[4]=w[1];  x[5]=w[2];}
+  R6(const R3& v1, const R3& w1) : v(v1), w(w1) {}
   R6(double x0, double x1, double x2, double x3, double x4, double x5)
-  {x[0]=x0;    x[1]=x1;    x[2]=x2;    x[3]=x3;    x[4]=x4;    x[5]=x5;}
+    : v(x0, x1, x2), w(x3, x4, x5) {}
 
-  double norm() const {return sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2] +
-				   x[3]*x[3] + x[4]*x[4] + x[5]*x[5]);}
+  double norm() const {return sqrt(v*v + w*w); }
 
-  R3 v() const { return R3(x[0],x[1],x[2]);  }
-  R3 w() const { return R3(x[3],x[4],x[5]);  }
-
-  void  clear(){bzero(x, 6*sizeof(double));}
+  void  clear(){v.clear(); w.clear();}
   
-  operator       double* ()        {return x;}
-  operator const double* ()  const {return x;}
-  
-  double operator [] (int i) const {return x[i];}
-  double &operator [] (int i) {return x[i];}
-  
-  friend R6 operator * (double s, const R6& x)
-  {return R6(s*x[0],  s*x[1],  s*x[2],  s*x[3],  s*x[4],  s*x[5]);}
+  friend R6 operator * (double s, const R6& x) {return R6(s*x.v,  s*x.w);}
   friend R6 operator * (const R6& r, double s) {return s*r;}
   friend R6 operator / (const R6& r, double s) {return (1.0/s)*r;}
 
   friend R6 operator + (const R6& r1, const R6& r2)
-  {return R6(r1[0]+r2[0], r1[1]+r2[1], r1[2]+r2[2], 
-	     r1[3]+r2[3], r1[4]+r2[4], r1[5]+r2[5]);}
+  {return R6(r1.v + r2.v, r1.w + r2.w); }
 
   friend R6 operator - (const R6& r1, const R6& r2)
-  {return R6(r1[0]-r2[0], r1[1]-r2[1], r1[2]-r2[2], 
-	     r1[3]-r2[3], r1[4]-r2[4], r1[5]-r2[5]);}
+  {return R6(r1.v - r2.v, r1.w - r2.w); }
+
+  R6 &operator += (const R6 &rhs) {
+    v += rhs.v;
+    w += rhs.w;
+    return *this;
+  }
+
 
   friend ostream& operator <<  (ostream& s, const R6& r){
     int p;
-    p = cout.precision();
-    cout.precision(12);
-    cout.setf(ios::fixed, ios::floatfield);
-    cout.setf(ios::right, ios::adjustfield);
+    p = s.precision();
+    s.precision(12);
+    s.setf(ios::fixed, ios::floatfield);
+    s.setf(ios::right, ios::adjustfield);
     
-    cout << setw(22) << r[0] 
-	 << setw(22) << r[1] 
-	 << setw(22) << r[2]
-	 << setw(22) << r[3]
-	 << setw(22) << r[4]
-	 << setw(22) << r[5];
+    s << setw(22) << r.v[0] 
+	 << setw(22) << r.v[1] 
+	 << setw(22) << r.v[2]
+	 << setw(22) << r.w[0]
+	 << setw(22) << r.w[1]
+	 << setw(22) << r.w[2];
     
-    cout.setf(ios::left, ios::adjustfield);
-    cout.precision(p);
+    s.setf(ios::left, ios::adjustfield);
+    s.precision(p);
     return s;
   }
 };

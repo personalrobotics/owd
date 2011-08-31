@@ -281,6 +281,9 @@ namespace OWD {
     /// can be disabled by setting it to zero.
     static double gravity;
 
+    /// \brief Whether we're running owd (false) or owdsim (true)
+    static const bool simulation;
+
     /// \brief The lower limit of each joint (in radians)
     static const std::vector<double> &lower_jlimit;
 

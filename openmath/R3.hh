@@ -29,12 +29,14 @@ class R3{
 public:
   double x[3];
 
-
   static const int X = 0;  static const int Y = 1;  static const int Z = 2;
 
   R3(){x[0]=x[1]=x[2]=0.0;}
   R3(double x0, double x1, double x2){x[0]=x0;  x[1]=x1;  x[2]=x2;}
-
+  R3(const R3 &r3) {
+    x[0]=r3.x[0]; x[1]=r3.x[1]; x[2]=r3.x[2];
+  }
+  
   double norm() const {return sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2]);}
 
   void normalize() {
@@ -44,11 +46,16 @@ public:
     x[2] /= d;
   }
 
+  void clear() {
+    bzero(x, 3*sizeof(double));
+  }
+
   operator       double* ()        {return x;}
   operator const double* ()  const {return x;}
   
-  double operator [] (int i) const {return x[i];}
-  
+  //  double &operator [] (int i) {return x[i];}
+  //  const double &operator [] (int i) const {return x[i];}
+
   /// \brief Scale by a double
   inline R3 &operator *= (const double d) {
     x[0]*=d; x[1]*=d; x[2]*=d;
@@ -64,12 +71,12 @@ public:
   }
 
   friend R3     operator * (double s, const R3& r)
-  {return R3(r[0]*s, r[1]*s, r[2]*s);}
+  {return R3(r.x[0]*s, r.x[1]*s, r.x[2]*s);}
   friend R3     operator * (const R3& r, double s) {return s*r;}
   friend R3     operator / (const R3& r, double s) {return (1.0/s)*r;}
   
   friend R3     operator + (const R3& r1, const R3& r2)
-  {return R3(r1[0]+r2[0], r1[1]+r2[1], r1[2]+r2[2]);}
+  {return R3(r1.x[0]+r2.x[0], r1.x[1]+r2.x[1], r1.x[2]+r2.x[2]);}
   
   R3 &operator += (const R3 &rhs) {
     x[0] += rhs.x[0];
@@ -79,23 +86,23 @@ public:
   }
 
   friend R3     operator - (const R3& r1, const R3& r2)
-  {return R3(r1[0]-r2[0], r1[1]-r2[1], r1[2]-r2[2]);}
+  {return R3(r1.x[0]-r2.x[0], r1.x[1]-r2.x[1], r1.x[2]-r2.x[2]);}
   // cross product
   friend R3     operator ^ (const R3& r1, const R3& r2)
-  {return R3(r1[1]*r2[2] - r1[2]*r2[1], 
-	     r1[2]*r2[0] - r1[0]*r2[2], 
-	     r1[0]*r2[1] - r1[1]*r2[0]);}
+  {return R3(r1.x[1]*r2.x[2] - r1.x[2]*r2.x[1], 
+	     r1.x[2]*r2.x[0] - r1.x[0]*r2.x[2], 
+	     r1.x[0]*r2.x[1] - r1.x[1]*r2.x[0]);}
   
   friend double operator * (const R3& r1, const R3& r2)
-  {return r1[0]*r2[0] + r1[1]*r2[1] + r1[2]*r2[2];}
+  {return r1.x[0]*r2.x[0] + r1.x[1]*r2.x[1] + r1.x[2]*r2.x[2];}
 
   friend ostream& operator <<  (ostream& s, const R3& r){
     int p;
-    p = cout.precision();
-    cout.precision(12);
-    cout.setf(ios::fixed, ios::floatfield);
-    cout << r[0] << " " << r[1] << " " << r[2];
-    cout.precision(p);
+    p = s.precision();
+    s.precision(12);
+    s.setf(ios::fixed, ios::floatfield);
+    s << r.x[0] << " " << r.x[1] << " " << r.x[2];
+    s.precision(p);
     return s;
   }
 };

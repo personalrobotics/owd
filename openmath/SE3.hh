@@ -76,6 +76,18 @@ public:
 
   friend SE3 operator * (const SE3& E1, const SE3& E2);
   friend SE3 operator ^ (const SE3& E,  int i);
+
+  // multiplication by a double will scale the translation and rotation.
+  // it's intended for scaling a difference between two SE3s.  For instance,
+  // you can find the "midpoint" between two SE3s with 0.5 * (SE3_second - SE3_first)
+  SE3 operator*(double a) const;
+  friend SE3 operator * (double a, const SE3 &s);
+
+  // differences between two SE3s can be computed by subtracting them.  The
+  // resulting SE3 will be the relative transform from one to the other.
+  // differences can be added back with the + operator.
+  SE3 operator +(const SE3 &s);
+  SE3 operator -(const SE3 &s);
   
   friend ostream& operator <<  (ostream& s, const SE3& r);
   
