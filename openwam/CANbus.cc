@@ -46,6 +46,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   tactile_top10(false), pucks(NULL),n_arm_pucks(number_of_arm_pucks),
   simulation(false), received_position_flags(0), received_state_flags(0),
   hand_motion_state_sequence(0),
+  ignore_breakaway_encoders(true),
   log_canbus_data(log_cb_data),
   candata(0),
   unread_packets(0)
@@ -956,7 +957,7 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
       }
     }
     last_hand_positions[nodeid-10] = value;
-    if (msglen==6) {
+    if ((msglen==6) && (!ignore_breakaway_encoders)) {
       // this puck also sent a value for the secondary encoder
       hand_secondary_positions[nodeid-10] = value2;
 
@@ -2618,12 +2619,9 @@ int CANbus::hand_get_positions(double &p1, double &p2, double &p3, double &p4) {
 }
  
 int CANbus::hand_get_inner_links(double &l1, double &l2, double &l3) {
-  /***************************
-    RAW ENCODER VALUES (for debugging)
-  l1 = hand_secondary_positions[1];
-  l2 = hand_secondary_positions[2];
-  l3 = hand_secondary_positions[3];
-  ******************************/
+  if (ignore_breakaway_encoders) {
+    return OW_FAILURE;
+  }
   for (int i=0; i<3; ++i) {
     if (hand_inner_links[i] == -12345) {
       // we haven't received data from the hand yet
@@ -2637,13 +2635,9 @@ int CANbus::hand_get_inner_links(double &l1, double &l2, double &l3) {
 }
 
 int CANbus::hand_get_outer_links(double &l1, double &l2, double &l3) {
-  /**************************
-    RAW ENCODER VALUES (for debugging)
-  l1 = hand_positions[1];
-  l2 = hand_positions[2];
-  l3 = hand_positions[3];
-  ***************************/
-
+  if (ignore_breakaway_encoders) {
+    return OW_FAILURE;
+  }
   for (int i=0; i<3; ++i) {
     if (hand_outer_links[i] == -12345) {
       // we haven't received data from the hand yet
@@ -2657,6 +2651,9 @@ int CANbus::hand_get_outer_links(double &l1, double &l2, double &l3) {
 }
 
 int CANbus::hand_get_breakaway(bool &b1, bool &b2, bool &b3) {
+  if (ignore_breakaway_encoders) {
+    return OW_FAILURE;
+  }
   for (int i=0; i<3; ++i) {
     if ((hand_inner_links[i] == -12345) ||
 	(hand_outer_links[i] == -12345)) {

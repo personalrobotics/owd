@@ -1438,13 +1438,21 @@ int WAM::hold_position(double jval[],bool grab_lock)
     jointstraj->stop();
   }
 
-  for(int i = Joint::J1; i <= Joint::Jn; i++) {
-    heldPositions[i] = joints[i].q;
-    jointsctrl[i].reset();
-    jointsctrl[i].run();
-    suppress_controller[i] = false;
-
-    if (jval != NULL) {
+  if (!holdpos) {
+    // we weren't already holding, so set the held position 
+    // to the current position
+    // (if we were already holding, then we won't change the target)
+    for(int i = Joint::J1; i <= Joint::Jn; i++) {
+      heldPositions[i] = joints[i].q;
+      jointsctrl[i].reset();
+      jointsctrl[i].run();
+      suppress_controller[i] = false;
+    }
+  }
+  
+  if (jval != NULL) {
+    // return the held positions
+    for(int i = Joint::J1; i <= Joint::Jn; i++) {
       jval[i]=heldPositions[i];
     }
   }

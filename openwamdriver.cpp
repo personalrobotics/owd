@@ -265,6 +265,7 @@ bool WamDriver::Init(const char *joint_cal_file)
   n.param("owd_plugins",plugin_list,std::string());
   n.param("log_controller_data",log_controller_data,false);
   n.param("gravity_vector",gravity_vector,std::string("-1,0,0"));
+  n.param("ignore_breakaway_encoders",bus->ignore_breakaway_encoders,false);
 
 #ifndef OWDSIM
   if (BH_model == 280) {

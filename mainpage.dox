@@ -126,6 +126,14 @@ roslaunch.  The following parameters are supported:
    base mounted vertically so the cables exit down.  For a WAM arm
    mounted horizontally on a tabletop, use "0,0,-1".
 
+ - \b ~/ignore_breakaway_encoders If true, the values of the secondary
+   encoders on an optionally-installed BH280 hand will be ignored and
+   will not be used to detect breakaway (due to hardware issues, many
+   BH280 hands do not have reliable secondary encoder readings).  When
+   breakaway detection is disabled the \b inner_links, \b outer_links,
+   and \b breakaway arrays in the WAMState message will be zero
+   length.  Defaults to false.
+
 \section running Running
 
 At this time %OWD should be launched on the same machine it will run
