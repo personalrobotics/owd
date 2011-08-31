@@ -1049,6 +1049,7 @@ void WAM::newcontrol_rt(double dt){
 
   // is there a joint trajectory running?
   if(jointstraj != NULL){
+    bool abort(false);
     try {
       RTIME t3 = ControlLoop::get_time_ns_rt();        
       jointstraj->evaluate(tc, traj_timestep * timestep_factor);
@@ -1158,12 +1159,24 @@ void WAM::newcontrol_rt(double dt){
     } catch (char *error) {
       // most likely a problem evaluating the trajectory, so
       // halt it and just hold position
-      ROS_ERROR("Problem in trajectory; aborting and holding current position");
+      ROS_ERROR("Exception in trajectory: %s",error);
+      ROS_ERROR("Aborting trajectory and holding current position");
+      abort=true;
+    } catch (const char *error) {
+      // most likely a problem evaluating the trajectory, so
+      // halt it and just hold position
+      ROS_ERROR("Exception in trajectory: %s",error);
+      ROS_ERROR("Aborting trajectory and holding current position");
+      abort=true;
+    } catch (...) {
+      ROS_ERROR("Unknown exception; aborting trajectory and holding current position");
+      abort=true;
+    }
+    if (abort) {
       delete jointstraj;
       jointstraj = NULL;
       double heldPositions[Joint::Jn+1];
       hold_position(heldPositions,false);
-
 	      
       for(int i = Joint::J1; i <= Joint::Jn; i++) {
 	tc.q[i-1] = heldPositions[i];
@@ -1173,8 +1186,8 @@ void WAM::newcontrol_rt(double dt){
       newJSControl_rt((&tc.q[0])-1,q,dt,pid_torq);
       RTIME t2 = ControlLoop::get_time_ns_rt();
       jscontroltime += (t2-t1) / 1e6;
-            
     }
+      
   } else if (holdpos) {
 
     for(int i = Joint::J1; i <= Joint::Jn; i++) {
@@ -1604,6 +1617,10 @@ WAM::~WAM() {
     char filename[200];
     snprintf(filename,200,"/tmp/wamstats%02d-final.csv",bus->id);
     recorder.dump(filename);
+  }
+  if (jointstraj) {
+    delete jointstraj;
+    jointstraj=NULL;
   }
   if (bus) {
     delete bus;
