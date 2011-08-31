@@ -180,7 +180,6 @@ private:
     double min_accel_time;
     double max_jerk;
     vector<double> joint_vel, joint_accel;
-    double lower_jlimit[7], upper_jlimit[7];
 
     bool discard_movements;
 

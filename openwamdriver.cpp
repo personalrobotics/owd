@@ -468,6 +468,7 @@ void WamDriver::unload_plugins() {
 	ROS_ERROR("Last system error: %s",perr);
       }
     }
+    ROS_INFO("Unloaded plugin at %p",plib);
   }
   loaded_plugins.clear();
 }
@@ -2429,8 +2430,9 @@ bool WamDriver::ReloadPlugins(pr_msgs::Reset::Request &req,
   }
   unload_plugins();
   std::string plugin_list;
-  ros::NodeHandle n;
+  ros::NodeHandle n("~");
   n.param("owd_plugins",plugin_list,std::string());
+  ROS_DEBUG_STREAM("Attempting to load plugins " << plugin_list);
   load_plugins(plugin_list);
   res.ok=true;
   return true;
