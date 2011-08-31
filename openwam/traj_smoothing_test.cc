@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
         printf("Could not construct ParaJointTraj from these points\n");
         exit(1);
     }
-    printf("Trajectory created; %d points, %d segments, %3.3g secs\n",traj.size(),pjt->parsegs[0].size(),pjt->traj_duration);
+    printf("Trajectory created; %zd points, %zd segments, %3.3g secs\n",traj.size(),pjt->parsegs[0].size(),pjt->traj_duration);
     csv = fopen("smoothed.csv","w");
     if (!csv) {
         printf("Cannot output to smoothed.csv\n");
