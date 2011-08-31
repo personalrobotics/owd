@@ -28,7 +28,7 @@
 #include <string.h>
 
 class MacQuinticElement {
-protected:
+public:
 
   // positions are n-dof vectors of joint angles
   OWD::JointPos start_pos, end_pos;
@@ -37,7 +37,6 @@ protected:
   double start_time, duration;
 
   double max_path_velocity, max_path_acceleration;
-public:
 
   static const double VEL_MAX = -1; // flag to specify max velocity
   static const double PI = 3.141592654;

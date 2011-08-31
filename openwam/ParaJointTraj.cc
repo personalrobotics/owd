@@ -115,7 +115,7 @@ ParaJointTraj::ParaJointTraj(TrajType &vtraj,
         ROS_WARN_COND(inflect && !bend,
 		      "ParaJointTraj: bend didn't detect inflection, point %d",i);
 	ROS_WARN_COND(bend && !inflect,
-		      "ParaJointTraj: EXTRA BEND FOUND AT POINT %d, SEGMENT %d",i,parsegs[0].size());
+		      "ParaJointTraj: EXTRA BEND FOUND AT POINT %d, SEGMENT %zd",i,parsegs[0].size());
 #endif // INFLECT_CHECK
         if (bend) {
             // finalize PS for each joint

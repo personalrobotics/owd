@@ -34,7 +34,8 @@
 class MacQuinticSegment:public MacQuinticElement {
   friend class MacQuinticBlend;
 
-protected:
+public:
+
   // direction is an n-dof unit vector pointing from start to end
   OWD::JointPos direction;
 
@@ -62,7 +63,6 @@ protected:
 				    MacAccelElement *ae2);
   std::vector<MacAccelElement *> accel_elements;
 
-public:
   MacQuinticSegment( OWD::TrajPoint first_p,
                      OWD::TrajPoint second_p,
 		     OWD::JointPos max_joint_vel,

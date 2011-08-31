@@ -33,12 +33,11 @@
 namespace OWD {
 
 class MacJointTraj : public Trajectory {
-private:
+public:
   int DOF;
   JointPos max_joint_vel;
   JointPos max_joint_accel;
   std::vector<MacQuinticElement *>::iterator current_piece;
-public:
   std::vector<MacQuinticElement *> macpieces;
   double traj_duration;
 
