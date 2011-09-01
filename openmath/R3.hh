@@ -62,6 +62,14 @@ public:
     return *this;
   }
 
+  /// \brief Add another R3 in place
+  inline R3 &operator += (const R3 &rhs) {
+    x[0] += rhs.x[0];
+    x[1] += rhs.x[1];
+    x[2] += rhs.x[2];
+    return *this;
+  }
+
   /// \brief Subtract another R3 in place
   inline R3 &operator -=(const R3 &rhs) {
     x[0] -= rhs.x[0];
@@ -78,13 +86,6 @@ public:
   friend R3     operator + (const R3& r1, const R3& r2)
   {return R3(r1.x[0]+r2.x[0], r1.x[1]+r2.x[1], r1.x[2]+r2.x[2]);}
   
-  R3 &operator += (const R3 &rhs) {
-    x[0] += rhs.x[0];
-    x[1] += rhs.x[1];
-    x[2] += rhs.x[2];
-    return *this;
-  }
-
   friend R3     operator - (const R3& r1, const R3& r2)
   {return R3(r1.x[0]-r2.x[0], r1.x[1]-r2.x[1], r1.x[2]-r2.x[2]);}
   // cross product

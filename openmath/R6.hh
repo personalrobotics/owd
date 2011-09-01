@@ -64,6 +64,12 @@ public:
     return *this;
   }
 
+  R6 &operator -= (const R6 &rhs) {
+    v -= rhs.v;
+    w -= rhs.w;
+    return *this;
+  }
+
 
   friend ostream& operator <<  (ostream& s, const R6& r){
     int p;
