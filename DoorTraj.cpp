@@ -39,7 +39,7 @@ void DoorTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   R3 world_PullDirection = (SO3)gfeplug->endpoint * PullDirection;
 
   // map the trajectory translation to just the direction we care about
-  double dot_prod = endpoint_movement.v() * world_PullDirection;
+  double dot_prod = endpoint_movement.v * world_PullDirection;
   R3 endpoint_trans = dot_prod * world_PullDirection;
 
   // don't correct the endpoint rotation at all

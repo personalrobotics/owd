@@ -156,7 +156,7 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   double net_force = workspace_force() * force_direction;
 
   // calculate the error
-  double force_target = forcetorque_vector.v().norm();
+  double force_target = forcetorque_vector.v.norm();
   double force_error = force_target -  net_force;
   double force_limit = xforce * force_target;
   gfeplug->net_force.data[4]=force_error;

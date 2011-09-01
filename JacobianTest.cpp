@@ -71,8 +71,8 @@ void JacobianTestTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 	       ((double)random() / (double)RAND_MAX -0.5)/20.0);
 
   ROS_INFO_NAMED("applyforce","Workspace desired movement of [%1.4f, %1.4f, %1.4f, %1.4f, %1.4f, %1.4f]",
-		 ws_tweak[0],ws_tweak[1],ws_tweak[2],ws_tweak[3],ws_tweak[4],
-		 ws_tweak[5]);
+		 ws_tweak.v[0],ws_tweak.v[1],ws_tweak.v[2],
+                 ws_tweak.w[0],ws_tweak.w[1],ws_tweak.w[2]);
   
   // get the correction from the Jacobian Pseudo-Inverse
   OWD::JointPos joint_correction =
@@ -88,13 +88,20 @@ void JacobianTestTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   }
 
   ROS_INFO_NAMED("applyforce","Workspace actual movement of  [%1.4f, %1.4f, %1.4f, %1.4f, %1.4f, %1.4f]",
-		 workspace_movement[0],workspace_movement[1],workspace_movement[2],workspace_movement[3],workspace_movement[4],
-		 workspace_movement[5]);
+		 workspace_movement.v[0],workspace_movement.v[1],
+                 workspace_movement.v[2],workspace_movement.w[0],
+                 workspace_movement.w[1],workspace_movement.w[2]);
 
   // compare the original ws change to the calculated value
   for (int i=0; i<6; ++i) {
-    double percent_error = (ws_tweak[i] - workspace_movement[i])
-      / ws_tweak[i];
+    double percent_error;
+    if (i<3) {
+      percent_error = (ws_tweak.v[i] - workspace_movement.v[i])
+        / ws_tweak.v[i];
+    } else {
+      percent_error = (ws_tweak.w[i-3] - workspace_movement.w[i-3])
+        / ws_tweak.w[i-3];
+    }
     if (fabs(percent_error) > .01) {
       ROS_WARN_NAMED("applyforce","Dim %d: remaining error of %2f%%",
 	       i+1,
