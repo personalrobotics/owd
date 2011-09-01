@@ -399,7 +399,14 @@ void WamDriver::load_plugins(std::string plugin_list) {
   std::string pname;
   while (std::getline(pp,pname,',')) {
     dlerror();  // clear any previous errors
-    void *plib = dlopen(pname.c_str(), RTLD_NOW);
+    void *plib;
+    try {
+      plib = dlopen(pname.c_str(), RTLD_NOW);
+    } catch (char const *error) {
+      ROS_WARN("Plugin %s threw error message \"%s\"",
+               pname.c_str(),error);
+      continue;
+    }
     char *perr = dlerror();
     if (perr != NULL) {
       ROS_WARN("Could not load plugin %s: %s", pname.c_str(),perr);
@@ -438,12 +445,19 @@ void WamDriver::load_plugins(std::string plugin_list) {
 		 pname.c_str(), perr);
 	dlclose(plib);
 	continue;
-      }		 
-      if (! (*pl_register)()) {
-	ROS_WARN("Could not call register_owd_plugin function in plugin %s",
-		 pname.c_str());
-	dlclose(plib);
-	continue;
+      }
+      try {
+        if (! (*pl_register)()) {
+          ROS_WARN("Could not call register_owd_plugin function in plugin %s",
+                   pname.c_str());
+          dlclose(plib);
+          continue;
+        }
+      } catch (char const* error) {
+        ROS_ERROR("Plugin %s threw error string \"%s\"",
+                  pname.c_str(),error);
+        dlclose(plib);
+        continue;
       }
       ROS_INFO("Loaded and registered plugin %s", pname.c_str());
       PluginPointers thisplugin(plib,pl_unregister);
