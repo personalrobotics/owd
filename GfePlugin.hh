@@ -35,9 +35,9 @@ public:
   virtual void Publish();
 
   static std_msgs::Float64MultiArray net_force;
-
+ 
 private:
-  ros::Publisher  pub_net_force;
+  ros::Publisher pub_net_force;
 };
 
 extern GfePlugin *gfeplug;

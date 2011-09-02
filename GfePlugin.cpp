@@ -15,6 +15,9 @@
 #include "DoorTraj.h"
 #include "JacobianTest.h"
 #include "WSTraj.h"
+#include "Follow.h"
+#include "HelixPlugin.h"
+#include "MoveDirection.h"
 
 GfePlugin::GfePlugin() {
   // ROS has already been initialized by OWD, so we can just
@@ -28,6 +31,15 @@ GfePlugin::GfePlugin() {
   if (!DoorTraj::Register()) {
     throw "DoorTraj trajectory failed to register";
   }
+ if (!Follow::Register()) {
+    throw "Follow trajectory failed to register";
+  }
+ if (!HelixTraj::Register()) {
+   throw "HelixTraj trajectory failed to registr";
+ }
+ if (!MoveDirection::Register()) {
+   throw "MoveDirection trajectory failed to register";
+ }
 #ifdef SIMULATION
   if (!JacobianTestTraj::Register()) {
     throw "JacobianTestTraj trajectory failed to register";
@@ -46,6 +58,9 @@ GfePlugin::~GfePlugin() {
   DoorTraj::Shutdown();
   JacobianTestTraj::Shutdown();
   WSTraj::Shutdown();
+  Follow::Shutdown();
+  HelixTraj::Shutdown();
+  MoveDirection::Shutdown();
 }
 
 void GfePlugin::Publish() {
@@ -59,7 +74,6 @@ std_msgs::Float64MultiArray GfePlugin::net_force;
 // of our plugin class.  We initialize it to NULL so that the register
 // function can tell whether or not one has already been allocated.
 GfePlugin *gfeplug = NULL;
-
 
 // The register_owd_plugin() is the only function that OWD will call when
 // the plugin is loaded.  It has to initialize our custom Plugin and 

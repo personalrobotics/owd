@@ -6,4 +6,6 @@ rosbuild_init()
 rosbuild_genmsg()
 rosbuild_gensrv()
 
-rosbuild_add_library(gfe_owd_plugin GfePlugin.cpp ApplyForceTraj.cpp DoorTraj.cpp JacobianTest.cpp WSTraj.cpp)
+rosbuild_add_library(gfe_owd_plugin GfePlugin.cpp ApplyForceTraj.cpp DoorTraj.cpp JacobianTest.cpp WSTraj.cpp Follow.cpp HelixPlugin.cpp MoveDirection.cpp )
+
+#rosbuild_add_library(force_read_plugin ForceReadPlugin.cpp )
