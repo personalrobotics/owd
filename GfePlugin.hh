@@ -9,14 +9,10 @@
 #define GFEPLUGIN_HH
 
 #include <openwam/Plugin.hh>
+#include <openwam/DataRecorder.cc>
 #include <std_msgs/Float64MultiArray.h>
 #include <ros/ros.h>
-
-// Added for Kyle's Follow trajectory
-#include <openwam/Trajectory.hh>
-#include <std_msgs/String.h>
-#include <math.h>
-#include <LinearMath/btQuaternion.h>
+#include <pthread.h>
 
 // #define SIMULATION
 #ifdef SIMULATION
@@ -36,8 +32,14 @@ public:
 
   static std_msgs::Float64MultiArray net_force;
  
+  DataRecorder<double> *recorder;
+  void log_data(const std::vector<double> &data);
+  bool write_recorder_data();
+  bool flush_recorder_data;
+
 private:
   ros::Publisher pub_net_force;
+  pthread_mutex_t recorder_mutex;
 };
 
 extern GfePlugin *gfeplug;

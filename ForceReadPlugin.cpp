@@ -93,6 +93,13 @@ void ForceReadPlugin::Publish() {
   
   //Fill the message vector with the calculated values of the force  
   for (int i=0; i<7; i++){
+    // BUG HERE: I was about to change the syntax for force_reading[] to 
+    //  force_reading.v[] and force_reading.w[] (each valid for 0-2).
+    //  However I see you're going to 7, which is beyond the end of
+    //  the R6.  Not sure what you're trying to do here; if you're
+    //  publishing the 6-DOF force/torque then you only need 6 dims.
+    //    Mike V. 9/2/2011
+#error Beyond end of array in force_reading[i] on next line
     force_read_msg.force[i] = force_reading[i];
   }
    

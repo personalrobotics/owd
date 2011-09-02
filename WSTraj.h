@@ -36,12 +36,15 @@ private:
   R6 driving_force;
   SE3 start_endpoint;
   R3 endpoint_translation;
+  R3 movement_direction;
   so3 endpoint_rotation;
   OWD::JointPos joint_change;
   double max_linear_vel, max_linear_accel,
     max_angular_vel, max_angular_accel;
   OWD::ParabolicSegment parseg;
   double vel_factor;
+  double force_scale;
+  static const double force_scale_gain = 5;
 
   /// Static members for handling the ROS service calls
   static ros::ServiceServer ss_AddWSTraj;

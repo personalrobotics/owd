@@ -19,7 +19,9 @@
 #include "HelixPlugin.h"
 #include "MoveDirection.h"
 
-GfePlugin::GfePlugin() {
+GfePlugin::GfePlugin()
+  : flush_recorder_data(false)
+{
   // ROS has already been initialized by OWD, so we can just
   // create our own NodeHandle in the same namespace
   ros::NodeHandle n("~");
@@ -50,6 +52,10 @@ GfePlugin::GfePlugin() {
   }
 
   pub_net_force = n.advertise<std_msgs::Float64MultiArray>("net_force",1);
+
+  // 6 seconds of samples at 500 Hz
+  recorder = new DataRecorder<double>(3000);
+  pthread_mutex_init(&recorder_mutex,NULL);
 }
 
 GfePlugin::~GfePlugin() {
@@ -61,10 +67,42 @@ GfePlugin::~GfePlugin() {
   Follow::Shutdown();
   HelixTraj::Shutdown();
   MoveDirection::Shutdown();
+  pub_net_force.shutdown();
+}
+
+void GfePlugin::log_data(const std::vector<double> &data) {
+  if (pthread_mutex_trylock(&recorder_mutex)) {
+    recorder->add(data);
+    pthread_mutex_unlock(&recorder_mutex);
+  }
 }
 
 void GfePlugin::Publish() {
   pub_net_force.publish(net_force);
+
+  // we have to lock around the write call so that the trajectories
+  // saving data to recorder don't do so while we are writing and
+  // clearing
+  if ((recorder->count > 2500) || flush_recorder_data) {
+    pthread_mutex_lock(&recorder_mutex);
+    write_recorder_data();
+    flush_recorder_data=false;
+    pthread_mutex_unlock(&recorder_mutex);
+  }
+}
+
+
+bool GfePlugin::write_recorder_data() {
+  char filename[200];
+  static int filenum(0);
+  ++filenum;
+  snprintf(filename,200,"/tmp/gfeplugin-%04d.csv",filenum);
+  ROS_INFO("Writing GfePlugin log to %s",filename);
+  pthread_mutex_lock(&recorder_mutex);
+  bool result = recorder->dump(filename);
+  recorder->reset();
+  pthread_mutex_unlock(&recorder_mutex);
+  return result;
 }
 
 // Static member inside GfePlugin class

@@ -30,6 +30,9 @@ bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
     res.id=0;
   }
 
+  // reset the errors in our static force controller
+  force_controller.reset();
+
   // always return true for the service call so that the client knows that
   // the call was processed, as opposed to there being a
   // network communication error.
@@ -40,7 +43,6 @@ bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
 
 ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude):
   OWD::Trajectory("GFE Apply Force"),
-  correction_motion_sum(0),
   time_sum(0), 
   last_force_error(0), stopforce(false)
 {
@@ -78,7 +80,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude):
     R3 torques;  // initializes to zero
     forcetorque_vector = R6(_force_direction,torques);
 
-    gfeplug->net_force.data.resize(11);
+    gfeplug->net_force.data.resize(48);
     // values used for debugging during development
     // not all of these are filled in right now, but here's
     // the general idea:
@@ -87,13 +89,16 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude):
     // 1: endpoint motion factor (1=100% of limit)
     // 2: joint motion factor (1=100% of limit)
     // 3: max condition number
-    // 4: force error
-    // 5: position/rotation correction
-    // 6: nullspace correction
-    // 7: force correction
-    // 8: force_x_avg
-    // 9: force_y_avg
-    // 10: force_z_avg
+    // 4: WS force X error
+    // 5: WS force Y error
+    // 6: WS force Z error
+    // 7-13: joint torques
+    // 14-16: WS position X,Y,Z error
+    // 17-19: WS rotation X,Y,Z error
+    // 20-26: joint position correction
+    // 27-33: incoming joint values
+    // 34-40: PID torques from previous timestep
+    // 41-47: Joint position changes since last timestep
 
   } else {
     throw "Could not get current WAM values from GfePlugin";
@@ -113,7 +118,24 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     runstate=OWD::Trajectory::DONE;
     return;
   }
+  // record the joint positions
+  gfeplug->net_force.data[27]=tc.q[0];
+  gfeplug->net_force.data[28]=tc.q[1];
+  gfeplug->net_force.data[29]=tc.q[2];
+  gfeplug->net_force.data[30]=tc.q[3];
+  gfeplug->net_force.data[31]=tc.q[4];
+  gfeplug->net_force.data[32]=tc.q[5];
+  gfeplug->net_force.data[33]=tc.q[6];
 
+  // record the PID torques from the previous timestep
+  gfeplug->net_force.data[34]=gfeplug->pid_torque[0];
+  gfeplug->net_force.data[35]=gfeplug->pid_torque[1];
+  gfeplug->net_force.data[36]=gfeplug->pid_torque[2];
+  gfeplug->net_force.data[37]=gfeplug->pid_torque[3];
+  gfeplug->net_force.data[38]=gfeplug->pid_torque[4];
+  gfeplug->net_force.data[39]=gfeplug->pid_torque[5];
+  gfeplug->net_force.data[40]=gfeplug->pid_torque[6];
+  
   // calculate the endpoint position error
   R3 position_err = (R3)endpoint_target - (R3)gfeplug->endpoint;
 
@@ -121,16 +143,16 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   // desired force and subtract it out
   double dot_prod = position_err * force_direction;
   R3 position_correction = position_err - dot_prod * force_direction;
+  gfeplug->net_force.data[14]=position_correction[0];
+  gfeplug->net_force.data[15]=position_correction[1];
+  gfeplug->net_force.data[16]=position_correction[2];
 
+#ifdef NDEF
   if (position_correction.norm() > .015) {
     // limit the step size each cycle
     position_correction *= .015 / position_correction.norm();
   }
-
-  // keep track of the total movement in the force direction so that
-  // we can actively brake if it exceeds our limit
-  //  axial_movement += dot_prod;
-  //  axial_movements.push_back(dot_prod);
+#endif
 
   // Compute the rotation error by taking the net rotation from the
   // current orientation to the original orientation and converting
@@ -140,47 +162,65 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
   // error in world frame
   R3 rotation_correction = rotation_error.t() * rotation_error.w();
+  gfeplug->net_force.data[17]=rotation_correction[0];
+  gfeplug->net_force.data[18]=rotation_correction[1];
+  gfeplug->net_force.data[19]=rotation_correction[2];
 
+#ifdef NDEF
   if (rotation_correction.norm() * 0.18 > .045) {
     // limit the correction this cycle.  0.18m is approximately the distance
     // from the link7 origin to the fingertips
     rotation_correction *= .045 / 0.18 / rotation_correction.norm();
   }
+#endif
 
-  // ok, we've corrected the position error that's normal to the
-  // force vector.  now we need to decide how much we need to adjust
-  // the position along our force vector in order to maintain the
-  // desired force at the f/t sensor
+  // we now have position corrections to bring the endpoint back
+  // into the desired configuration along the force direction.  Now
+  // we'll use the ForceController to calculate the torques to give
+  // us the right endpoint force.
 
-  // take the dot product of the WS force with our force direction
-  double net_force = workspace_force() * force_direction;
+  // get the current smoothed sensor force/torque in WS coordinates
+  R6 current_force_torque = workspace_forcetorque();
 
-  // calculate the error
-  double force_target = forcetorque_vector.v.norm();
-  double force_error = force_target -  net_force;
-  double force_limit = xforce * force_target;
-  gfeplug->net_force.data[4]=force_error;
-  if (fabs(force_error) > force_limit) {
-    // threshold our force error
-    if (force_error > 0) {
-      force_error = force_limit;
-    } else {
-      force_error = -force_limit;
-    }
+  // take the dot product of the WS force with our force direction, so
+  // that we just correct the on-axis forces.
+  // we'll throw out the torques and set them to zero.
+  R6 net_force_torque((current_force_torque.v * force_direction)
+                      * force_direction, // project onto direction
+                      R3()); // zero
+
+  // overall force/torque error in WS coordinates
+  R6 workspace_forcetorque_error =
+    forcetorque_vector - net_force_torque;
+  gfeplug->net_force.data[4] = workspace_forcetorque_error.v[0];
+  gfeplug->net_force.data[5] = workspace_forcetorque_error.v[1];
+  gfeplug->net_force.data[6] = workspace_forcetorque_error.v[2];
+
+  // Pass the F/T error to the force controller to get
+  // the joint torques to apply
+  OWD::JointPos correction_torques = 
+    force_controller.control(workspace_forcetorque_error);
+  gfeplug->net_force.data[7] = correction_torques[0];
+  gfeplug->net_force.data[8] = correction_torques[1];
+  gfeplug->net_force.data[9] = correction_torques[2];
+  gfeplug->net_force.data[10] = correction_torques[3];
+  gfeplug->net_force.data[11] = correction_torques[4];
+  gfeplug->net_force.data[12] = correction_torques[5];
+  gfeplug->net_force.data[13] = correction_torques[6];
+
+  // specify the feedforward torques that would ideally produce the
+  // desired endpoint force.  this makes life easier for the force
+  // controller.
+  OWD::JointPos ideal_torques = 
+    gfeplug->JacobianTranspose_times_vector(forcetorque_vector);
+
+  // sum the correction and feedforward torques
+  for (unsigned int i=0; i<tc.t.size(); ++i) {
+#ifdef NOTHING
+    tc.t[i] = correction_torques[i]
+      + (isnan(ideal_torques[i])? 0 : ideal_torques[i]);
+#endif
   }
-  double force_error_delta = force_error - last_force_error;
-  last_force_error = force_error;
-
-  // multiply it times our gain
-  double correction_distance = force_error * force_gain_kp
-    + force_error_delta * force_gain_kd;
-
-  // limit the amount of motion due to the force error
-  correction_distance = limit_force_correction_movement(correction_distance);
-
-  // multiply the distance times the force direction vector and
-  // add the resulting vector to our position error
-  position_correction += correction_distance * force_direction;
 
   R6 endpos_correction(position_correction,rotation_correction);
   OWD::JointPos joint_correction;
@@ -193,6 +233,13 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // favorable configuration
     return;
   }
+  gfeplug->net_force.data[20]=joint_correction[0];
+  gfeplug->net_force.data[21]=joint_correction[1];
+  gfeplug->net_force.data[22]=joint_correction[2];
+  gfeplug->net_force.data[23]=joint_correction[3];
+  gfeplug->net_force.data[24]=joint_correction[4];
+  gfeplug->net_force.data[25]=joint_correction[5];
+  gfeplug->net_force.data[26]=joint_correction[6];
 
   // calculate a move in the nullspace that keeps the arm as close to its
   // original configuration as possible
@@ -205,42 +252,15 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // don't worry about it
   }
 
+#ifdef NDEF
   // Check the requested motion of each joint over the past 0.25 seconds to 
   // make sure it doesn't exceed 90deg/sec (0.3927 rad in 0.25 sec)
-
   if (time_sum > time_window) {
     OWD::JointPos joint_motion = tc.q - jointpositions.front()
       + joint_correction;
     gfeplug->net_force.data[2]=joint_motion.length() / joint_vel_limit / time_sum;
-  /*  joint speed limits weren't working too well the last time I tried,
-      so I've commented out this section until I can test it further
-
-    for (unsigned int i=0; i<joint_motion.size(); ++i) {
-      if (fabs(joint_motion[i]) > joint_vel_limit * time_sum) {
-	if ((fabs(joint_motion[i]-joint_correction[i])
-	    > joint_vel_limit * time_sum)
-	    && (fabs(joint_motion[i]) > fabs(joint_motion[i]-joint_correction[i]))) {
-	  // we were exceeding the joint motion limits even without the
-	  // correction, and the correction is only making it worse, so
-	  // don't do any correction this round
-      	  joint_motion=tc.q - jointpositions.front();
-	  break;
-	} else {
-	  // the correction at least helps a little, so
-	  // leave it unchanged
-	}
-      } else {
-	// bring this joint's correction back to the limit.
-	// yes, this will change the direction of the overall joint
-	// correction vector, but it will bring us as close as we can
-	// get to the desired target.
-	joint_motion[i] *= joint_vel_limit * time_sum / fabs(joint_motion[i]);
-      }
-    }
-    // recalculate our joint correction
-    joint_correction = jointpositions.front()+ joint_motion - tc.q;
-  */
   }
+#endif
 
   // Normally the evaluate function will be called with dt equal to
   // the control period.  But if OWD is detecting stall conditions due to
@@ -253,137 +273,69 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   
   // add the correction to the joint values
   for (unsigned int i=0; i<tc.q.size(); ++i) {
+#ifdef NOTHING
     tc.q[i] += isnan(joint_correction[i])? 0 : joint_correction[i];
+#endif
   }
+  OWD::JointPos joint_change(7);
+  if (jointpositions.size() > 0) {
+    joint_change = (tc.q - jointpositions.back());
+  }
+  gfeplug->net_force.data[41]=joint_change[0];
+  gfeplug->net_force.data[42]=joint_change[1];
+  gfeplug->net_force.data[43]=joint_change[2];
+  gfeplug->net_force.data[44]=joint_change[3];
+  gfeplug->net_force.data[45]=joint_change[4];
+  gfeplug->net_force.data[46]=joint_change[5];
+  gfeplug->net_force.data[47]=joint_change[6];
+
   jointpositions.push(tc.q);  // remember the requested positions
-
-  // specify the feedforward torques that would ideally produce the
-  // desired endpoint force.  this makes life easier for the force
-  // controller.
-  OWD::JointPos joint_torques = 
-    gfeplug->JacobianTranspose_times_vector(forcetorque_vector);
-  for (unsigned int i=0; i<tc.t.size(); ++i) {
-    tc.t[i] = isnan(joint_torques[i])? 0 : joint_torques[i];
-  }
-
   // update the values to be published
   gfeplug->net_force.data[3]=OWD::Kinematics::max_condition;
 
   while (time_sum > time_window) {
     // update our averaging windows
     time_sum -= times.front();  times.pop();
-    correction_motion_sum -= correction_distances.front();
-    correction_distances.pop();
     jointpositions.pop();
   }
+
+  // record our data for logging
+  gfeplug->log_data(gfeplug->net_force.data);
 
   end_position =tc.q;  // keep tracking the current position
   return;
 }
 
-R3 ApplyForceTraj::workspace_force() {
-  // get the FT force and smooth it
+R6 ApplyForceTraj::workspace_forcetorque() {
+  // get the FT force+torque and smooth it
   // I make this a little more efficient by always keeping track
   // of the sum of all the elements in the queue, so no matter how
   // many elements we are averaging we can quickly compute the new
   // average by just adjusting the sum and dividing by the count.
-  static std::queue<double> force_x, force_y, force_z;
-  static double force_x_sum=0;
-  static double force_y_sum=0;
-  static double force_z_sum=0;
-  force_x.push(gfeplug->ft_force[0]);
-  force_y.push(gfeplug->ft_force[1]);
-  force_z.push(gfeplug->ft_force[2]);
-  force_x_sum += gfeplug->ft_force[0];
-  force_y_sum += gfeplug->ft_force[1];
-  force_z_sum += gfeplug->ft_force[2];
-  if (force_x.size() > FT_window_size) {
-    force_x_sum -= force_x.front();
-    force_y_sum -= force_y.front();
-    force_z_sum -= force_z.front();
-    force_x.pop();
-    force_y.pop();
-    force_z.pop();
+  static std::queue<R6> force_torque;
+  static R6 force_torque_sum;
+
+  R6 current_ft(gfeplug->ft_force[0], gfeplug->ft_force[1],
+                gfeplug->ft_force[2], gfeplug->ft_force[3],
+                gfeplug->ft_force[4], gfeplug->ft_force[5]);
+  force_torque.push(current_ft);
+  force_torque_sum += current_ft;
+
+  if (force_torque.size() > FT_window_size) {
+    force_torque_sum -= force_torque.front();
+    force_torque.pop();
   }
-  double force_x_avg = force_x_sum / force_x.size();
-  double force_y_avg = force_y_sum / force_y.size();
-  double force_z_avg = force_z_sum / force_z.size();
+  R6 force_torque_avg = force_torque_sum / force_torque.size();
   
-  // we want to make sure we're applying forcetorque_vector of force
-  // in workspace coordinates, so first calculate our actual force
-  // in that direction using the values from the f/t sensor.
+  // rotate the force and torque into workspace coordinates
   // we negate each of the sensor readings because what we want is a
   // measure of what the arm is producing, which is the opposite of
   // what the F/T sensor feels.
-  R3 handframe_force(-force_x_avg,
-		     -force_y_avg,
-		     -force_z_avg);
-  // rotate into workspace coordinates
-  R3 ws_force = (SO3) gfeplug->endpoint * handframe_force;
-  gfeplug->net_force.data[8]=ws_force[0];
-  gfeplug->net_force.data[9]=ws_force[1];
-  gfeplug->net_force.data[10]=ws_force[2];
+  R6 ws_force_torque((SO3)gfeplug->endpoint * (-1 * force_torque_avg.v),
+                     (SO3)gfeplug->endpoint * (-1 * force_torque_avg.w));
 
-  return ws_force;
-}
 
-double ApplyForceTraj::limit_force_correction_movement(double correction_distance) {
-  // Check the total force-based position correction we have made
-  // in the past 0.25 seconds to make sure it doesn't exceed the
-  // cartesian velocity limit
-
-#ifdef WINDOW
-  if (time_sum > time_window) {
-    double correction_motion = correction_motion_sum + correction_distance;
-    if (fabs(correction_motion) > (cartesian_vel_limit * time_sum)) {
-      // The full correction will exceed our overall velocity limit.
-      if (fabs(correction_motion_sum) > (cartesian_vel_limit * time_sum)) {
-	if (fabs(correction_motion) > fabs(correction_motion_sum)) {
-	  // we were already exceeding the limit for this timestep, and
-	  // our correction only makes it worse, so don't do any correction
-	  // this time around
-	  correction_distance = 0;
-	} else {
-	  // the correction seems to be helping, so we will just stick
-	  // with the full correction
-	}
-      } else {
-	// reduce the correction to be within the velocity limit
-	if (correction_motion_sum > 0) {
-	  correction_distance = cartesian_vel_limit * time_sum - 
-	    correction_motion_sum;
-	} else {
-	  correction_distance = - cartesian_vel_limit * time_sum - 
-	    correction_motion_sum;
-	}
-      }
-    }
-  }
-
-  correction_motion_sum += correction_distance;
-
-  // publish for debugging
-  gfeplug->net_force.data[1] 
-    =correction_motion_sum / cartesian_vel_limit / time_sum;
-
-#else
-
-#ifdef NONE
-  gfeplug->net_force.data[1] 
-    =correction_distance / cartesian_vel_limit / time_sum;
-  if (fabs(correction_distance) > (cartesian_vel_limit*.002)) {
-    if (correction_distance > 0) {
-      correction_distance = cartesian_vel_limit*.002;
-    } else {
-      correction_distance = - cartesian_vel_limit*.002;
-    }
-  }
-#endif // NONE
-
-#endif // WINDOW
-
-  correction_distances.push(correction_distance);
-  return correction_distance;
+  return ws_force_torque;
 }
 
 
@@ -394,37 +346,18 @@ bool ApplyForceTraj::StopForce(gfe_owd_plugin::StopForce::Request &req,
   return true;
 }
 
-bool ApplyForceTraj::SetForcePGain(pr_msgs::SetStiffness::Request &req,
-				  pr_msgs::SetStiffness::Response &res) {
-  if (req.stiffness > .008) {
-    res.reason = "Proportional gain appears too high (above .008, which was unstable).  If you really want this gain you have to change the code).";
+bool ApplyForceTraj::SetForceGains(pr_msgs::SetJointOffsets::Request &req,
+                                   pr_msgs::SetJointOffsets::Response &res) {
+  if (req.offset.size() != 6) {
+    res.reason = "Need 6 gains: force kP, kD, kI, torque kP, kD, kI";
     res.ok=false;
   } else {
-    force_gain_kp = req.stiffness;
-    res.ok=true;
-  }
-  return true;
-}
-
-bool ApplyForceTraj::SetForceDGain(pr_msgs::SetStiffness::Request &req,
-				  pr_msgs::SetStiffness::Response &res) {
-  if (req.stiffness > .001) {
-    res.reason = "Derivative gain appears too high (above .001, which was unstable).  If you really want this gain you have to change the code).";
-    res.ok=false;
-  } else {
-    force_gain_kd = req.stiffness;
-    res.ok=true;
-  }
-  return true;
-}
-
-bool ApplyForceTraj::SetForceFactor(pr_msgs::SetStiffness::Request &req,
-				    pr_msgs::SetStiffness::Response &res) {
-  if (req.stiffness > 10) {
-    res.reason = "10 is too high.  If you really want this gain you have to change the code).";
-    res.ok=false;
-  } else {
-    xforce = req.stiffness;
+    force_controller.fkp=req.offset[0];
+    force_controller.fkd=req.offset[1];
+    force_controller.fki=req.offset[2];
+    force_controller.tkp=req.offset[3];
+    force_controller.tkd=req.offset[4];
+    force_controller.tki=req.offset[5];
     res.ok=true;
   }
   return true;
@@ -438,19 +371,17 @@ double ApplyForceTraj::xforce = 1.0;
 
 double ApplyForceTraj::cartesian_vel_limit=0.5;
 
+ForceController ApplyForceTraj::force_controller;
+
 ros::ServiceServer ApplyForceTraj::ss_ApplyForce,
-  ApplyForceTraj::ss_SetForcePGain, 
-  ApplyForceTraj::ss_SetForceDGain,
-  ApplyForceTraj::ss_SetForceFactor;
+  ApplyForceTraj::ss_SetForceGains;
   
 
 // Set up our ROS service for receiving trajectory requests.
 bool ApplyForceTraj::Register() {
   ros::NodeHandle n("~");
   ss_ApplyForce = n.advertiseService("ApplyForce",&ApplyForceTraj::ApplyForce);
-  ss_SetForcePGain = n.advertiseService("SetForcePGain",&ApplyForceTraj::SetForcePGain);
-  ss_SetForceDGain = n.advertiseService("SetForceDGain",&ApplyForceTraj::SetForceDGain);
-  ss_SetForceFactor = n.advertiseService("SetForceFactor",&ApplyForceTraj::SetForceFactor);
+  ss_SetForceGains = n.advertiseService("SetForceGains",&ApplyForceTraj::SetForceGains);
 
   return true;
 }
@@ -458,12 +389,11 @@ bool ApplyForceTraj::Register() {
 // Shut down our service so that it's no longer listed by the ROS master
 void ApplyForceTraj::Shutdown() {
   ss_ApplyForce.shutdown();
-  ss_SetForcePGain.shutdown();
-  ss_SetForceDGain.shutdown();
-  ss_SetForceFactor.shutdown();
+  ss_SetForceGains.shutdown();
 }
 
 ApplyForceTraj::~ApplyForceTraj() {
+  gfeplug->flush_recorder_data = true;
   ss_StopForce.shutdown();
 }
 
