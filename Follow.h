@@ -51,7 +51,9 @@
 
 #include "GfePlugin.hh"
 #include <openwam/Trajectory.hh>
-
+#include <std_msgs/String.h>
+#include <math.h>
+#include <LinearMath/btQuaternion.h>
 #include <joy/Joy.h>
 #include <sensor_msgs/JointState.h>
 #include <pr_msgs/ArmConfigCheck.h>
@@ -61,10 +63,10 @@
 #include <cmath>
 #include <time.h>
 
-#define FULL_SCALE_JOYSTICK .60
-#define NDOF 7
-#define VELOCITY_LIMIT 0.5
-#define JITTER_SCALE 0.05
+#define FOLLOW_FULL_SCALE_JOYSTICK .60
+#define FOLLOW_NDOF 7
+#define FOLLOW_VELOCITY_LIMIT 0.5
+#define FOLLOW_JITTER_SCALE 0.05
 #define counter_limit 10          //***TODO, switch this value to input
 
 enum JoyToggle {VELOCITY, ANGULAR_VELOCITY};
@@ -91,7 +93,7 @@ class Follow : public OWD::Trajectory {
  private:
   int mode;                         //For holding mode_joy (1) or mode_none (0)
   OWD::JointPos zeros;              //For zeroing out pos, vel, acc, t
-  double JointLimits[NDOF][2];      //Array for holding values of joint limits
+  double JointLimits[FOLLOW_NDOF][2];      //Array for holding values of joint limits
   JoyToggle whatWeAreControlling;   //Control using velocity or angular velocity
   bool jitter;                      //Jitter the end effector or not
   R6 vel_des;                       //Desired velocity of end-effector

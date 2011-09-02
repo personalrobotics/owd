@@ -40,7 +40,7 @@ Description:     The constructor sets the start position to the current
 Follow::Follow(int mode_in): OWD::Trajectory("Follow"), mode(mode_in), whatWeAreControlling(VELOCITY), jitter(true), stopfollow(false) {
   
   //Initialize a vector of size 7, with all zeros
-  zeros = OWD::JointPos(std::vector<double>(NDOF,0.0));
+  zeros = OWD::JointPos(std::vector<double>(FOLLOW_NDOF,0.0));
 
   // If the start position doesn't match the WAM's current position,
   // OWD will reject the trajectory.  These help to let other plugins know
@@ -493,9 +493,9 @@ void Follow::TrajForJoyTeleop(OWD::Trajectory::TrajControl &tc, double dt) {
   previous_button_7 = current_button_7;
 
   // Create three zeroed out JointPos vectors of size 7 for the position, vel, and accel
-  OWD::JointPos pos(std::vector<double>(NDOF,0.0));
-  OWD::JointPos vel(std::vector<double>(NDOF,0.0));
-  OWD::JointPos acc(std::vector<double>(NDOF,0.0));
+  OWD::JointPos pos(std::vector<double>(FOLLOW_NDOF,0.0));
+  OWD::JointPos vel(std::vector<double>(FOLLOW_NDOF,0.0));
+  OWD::JointPos acc(std::vector<double>(FOLLOW_NDOF,0.0));
 
   // vel_des = desired end-effector velocity and angular velocity
   // vel_des = [vx, vy, vz, wx, wy, wz]
@@ -536,11 +536,11 @@ void Follow::TrajForJoyTeleop(OWD::Trajectory::TrajControl &tc, double dt) {
 
     // Scale to a desired max velocity along with making an exponential relationship to allow
     // for precise positioning.
-    vel_des.v[i] = joy_scale*vel_sign*(vel_des.v[i]/FULL_SCALE_JOYSTICK)*(vel_des.v[i]/FULL_SCALE_JOYSTICK);
+    vel_des.v[i] = joy_scale*vel_sign*(vel_des.v[i]/FOLLOW_FULL_SCALE_JOYSTICK)*(vel_des.v[i]/FOLLOW_FULL_SCALE_JOYSTICK);
 
     // repeat for .w members
     vel_sign = (vel_des.w[i] >= 0.0)?1.0:-1.0;
-    vel_des.w[i] = joy_scale*vel_sign*(vel_des.w[i]/FULL_SCALE_JOYSTICK)*(vel_des.w[i]/FULL_SCALE_JOYSTICK);
+    vel_des.w[i] = joy_scale*vel_sign*(vel_des.w[i]/FOLLOW_FULL_SCALE_JOYSTICK)*(vel_des.w[i]/FOLLOW_FULL_SCALE_JOYSTICK);
 
   }
 
@@ -581,7 +581,7 @@ void Follow::TrajForJoyTeleop(OWD::Trajectory::TrajControl &tc, double dt) {
       vel_max = fabs(vel[i]);
     }
   }
-  double vel_limit = VELOCITY_LIMIT;
+  double vel_limit = FOLLOW_VELOCITY_LIMIT;
   if (vel_max > vel_limit) {
     vel = vel*(vel_limit/vel_max);
   }
@@ -612,9 +612,9 @@ void Follow::TrajForJoyTeleop(OWD::Trajectory::TrajControl &tc, double dt) {
   // Save values for next iteration
   if ( (jitter==true) && (counter >= counter_limit) ){
     // Create three vectors for holding the noise information
-    OWD::JointPos position_noise(std::vector<double>(NDOF,0.0));
-    OWD::JointPos velocity_noise(std::vector<double>(NDOF,0.0));
-    OWD::JointPos acceleration_noise(std::vector<double>(NDOF,0.0));
+    OWD::JointPos position_noise(std::vector<double>(FOLLOW_NDOF,0.0));
+    OWD::JointPos velocity_noise(std::vector<double>(FOLLOW_NDOF,0.0));
+    OWD::JointPos acceleration_noise(std::vector<double>(FOLLOW_NDOF,0.0));
 
     // Retrieve values of noise to add to pos, vel, and acc
     Jitter(position_noise, velocity_noise, acceleration_noise);
@@ -667,7 +667,7 @@ Returns:         This function returns the three inputs with values for the nois
 void Follow::Jitter(OWD::JointPos &noise_pos, OWD::JointPos &noise_vel, OWD::JointPos &noise_accel) {
 
   // Jitter the wrist
-  noise_pos[6] = JITTER_SCALE * sin( rand() % 10000 );
+  noise_pos[6] = FOLLOW_JITTER_SCALE * sin( rand() % 10000 );
 
   // TODO: Add values to velocity and acceleration noise (derivatives of position noise)
   noise_vel = zeros;
@@ -735,7 +735,7 @@ Notes:           Below are the joint limits from the WAM Manual:
 bool Follow::CheckExceedJointLimits(OWD::JointPos position) {
 
   // Compare input position vector and corresponding value in joint limit array
-  for (int i=0; i<NDOF; i++){
+  for (int i=0; i<FOLLOW_NDOF; i++){
 
     if( ( position[i] < JointLimits[i][0] ) || ( position[i] > JointLimits[i][1] ) ){
       
