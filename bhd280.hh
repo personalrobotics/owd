@@ -41,6 +41,7 @@ public:
     ss_gethanddof,
     ss_movehand,
     ss_resethand,
+    ss_resethandquick,
     ss_resetfinger,
     ss_sethandprop,
     ss_gethandprop,
@@ -65,6 +66,8 @@ public:
   bool RelaxHand(pr_msgs::RelaxHand::Request &req,
 		 pr_msgs::RelaxHand::Response &res);
   bool ResetHand(pr_msgs::ResetHand::Request &req,
+		 pr_msgs::ResetHand::Response &res);
+  bool ResetHandQuick(pr_msgs::ResetHand::Request &req,
 		 pr_msgs::ResetHand::Response &res);
   bool ResetFinger(pr_msgs::ResetFinger::Request &req,
 		   pr_msgs::ResetFinger::Response &res);

@@ -48,7 +48,13 @@ for the clients which communicate with them.
  - \b /bhd/ResetHand: type: \e pr_msgs/ResetHand.  Send the HI (Hand
    Initialize) command to each hand puck, in the sequence 1, 2, 3, 1,
    2, 3, 1, 2, 3, 4 (allows the hand to fully unfold if fingers are
-   blocking one-another in the worst-case configuration).
+   blocking one-another in the worst-case configuration).  The HI command 
+   is the only guaranteed way to clear the breakaway condition.
+
+ - \b /bhd/ResetHandQuick: type: \e pr_msgs/ResetHand.  Send the HI (Hand
+   Initialize) command to each hand puck and the spread puck simultaneously.
+   This command will work for most, but not every hand configuration. The 
+   HI command is the only guaranteed way to clear the breakaway condition.
 
  - \b /bhd/ResetFinger: type: \e pr_msgs/ResetFinger.  Send the HI
    command to a single specified finger (1 through 4).

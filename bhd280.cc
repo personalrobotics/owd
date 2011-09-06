@@ -77,6 +77,8 @@ void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 				      &BHD_280::MoveHand,this);
   ss_resethand = n.advertiseService("ResetHand",
 				    &BHD_280::ResetHand,this);
+  ss_resethandquick = n.advertiseService("ResetHandQuick",
+				    &BHD_280::ResetHandQuick,this);
   ss_resetfinger = n.advertiseService("ResetFinger",
 				      &BHD_280::ResetFinger,this);
   ss_relaxhand = n.advertiseService("RelaxHand",
@@ -98,6 +100,7 @@ void BHD_280::Unadvertise() {
   ss_gethanddof.shutdown();
   ss_movehand.shutdown();
   ss_resethand.shutdown();
+  ss_resethandquick.shutdown();
   ss_resetfinger.shutdown();
   ss_relaxhand.shutdown();
   ss_setspeed.shutdown();
@@ -305,6 +308,46 @@ bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
     res.ok=false;
     res.reason="Failed to reset spread";
     return true;
+  }
+  int waitcount=0;
+  while (bus->finger_hi_pending[3]) {
+    if (++waitcount > 100) {
+      res.ok=false;
+      res.reason="Spread failed to reset after 10 seconds";
+      return true;
+    }
+    usleep(100000);
+  }
+  return true;
+}
+
+bool BHD_280::ResetHandQuick(pr_msgs::ResetHand::Request &req,
+			     pr_msgs::ResetHand::Response &res) {
+  res.ok=true;
+  // send reset commands to all the fingers at once
+  for (int i=11; i<=13; ++i) {
+    if (bus->send_finger_reset(i) != OW_SUCCESS) {
+      res.ok=false;
+      res.reason="Failed to reset a finger";
+      return true;
+    }
+  }
+  if (bus->send_finger_reset(14) != OW_SUCCESS) {
+    res.ok=false;
+    res.reason="Failed to reset spread";
+    return true;
+  }
+  // wait for them all to finish
+  for (int i=11; i<=13; ++i) {
+    int waitcount = 0;
+    while (bus->finger_hi_pending[i-11]) {
+      if (++waitcount > 100) {
+	res.ok=false;
+	res.reason="Finger failed to reset after 10 seconds";
+	return true;
+      }
+      usleep(100000);
+    }
   }
   int waitcount=0;
   while (bus->finger_hi_pending[3]) {
