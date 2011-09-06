@@ -30,6 +30,13 @@
          * "none" For no hand installed -->
   <param name="owd/hand_type" type="string" value="280+TACT" />
   
+  <!-- If true, the values of the optional secondary encoders on the -->
+  <!-- BH280 hand will be ignored and will not be used to detect breakaway. -->
+  <!-- When breakaway detection is disabled the inner_links, outer_links-->
+  <!-- and breakaway arrays in the WAMState message will be -->
+  <!-- zero length.  Defaults to false. -->
+  <param name="owd/ignore_breakaway_encoders" type="bool" value="false" />
+  
   <!-- Whether the Barrett Force/Torque sensor is installed (true/false) -->
   <param name="owd/forcetorque_sensor" type="bool" value="true" />
   
