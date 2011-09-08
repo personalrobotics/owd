@@ -31,7 +31,7 @@ FT::~FT() {
 }
 
 void FT::AdvertiseAndSubscribe(ros::NodeHandle &n) {
-  pub_ft = n.advertise<geometry_msgs::WrenchStamped>("forcetorque", 40);
+  pub_ft = n.advertise<geometry_msgs::WrenchStamped>("forcetorque", 1);
   ss_tare = n.advertiseService("ft_tare",&FT::Tare,this);
 }
 

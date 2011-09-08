@@ -70,7 +70,7 @@ BHD_280::~BHD_280() {
 }
 
 void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
-  pub_handstate = n.advertise<pr_msgs::BHState>("handstate", 10);
+  pub_handstate = n.advertise<pr_msgs::BHState>("handstate", 1);
   ss_gethanddof = n.advertiseService("GetHandDOF",
 					&BHD_280::GetDOF,this);
   ss_movehand = n.advertiseService("MoveHand",
@@ -332,11 +332,6 @@ bool BHD_280::ResetHandQuick(pr_msgs::ResetHand::Request &req,
       return true;
     }
   }
-  if (bus->send_finger_reset(14) != OW_SUCCESS) {
-    res.ok=false;
-    res.reason="Failed to reset spread";
-    return true;
-  }
   // wait for them all to finish
   for (int i=11; i<=13; ++i) {
     int waitcount = 0;
@@ -348,6 +343,11 @@ bool BHD_280::ResetHandQuick(pr_msgs::ResetHand::Request &req,
       }
       usleep(100000);
     }
+  }
+  if (bus->send_finger_reset(14) != OW_SUCCESS) {
+    res.ok=false;
+    res.reason="Failed to reset spread";
+    return true;
   }
   int waitcount=0;
   while (bus->finger_hi_pending[3]) {
