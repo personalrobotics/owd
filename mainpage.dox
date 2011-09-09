@@ -294,7 +294,7 @@ commands should be published to the following topic:
 
  - \b wamservo (type pr_msgs/Servo): A vector of one or more joint
    indices followed by a vector of corresponding velocities in
-   radians/sec.
+   radians/sec.  Note: joint indices are 1 based.
 
 %OWD provides feedback through the following ROS topics:
 
