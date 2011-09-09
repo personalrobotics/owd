@@ -45,6 +45,7 @@
 #include <pr_msgs/GetDOF.h>
 #include <pr_msgs/Servo.h>
 #include <pr_msgs/Reset.h>
+#include <pr_msgs/SetForceInputThreshold.h>
 #include <owd/CalibrateJoints.h>
 #include <owd/StepJoint.h>
 #include <owd/SetGains.h>
@@ -127,6 +128,8 @@ public:
 		  owd::SetGains::Response &res);
     bool ReloadPlugins(pr_msgs::Reset::Request &req,
 		       pr_msgs::Reset::Response &res);
+    bool SetForceInputThreshold(pr_msgs::SetForceInputThreshold::Request &req,
+				pr_msgs::SetForceInputThreshold::Response &res);
 
     void AdvertiseAndSubscribe(ros::NodeHandle &n);
 
@@ -262,7 +265,8 @@ private:
       ss_CalibrateJoints,
       ss_StepJoint,
       ss_SetGains,
-      ss_ReloadPlugins;
+      ss_ReloadPlugins,
+      ss_SetForceInputThreshold;
 
     tf::TransformBroadcaster tf_broadcaster;
     btTransform wam_tf_base[7];

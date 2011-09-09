@@ -528,6 +528,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("SetGains", &WamDriver::SetGains, this);
   ss_ReloadPlugins = 
     n.advertiseService("ReloadPlugins", &WamDriver::ReloadPlugins, this);
+  ss_SetForceInputThreshold =
+    n.advertiseService("SetForceInputThreshold", &WamDriver::SetForceInputThreshold, this);
 
 #ifdef BUILD_FOR_SEA
   sub_wam_joint_targets = 
@@ -2448,6 +2450,17 @@ bool WamDriver::ReloadPlugins(pr_msgs::Reset::Request &req,
   n.param("owd_plugins",plugin_list,std::string());
   ROS_DEBUG_STREAM("Attempting to load plugins " << plugin_list);
   load_plugins(plugin_list);
+  res.ok=true;
+  return true;
+}
+
+bool WamDriver::SetForceInputThreshold(pr_msgs::SetForceInputThreshold::Request &req,
+				       pr_msgs::SetForceInputThreshold::Response &res) {
+  R3 direction(req.direction.x, req.direction.y, req.direction.z);
+  direction.normalize();
+  Trajectory::forcetorque_threshold_direction = direction;
+  Trajectory::forcetorque_threshold = req.force;
+  res.reason=std::string("");
   res.ok=true;
   return true;
 }

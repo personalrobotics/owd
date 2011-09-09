@@ -68,13 +68,15 @@ namespace OWD {
   }
 
   void Trajectory::ForceFeedback(double ft[]) {
-    memcpy(forcetorque,ft,6*sizeof(double));
+    forcetorque = R6(ft[0],ft[1],ft[2],
+		     ft[3],ft[4],ft[5]);
     valid_ft=true;
-    // simplistic check to see if greater than 3N of force towards palm
     static int forcecount(0);
+   
     if ((runstate==RUN) &&
 	CancelOnForceInput &&
-	(forcetorque[2] < -6.0)) {
+	((forcetorque.v * forcetorque_threshold_direction) 
+	 > forcetorque_threshold)) {
       if (++forcecount == 8) {
 	// only stop if we have eight cycles in a row that exceed the threshold
 	runstate=ABORT;
@@ -89,4 +91,6 @@ namespace OWD {
   {
   }
 
+  R3 Trajectory::forcetorque_threshold_direction(0,0,-1);  // negative Z (towards palm)
+  double Trajectory::forcetorque_threshold(6.0);    // 6 newtons
 }; // namespace OWD

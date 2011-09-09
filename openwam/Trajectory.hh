@@ -32,6 +32,7 @@
 
 // #include "Profile.hh"
 #include "TrajType.hh"
+#include "R6.hh"
 // #include "WAM.hh"
 
 namespace OWD {
@@ -113,14 +114,17 @@ namespace OWD {
     /// \brief Automatically cancel a trajectory based on sensed force
     ///
     /// If true, OWD will cancel the trajectory if
-    /// the force/torque sensor reports a Z value below the internal
-    /// threshold (for detecting normal force on the palm).  Defaults
-    /// to false, in which case values from the force/torque sensor
-    /// are ignored).
+    /// the force/torque sensor reports a value above the threshold
+    /// in the specified direction.  Use the SetForceInputThreshold service
+    /// to set the threshold (default is 6 Newtons towards the palm).
+    /// This option defaults to false, in which case values from the 
+    /// force/torque sensor are ignored.
     bool  CancelOnForceInput;
 
-    double forcetorque[6];
+    R6 forcetorque;
     bool valid_ft;
+    static R3 forcetorque_threshold_direction;
+    static double forcetorque_threshold;
   
     /// \brief The contructor requires a trajectory name
     ///
