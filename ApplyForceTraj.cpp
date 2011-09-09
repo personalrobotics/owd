@@ -41,10 +41,12 @@ bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
   return true;
 }
 
-ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude):
+ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
+			       double dist_limit):
   OWD::Trajectory("GFE Apply Force"),
   time_sum(0), 
-  last_force_error(0), stopforce(false)
+  last_force_error(0), stopforce(false),
+  distance_limit(dist_limit)
 {
   if (gfeplug) {
 
@@ -80,7 +82,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude):
     R3 torques;  // initializes to zero
     forcetorque_vector = R6(_force_direction,torques);
 
-    gfeplug->net_force.data.resize(48);
+    gfeplug->net_force.data.resize(51);
     // values used for debugging during development
     // not all of these are filled in right now, but here's
     // the general idea:
@@ -99,6 +101,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude):
     // 27-33: incoming joint values
     // 34-40: PID torques from previous timestep
     // 41-47: Joint position changes since last timestep
+    // 48-50: X,Y,Z readings from force sensor
 
   } else {
     throw "Could not get current WAM values from GfePlugin";
@@ -142,6 +145,18 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   // calculate the component of the error in the direction of the
   // desired force and subtract it out
   double dot_prod = position_err * force_direction;
+
+  // limit the amount of distance we can travel from the
+  // starting position
+  bool at_limit(false);
+  if (dot_prod > distance_limit) {
+    dot_prod = distance_limit;
+    at_limit=true;
+  } else if (dot_prod < -distance_limit) {
+    dot_prod = -distance_limit;
+    at_limit=true;
+  }
+
   R3 position_correction = position_err - dot_prod * force_direction;
   gfeplug->net_force.data[14]=position_correction[0];
   gfeplug->net_force.data[15]=position_correction[1];
@@ -181,6 +196,9 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
   // get the current smoothed sensor force/torque in WS coordinates
   R6 current_force_torque = workspace_forcetorque();
+  gfeplug->net_force.data[48]=current_force_torque.v[0];
+  gfeplug->net_force.data[49]=current_force_torque.v[1];
+  gfeplug->net_force.data[50]=current_force_torque.v[2];
 
   // take the dot product of the WS force with our force direction, so
   // that we just correct the on-axis forces.
@@ -215,11 +233,11 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     gfeplug->JacobianTranspose_times_vector(forcetorque_vector);
 
   // sum the correction and feedforward torques
-  for (unsigned int i=0; i<tc.t.size(); ++i) {
-#ifdef NOTHING
-    tc.t[i] = correction_torques[i]
-      + (isnan(ideal_torques[i])? 0 : ideal_torques[i]);
-#endif
+  if (! at_limit) { // skip the force if we're at the distance limit
+    for (unsigned int i=0; i<tc.t.size(); ++i) {
+      tc.t[i] = correction_torques[i]
+	+ (isnan(ideal_torques[i])? 0 : ideal_torques[i]);
+    }
   }
 
   R6 endpos_correction(position_correction,rotation_correction);
@@ -273,9 +291,9 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   
   // add the correction to the joint values
   for (unsigned int i=0; i<tc.q.size(); ++i) {
-#ifdef NOTHING
+//#ifdef NOTHING
     tc.q[i] += isnan(joint_correction[i])? 0 : joint_correction[i];
-#endif
+//#endif
   }
   OWD::JointPos joint_change(7);
   if (jointpositions.size() > 0) {

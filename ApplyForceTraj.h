@@ -22,7 +22,7 @@ public:
   /// Holds the endpoint at the current position while applying
   /// force in the specified direction.  Endpoint is free to move
   /// in the direction of the force
-  ApplyForceTraj(R3 direction, double force);
+  ApplyForceTraj(R3 direction, double force, double distance_limit = 0.1);
   ~ApplyForceTraj();
 
   virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
@@ -57,6 +57,7 @@ private:
   static const double time_window = 0.1; // seconds
   double last_force_error;
   bool stopforce;
+  double distance_limit;
   static const unsigned int FT_window_size=64;
   ros::ServiceServer ss_StopForce;
   static double force_gain_kp, force_gain_kd, xforce;

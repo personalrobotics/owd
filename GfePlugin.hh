@@ -32,11 +32,12 @@ public:
 
   static std_msgs::Float64MultiArray net_force;
  
+  bool write_log_file;
   DataRecorder<double> *recorder;
   void log_data(const std::vector<double> &data);
   bool write_recorder_data();
   bool flush_recorder_data;
-
+  
 private:
   ros::Publisher pub_net_force;
   pthread_mutex_t recorder_mutex;

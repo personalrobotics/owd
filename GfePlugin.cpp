@@ -20,11 +20,13 @@
 #include "MoveDirection.h"
 
 GfePlugin::GfePlugin()
-  : flush_recorder_data(false)
+  : write_log_file(false),flush_recorder_data(false)
 {
   // ROS has already been initialized by OWD, so we can just
   // create our own NodeHandle in the same namespace
   ros::NodeHandle n("~");
+
+  n.param("log_gfeplugin_data",write_log_file,false);
 
   // Let our Trajectory classes register themselves
   if (!ApplyForceTraj::Register()) {
@@ -71,7 +73,7 @@ GfePlugin::~GfePlugin() {
 }
 
 void GfePlugin::log_data(const std::vector<double> &data) {
-  if (pthread_mutex_trylock(&recorder_mutex)) {
+  if (write_log_file && pthread_mutex_trylock(&recorder_mutex)) {
     recorder->add(data);
     pthread_mutex_unlock(&recorder_mutex);
   }
@@ -83,11 +85,10 @@ void GfePlugin::Publish() {
   // we have to lock around the write call so that the trajectories
   // saving data to recorder don't do so while we are writing and
   // clearing
-  if ((recorder->count > 2500) || flush_recorder_data) {
-    pthread_mutex_lock(&recorder_mutex);
+  if (write_log_file &&
+      ((recorder->count > 2500) || flush_recorder_data)) {
     write_recorder_data();
     flush_recorder_data=false;
-    pthread_mutex_unlock(&recorder_mutex);
   }
 }
 
