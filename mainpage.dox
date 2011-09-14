@@ -261,6 +261,16 @@ A few additional service calls are provided for manipulating %OWD:
    the safety_torque threshold values.  Defaults to 1.0, the most
    sensitive setting.
 
+ - \b SetForceInputThreshold: Sets the termination criteria for
+   trajectories having the CancelOnForceInput option set.  Takes two
+   arguments:
+   - \b direction is a unit vector in the force/torque coordinate frame
+    (which is in the same orientation as the hand frame)
+   - \b force is a scalar representing the threshold value, in Newtons
+   The values you set will remain set until you change them again.  The
+   initial value is (0,0,-1) and 6 (six Newtons of force pressing in
+   towards the palm).
+
  - \b GetArmDOF: Returns the number of joints
 
  - \b CalibrateJoints: Puts the arm into <b>Calibration Mode</b>, so
