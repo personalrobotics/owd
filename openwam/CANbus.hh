@@ -143,6 +143,7 @@ public:
   int32_t received_state_flags;
   int hand_motion_state_sequence;
   bool ignore_breakaway_encoders;
+  int32_t hsg_value;
 
   static std::map<int,std::string> propname; // reverse number-to-name lookup
 

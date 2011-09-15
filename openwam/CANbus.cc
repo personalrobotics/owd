@@ -47,6 +47,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   simulation(false), received_position_flags(0), received_state_flags(0),
   hand_motion_state_sequence(0),
   ignore_breakaway_encoders(true),
+  hsg_value(3400),
   log_canbus_data(log_cb_data),
   candata(0),
   unread_packets(0)
@@ -563,7 +564,7 @@ int CANbus::status(int32_t* nodes){
 	if (!firstFound) {
 	  ROS_DEBUG_NAMED("canstatus","trying to wake node %d",n);
 	  if ((wake_puck(NODE2ADDR(n)) == OW_SUCCESS) &&
-	      (get_property_rt(NODE2ADDR(n), 0, &fw_vers, 40000) == OW_SUCCESS)){
+	      (get_property_rt(NODE2ADDR(n), VERS, &fw_vers, 40000) == OW_SUCCESS)){
 	    ROS_DEBUG_NAMED("canstatus","puck %d firmware version %d",n,fw_vers);
 	    initPropertyDefs(fw_vers);
 	    firstFound = 1;
@@ -2304,6 +2305,14 @@ int CANbus::hand_reset() {
     if (tactile_data) {
       if (configure_tactile_sensors() != OW_SUCCESS) {
 	ROS_ERROR("Could not initialize Tactile Sensors");
+	return OW_FAILURE;
+      }
+    }
+    
+    // set the HSG value according to our ROS parameter
+    if (fw_vers >= 182) {
+      if (set_property_rt(GROUPID(5), HSG, hsg_value, false, 10000) != OW_SUCCESS) {
+	ROS_ERROR("Could not set HSG for hand pucks");
 	return OW_FAILURE;
       }
     }
