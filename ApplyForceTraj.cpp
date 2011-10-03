@@ -57,12 +57,16 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
 	(gfeplug->ft_torque.size() < 3)) {
       throw "ApplyForce requires that the Force/Torque sensor is installed and configured";
     }
+
+    /*  This check was removed so that we can call ApplyForce while we're
+	already in contact with something.
     for (int i=0; i<3; ++i) {
       if ((gfeplug->ft_force[i] > max_tared_force) || 
 	  (gfeplug->ft_torque[i] > max_tared_torque)) {
 	throw "F/T sensor must be tared in the current configuration before calling ApplyForce";
       }
-    }
+   }
+    */
 
     if (OWD::Kinematics::max_condition > 15) {
       throw "Arm is too close to a singularity for accurate force control; please move it to a different configuration and try again";
