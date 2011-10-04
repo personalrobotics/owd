@@ -32,7 +32,7 @@
 
 // #include "Profile.hh"
 #include "TrajType.hh"
-#include "R6.hh"
+#include "../openmath/R6.hh"
 // #include "WAM.hh"
 
 namespace OWD {
