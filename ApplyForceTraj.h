@@ -42,6 +42,7 @@ public:
 
 private:
   R6 workspace_forcetorque();
+  OWD::JointPos limit_excursion_and_velocity(double travel);
   double limit_force_correction_movement(double correction_distance);
 
   SE3 endpoint_target;
@@ -52,6 +53,7 @@ private:
   static const double joint_vel_limit=0.03927; // rad/s; .39 = 90deg/sec
   static const double hand_mass=1.405; // kg
   std::queue<OWD::JointPos> jointpositions;
+  std::queue<R3> endpositions;
   std::queue<double> times;
   double time_sum;
   static const double time_window = 0.1; // seconds

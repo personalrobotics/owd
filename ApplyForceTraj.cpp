@@ -86,7 +86,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     R3 torques;  // initializes to zero
     forcetorque_vector = R6(_force_direction,torques);
 
-    gfeplug->net_force.data.resize(51);
+    gfeplug->net_force.data.resize(53);
     // values used for debugging during development
     // not all of these are filled in right now, but here's
     // the general idea:
@@ -106,6 +106,8 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     // 34-40: PID torques from previous timestep
     // 41-47: Joint position changes since last timestep
     // 48-50: X,Y,Z readings from force sensor
+    // 51: magnitude of the force controller error vector
+    // 52: magnitude of the force controller error integral
 
   } else {
     throw "Could not get current WAM values from GfePlugin";
@@ -151,27 +153,14 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   double dot_prod = position_err * force_direction;
 
   // limit the amount of distance we can travel from the
-  // starting position
-  bool at_limit(false);
-  if (dot_prod > distance_limit) {
-    dot_prod = distance_limit;
-    at_limit=true;
-  } else if (dot_prod < -distance_limit) {
-    dot_prod = -distance_limit;
-    at_limit=true;
-  }
+  // starting position and the EE velocity by applying counter-torques
+  // as necessary
+  OWD::JointPos damping_torques = limit_excursion_and_velocity(dot_prod);
 
   R3 position_correction = position_err - dot_prod * force_direction;
   gfeplug->net_force.data[14]=position_correction[0];
   gfeplug->net_force.data[15]=position_correction[1];
   gfeplug->net_force.data[16]=position_correction[2];
-
-#ifdef NDEF
-  if (position_correction.norm() > .015) {
-    // limit the step size each cycle
-    position_correction *= .015 / position_correction.norm();
-  }
-#endif
 
   // Compute the rotation error by taking the net rotation from the
   // current orientation to the original orientation and converting
@@ -220,8 +209,10 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
   // Pass the F/T error to the force controller to get
   // the joint torques to apply
-  OWD::JointPos correction_torques = 
+  OWD::JointPos correction_torques(tc.q.size());
+  correction_torques = 
     force_controller.control(workspace_forcetorque_error);
+
   gfeplug->net_force.data[7] = correction_torques[0];
   gfeplug->net_force.data[8] = correction_torques[1];
   gfeplug->net_force.data[9] = correction_torques[2];
@@ -229,6 +220,8 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   gfeplug->net_force.data[11] = correction_torques[4];
   gfeplug->net_force.data[12] = correction_torques[5];
   gfeplug->net_force.data[13] = correction_torques[6];
+  gfeplug->net_force.data[51] = force_controller.last_ft_error.norm();
+  gfeplug->net_force.data[52] = force_controller.ft_error_integral.norm();
 
   // specify the feedforward torques that would ideally produce the
   // desired endpoint force.  this makes life easier for the force
@@ -237,14 +230,16 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     gfeplug->JacobianTranspose_times_vector(forcetorque_vector);
 
   // sum the correction and feedforward torques
-  if (! at_limit) { // skip the force if we're at the distance limit
-    for (unsigned int i=0; i<tc.t.size(); ++i) {
-      tc.t[i] = correction_torques[i]
-	+ (isnan(ideal_torques[i])? 0 : ideal_torques[i]);
-    }
+  for (unsigned int i=0; i<tc.t.size(); ++i) {
+    tc.t[i] = correction_torques[i]
+      + ideal_torques[i]
+      + damping_torques[i];
   }
 
   R6 endpos_correction(position_correction,rotation_correction);
+  R3 desired_endpoint = (R3)gfeplug->endpoint + endpos_correction.v;
+  endpositions.push(desired_endpoint);
+
   OWD::JointPos joint_correction;
   try {
     joint_correction = 
@@ -274,30 +269,9 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // don't worry about it
   }
 
-#ifdef NDEF
-  // Check the requested motion of each joint over the past 0.25 seconds to 
-  // make sure it doesn't exceed 90deg/sec (0.3927 rad in 0.25 sec)
-  if (time_sum > time_window) {
-    OWD::JointPos joint_motion = tc.q - jointpositions.front()
-      + joint_correction;
-    gfeplug->net_force.data[2]=joint_motion.length() / joint_vel_limit / time_sum;
-  }
-#endif
-
-  // Normally the evaluate function will be called with dt equal to
-  // the control period.  But if OWD is detecting stall conditions due to
-  // too-high PID torques, it will reduce the timescale and we'll see
-  // smaller values for dt, meaning we should take a smaller "step" along
-  // the trajectory path.  We'll achieve this by scaling down our 
-  // ultimate joint correction.
-  joint_correction *= dt / OWD::ControlLoop::PERIOD;
-  gfeplug->net_force.data[0]=dt/OWD::ControlLoop::PERIOD;
-  
   // add the correction to the joint values
   for (unsigned int i=0; i<tc.q.size(); ++i) {
-//#ifdef NOTHING
     tc.q[i] += isnan(joint_correction[i])? 0 : joint_correction[i];
-//#endif
   }
   OWD::JointPos joint_change(7);
   if (jointpositions.size() > 0) {
@@ -319,6 +293,7 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // update our averaging windows
     time_sum -= times.front();  times.pop();
     jointpositions.pop();
+    endpositions.pop();
   }
 
   // record our data for logging
@@ -385,13 +360,51 @@ bool ApplyForceTraj::SetForceGains(pr_msgs::SetJointOffsets::Request &req,
   return true;
 }
 
+OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
+  // We limit the excursion by calculating a restoring force proportional
+  // to the cube of the distance beyond 90% of the travel limit.  By the
+  // time we get to 100% of the travel limit, the restoring force will be
+  // equal to the excursion_gain.
+  double excursion_return_force = 0;
+  static double excursion_gain = 10; // 10N of force if we reach the limit
+  if (travel > 0.9 * distance_limit) {
+    excursion_return_force = pow((travel - 0.9*distance_limit) / (0.1*distance_limit),3)
+      * excursion_gain;
+  } else if (travel < -0.9 * distance_limit) {
+    excursion_return_force = pow((travel + 0.9*distance_limit) / (0.1*distance_limit),3)
+      * excursion_gain;
+  }
+
+  // We limit the velocity by creating a virtual dashpot that applies
+  // a counter force proportional to the velocity.
+  static double velocity_gain = 4; // 1N at 100% of limit
+  double velocity_return_force=0;
+  if (endpositions.size() > 10) {  // need enough data
+    R3 endpoint_motion = (R3)gfeplug->endpoint - endpositions.front();
+    gfeplug->net_force.data[1] = endpoint_motion.norm()
+      / (cartesian_vel_limit * time_sum);
+    double linear_endpoint_motion = endpoint_motion * force_direction;
+    velocity_return_force = - pow(linear_endpoint_motion
+				  / (cartesian_vel_limit * time_sum),3)
+      * velocity_gain;
+  }
+
+  // compute the corresponding joint torques
+  R3 correction_torque;
+  R6 correction_ft 
+    = R6((excursion_return_force+velocity_return_force)* force_direction,
+	 correction_torque);
+
+  return OWD::Plugin::JacobianTranspose_times_vector(correction_ft);
+}
+
 double ApplyForceTraj::force_gain_kp = 1.6e-3;
 
 double ApplyForceTraj::force_gain_kd = 0;
 
 double ApplyForceTraj::xforce = 1.0;
 
-double ApplyForceTraj::cartesian_vel_limit=0.5;
+double ApplyForceTraj::cartesian_vel_limit=0.1;
 
 ForceController ApplyForceTraj::force_controller;
 

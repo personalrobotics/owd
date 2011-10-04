@@ -40,7 +40,8 @@ public:
   
 private:
   ros::Publisher pub_net_force;
-  pthread_mutex_t recorder_mutex;
+  pthread_mutex_t recorder_mutex,
+    pub_mutex;
 };
 
 extern GfePlugin *gfeplug;

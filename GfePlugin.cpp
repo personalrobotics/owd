@@ -58,10 +58,16 @@ GfePlugin::GfePlugin()
   // 6 seconds of samples at 500 Hz
   recorder = new DataRecorder<double>(3000);
   pthread_mutex_init(&recorder_mutex,NULL);
+  pthread_mutex_init(&pub_mutex,NULL);
 }
 
 GfePlugin::~GfePlugin() {
-  // Also tell our Trajectory classes to clean up.
+  // grabbing the lock will make sure that the publisher doesn't try
+  // to use ROS at the same time (was causing occassional crashes when
+  // reloading the plugin)
+  pthread_mutex_lock(&pub_mutex);
+
+  // Tell our Trajectory classes to clean up.
   ApplyForceTraj::Shutdown();
   DoorTraj::Shutdown();
   JacobianTestTraj::Shutdown();
@@ -69,6 +75,8 @@ GfePlugin::~GfePlugin() {
   Follow::Shutdown();
   HelixTraj::Shutdown();
   MoveDirection::Shutdown();
+
+  // Shut down our publisher
   pub_net_force.shutdown();
 }
 
@@ -80,15 +88,19 @@ void GfePlugin::log_data(const std::vector<double> &data) {
 }
 
 void GfePlugin::Publish() {
-  pub_net_force.publish(net_force);
-
-  // we have to lock around the write call so that the trajectories
-  // saving data to recorder don't do so while we are writing and
-  // clearing
-  if (write_log_file &&
-      ((recorder->count > 2500) || flush_recorder_data)) {
-    write_recorder_data();
-    flush_recorder_data=false;
+  // only if we are not shutting down
+  if (pthread_mutex_trylock(&pub_mutex)) {
+    pub_net_force.publish(net_force);
+    
+    // we have to lock around the write call so that the trajectories
+    // saving data to recorder don't do so while we are writing and
+    // clearing
+    if (write_log_file &&
+	((recorder->count > 2500) || flush_recorder_data)) {
+      write_recorder_data();
+      flush_recorder_data=false;
+    }
+    pthread_mutex_unlock(&pub_mutex);
   }
 }
 

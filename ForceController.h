@@ -21,6 +21,7 @@ class ForceController {
   double tkp, tkd, tki;  // torque gains
   R6 last_ft_error;
   R6 ft_error_integral;
+  double integral_saturation_limit;
 };
 
 #endif // FORCE_CONTROLLER_H
