@@ -8,8 +8,8 @@
 #include "ForceController.h"
 
 ForceController::ForceController()
-  : fkp(4), fkd(64), fki(0.1),
-    tkp(4), tkd(4), tki(1),
+  : fkp(2), fkd(16), fki(0.05),
+    tkp(1), tkd(0), tki(1),
     last_ft_error(0,0,0,0,0,0),
     ft_error_integral(0,0,0,0,0,0),
     integral_saturation_limit(200) {
@@ -25,7 +25,7 @@ OWD::JointPos ForceController::control(R6 ft_error) {
 
   // limit the magnitude of the proportional error (and thus the
   // amount that gets added to the integral term, too)
-  static double ft_error_limit = 5.0;
+  static double ft_error_limit = 3.0;
   if (ft_error.norm() > ft_error_limit) {
     ft_error = ft_error * ft_error_limit / ft_error.norm();
   }
