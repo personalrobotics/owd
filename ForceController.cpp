@@ -8,7 +8,7 @@
 #include "ForceController.h"
 
 ForceController::ForceController()
-  : fkp(2), fkd(16), fki(0.05),
+  : fkp(2), fkd(16), fki(0.025),
     tkp(1), tkd(0), tki(1),
     last_ft_error(0,0,0,0,0,0),
     ft_error_integral(0,0,0,0,0,0),
