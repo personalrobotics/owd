@@ -40,7 +40,7 @@ public:
   static const int WZ =  5;
 
   R6(){clear();}
-  R6(const R3& v1, const R3& w1) : v(v1), w(w1) {}
+  R6(R3 v1, R3 w1) : v(v1), w(w1) {}
   R6(double x0, double x1, double x2, double x3, double x4, double x5)
     : v(x0, x1, x2), w(x3, x4, x5) {}
 
