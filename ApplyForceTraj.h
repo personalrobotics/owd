@@ -44,6 +44,7 @@ private:
   R6 workspace_forcetorque();
   OWD::JointPos limit_excursion_and_velocity(double travel);
   double limit_force_correction_movement(double correction_distance);
+  template<class value_t> value_t butterworth(value_t);
 
   SE3 endpoint_target;
   R3 force_direction;

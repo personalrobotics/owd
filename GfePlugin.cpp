@@ -56,7 +56,7 @@ GfePlugin::GfePlugin()
   pub_net_force = n.advertise<std_msgs::Float64MultiArray>("net_force",1);
 
   // 6 seconds of samples at 500 Hz
-  recorder = new DataRecorder<double>(3000);
+  recorder = new DataRecorder<double>(6000);
   pthread_mutex_init(&recorder_mutex,NULL);
   pthread_mutex_init(&pub_mutex,NULL);
 }
@@ -78,6 +78,8 @@ GfePlugin::~GfePlugin() {
 
   // Shut down our publisher
   pub_net_force.shutdown();
+  
+  pthread_mutex_unlock(&pub_mutex);
 }
 
 void GfePlugin::log_data(const std::vector<double> &data) {
@@ -91,16 +93,13 @@ void GfePlugin::Publish() {
   // only if we are not shutting down
   if (pthread_mutex_trylock(&pub_mutex)) {
     pub_net_force.publish(net_force);
-    
-    // we have to lock around the write call so that the trajectories
-    // saving data to recorder don't do so while we are writing and
-    // clearing
-    if (write_log_file &&
-	((recorder->count > 2500) || flush_recorder_data)) {
-      write_recorder_data();
-      flush_recorder_data=false;
-    }
     pthread_mutex_unlock(&pub_mutex);
+  }    
+  
+  if (write_log_file &&
+      ((recorder->count > 2500) || flush_recorder_data)) {
+    write_recorder_data();
+    flush_recorder_data=false;
   }
 }
 
@@ -112,7 +111,9 @@ bool GfePlugin::write_recorder_data() {
   snprintf(filename,200,"/tmp/gfeplugin-%04d.csv",filenum);
   ROS_INFO("Writing GfePlugin log to %s",filename);
   pthread_mutex_lock(&recorder_mutex);
+  ROS_INFO("dumping log...");
   bool result = recorder->dump(filename);
+  ROS_INFO("done.");
   recorder->reset();
   pthread_mutex_unlock(&recorder_mutex);
   return result;

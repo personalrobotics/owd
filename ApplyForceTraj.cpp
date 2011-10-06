@@ -8,6 +8,7 @@
 #include "ApplyForceTraj.h"
 #include <openwam/Kinematics.hh>
 #include <openwam/ControlLoop.hh>
+#include <deque>
 
 // Process our ApplyForce service calls from ROS
 bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
@@ -86,7 +87,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     R3 torques;  // initializes to zero
     forcetorque_vector = R6(_force_direction,torques);
 
-    gfeplug->net_force.data.resize(53);
+    gfeplug->net_force.data.resize(60);
     // values used for debugging during development
     // not all of these are filled in right now, but here's
     // the general idea:
@@ -95,9 +96,9 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     // 1: endpoint motion factor (1=100% of limit)
     // 2: joint motion factor (1=100% of limit)
     // 3: max condition number
-    // 4: WS force X error
-    // 5: WS force Y error
-    // 6: WS force Z error
+    // 4: force controller Ferr
+    // 5: force controller dFerr
+    // 6: force controller IFerr
     // 7-13: joint torques
     // 14-16: WS position X,Y,Z error
     // 17-19: WS rotation X,Y,Z error
@@ -105,9 +106,14 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     // 27-33: incoming joint values
     // 34-40: PID torques from previous timestep
     // 41-47: Joint position changes since last timestep
-    // 48-50: X,Y,Z readings from force sensor
-    // 51: magnitude of the force controller error vector
-    // 52: magnitude of the force controller error integral
+    // 48-50: smoothed X,Y,Z force readings from force sensor
+    // 51-53: raw X,Y,Z force readings
+    // 54:  1-dim force controller correction force
+    // 55:  1-dim travel in force direction from start point
+    // 56:  excursion return force
+    // 57:  1-dim velocity in force direction
+    // 58:  velocity damping force
+    // 59:  GfePlugin::recorder->count
 
   } else {
     throw "Could not get current WAM values from GfePlugin";
@@ -122,6 +128,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
 void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   time += dt;
   times.push(dt);  time_sum += dt;
+  gfeplug->net_force.data[0 ]=dt/OWD::ControlLoop::PERIOD;
   
   if (stopforce) {
     runstate=OWD::Trajectory::DONE;
@@ -145,6 +152,11 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   gfeplug->net_force.data[39]=gfeplug->pid_torque[5];
   gfeplug->net_force.data[40]=gfeplug->pid_torque[6];
   
+  // record the force readings
+  gfeplug->net_force.data[51]=gfeplug->ft_force[0];
+  gfeplug->net_force.data[52]=gfeplug->ft_force[1];
+  gfeplug->net_force.data[53]=gfeplug->ft_force[2];
+
   // calculate the endpoint position error
   R3 position_err = (R3)endpoint_target - (R3)gfeplug->endpoint;
 
@@ -203,15 +215,22 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   // overall force/torque error in WS coordinates
   R6 workspace_forcetorque_error =
     forcetorque_vector - net_force_torque;
-  gfeplug->net_force.data[4] = workspace_forcetorque_error.v[0];
-  gfeplug->net_force.data[5] = workspace_forcetorque_error.v[1];
-  gfeplug->net_force.data[6] = workspace_forcetorque_error.v[2];
 
   // Pass the F/T error to the force controller to get
   // the joint torques to apply
   OWD::JointPos correction_torques(tc.q.size());
   correction_torques = 
     force_controller.control(workspace_forcetorque_error);
+
+  // log the 1-dimensional values from force controller
+  gfeplug->net_force.data[4] = force_controller.bounded_ft_error.v 
+    * force_direction;
+  gfeplug->net_force.data[5] = force_controller.ft_error_delta.v
+    * force_direction;
+  gfeplug->net_force.data[6] = force_controller.ft_error_integral.v
+    * force_direction / 3.0;
+  gfeplug->net_force.data[54] = force_controller.ft_correction.v
+    * force_direction;
 
   gfeplug->net_force.data[7] = correction_torques[0];
   gfeplug->net_force.data[8] = correction_torques[1];
@@ -220,8 +239,7 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   gfeplug->net_force.data[11] = correction_torques[4];
   gfeplug->net_force.data[12] = correction_torques[5];
   gfeplug->net_force.data[13] = correction_torques[6];
-  gfeplug->net_force.data[51] = force_controller.last_ft_error.norm();
-  gfeplug->net_force.data[52] = force_controller.ft_error_integral.norm();
+
 
   // specify the feedforward torques that would ideally produce the
   // desired endpoint force.  this makes life easier for the force
@@ -245,9 +263,8 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     joint_correction = 
       gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
   } catch (const char *err) {
-    // no valid Jacobian, for whatever reason, so just leave the joint
-    // values unchanged.  Maybe someone will move us back to a more
-    // favorable configuration
+    // no valid Jacobian, for whatever reason, so give up.
+    runstate=OWD::Trajectory::ABORT;
     return;
   }
   gfeplug->net_force.data[20]=joint_correction[0];
@@ -298,6 +315,7 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
   // record our data for logging
   gfeplug->log_data(gfeplug->net_force.data);
+  gfeplug->net_force.data[59]=gfeplug->recorder->count;
 
   end_position =tc.q;  // keep tracking the current position
   return;
@@ -309,12 +327,17 @@ R6 ApplyForceTraj::workspace_forcetorque() {
   // of the sum of all the elements in the queue, so no matter how
   // many elements we are averaging we can quickly compute the new
   // average by just adjusting the sum and dividing by the count.
+
+  R6 current_ft(gfeplug->ft_force[0],
+		gfeplug->ft_force[1],
+		gfeplug->ft_force[2],
+		gfeplug->ft_torque[0],
+		gfeplug->ft_torque[1],
+		gfeplug->ft_torque[2]);
+
+  /*
   static std::queue<R6> force_torque;
   static R6 force_torque_sum;
-
-  R6 current_ft(gfeplug->ft_force[0], gfeplug->ft_force[1],
-                gfeplug->ft_force[2], gfeplug->ft_force[3],
-                gfeplug->ft_force[4], gfeplug->ft_force[5]);
   force_torque.push(current_ft);
   force_torque_sum += current_ft;
 
@@ -323,6 +346,8 @@ R6 ApplyForceTraj::workspace_forcetorque() {
     force_torque.pop();
   }
   R6 force_torque_avg = force_torque_sum / force_torque.size();
+*/
+  R6 force_torque_avg = butterworth(current_ft);
   
   // rotate the force and torque into workspace coordinates
   // we negate each of the sensor readings because what we want is a
@@ -335,6 +360,53 @@ R6 ApplyForceTraj::workspace_forcetorque() {
   return ws_force_torque;
 }
 
+template<class value_t> value_t ApplyForceTraj::butterworth(value_t current) {
+  // coefficients for a 3rd-order filter with a
+  // cutoff of 10hz
+  /*
+  static const unsigned int order=3;
+  static const double B1=0.2196e-3;
+  static const double B2=0.6588e-3;
+  static const double B3=0.6588e-3;
+  static const double B4=0.2196e-3;
+  static const double A2=-2.7488;
+  static const double A3= 2.5282;
+  static const double A4=-0.7776;
+  */
+
+  // coefficients for a 2nd-order filter with a
+  // cutoff of 10hz
+  static const unsigned int order=2;
+  static const double B1=0.0036;
+  static const double B2=0.0072;
+  static const double B3=0.0036;
+  static const double A2=-1.8227;
+  static const double A3= 0.8372;
+
+  static std::deque<value_t> X;
+  static std::deque<value_t> Y;
+  if (X.size() != order) {
+    // initialize with all current values
+    X.resize(order,current);
+    Y.resize(order,current);
+  } 
+  
+  //  3rd-order equation
+  //value_t output = B1*current
+  //  + B2*X[0] + B3*X[1] + B4*X[2]
+  //  - A2*Y[0] - A3*Y[1] - A4*Y[2];
+  
+  // 2nd-order equation
+  value_t output = B1*current
+    + B2*X[0] + B3*X[1]
+    - A2*Y[0] - A3*Y[1];
+
+  X.pop_back();
+  Y.pop_back();
+  X.push_front(current);
+  Y.push_front(output);
+  return output;
+}
 
 // Stop the trajectory when asked by a client
 bool ApplyForceTraj::StopForce(gfe_owd_plugin::StopForce::Request &req,
@@ -361,6 +433,7 @@ bool ApplyForceTraj::SetForceGains(pr_msgs::SetJointOffsets::Request &req,
 }
 
 OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
+
   // We limit the excursion by calculating a restoring force proportional
   // to the cube of the distance beyond 90% of the travel limit.  By the
   // time we get to 100% of the travel limit, the restoring force will be
@@ -374,19 +447,28 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
     excursion_return_force = pow((travel + 0.9*distance_limit) / (0.1*distance_limit),3)
       * excursion_gain;
   }
-
+  gfeplug->net_force.data[55] = travel * 1000.0;
+  gfeplug->net_force.data[56] = excursion_return_force;
+    
   // We limit the velocity by creating a virtual dashpot that applies
   // a counter force proportional to the velocity.
-  static double velocity_gain = 4; // 1N at 100% of limit
+  const double velocity_gain = 0.0133;
+  static double last_travel(travel);
+  double travel_delta = travel - last_travel;
+  last_travel = travel;
+  double velocity = butterworth(travel_delta) / OWD::ControlLoop::PERIOD;
   double velocity_return_force=0;
   if (endpositions.size() > 10) {  // need enough data
     R3 endpoint_motion = (R3)gfeplug->endpoint - endpositions.front();
-    gfeplug->net_force.data[1] = endpoint_motion.norm()
-      / (cartesian_vel_limit * time_sum);
-    double linear_endpoint_motion = endpoint_motion * force_direction;
-    velocity_return_force = - pow(linear_endpoint_motion
-				  / (cartesian_vel_limit * time_sum),3)
-      * velocity_gain;
+    gfeplug->net_force.data[1] = travel / cartesian_vel_limit;
+    // velocity damping is using the travel direction, not the workspace
+    //    direction, so it's sometimes the wrong sign.  Disabling for now.
+    //
+    //    velocity_return_force = 
+    //      - pow(velocity / cartesian_vel_limit, 3)
+    //      * velocity_gain;
+    gfeplug->net_force.data[57] = velocity * 1000.0;
+    gfeplug->net_force.data[58] = velocity_return_force;
   }
 
   // compute the corresponding joint torques
