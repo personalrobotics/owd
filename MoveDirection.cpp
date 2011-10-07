@@ -111,6 +111,7 @@ MoveDirection::MoveDirection(double direction_in_x,
      direction[2] = direction_in_z;
      direction = direction.normalize();
       
+#if 0
      // Check to make sure that the force/torque sensor has been properly tared
      const double max_tared_force = 0.5;
      const double max_tared_torque= 0.5;
@@ -124,6 +125,7 @@ MoveDirection::MoveDirection(double direction_in_x,
 	 throw "HelixTraj did not properly tare the F/T sensor in the current configuration";
        }
      }
+#endif
 
 #ifdef MD_SAFE
      // Check to make sure we are not too close to a singularity
@@ -360,7 +362,7 @@ void MoveDirection::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     if(++forcecount == 8){
       ROS_INFO("Trajectory is being shut down due to 8 cycles exceeding the FORCE_THRESHOLD");
 
-      stopmovedirection = true;
+      //stopmovedirection = true;
 
       return;
     } 

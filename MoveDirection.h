@@ -64,9 +64,9 @@ Instructions:  To run this plugin, after typing rosmake in the folder
 //#define MD_SAFE                // Uncomment to look for singularities and limit joint movement
 #define NDOF 7                   // Number of degrees of freedom
 #define MAX_DISTANCE 1           // Maximum distance to move in given direction in meters
-#define FORCE_THRESHOLD 1.5      // Newtons of force for threshold in case of collision
-#define VELOCITY_LIMIT 0.05      // Maximum allowable joint velocity in radians/second
-#define VELOCITY_INPUT_LIMIT 0.1 // Maximum allowable input velocity in meters/second
+#define FORCE_THRESHOLD 100      // Newtons of force for threshold in case of collision
+#define VELOCITY_LIMIT 0.5      // Maximum allowable joint velocity in radians/second
+#define VELOCITY_INPUT_LIMIT 1 // Maximum allowable input velocity in meters/second
 
 // Class for creating straight trajectory in x, y or z-direction of wam7
 class MoveDirection : public OWD::Trajectory, public JointsToTF {

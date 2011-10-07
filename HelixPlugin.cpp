@@ -181,8 +181,8 @@ HelixTraj::HelixTraj(double amplitude_in, double pitch_in)
      }
   
      // Check to make sure that the force/torque sensor has been properly tared
-     const double max_tared_force = 0.5;
-     const double max_tared_torque= 0.5;
+     const double max_tared_force = 1.0;
+     const double max_tared_torque= 1.0;
      if ( (gfeplug->ft_force.size() < 3) || (gfeplug->ft_torque.size() < 3) ) {
        throw "HelixTraj requires that the Force/Torque sensor is installed and configured";
      }
@@ -400,6 +400,7 @@ void HelixTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
     // Raise flag to shut down the trajectory
     stophelixtraj = true;
+    //pitch = 0.0;
 
     return;
     }

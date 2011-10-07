@@ -38,14 +38,14 @@ Instructions:  To run this plugin, after typing rosmake in the folder
 #include <time.h>
 
 #define HP_VERBOSE              // Comment out to eliminate extra printing of values
-#define HP_SAFE                 // Comment out to eliminate singularity check
+//#define HP_SAFE                 // Comment out to eliminate singularity check
 #define NDOF 7                  // Number of degrees of freedom
 #define PI 3.1415926535         // Apple PI, to 10 decimal places
-#define AMPLITUDE_MAX 0.05      // Maximum amplitude of helix
+#define AMPLITUDE_MAX 0.1      // Maximum amplitude of helix
 #define PITCH_MAX 0.1           // Maximum pitch of helix
-#define VELOCITY_LIMIT 0.05     // Maximum joint velocity in m/s
-#define FREQUENCY 0.1           // Cycles/second of helix
-#define Z_THRESHOLD 3           // Newtons of force for Z-direction threshold
+#define VELOCITY_LIMIT 0.5     // Maximum joint velocity in m/s
+#define FREQUENCY 1           // Cycles/second of helix
+#define Z_THRESHOLD 20           // Newtons of force for Z-direction threshold
 #define DISTANCE_THRESHOLD .75  // Maximum distance in meters to travel in z-direction
 
 // Class for transforming joint coordinate frames to wam0
