@@ -166,8 +166,9 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
   // limit the amount of distance we can travel from the
   // starting position and the EE velocity by applying counter-torques
-  // as necessary
-  OWD::JointPos damping_torques = limit_excursion_and_velocity(dot_prod);
+  // as necessary.  we'll pass in the amount of travel in the force direction
+  // that's occurred, which is just the opposite of dot_prod.
+  OWD::JointPos damping_torques = limit_excursion_and_velocity(-dot_prod);
 
   R3 position_correction = position_err - dot_prod * force_direction;
   gfeplug->net_force.data[14]=position_correction[0];
@@ -433,6 +434,8 @@ bool ApplyForceTraj::SetForceGains(pr_msgs::SetJointOffsets::Request &req,
 }
 
 OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
+  // The travel argument is the distance we've moved in the force direction
+  // from the original starting point.
 
   // We limit the excursion by calculating a restoring force proportional
   // to the cube of the distance beyond 90% of the travel limit.  By the
@@ -441,10 +444,10 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
   double excursion_return_force = 0;
   static double excursion_gain = 10; // 10N of force if we reach the limit
   if (travel > 0.9 * distance_limit) {
-    excursion_return_force = pow((travel - 0.9*distance_limit) / (0.1*distance_limit),3)
+    excursion_return_force = -pow((travel - 0.9*distance_limit) / (0.1*distance_limit),3)
       * excursion_gain;
   } else if (travel < -0.9 * distance_limit) {
-    excursion_return_force = pow((travel + 0.9*distance_limit) / (0.1*distance_limit),3)
+    excursion_return_force = -pow((travel + 0.9*distance_limit) / (0.1*distance_limit),3)
       * excursion_gain;
   }
   gfeplug->net_force.data[55] = travel * 1000.0;
@@ -452,24 +455,18 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
     
   // We limit the velocity by creating a virtual dashpot that applies
   // a counter force proportional to the velocity.
-  const double velocity_gain = 0.0133;
+  const double velocity_gain = 0.35;
   static double last_travel(travel);
   double travel_delta = travel - last_travel;
   last_travel = travel;
   double velocity = butterworth(travel_delta) / OWD::ControlLoop::PERIOD;
   double velocity_return_force=0;
-  if (endpositions.size() > 10) {  // need enough data
-    R3 endpoint_motion = (R3)gfeplug->endpoint - endpositions.front();
-    gfeplug->net_force.data[1] = travel / cartesian_vel_limit;
-    // velocity damping is using the travel direction, not the workspace
-    //    direction, so it's sometimes the wrong sign.  Disabling for now.
-    //
-    //    velocity_return_force = 
-    //      - pow(velocity / cartesian_vel_limit, 3)
-    //      * velocity_gain;
-    gfeplug->net_force.data[57] = velocity * 1000.0;
-    gfeplug->net_force.data[58] = velocity_return_force;
-  }
+  gfeplug->net_force.data[1] = travel / cartesian_vel_limit;
+  velocity_return_force = 
+    - pow(velocity / cartesian_vel_limit, 3)
+    * velocity_gain;
+  gfeplug->net_force.data[57] = velocity * 1000.0;
+  gfeplug->net_force.data[58] = velocity_return_force;
 
   // compute the corresponding joint torques
   R3 correction_torque;
