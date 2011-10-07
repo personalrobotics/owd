@@ -15,6 +15,7 @@
 #include <gfe_owd_plugin/StopForce.h>
 #include <pr_msgs/SetJointOffsets.h> // for changing force gains
 #include <queue>
+#include "Butterworth.h"
 
 class ApplyForceTraj : public OWD::Trajectory {
 public:
@@ -44,7 +45,6 @@ private:
   R6 workspace_forcetorque();
   OWD::JointPos limit_excursion_and_velocity(double travel);
   double limit_force_correction_movement(double correction_distance);
-  template<class value_t> value_t butterworth(value_t);
 
   SE3 endpoint_target;
   R3 force_direction;
@@ -65,6 +65,8 @@ private:
   ros::ServiceServer ss_StopForce;
   static double force_gain_kp, force_gain_kd, xforce;
   static ForceController force_controller;
+  Butterworth<R6> ft_filter;
+  Butterworth<double> velocity_filter;
   
   /// Static members for handling the ROS service calls
   static ros::ServiceServer ss_ApplyForce;

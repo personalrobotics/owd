@@ -55,7 +55,6 @@ GfePlugin::GfePlugin()
 
   pub_net_force = n.advertise<std_msgs::Float64MultiArray>("net_force",1);
 
-  // 6 seconds of samples at 500 Hz
   recorder = new DataRecorder<double>(6000);
   pthread_mutex_init(&recorder_mutex,NULL);
   pthread_mutex_init(&pub_mutex,NULL);
@@ -83,7 +82,7 @@ GfePlugin::~GfePlugin() {
 }
 
 void GfePlugin::log_data(const std::vector<double> &data) {
-  if (write_log_file && pthread_mutex_trylock(&recorder_mutex)) {
+  if (write_log_file && (pthread_mutex_trylock(&recorder_mutex) == 0)) {
     recorder->add(data);
     pthread_mutex_unlock(&recorder_mutex);
   }
@@ -91,7 +90,7 @@ void GfePlugin::log_data(const std::vector<double> &data) {
 
 void GfePlugin::Publish() {
   // only if we are not shutting down
-  if (pthread_mutex_trylock(&pub_mutex)) {
+  if (pthread_mutex_trylock(&pub_mutex) == 0) {
     pub_net_force.publish(net_force);
     pthread_mutex_unlock(&pub_mutex);
   }    

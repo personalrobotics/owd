@@ -8,7 +8,6 @@
 #include "ApplyForceTraj.h"
 #include <openwam/Kinematics.hh>
 #include <openwam/ControlLoop.hh>
-#include <deque>
 
 // Process our ApplyForce service calls from ROS
 bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
@@ -47,13 +46,12 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   OWD::Trajectory("GFE Apply Force"),
   time_sum(0), 
   last_force_error(0), stopforce(false),
-  distance_limit(dist_limit)
+  distance_limit(dist_limit),
+  ft_filter(2,10.0),
+  velocity_filter(2,10.0)
 {
   if (gfeplug) {
 
-    // make sure that the F/T sensor has already been tared
-    const double max_tared_force=1.0;
-    const double max_tared_torque=0.1;
     if ((gfeplug->ft_force.size() < 3) ||
 	(gfeplug->ft_torque.size() < 3)) {
       throw "ApplyForce requires that the Force/Torque sensor is installed and configured";
@@ -61,6 +59,9 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
 
     /*  This check was removed so that we can call ApplyForce while we're
 	already in contact with something.
+    // make sure that the F/T sensor has already been tared
+    const double max_tared_force=1.0;
+    const double max_tared_torque=0.1;
     for (int i=0; i<3; ++i) {
       if ((gfeplug->ft_force[i] > max_tared_force) || 
 	  (gfeplug->ft_torque[i] > max_tared_torque)) {
@@ -348,7 +349,7 @@ R6 ApplyForceTraj::workspace_forcetorque() {
   }
   R6 force_torque_avg = force_torque_sum / force_torque.size();
 */
-  R6 force_torque_avg = butterworth(current_ft);
+  R6 force_torque_avg = ft_filter.eval(current_ft);
   
   // rotate the force and torque into workspace coordinates
   // we negate each of the sensor readings because what we want is a
@@ -361,53 +362,6 @@ R6 ApplyForceTraj::workspace_forcetorque() {
   return ws_force_torque;
 }
 
-template<class value_t> value_t ApplyForceTraj::butterworth(value_t current) {
-  // coefficients for a 3rd-order filter with a
-  // cutoff of 10hz
-  /*
-  static const unsigned int order=3;
-  static const double B1=0.2196e-3;
-  static const double B2=0.6588e-3;
-  static const double B3=0.6588e-3;
-  static const double B4=0.2196e-3;
-  static const double A2=-2.7488;
-  static const double A3= 2.5282;
-  static const double A4=-0.7776;
-  */
-
-  // coefficients for a 2nd-order filter with a
-  // cutoff of 10hz
-  static const unsigned int order=2;
-  static const double B1=0.0036;
-  static const double B2=0.0072;
-  static const double B3=0.0036;
-  static const double A2=-1.8227;
-  static const double A3= 0.8372;
-
-  static std::deque<value_t> X;
-  static std::deque<value_t> Y;
-  if (X.size() != order) {
-    // initialize with all current values
-    X.resize(order,current);
-    Y.resize(order,current);
-  } 
-  
-  //  3rd-order equation
-  //value_t output = B1*current
-  //  + B2*X[0] + B3*X[1] + B4*X[2]
-  //  - A2*Y[0] - A3*Y[1] - A4*Y[2];
-  
-  // 2nd-order equation
-  value_t output = B1*current
-    + B2*X[0] + B3*X[1]
-    - A2*Y[0] - A3*Y[1];
-
-  X.pop_back();
-  Y.pop_back();
-  X.push_front(current);
-  Y.push_front(output);
-  return output;
-}
 
 // Stop the trajectory when asked by a client
 bool ApplyForceTraj::StopForce(gfe_owd_plugin::StopForce::Request &req,
@@ -455,11 +409,11 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
     
   // We limit the velocity by creating a virtual dashpot that applies
   // a counter force proportional to the velocity.
-  const double velocity_gain = 0.35;
+  const double velocity_gain = 0.5;
   static double last_travel(travel);
   double travel_delta = travel - last_travel;
   last_travel = travel;
-  double velocity = butterworth(travel_delta) / OWD::ControlLoop::PERIOD;
+  double velocity = velocity_filter.eval(travel_delta) / OWD::ControlLoop::PERIOD;
   double velocity_return_force=0;
   gfeplug->net_force.data[1] = travel / cartesian_vel_limit;
   velocity_return_force = 

@@ -93,8 +93,8 @@ while (<>) {
 	print {$GP[1]} "replot $f using 1 title \"time factor\" with lines ls 22 axes x1y2\n";
 
 	print {$GP[2]} "set title \"Force controller values ($name)\"\n";
-#	print {$GP[2]} "  plot $f using 54 title \"Z force\" with lines ls 1\n";
-	print {$GP[2]} "  plot $f using 49 title \"filtered force\" with lines ls 2\n";
+	print {$GP[2]} "  plot $f using 54 title \"Z force\" with lines ls 1\n";
+	print {$GP[2]} "replot $f using 49 title \"filtered force\" with lines ls 2\n";
 	print {$GP[2]} "replot $f using 5 title \"force error\" with lines ls 3\n";
 	print {$GP[2]} "replot $f using 6 title \"delta error\" with lines ls 4\n";
 	print {$GP[2]} "replot $f using 7 title \"integral error / 3\" with lines ls 5\n";
