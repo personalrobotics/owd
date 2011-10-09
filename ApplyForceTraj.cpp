@@ -47,6 +47,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   time_sum(0), 
   last_force_error(0), stopforce(false),
   distance_limit(dist_limit),
+  last_travel(0),
   ft_filter(2,10.0),
   velocity_filter(2,10.0)
 {
@@ -410,7 +411,6 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
   // We limit the velocity by creating a virtual dashpot that applies
   // a counter force proportional to the velocity.
   const double velocity_gain = 0.5;
-  static double last_travel(travel);
   double travel_delta = travel - last_travel;
   last_travel = travel;
   double velocity = velocity_filter.eval(travel_delta) / OWD::ControlLoop::PERIOD;
