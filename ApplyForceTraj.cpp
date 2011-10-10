@@ -15,6 +15,13 @@ bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
   // compute a new trajectory
   try {
     ApplyForceTraj *newtraj = new ApplyForceTraj(R3(req.x,req.y,req.z),req.f);
+    if (req.vibrate_amplitude_m > 0) {
+      newtraj->SetVibration(req.vibrate_hand_x,
+			     req.vibrate_hand_y,
+			     req.vibrate_hand_z,
+			     req.vibrate_amplitude_m,
+			     req.vibrate_frequency_hz);
+    }
     // send it to the arm
     res.id = OWD::Plugin::AddTrajectory(newtraj,res.reason);
     if (res.id > 0) {
@@ -49,7 +56,8 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   distance_limit(dist_limit),
   last_travel(0),
   ft_filter(2,10.0),
-  velocity_filter(2,10.0)
+  velocity_filter(2,10.0),
+  vibration(NULL)
 {
   if (gfeplug) {
 
@@ -160,7 +168,12 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   gfeplug->net_force.data[53]=gfeplug->ft_force[2];
 
   // calculate the endpoint position error
-  R3 position_err = (R3)endpoint_target - (R3)gfeplug->endpoint;
+  R3 position_goal = (R3)endpoint_target;
+  if (vibration) {
+    position_goal += vibration->eval(dt);
+  }
+
+  R3 position_err = position_goal - gfeplug->endpoint;
 
   // calculate the component of the error in the direction of the
   // desired force and subtract it out
@@ -431,6 +444,14 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
   return OWD::Plugin::JacobianTranspose_times_vector(correction_ft);
 }
 
+void ApplyForceTraj::SetVibration(double hand_x, double hand_y, double hand_z,
+				  double amplitude, double frequency) {
+  vibration = new Vibration(R3(hand_x, hand_y, hand_z),
+			    amplitude,
+			    frequency);
+}
+
+
 double ApplyForceTraj::force_gain_kp = 1.6e-3;
 
 double ApplyForceTraj::force_gain_kd = 0;
@@ -463,5 +484,8 @@ void ApplyForceTraj::Shutdown() {
 ApplyForceTraj::~ApplyForceTraj() {
   gfeplug->flush_recorder_data = true;
   ss_StopForce.shutdown();
+  if (vibration) {
+    delete vibration;
+  }
 }
 

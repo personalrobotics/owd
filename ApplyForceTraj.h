@@ -16,6 +16,7 @@
 #include <pr_msgs/SetJointOffsets.h> // for changing force gains
 #include <queue>
 #include "Butterworth.h"
+#include "Vibration.h"
 
 class ApplyForceTraj : public OWD::Trajectory {
 public:
@@ -36,6 +37,9 @@ public:
 
   static bool SetForceGains(pr_msgs::SetJointOffsets::Request &req,
                             pr_msgs::SetJointOffsets::Response &res);
+
+  void SetVibration(double hand_x, double hand_y, double hand_z,
+		    double amplitude, double frequency);
 
   /// functions for starting up and shutting down the service
   static bool Register();
@@ -68,6 +72,7 @@ private:
   static ForceController force_controller;
   Butterworth<R6> ft_filter;
   Butterworth<double> velocity_filter;
+  Vibration *vibration;
   
   /// Static members for handling the ROS service calls
   static ros::ServiceServer ss_ApplyForce;

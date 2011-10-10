@@ -6,6 +6,11 @@ float64 x
 float64 y
 float64 z
 float64 f
+float64 vibrate_hand_x
+float64 vibrate_hand_y
+float64 vibrate_hand_z
+float64 vibrate_amplitude_m
+float64 vibrate_frequency_hz
 ---
 bool ok
 string reason

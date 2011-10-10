@@ -13,12 +13,12 @@ use IO::Handle;
 $GP[0] = "GNUPLOT0";
 $GP[1] = "GNUPLOT1";
 $GP[2] = "GNUPLOT2";
-open($GP[0] , "| gnuplot -geometry 1200x800");
-open($GP[1] , "| gnuplot -geometry 1200x800");
+#open($GP[0] , "| gnuplot -geometry 1200x800");
+#open($GP[1] , "| gnuplot -geometry 1200x800");
 open($GP[2] , "| gnuplot -geometry 1200x800");
 # set autoflush
-$GP[0]->autoflush(1);
-$GP[1]->autoflush(1);
+#$GP[0]->autoflush(1);
+#$GP[1]->autoflush(1);
 $GP[2]->autoflush(1);
 # use lines for plots
 
@@ -44,8 +44,8 @@ set style line 14 lt 0 lc rgbcolor \"violet\"
 set style line 22 lt 1 lc rgbcolor \"black\"
 EOM
 
-print {$GP[0]} $setup;
-print {$GP[1]} $setup;
+#print {$GP[0]} $setup;
+#print {$GP[1]} $setup;
 print {$GP[2]} $setup;
 
 $linenum = -1;
@@ -72,29 +72,29 @@ while (<>) {
 
     if (-e $f) {
 	$f = "\"$f\"";
-	print {$GP[0]} "set title \"Force reading and error in WS coords ($name)\"\n";
-	print {$GP[0]} "  plot $f using 49 title \"X force\" with lines ls 1\n";
-	print {$GP[0]} "replot $f using 50 title \"Y force\" with lines ls 2\n";
-	print {$GP[0]} "replot $f using 51 title \"Z force\" with lines ls 3\n";
-	print {$GP[0]} "replot $f using 5 title \"X error\" with lines ls 8\n";
-	print {$GP[0]} "replot $f using 6 title \"Y error\" with lines ls 9\n";
-	print {$GP[0]} "replot $f using 7 title \"Z error\" with lines ls 10\n";
-	print {$GP[0]} "replot $f using 1 title \"time factor\" with lines ls 22 axes x1y2\n";
-
-
-	print {$GP[1]} "set title \"Joint torques to correct force ($name)\"\n";
-	print {$GP[1]} "  plot $f using 8 title \"J1 torque\" with lines ls 1\n";
-	print {$GP[1]} "replot $f using 9 title \"J2 torque\" with lines ls 2\n";
-	print {$GP[1]} "replot $f using 10 title \"J3 torque\" with lines ls 3\n";
-	print {$GP[1]} "replot $f using 11 title \"J4 torque\" with lines ls 4\n";
-	print {$GP[1]} "replot $f using 12 title \"J5 torque\" with lines ls 5\n";
-	print {$GP[1]} "replot $f using 13 title \"J6 torque\" with lines ls 6\n";
-	print {$GP[1]} "replot $f using 14 title \"J7 torque\" with lines ls 7\n";
-	print {$GP[1]} "replot $f using 1 title \"time factor\" with lines ls 22 axes x1y2\n";
+#	print {$GP[0]} "set title \"Force reading and error in WS coords ($name)\"\n";
+#	print {$GP[0]} "  plot $f using 49 title \"X force\" with lines ls 1\n";
+#	print {$GP[0]} "replot $f using 50 title \"Y force\" with lines ls 2\n";
+#	print {$GP[0]} "replot $f using 51 title \"Z force\" with lines ls 3\n";
+#	print {$GP[0]} "replot $f using 5 title \"X error\" with lines ls 8\n";
+#	print {$GP[0]} "replot $f using 6 title \"Y error\" with lines ls 9\n";
+#	print {$GP[0]} "replot $f using 7 title \"Z error\" with lines ls 10\n";
+#	print {$GP[0]} "replot $f using 1 title \"time factor\" with lines ls 22 axes x1y2\n";
+#
+#
+#	print {$GP[1]} "set title \"Joint torques to correct force ($name)\"\n";
+#	print {$GP[1]} "  plot $f using 8 title \"J1 torque\" with lines ls 1\n";
+#	print {$GP[1]} "replot $f using 9 title \"J2 torque\" with lines ls 2\n";
+#	print {$GP[1]} "replot $f using 10 title \"J3 torque\" with lines ls 3\n";
+#	print {$GP[1]} "replot $f using 11 title \"J4 torque\" with lines ls 4\n";
+#	print {$GP[1]} "replot $f using 12 title \"J5 torque\" with lines ls 5\n";
+#	print {$GP[1]} "replot $f using 13 title \"J6 torque\" with lines ls 6\n";
+#	print {$GP[1]} "replot $f using 14 title \"J7 torque\" with lines ls 7\n";
+#	print {$GP[1]} "replot $f using 1 title \"time factor\" with lines ls 22 axes x1y2\n";
 
 	print {$GP[2]} "set title \"Force controller values ($name)\"\n";
-	print {$GP[2]} "  plot $f using 54 title \"Z force\" with lines ls 1\n";
-	print {$GP[2]} "replot $f using 49 title \"filtered force\" with lines ls 2\n";
+#	print {$GP[2]} "  plot $f using 54 title \"Z force\" with lines ls 1\n";
+	print {$GP[2]} "plot $f using 49 title \"filtered force\" with lines ls 2\n";
 	print {$GP[2]} "replot $f using 5 title \"force error\" with lines ls 3\n";
 	print {$GP[2]} "replot $f using 6 title \"delta error\" with lines ls 4\n";
 	print {$GP[2]} "replot $f using 7 title \"integral error / 3\" with lines ls 5\n";
@@ -154,8 +154,8 @@ while (<>) {
 
     } else {
 	print "$f not found";
-	print {$GP[0]} "clear\n";
-	print {$GP[1]} "clear\n";
+#	print {$GP[0]} "clear\n";
+#	print {$GP[1]} "clear\n";
 	print {$GP[2]} "clear\n";
     }
 }
