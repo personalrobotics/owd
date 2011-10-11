@@ -82,6 +82,7 @@ public:
 private:
   void AdvertiseAndSubscribe(ros::NodeHandle &n);
   void GetParameters(ros::NodeHandle &n);
+  void SetPuckValues();
   void Unadvertise();
   void createT(double a, double alpha, double d, double theta, double result[4][4]);
 

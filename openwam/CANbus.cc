@@ -2309,14 +2309,6 @@ int CANbus::hand_reset() {
       }
     }
     
-    // set the HSG value according to our ROS parameter
-    if (fw_vers >= 182) {
-      if (set_property_rt(GROUPID(5), HSG, hsg_value, false, 10000) != OW_SUCCESS) {
-	ROS_ERROR("Could not set HSG for hand pucks");
-	return OW_FAILURE;
-      }
-    }
-
     return OW_SUCCESS;
   }
   

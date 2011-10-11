@@ -32,6 +32,7 @@
 BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   AdvertiseAndSubscribe(node);
   GetParameters(node);
+  SetPuckValues();
   tf_broadcaster = new tf::TransformBroadcaster();
   bhstate.state = pr_msgs::BHState::state_done;
   bhstate.temperature=0.0f;
@@ -96,6 +97,15 @@ void BHD_280::GetParameters(ros::NodeHandle &n) {
   n.param("hsg_value",bus->hsg_value,3400);
 }
   
+void BHD_280::SetPuckValues() {
+  // set the HSG value according to our ROS parameter
+  if (bus->fw_vers >= 182) {
+    if (bus->hand_set_property(GROUPID(5), HSG, bus->hsg_value) != OW_SUCCESS) {
+      ROS_WARN("Could not set HSG for hand pucks");
+    }
+  }
+}
+
 void BHD_280::Unadvertise() {
   pub_handstate.shutdown();
   ss_gethanddof.shutdown();
