@@ -647,6 +647,7 @@ void control_loop_rt(void* argv){
 	  }
 	}
 	if (!pending_hi) {
+          hand_cycles = 12;
 	  if (hand_counter==1) {
 	    wam->bus->request_positions_rt(GROUPID(5));
 	  }
