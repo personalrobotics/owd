@@ -35,7 +35,8 @@ BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   SetPuckValues();
   tf_broadcaster = new tf::TransformBroadcaster();
   bhstate.state = pr_msgs::BHState::state_done;
-  bhstate.temperature=0.0f;
+  bhstate.puck_temp_C.resize(4,0);
+  bhstate.motor_temp_C.resize(4,0);
   bhstate.positions.resize(4, 0.0f);
   bhstate.strain.resize(3, 0.0f);
   bhstate.internal_state.resize(4);
@@ -166,6 +167,10 @@ bool BHD_280::Publish() {
   }
 
   bus->hand_get_state(state);
+  for (unsigned int i=0; i<4; ++i) {
+    bhstate.puck_temp_C[i] = bus->hand_puck_temp[i];
+    bhstate.motor_temp_C[i] = bus->hand_motor_temp[i];
+  }
   // combine all the individual states into one
   // UNINIT has the highest priority
   // MOVING has priority over STALLED

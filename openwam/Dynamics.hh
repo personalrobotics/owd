@@ -25,8 +25,8 @@
 
 #include "Joint.hh"
 
-#include <SE3.hh>
-#include <R6.hh>
+#include "../openmath/SE3.hh"
+#include "../openmath/R6.hh"
 
 //#include <mkl_lapack.h>
 //#include <mkl_blas.h>

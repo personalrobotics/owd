@@ -74,6 +74,8 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   apply_squeeze[0]=apply_squeeze[1]=apply_squeeze[2]=apply_squeeze[3] = false;
   finger_hi_pending[0]=finger_hi_pending[1]=finger_hi_pending[2]=finger_hi_pending[3] = false;
   hand_puck_mode[0]=hand_puck_mode[1]=hand_puck_mode[2]=hand_puck_mode[3]=-1;
+  hand_puck_temp[0]=hand_puck_temp[1]=hand_puck_temp[2]=hand_puck_temp[3]=-1;
+  hand_motor_temp[0]=hand_motor_temp[1]=hand_motor_temp[2]=hand_motor_temp[3]=-1;
   // the fourth finger finger puck also returns a strain value when we 
   // ask group 5 for strain, but it is meaningless and is not used
   // outside of OWD, so even though we have a four position in the array it
@@ -1934,6 +1936,23 @@ int CANbus::hand_activate(int32_t *nodes) {
 }
 
 int CANbus::request_hand_state_rt() {
+  // request the puck and motor temps
+  if (request_property_rt(GROUPID(5),TEMP) != OW_SUCCESS) {
+    ROS_WARN_NAMED("can_bh280",
+		   "Failed to request TEMP from hand pucks: %s",
+		   last_error);
+    return OW_FAILURE;
+  }
+  if (request_property_rt(GROUPID(5),THERM) != OW_SUCCESS) {
+    ROS_WARN_NAMED("can_bh280",
+		   "Failed to request THERM from hand pucks: %s",
+		   last_error);
+    return OW_FAILURE;
+  }
+  
+
+
+
   // If we were already stationary, assume we're still
   // stationary.
   bool moving(false);
@@ -1948,7 +1967,6 @@ int CANbus::request_hand_state_rt() {
   }
 
   // otherwise, request state from hand pucks
-  int32_t mode;
   if (request_property_rt(GROUPID(5),MODE) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280",
 		   "Failed to request MODE from hand pucks: %s",
@@ -1962,6 +1980,7 @@ int CANbus::request_hand_state_rt() {
   if (hand_motion_state_sequence == 2) {
     hand_motion_state_sequence=0;
   }
+
   return OW_SUCCESS;
 }
 
@@ -2151,6 +2170,12 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     if ((hires_received & 0xF) == 0xF) {
       valid_tactile_data=true;
     }
+  } else if (property == TEMP) {
+    // Puck temperature
+    hand_puck_temp[nodeid-11]=value;
+  } else if (property == THERM) {
+    // Motor temperature
+    hand_motor_temp[nodeid-11]=value;
   } else {
     // assume it's a response to a GetHandProperty request, and send
     // the result back through the hand queue/pipe
@@ -2491,9 +2516,6 @@ int CANbus::hand_move(std::vector<double> p) {
     return OW_FAILURE;
   }
 
-  // Finally, check to see if we should apply a squeeze after the
-  // move is complete.  If any of the goal positions are non-zero,
-  // we'll follow up with a squeeze.
   for (unsigned int i=0; i<4; ++i) {
     // record the fact that once the hand stops, we want to keep
     // applying pressure.  this helps to ensure that even if a gripped

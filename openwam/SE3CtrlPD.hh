@@ -19,7 +19,7 @@
 
 #include "SE3Ctrl.hh"
 
-#include <R6.hh>
+#include "../openmath/R6.hh"
 
 //#include <mkl_lapack.h>
 //#include <mkl_blas.h>

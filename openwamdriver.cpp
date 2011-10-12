@@ -86,7 +86,6 @@ namespace OWD {
 WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tactile) :
   cmdnum(0), nJoints(Joint::Jn),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
-  owam(NULL),
   running(true),
   modified_j1(false)
 {
@@ -2464,6 +2463,11 @@ bool WamDriver::SetForceInputThreshold(pr_msgs::SetForceInputThreshold::Request 
   res.ok=true;
   return true;
 }
+
+// storage for static members
+CANbus *WamDriver::bus = NULL;
+WAM *WamDriver::owam = NULL;
+
 
 #ifdef BUILD_FOR_SEA
 void WamDriver::wamjointtargets_callback(const boost::shared_ptr<const pr_msgs::IndexedJointValues> &jt) {

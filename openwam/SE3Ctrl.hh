@@ -18,7 +18,7 @@
 */
 
 #include "Controller.hh"
-#include <SE3.hh>
+#include "../openmath/SE3.hh"
 
 #ifndef __SE3CTRL_HH__
 #define __SE3CTRL_HH__

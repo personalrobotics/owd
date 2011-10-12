@@ -331,7 +331,6 @@ DataRecorder<canio_data> candata;
   double hand_outer_links[3+1];
   double hand_strain[4+1];
   bool hand_breakaway[3+1];
-private:
 #ifdef OWD_RT
   RT_MUTEX hand_queue_mutex;
   RT_MUTEX hand_cmd_mutex;
@@ -379,6 +378,8 @@ public:
 
   bool finger_hi_pending[4];
   int hand_puck_mode[4];
+  int hand_puck_temp[4];
+  int hand_motor_temp[4];
 };
 
 #endif // __CANBUS_H__

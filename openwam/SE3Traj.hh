@@ -20,8 +20,7 @@
 #include "Trajectory.hh"
 #include "Profile.hh"
 
-#include <SE3.hh>
-#include <SE3.hh>
+#include "../openmath/SE3.hh"
 
 #ifndef __SE3TRAJ_HH__
 #define __SE3TRAJ_HH__

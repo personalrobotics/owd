@@ -231,8 +231,8 @@ private:
     void unload_plugins();
 
  public: // make this public so that it can be shared with BHD_280
-    CANbus *bus;
-    WAM *owam;
+    static CANbus *bus;
+    static WAM *owam;
     bool running;
 
  private:
