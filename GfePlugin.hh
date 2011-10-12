@@ -10,6 +10,7 @@
 
 #include <openwam/Plugin.hh>
 #include <openwam/DataRecorder.cc>
+#include <pr_msgs/MoveHand.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <ros/ros.h>
 #include <pthread.h>
@@ -37,9 +38,12 @@ public:
   void log_data(const std::vector<double> &data);
   bool write_recorder_data();
   bool flush_recorder_data;
+  bool PowerGrasp(pr_msgs::MoveHand::Request &req,
+		  pr_msgs::MoveHand::Response &res);
   
 private:
   ros::Publisher pub_net_force;
+  ros::ServiceServer ss_PowerGrasp;
   pthread_mutex_t recorder_mutex,
     pub_mutex;
 };

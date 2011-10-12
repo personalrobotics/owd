@@ -9,8 +9,8 @@
 #include <ros/ros.h>
 #include <std_msgs/String.h>
 #include <math.h>
-#include "openwam/Kinematics.hh"
 #include <iostream>
+#include "openwam/Kinematics.hh"
 #include "ApplyForceTraj.h"
 #include "DoorTraj.h"
 #include "JacobianTest.h"
@@ -18,6 +18,9 @@
 #include "Follow.h"
 #include "HelixPlugin.h"
 #include "MoveDirection.h"
+#define PEAK_CAN
+#include "openwamdriver.h"
+#include "openwam/CANdefs.hh"	// for HANDSTATE_* enumeration
 
 GfePlugin::GfePlugin()
   : write_log_file(false),flush_recorder_data(false)
@@ -25,6 +28,7 @@ GfePlugin::GfePlugin()
   // ROS has already been initialized by OWD, so we can just
   // create our own NodeHandle in the same namespace
   ros::NodeHandle n("~");
+  ss_PowerGrasp = n.advertiseService("PowerGrasp",&GfePlugin::PowerGrasp, this);
 
   n.param("log_gfeplugin_data",write_log_file,false);
 
@@ -77,6 +81,9 @@ GfePlugin::~GfePlugin() {
 
   // Shut down our publisher
   pub_net_force.shutdown();
+
+  // Shut down our services
+  ss_PowerGrasp.shutdown();
   
   pthread_mutex_unlock(&pub_mutex);
 }
@@ -116,6 +123,91 @@ bool GfePlugin::write_recorder_data() {
   recorder->reset();
   pthread_mutex_unlock(&recorder_mutex);
   return result;
+}
+
+bool GfePlugin::PowerGrasp(pr_msgs::MoveHand::Request &req,
+			   pr_msgs::MoveHand::Response &res) {
+  int32_t state[4];
+  OWD::WamDriver::bus->hand_get_state(state);
+  for (unsigned int i=0; i<4; ++i) {
+    if (state[i] == HANDSTATE_UNINIT) {
+      ROS_WARN("Rejected PowerGrasp: hand is uninitialized");
+      res.ok=false;
+      res.reason="Hand is uninitialized";
+      return true;
+    }
+  }
+  if (req.positions.size() != 4) {
+    std::stringstream s;
+    s << "Expected 4 joints for MoveHand but received " << req.positions.size();
+    ROS_ERROR("%s",s.str().c_str());
+    res.ok=false;
+    res.reason=s.str().c_str();
+    return true;
+  }
+  if (req.movetype != pr_msgs::MoveHand::Request::movetype_position) {
+    ROS_ERROR("Only position moves (type=1) are supported for PowerGrasp");
+    res.ok=false;
+    res.reason="Only position moves (type=1) are supported for PowerGrasp";
+    return true;
+  }
+  
+  // turn off the TSTOP value and set higher torque limit
+  for (int32_t node=11; node<=13; ++node) {
+    if (OWD::WamDriver::bus->hand_set_property(node,TSTOP,0) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+    if (OWD::WamDriver::bus->hand_set_property(node,MT,1800) != OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  }
+
+  // Now set the endpoints and issue the move command
+  for (int32_t i=0; i<3; ++i) {
+    // make sure we don't try to move beyond the 0 to 2.4 range
+    if (req.positions[i] < 0) {
+      req.positions[i]=0;
+    }
+    if (req.positions[i] > 2.4) {
+      req.positions[i]=2.4;
+    }
+    OWD::WamDriver::bus->hand_goal_positions[i+1]
+      = OWD::WamDriver::bus->finger_radians_to_encoder(req.positions[i]);
+    if (OWD::WamDriver::bus->hand_set_property(11+i,E,
+					       OWD::WamDriver::bus->hand_goal_positions[i+1]) 
+	!= OW_SUCCESS) {
+      return OW_FAILURE;
+    }
+  }
+  // set the spread position
+  OWD::WamDriver::bus->hand_goal_positions[4] 
+    = OWD::WamDriver::bus->spread_radians_to_encoder(req.positions[3]);
+  if (OWD::WamDriver::bus->hand_set_property(14,E,
+					     OWD::WamDriver::bus->hand_goal_positions[4])
+      != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+
+  // record the fact that a motion request is in progress, so we should
+  // ignore any state responses that were made between now and when the
+  // move command actually makes it to the pucks
+  OWD::WamDriver::bus->hand_motion_state_sequence = 1;
+
+  // send the move command
+  if (OWD::WamDriver::bus->hand_set_property(GROUPID(5),MODE,MODE_TRAPEZOID) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+
+  for (unsigned int i=0; i<4; ++i) {
+    OWD::WamDriver::bus->apply_squeeze[i]=false;
+  }
+  for (unsigned int i=0; i<4; ++i) {
+    OWD::WamDriver::bus->handstate[i] = HANDSTATE_MOVING;
+    OWD::WamDriver::bus->encoder_changed[i] = 6;
+  }
+  OWD::WamDriver::bus->received_state_flags &= ~(0x7800); // clear the four hand bits
+
+  return true;
 }
 
 // Static member inside GfePlugin class
