@@ -5,7 +5,8 @@ float64[] inner_links
 float64[] outer_links
 bool[] breakaway
 float64[] strain
-float32 temperature
+int32[] puck_temp_C
+int32[] motor_temp_C
 uint8 state
 uint8[] internal_state
 uint8[] puck_mode
