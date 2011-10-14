@@ -43,9 +43,9 @@ Instructions:  To run this plugin, after typing rosmake in the folder
 #define PI 3.1415926535         // Apple PI, to 10 decimal places
 #define AMPLITUDE_MAX 0.1      // Maximum amplitude of helix
 #define PITCH_MAX 0.1           // Maximum pitch of helix
-#define VELOCITY_LIMIT 0.5     // Maximum joint velocity in m/s
+#define VELOCITY_LIMIT 1.0     // Maximum joint velocity in m/s
 #define FREQUENCY 1           // Cycles/second of helix
-#define Z_THRESHOLD 20           // Newtons of force for Z-direction threshold
+#define Z_THRESHOLD 6           // Newtons of force for Z-direction threshold
 #define DISTANCE_THRESHOLD .75  // Maximum distance in meters to travel in z-direction
 
 // Class for transforming joint coordinate frames to wam0
