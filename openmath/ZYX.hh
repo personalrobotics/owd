@@ -31,7 +31,18 @@ public:
   ZYX(){x=y=z=0.0;}
   ZYX(double x, double y, double z){this->x=x; this->y=y; this->z=z;}
 
-  operator SO3() const;
+  operator SO3() const
+  {
+    double cx, sx, cy, sy, cz, sz;
+    
+    cx = cos(x); sx = sin(x);
+    cy = cos(y); sy = sin(y);
+    cz = cos(z); sz = sin(z);
+    
+    return SO3( R3( cz*cy,           sz*cy,         -sy),
+                R3(-sz*cx+cz*sy*sx,  cz*cx+sz*sy*sx, cy*sx),
+                R3( sz*sx+cz*sy*cx, -cz*sx+sz*sy*cx, cy*cx) );
+  };
 };
 
 #endif
