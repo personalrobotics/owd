@@ -607,12 +607,12 @@ void control_loop_rt(void* argv){
 	failure=true;
 	break;
       }
+#endif
 
       if (wam->bus->forcetorque_data) {
 	// REQUEST F/T DATA (every cycle)
 	wam->bus->request_forcetorque_rt();
       }
-#endif
 
       // While the pucks are receiving and processing the position request,
       // send out our secondary request for retrieval afterwards.

@@ -280,7 +280,12 @@ int CANbus::check(){
   online_pucks = 0;
   int low=NODE_MIN, high=NODE_MAX;
 #ifdef BH280_ONLY
-  low=11; high=14;
+  if (forcetorque_data) {
+    low=8;
+  } else {
+    low=11;
+  }
+  high=14;
 #endif // BH280_ONLY
 
   for(int n=low; n<=high; n++){
@@ -404,7 +409,6 @@ int CANbus::check(){
     ROS_INFO_NAMED("can_bh280","done.");
   }
 
-#ifndef BH280_ONLY
   if (forcetorque_data) {
     ROS_INFO_NAMED("can_ft","  Initializing force/torque sensor...");
     if(wake_puck(8) == OW_FAILURE){
@@ -419,6 +423,7 @@ int CANbus::check(){
     }
   }
 
+#ifndef BH280_ONLY
   for (int nodeid=1; nodeid <=14; ++nodeid) {
     if ((nodeid > n_arm_pucks) && (nodeid < 8)) {
       // if 4 dof arm, skip to puck 8 after when done enumerating the 4 arm pucks
@@ -543,7 +548,12 @@ int CANbus::status(int32_t* nodes){
   int low=NODE_MIN;
   int high=NODE_MAX;
 #ifdef BH280_ONLY
-  low=11; high=14;
+  if (forcetorque_data) {
+    low=8;
+  } else {
+    low=11;
+  }
+  high=14;
 #endif // BH280_ONLY
   for(int n=low; n<=high; ++n){
     msg[0] = (unsigned char) 5;   // STAT = 5 for all firmware versions
@@ -565,7 +575,9 @@ int CANbus::status(int32_t* nodes){
       } else {
           // parsed ok
 	ROS_DEBUG_NAMED("canstatus","parsed response from node %d",NODE2ADDR(n));
-	if (!firstFound) {
+	// only check the firmware version if we're not reading from
+	// the force/torque sensor
+	if (!firstFound && (n != 8)) {
 	  ROS_DEBUG_NAMED("canstatus","trying to wake node %d",n);
 	  if ((wake_puck(NODE2ADDR(n)) == OW_SUCCESS) &&
 	      (get_property_rt(NODE2ADDR(n), VERS, &fw_vers, 40000) == OW_SUCCESS)){
