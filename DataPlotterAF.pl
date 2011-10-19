@@ -13,12 +13,12 @@ use IO::Handle;
 $GP[0] = "GNUPLOT0";
 $GP[1] = "GNUPLOT1";
 $GP[2] = "GNUPLOT2";
-#open($GP[0] , "| gnuplot -geometry 1200x800");
-#open($GP[1] , "| gnuplot -geometry 1200x800");
+open($GP[0] , "| gnuplot -geometry 1200x800");
+open($GP[1] , "| gnuplot -geometry 1200x800");
 open($GP[2] , "| gnuplot -geometry 1200x800");
 # set autoflush
-#$GP[0]->autoflush(1);
-#$GP[1]->autoflush(1);
+$GP[0]->autoflush(1);
+$GP[1]->autoflush(1);
 $GP[2]->autoflush(1);
 # use lines for plots
 
@@ -44,8 +44,8 @@ set style line 14 lt 0 lc rgbcolor \"violet\"
 set style line 22 lt 1 lc rgbcolor \"black\"
 EOM
 
-#print {$GP[0]} $setup;
-#print {$GP[1]} $setup;
+print {$GP[0]} $setup;
+print {$GP[1]} $setup;
 print {$GP[2]} $setup;
 
 $linenum = -1;
@@ -117,24 +117,24 @@ while (<>) {
 #	print {$GP[0]} "replot $f using 1 title \"time factor\" with lines ls 22 axes x1y2\n";
 
 
-#	print {$GP[1]} "set title \"Positional errors ($name)\"\n";
-#	print {$GP[1]} "  plot $f using 15 title \"X error\"  with lines ls 1\n";
-#	print {$GP[1]} "replot $f using 16 title \"Y error\" with lines ls 2\n";
-#	print {$GP[1]} "replot $f using 17 title \"Z error\" with lines ls 3\n";
-#	print {$GP[1]} "replot $f using 18 title \"r error\" with lines ls 4 axes x1y2\n";
-#	print {$GP[1]} "replot $f using 19 title \"p error\" with lines ls 5 axes x1y2\n ";
-#	print {$GP[1]} "replot $f using 20 title \"y error\" with lines ls 6 axes x1y2\n";
+	print {$GP[1]} "set title \"Positional errors ($name)\"\n";
+	print {$GP[1]} "  plot $f using 15 title \"X error\"  with lines ls 1\n";
+	print {$GP[1]} "replot $f using 16 title \"Y error\" with lines ls 2\n";
+	print {$GP[1]} "replot $f using 17 title \"Z error\" with lines ls 3\n";
+	print {$GP[1]} "replot $f using 18 title \"r error\" with lines ls 4 axes x1y2\n";
+	print {$GP[1]} "replot $f using 19 title \"p error\" with lines ls 5 axes x1y2\n ";
+	print {$GP[1]} "replot $f using 20 title \"y error\" with lines ls 6 axes x1y2\n";
 
-#	print {$GP[2]} "set title \"PID torques from previous cycle ($name)\"\n";
-#	print {$GP[2]} "  plot $f using 35 title \"J1 PID\" with lines ls 1\n";
-#	print {$GP[2]} "replot $f using 36 title \"J2 PID\" with lines ls 2\n";
-#	print {$GP[2]} "replot $f using 37 title \"J3 PID\" with lines ls 3\n";
-#	print {$GP[2]} "replot $f using 38 title \"J4 PID\" with lines ls 4\n";
-#	print {$GP[2]} "replot $f using 39 title \"J5 PID\" with lines ls 5\n";
-#	print {$GP[2]} "replot $f using 40 title \"J6 PID\" with lines ls 6\n";
-#	print {$GP[2]} "replot $f using 41 title \"J7 PID\" with lines ls 7\n";
+	print {$GP[0]} "set title \"PID torques from previous cycle ($name)\"\n";
+	print {$GP[0]} "  plot $f using 35 title \"J1 PID\" with lines ls 1\n";
+	print {$GP[0]} "replot $f using 36 title \"J2 PID\" with lines ls 2\n";
+	print {$GP[0]} "replot $f using 37 title \"J3 PID\" with lines ls 3\n";
+	print {$GP[0]} "replot $f using 38 title \"J4 PID\" with lines ls 4\n";
+	print {$GP[0]} "replot $f using 39 title \"J5 PID\" with lines ls 5\n";
+	print {$GP[0]} "replot $f using 40 title \"J6 PID\" with lines ls 6\n";
+	print {$GP[0]} "replot $f using 41 title \"J7 PID\" with lines ls 7\n";
 
-#	print {$GP[0]} "set title $f\n";
+#	print {$GP[0]} "set title \"Joint values ($name)\"\n";
 #	print {$GP[0]} "  plot $f using 28 title \"J1 input\" with lines ls 1\n";
 #	print {$GP[0]} "replot $f using 29 title \"J2 input\" with lines ls 2\n";
 #	print {$GP[0]} "replot $f using 30 title \"J3 input\" with lines ls 3\n";
@@ -143,7 +143,7 @@ while (<>) {
 #	print {$GP[0]} "replot $f using 33 title \"J6 input\" with lines ls 6\n";
 #	print {$GP[0]} "replot $f using 34 title \"J7 input\" with lines ls 7\n";
 
-#	print {$GP[0]} "set title $f\n";
+#	print {$GP[0]} "set title \"Joint corrections ($name)\"\n";
 #	print {$GP[0]} "  plot $f using 21 title \"J1 correction\" with lines ls 1\n";
 #	print {$GP[0]} "replot $f using 22 title \"J2 correction\" with lines ls 2\n";
 #	print {$GP[0]} "replot $f using 23 title \"J3 correction\" with lines ls 3\n";
@@ -154,8 +154,8 @@ while (<>) {
 
     } else {
 	print "$f not found";
-#	print {$GP[0]} "clear\n";
-#	print {$GP[1]} "clear\n";
+	print {$GP[0]} "clear\n";
+	print {$GP[1]} "clear\n";
 	print {$GP[2]} "clear\n";
     }
 }

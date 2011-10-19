@@ -22,6 +22,9 @@ bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
 			     req.vibrate_amplitude_m,
 			     req.vibrate_frequency_hz);
     }
+    if (req.rotational_compliance) {
+      newtraj->rotational_leeway = 10.0/180.0*3.14159; // 10 degrees
+    }
     // send it to the arm
     res.id = OWD::Plugin::AddTrajectory(newtraj,res.reason);
     if (res.id > 0) {
@@ -57,7 +60,8 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   last_travel(0),
   ft_filter(2,10.0),
   velocity_filter(2,10.0),
-  vibration(NULL)
+  vibration(NULL),
+  rotational_leeway(0)
 {
   if (gfeplug) {
 
@@ -97,7 +101,6 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     R3 torques;  // initializes to zero
     forcetorque_vector = R6(_force_direction,torques);
 
-    gfeplug->net_force.data.resize(60);
     // values used for debugging during development
     // not all of these are filled in right now, but here's
     // the general idea:
@@ -124,6 +127,8 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     // 57:  1-dim velocity in force direction
     // 58:  velocity damping force
     // 59:  GfePlugin::recorder->count
+    // 60:  total_endpoint_rotation.theta
+    gfeplug->net_force.data.resize(61);
 
   } else {
     throw "Could not get current WAM values from GfePlugin";
@@ -190,26 +195,6 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   gfeplug->net_force.data[15]=position_correction[1];
   gfeplug->net_force.data[16]=position_correction[2];
 
-  // Compute the rotation error by taking the net rotation from the
-  // current orientation to the original orientation and converting
-  // it to axis-angle format
-  SO3 rotation_error_SO3 = (SO3)endpoint_target * (! (SO3)gfeplug->endpoint);
-  so3 rotation_error = (so3) rotation_error_SO3;
-
-  // error in world frame
-  R3 rotation_correction = rotation_error.t() * rotation_error.w();
-  gfeplug->net_force.data[17]=rotation_correction[0];
-  gfeplug->net_force.data[18]=rotation_correction[1];
-  gfeplug->net_force.data[19]=rotation_correction[2];
-
-#ifdef NDEF
-  if (rotation_correction.norm() * 0.18 > .045) {
-    // limit the correction this cycle.  0.18m is approximately the distance
-    // from the link7 origin to the fingertips
-    rotation_correction *= .045 / 0.18 / rotation_correction.norm();
-  }
-#endif
-
   // we now have position corrections to bring the endpoint back
   // into the desired configuration along the force direction.  Now
   // we'll use the ForceController to calculate the torques to give
@@ -256,7 +241,6 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   gfeplug->net_force.data[12] = correction_torques[5];
   gfeplug->net_force.data[13] = correction_torques[6];
 
-
   // specify the feedforward torques that would ideally produce the
   // desired endpoint force.  this makes life easier for the force
   // controller.
@@ -267,10 +251,54 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   for (unsigned int i=0; i<tc.t.size(); ++i) {
     tc.t[i] = correction_torques[i]
       + ideal_torques[i]
-      + damping_torques[i];
+      + damping_torques[i]
+      ;
   }
 
-  R6 endpos_correction(position_correction,rotation_correction);
+  SO3 current_endpoint_target((SO3)endpoint_target);
+
+  if (rotational_leeway > 0) {
+    // we will servo the current_endpoint_target in response to torque
+    // readings, up to a limit of rotational_leeway radians from 
+    // the original configuration
+    R3 current_torque(current_force_torque.w);
+    // zero out the Z torque
+    current_torque[2] = 0;
+    // take out the magnitude, leaving a unit vector
+    double total_torque = current_torque.normalize();
+    // make a rotation by scaling the torque by our gain
+    //    const double rotational_gain(1.0/180.0*3.14159/0.2); // 1 deg for 0.2Nm
+    const double rotational_gain(0);
+    so3 torque_rotation(current_torque, total_torque * rotational_gain);
+    // rotate into world coordinates
+    SO3 world_torque_rotation ((SO3)gfeplug->endpoint * (SO3)torque_rotation);
+
+    // see what it does to our endpoint
+    SO3 new_endpoint = world_torque_rotation * (SO3)gfeplug->endpoint;
+    SO3 total_endpoint_rotation_SO3 = current_endpoint_target * (! new_endpoint);
+    so3 total_endpoint_rotation = (so3) total_endpoint_rotation_SO3;
+    gfeplug->net_force.data[60] = total_endpoint_rotation.theta;
+    if (total_endpoint_rotation.theta > rotational_leeway) {
+      // bound the total rotation
+      total_endpoint_rotation.theta = rotational_leeway;
+      total_endpoint_rotation_SO3 = (SO3) total_endpoint_rotation;
+    }
+    // update our target
+    //    current_endpoint_target = (!total_endpoint_rotation_SO3) * (SO3)endpoint_target;
+  }
+
+  // Compute the rotation error by taking the net rotation from the
+  // current orientation to the original orientation and converting
+  // it to axis-angle format
+  SO3 rotation_correction_SO3 = current_endpoint_target * (! (SO3)gfeplug->endpoint);
+  so3 rotation_correction = (so3) rotation_correction_SO3;
+
+  R3 rotation_correction_R3 = rotation_correction.t() * rotation_correction.w();
+  gfeplug->net_force.data[17]=rotation_correction_R3[0];
+  gfeplug->net_force.data[18]=rotation_correction_R3[1];
+  gfeplug->net_force.data[19]=rotation_correction_R3[2];
+
+  R6 endpos_correction(position_correction,rotation_correction_R3);
   R3 desired_endpoint = (R3)gfeplug->endpoint + endpos_correction.v;
   endpositions.push(desired_endpoint);
 

@@ -73,6 +73,8 @@ private:
   Butterworth<R6> ft_filter;
   Butterworth<double> velocity_filter;
   Vibration *vibration;
+ public:
+  double rotational_leeway;
   
   /// Static members for handling the ROS service calls
   static ros::ServiceServer ss_ApplyForce;

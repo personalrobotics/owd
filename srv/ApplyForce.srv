@@ -11,6 +11,7 @@ float64 vibrate_hand_y
 float64 vibrate_hand_z
 float64 vibrate_amplitude_m
 float64 vibrate_frequency_hz
+bool rotational_compliance
 ---
 bool ok
 string reason
