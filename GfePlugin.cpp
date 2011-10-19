@@ -79,6 +79,11 @@ GfePlugin::~GfePlugin() {
   HelixTraj::Shutdown();
   MoveDirection::Shutdown();
 
+  if (write_log_file && (recorder->count > 0)) {
+    // do a final write of any lingering log data
+    write_recorder_data();
+  }
+
   // Shut down our publisher
   pub_net_force.shutdown();
 
