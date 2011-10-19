@@ -50,7 +50,9 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   hsg_value(3400),
   log_canbus_data(log_cb_data),
   candata(0),
-  unread_packets(0)
+  unread_packets(0),
+  get_property_expecting_id(0),
+  get_property_expecting_prop(0)
 {
 
   // hand_queue_mutex is used to manage access to the hand command/response queues
@@ -1830,9 +1832,12 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
   msg.nodeid=id;
   msg.property=prop;
   msg.value=0;
+  get_property_expecting_id = id;
+  get_property_expecting_prop = prop;
 
   if (mutex_lock(&hand_cmd_mutex)) {
     ROS_ERROR_NAMED("can_bh280","Could not lock hand command mutex");
+    get_property_expecting_id = 0;
     return OW_FAILURE;
   }
 
@@ -1847,6 +1852,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
 		      bytes,sizeof(CANmsg));
     }
     mutex_unlock(&hand_cmd_mutex);
+    get_property_expecting_id = 0;
     return OW_FAILURE;
   }
   // now read from the pipe; the read will return as soon as the data is available
@@ -1855,11 +1861,13 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
   if (bytes < 0) {
     ROS_ERROR_NAMED("can_bh280","Error reading data from hand message pipe: %d", errno);
     mutex_unlock(&hand_cmd_mutex);
+    get_property_expecting_id = 0;
     return OW_FAILURE;
   }
   if (bytes < sizeof(CANmsg)) {
     ROS_ERROR_NAMED("can_bh280","Incomplete read of message from hand message pipe: expected %ld but got %d bytes",
 		    sizeof(CANmsg),bytes);
+    get_property_expecting_id = 0;
     mutex_unlock(&hand_cmd_mutex);
     return OW_FAILURE;
   }
@@ -1871,7 +1879,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
 
   // wait for the response
   bool done=false;
-  int retry=10;
+  int retry=20;
   do {
     usleep(1000);
     mutex_lock(&hand_queue_mutex);
@@ -1882,6 +1890,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
     }
     mutex_unlock(&hand_queue_mutex);
   } while (!done && ros::ok() && (--retry > 0));
+  get_property_expecting_id = 0;
   if (!ros::ok()) {
     mutex_unlock(&hand_cmd_mutex);
     return OW_FAILURE;
@@ -2177,29 +2186,42 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     // Motor temperature
     hand_motor_temp[nodeid-11]=value;
   } else {
-    // assume it's a response to a GetHandProperty request, and send
-    // the result back through the hand queue/pipe
-    CANmsg handmsg;
-    handmsg.nodeid = nodeid;
-    handmsg.property = property;
-    handmsg.value = value;
-#ifdef OWD_RT
-    ssize_t bytecount = rt_pipe_write(&handpipe,&handmsg,sizeof(CANmsg),P_NORMAL);
-    if (bytecount < sizeof(CANmsg)) {
-      if (bytecount < 0) {
-	snprintf(last_error,200,"Error writing to hand message pipe: %zd",bytecount);
-      } else {
-	snprintf(last_error,200,"Incomplete write to hand message pipe: only %zd of %ld bytes were written",
-		 bytecount,sizeof(CANmsg));
-      }
-      return OW_FAILURE;
-    }
-#else // ! OWD_RT
-    hand_response_queue.push(handmsg);
-#endif // ! OWD_RT
-    
+    // unexpected message type
+    snprintf(last_error,200,"Unexpected property response received (nodeid = %d, property=%d",nodeid, property);
+    return OW_FAILURE;
   }
   return OW_SUCCESS;
+}
+
+int CANbus::process_get_property_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
+  // it's a response to a GetHandProperty request, so send
+  // the result back through the hand queue/pipe
+
+  int32_t nodeid, property, value;
+  // extract the payload
+  if(parse(msgid, msg, msglen, &nodeid, &property, &value) != OW_SUCCESS){
+    //    ROS_WARN("CANbus::process_get_property_response_rt: parse failed: %s",last_error);
+    return OW_FAILURE;
+  }
+  
+  CANmsg handmsg;
+  handmsg.nodeid = nodeid;
+  handmsg.property = property;
+  handmsg.value = value;
+#ifdef OWD_RT
+  ssize_t bytecount = rt_pipe_write(&handpipe,&handmsg,sizeof(CANmsg),P_NORMAL);
+  if (bytecount < sizeof(CANmsg)) {
+    if (bytecount < 0) {
+      snprintf(last_error,200,"Error writing to hand message pipe: %zd",bytecount);
+    } else {
+      snprintf(last_error,200,"Incomplete write to hand message pipe: only %zd of %ld bytes were written",
+	       bytecount,sizeof(CANmsg));
+    }
+    return OW_FAILURE;
+  }
+#else // ! OWD_RT
+  hand_response_queue.push(handmsg);
+#endif // ! OWD_RT
 }
 
 int CANbus::process_safety_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {

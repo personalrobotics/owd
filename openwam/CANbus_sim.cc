@@ -256,6 +256,7 @@ int CANbus::process_arm_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen)
 int CANbus::process_safety_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) { return OW_SUCCESS; }
 int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) { return OW_SUCCESS; }
 int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) { return OW_SUCCESS; }
+int CANbus::process_get_property_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) { return OW_SUCCESS; }
 
 int CANbus::ft_tare() {return OW_SUCCESS; }
 int CANbus::hand_move(std::vector<double> p) {

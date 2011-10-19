@@ -234,7 +234,8 @@ DataRecorder<canio_data> candata;
   int process_safety_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen);
   int process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen);
   int process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen);
-  
+  int process_get_property_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen);
+
   int read_forcetorque_rt();
   static int ft_combine(unsigned char msb, unsigned char lsb);
 
@@ -380,6 +381,9 @@ public:
   int hand_puck_mode[4];
   int hand_puck_temp[4];
   int hand_motor_temp[4];
+
+  int32_t get_property_expecting_id;
+  int32_t get_property_expecting_prop;
 };
 
 #endif // __CANBUS_H__

@@ -600,7 +600,6 @@ void control_loop_rt(void* argv){
   bool failure=false;
   while((ctrl_loop->state_rt() == CONTROLLOOP_RUN) && (ros::ok())){
       RTIME loopstart_time = ControlLoop::get_time_ns_rt(); // record the time
-
 #ifndef BH280_ONLY
       // REQUEST POSITIONS
       if(wam->bus->request_positions_rt(GROUPID(4)) == OW_FAILURE){
@@ -687,16 +686,22 @@ void control_loop_rt(void* argv){
 	// process the response
 	uint32_t TO_GROUP = msgid & 0x41F;
 	uint32_t FROM_NODE = (msgid & 0x3E0) >> 5;
-	if (TO_GROUP == 0x403) { // group 3
+	uint32_t PROPERTY = msg[0] & 0x7F;
+	if ((FROM_NODE == wam->bus->get_property_expecting_id) &&
+	    (PROPERTY == wam->bus->get_property_expecting_prop)) {
+	  wam->bus->process_get_property_response_rt(msgid, msg, msglen);
+	} else if (TO_GROUP == 0x403) { // group 3
 	  // 22-bit AP response
 	  wam->bus->process_positions_rt(msgid, msg, msglen);
 	} else if (FROM_NODE == 8) {
 	  // forcetorque puck
 	  wam->bus->process_forcetorque_response_rt(msgid,msg,msglen);
+	  wam->lock_rt("control_loop");
 	  if (wam->jointstraj) {
 	    // pass the new values to the running trajectory
 	    wam->jointstraj->ForceFeedback(wam->bus->forcetorque_data);
 	  }
+	  wam->unlock("control_loop");
 	} else if (FROM_NODE == 10) {
 	  // safety puck
 	  wam->bus->process_safety_response_rt(msgid,msg,msglen);
@@ -743,7 +748,9 @@ void control_loop_rt(void* argv){
 	  control_start_time = ControlLoop::get_time_ns_rt();
 	  // tell the control function how long it was between successive
 	  // request_position_rt() calls.  
+	  wam->lock_rt("control_loop");
 	  wam->newcontrol_rt( ((double)(loopstart_time - last_loopstart_time)) * 1e-9); // ns to s
+	  wam->unlock("control_loop");
 	  last_loopstart_time = loopstart_time;
 	  sendtorque_start_time = ControlLoop::get_time_ns_rt();
 	  if(wam->bus->send_torques_rt() == OW_FAILURE){
@@ -974,28 +981,6 @@ void WAM::newcontrol_rt(double dt){
     
   std::vector<double> data;
   bool data_recorded=false;
-
-  static int skipped_locks=0;
-    
-  if (! this->lock_rt("newcontrol") ) {
-    // if we couldn't get the lock in the time we wanted, then
-    // just republish the previous torques.  we will only do this
-    // 10 times before giving up on the current trajectory
-    if (++skipped_locks > 10) {
-      // reduce the torque
-      for(int j=Joint::J1; j<=Joint::Jn; j++){
-	joints[j].t *= 0.99; // this should bring the WAM to zero torque in about 250 cycles (0.5 secs)
-      }
-      jtrq2mtrq();         // results in motor::torque
-      // need to push an error message through a message pipe
-    }
-    if(send_mtrq() == OW_FAILURE) {
-      ROS_ERROR("WAM::control_loop: send_mtrq failed.");
-    }
-    return;
-  }
-
-  skipped_locks=0;
 
   // read new motor positions
   recv_mpos(); // will always succeed, since it's just a copy
@@ -1292,10 +1277,9 @@ void WAM::newcontrol_rt(double dt){
     // as if they instantly moved to where we wanted.
     this->unlock();
     set_jpos((&tc.q[0])-1);
-    this->lock_rt("newcontrol2");
+    this->lock_rt("control_loop");
   }
 
-  this->unlock();
 }
 
 bool WAM::safety_torques_exceeded(double t[]) {
@@ -1395,11 +1379,12 @@ int WAM::resume_trajectory() {
 }
 
 int WAM::cancel_trajectory() {
+  this->lock("cancel_traj");
   if (!jointstraj) {
     // no trajectory exists
+    this->unlock("cancel_traj");
     return OW_SUCCESS;
   }
-  this->lock("cancel_traj");
   jointstraj->stop();
 
   for(int i = Joint::J1; i<=Joint::Jn; i++) {
