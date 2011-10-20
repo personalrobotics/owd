@@ -75,7 +75,8 @@ private:
   Vibration *vibration;
  public:
   double rotational_leeway;
-  
+  SO3 current_endpoint_target;
+
   /// Static members for handling the ROS service calls
   static ros::ServiceServer ss_ApplyForce;
   static ros::ServiceServer ss_SetForceGains;

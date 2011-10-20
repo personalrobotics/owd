@@ -92,8 +92,8 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     end_position = start_position;
 
     // Save the current Workspace endpoint position
-    endpoint_target = gfeplug->endpoint;
-
+    current_endpoint_target = endpoint_target = gfeplug->endpoint;
+    
     // Calculate the force/torque to apply at endpoint
     _force_direction.normalize();
     force_direction = _force_direction; // save for evaluate function
@@ -128,7 +128,10 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     // 58:  velocity damping force
     // 59:  GfePlugin::recorder->count
     // 60:  total_endpoint_rotation.theta
-    gfeplug->net_force.data.resize(61);
+    // 61:  endpoint WS X rotation due to torque values
+    // 62:  endpoint WS Y rotation due to torque values
+    // 63:  endpoint WS Z rotation due to torque values
+    gfeplug->net_force.data.resize(64);
 
   } else {
     throw "Could not get current WAM values from GfePlugin";
@@ -255,36 +258,37 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
       ;
   }
 
-  SO3 current_endpoint_target((SO3)endpoint_target);
-
   if (rotational_leeway > 0) {
     // we will servo the current_endpoint_target in response to torque
     // readings, up to a limit of rotational_leeway radians from 
-    // the original configuration
-    R3 current_torque(current_force_torque.w);
-    // zero out the Z torque
-    current_torque[2] = 0;
-    // take out the magnitude, leaving a unit vector
-    double total_torque = current_torque.normalize();
-    // make a rotation by scaling the torque by our gain
-    //    const double rotational_gain(1.0/180.0*3.14159/0.2); // 1 deg for 0.2Nm
-    const double rotational_gain(0);
-    so3 torque_rotation(current_torque, total_torque * rotational_gain);
-    // rotate into world coordinates
-    SO3 world_torque_rotation ((SO3)gfeplug->endpoint * (SO3)torque_rotation);
+    // the original configuration.
+    // The current_force_torque vector contains the values that the arm is
+    // producing on the world, so we need to negate them to take into account
+    // what the hand is feeling.
+    R3 current_torque(-1.0 * current_force_torque.w);
+    const double rotational_gain(0.01/180.0*3.14159/0.2); // 1/100 deg for 0.2Nm
+    // take out the magnitude, leaving a unit vector, and make a rotation by
+    // scaling the torque by our gain
+    double rotation_magnitude = current_torque.normalize() * rotational_gain;
+    so3 world_torque_rotation(current_torque, rotation_magnitude);
+    gfeplug->net_force.data[61] = current_torque[0]*rotation_magnitude;
+    gfeplug->net_force.data[62] = current_torque[1]*rotation_magnitude;
+    gfeplug->net_force.data[63] = current_torque[2]*rotation_magnitude;
 
     // see what it does to our endpoint
-    SO3 new_endpoint = world_torque_rotation * (SO3)gfeplug->endpoint;
-    SO3 total_endpoint_rotation_SO3 = current_endpoint_target * (! new_endpoint);
+    SO3 new_endpoint = (SO3)world_torque_rotation * current_endpoint_target;
+    SO3 total_endpoint_rotation_SO3 = (SO3)endpoint_target * (! new_endpoint);
     so3 total_endpoint_rotation = (so3) total_endpoint_rotation_SO3;
+    
     gfeplug->net_force.data[60] = total_endpoint_rotation.theta;
     if (total_endpoint_rotation.theta > rotational_leeway) {
       // bound the total rotation
       total_endpoint_rotation.theta = rotational_leeway;
       total_endpoint_rotation_SO3 = (SO3) total_endpoint_rotation;
     }
-    // update our target
-    //    current_endpoint_target = (!total_endpoint_rotation_SO3) * (SO3)endpoint_target;
+    // update our target to be only "leeway" away from original
+    current_endpoint_target = (!total_endpoint_rotation_SO3) * (SO3)endpoint_target;
+    current_endpoint_target.normalize();
   }
 
   // Compute the rotation error by taking the net rotation from the
@@ -379,18 +383,6 @@ R6 ApplyForceTraj::workspace_forcetorque() {
 		gfeplug->ft_torque[1],
 		gfeplug->ft_torque[2]);
 
-  /*
-  static std::queue<R6> force_torque;
-  static R6 force_torque_sum;
-  force_torque.push(current_ft);
-  force_torque_sum += current_ft;
-
-  if (force_torque.size() > FT_window_size) {
-    force_torque_sum -= force_torque.front();
-    force_torque.pop();
-  }
-  R6 force_torque_avg = force_torque_sum / force_torque.size();
-*/
   R6 force_torque_avg = ft_filter.eval(current_ft);
   
   // rotate the force and torque into workspace coordinates
