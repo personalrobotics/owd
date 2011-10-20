@@ -118,12 +118,16 @@ while (<>) {
 
 
 	print {$GP[1]} "set title \"Positional errors ($name)\"\n";
-	print {$GP[1]} "  plot $f using 15 title \"X error\"  with lines ls 1\n";
-	print {$GP[1]} "replot $f using 16 title \"Y error\" with lines ls 2\n";
-	print {$GP[1]} "replot $f using 17 title \"Z error\" with lines ls 3\n";
-	print {$GP[1]} "replot $f using 18 title \"r error\" with lines ls 4 axes x1y2\n";
-	print {$GP[1]} "replot $f using 19 title \"p error\" with lines ls 5 axes x1y2\n ";
-	print {$GP[1]} "replot $f using 20 title \"y error\" with lines ls 6 axes x1y2\n";
+#	print {$GP[1]} "  plot $f using 15 title \"X error\"  with lines ls 1\n";
+#	print {$GP[1]} "replot $f using 16 title \"Y error\" with lines ls 2\n";
+#	print {$GP[1]} "replot $f using 17 title \"Z error\" with lines ls 3\n";
+	print {$GP[1]} "  plot $f using 18 title \"r error\" with lines ls 4\n";
+	print {$GP[1]} "replot $f using 19 title \"p error\" with lines ls 5\n ";
+	print {$GP[1]} "replot $f using 20 title \"y error\" with lines ls 6\n";
+	print {$GP[1]} "replot $f using 61 title \"total rotation\" with lines ls 8 axes x1y2\n";
+	print {$GP[1]} "replot $f using 62 title \"torque X rotation\" with lines ls 1 axes x1y2\n";
+	print {$GP[1]} "replot $f using 63 title \"torque Y rotation\" with lines ls 2 axes x1y2\n";
+	print {$GP[1]} "replot $f using 64 title \"torque Z rotation\" with lines ls 3 axes x1y2\n";
 
 	print {$GP[0]} "set title \"PID torques from previous cycle ($name)\"\n";
 	print {$GP[0]} "  plot $f using 35 title \"J1 PID\" with lines ls 1\n";
