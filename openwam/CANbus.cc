@@ -47,7 +47,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   simulation(false), received_position_flags(0), received_state_flags(0),
   hand_motion_state_sequence(0),
   ignore_breakaway_encoders(true),
-  hsg_value(3400),
+  hsg_value(0),
   log_canbus_data(log_cb_data),
   candata(0),
   unread_packets(0),
