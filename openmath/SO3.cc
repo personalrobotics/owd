@@ -17,7 +17,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "SO3.hh"
-#include <assert.h>
 
 so3::operator SO3() const{
   double ct, st, vt, w1, w2, w3;
@@ -40,9 +39,7 @@ SO3::SO3(const R3 rx, const R3 ry, const R3 rz){
     this->R[1][0] = rx[1];  this->R[1][1] = ry[1];  this->R[1][2] = rz[1];
     this->R[2][0] = rx[2];  this->R[2][1] = ry[2];  this->R[2][2] = rz[2];
     
-    for(int i=0; i<3; i++)
-        for(int j=0; j<3; j++)
-            assert(this->R[i][j] <= 1.0 && this->R[i][j] >= -1.0);
+    normalize();
 }
 
 void SO3::eye(){
@@ -122,6 +119,20 @@ SO3 operator * (const SO3& r1, const SO3& r2){
 	  r1[SO3::R33]*r2[SO3::R33]);
 
   return R;
+}
+
+void SO3::normalize() {
+  // assume that x, y, and z are all the wrong length and aren't
+  // necessarily orthogonal
+  R3 x(R[0][0], R[1][0], R[2][0]);
+  x.normalize();
+  R3 y(R[0][1], R[1][1], R[2][1]);
+  R3 z = x^y;  // z is now orthogonal to x and y
+  z.normalize();
+  y = z^x;
+  R[0][0] = x[0];   R[1][0] = x[1];  R[2][0] = x[2];
+  R[0][1] = y[0];   R[1][1] = y[1];  R[2][1] = y[2];
+  R[0][2] = z[0];   R[1][2] = z[1];  R[2][2] = z[2];
 }
 
 ostream& operator <<  (ostream& s, const SO3& r){

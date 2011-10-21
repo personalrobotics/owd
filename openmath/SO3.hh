@@ -28,10 +28,9 @@
 class SO3;
 
 class so3{
-private:
+public:
   R3 omega;
   double theta;
-public:
 
   // this is used to avoid singularities in so3. It's the minimum rotation.
   static const double EPSILON = 0.0000000000001;
@@ -43,6 +42,8 @@ public:
   double t() const {return theta;}
 
   operator SO3() const;
+
+  void normalize() {omega.normalize();}
 
   friend so3 operator * (double s, const so3& r){return so3(r.w(), r.t()*s);}
   friend so3 operator * (const so3& r, double s){return so3(r.w(), r.t()*s);}
@@ -77,6 +78,8 @@ public:
   
   operator so3() const;  // convert to so3
   
+  void normalize();
+
   friend SO3 operator * (const SO3& R1, const SO3& R2);
   friend R3  operator * (const SO3& R,  const R3& p);
   friend SO3 operator ! (const SO3& R);

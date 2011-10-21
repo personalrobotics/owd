@@ -39,11 +39,12 @@ public:
   
   double norm() const {return sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2]);}
 
-  void normalize() {
+  double normalize() {
     double d=norm();
     x[0] /= d;
     x[1] /= d;
     x[2] /= d;
+    return d; // in case someone wants our original magnitude
   }
 
   void clear() {
