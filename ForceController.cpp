@@ -10,6 +10,7 @@
 ForceController::ForceController()
   : fkp(2), fkd(0), fki(0.08),
     tkp(0), tkd(0), tki(0),
+    f_multiplier(1.0),
     last_ft_error(0,0,0,0,0,0),
     ft_error_integral(0,0,0,0,0,0),
     integral_saturation_limit(12) {
@@ -39,9 +40,9 @@ OWD::JointPos ForceController::control(R6 ft_error) {
   }
 
   ft_correction.v =
-    fkp * bounded_ft_error.v +
-    fkd * ft_error_delta.v +
-    fki * ft_error_integral.v;
+    f_multiplier * fkp * bounded_ft_error.v +
+    f_multiplier * fkd * ft_error_delta.v +
+    f_multiplier * fki * ft_error_integral.v;
   ft_correction.w =
     tkp * bounded_ft_error.w +
     tkd * ft_error_delta.w +

@@ -41,6 +41,13 @@ bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
   }
 
   // reset the errors in our static force controller
+  if ((req.f < 0.5) && (req.f > -0.5)) {
+    // must reduce the proportional gain for small forces or it oscillates
+    // too easily
+    force_controller.f_multiplier = 0.25;
+  } else {
+    force_controller.f_multiplier = 1.0;
+  }
   force_controller.reset();
 
   // always return true for the service call so that the client knows that

@@ -19,6 +19,7 @@ class ForceController {
 
   double fkp, fkd, fki;  // force gains
   double tkp, tkd, tki;  // torque gains
+  double f_multiplier; // gain scaling
   R6 last_ft_error;
   R6 bounded_ft_error, ft_error_delta, ft_error_integral;
   R6 ft_correction;
