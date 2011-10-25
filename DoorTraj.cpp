@@ -20,7 +20,7 @@ DoorTraj::DoorTraj(OWD::TrajType &vtraj, gfe_owd_plugin::OpenDoor::Request::_ee_
 		 max_j_vel, 
 		 max_j_accel,
 		 maxjerk,
-		 false, false, false),
+		 false, false, false,false),
     PullDirection(_PullDirection),
     endpoint_position_goal((R3)gfeplug->endpoint),
     last_traj_endpoint((R3)gfeplug->endpoint)

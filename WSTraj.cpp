@@ -53,6 +53,10 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
 {
   movement_direction.normalize();
   start_position = OWD::JointPos(wst.starting_config);
+  OWD::JointPos current_pos(gfeplug->arm_position);
+  if (start_position.closeto(current_pos)) {
+    start_position = current_pos;
+  }
   end_position = OWD::JointPos(wst.ending_config);
   joint_change = OWD::JointPos(wst.ending_config) - start_position;
 
@@ -156,35 +160,6 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // based on how much time elapsed since the last call
     time += dt;
 
-    // check for ending condition
-    if (time > parseg.end_time) {
-      time = parseg.end_time;
-      runstate = DONE;
-    }
-
-    // calculate our trajectory position
-    double dist, vel, accel;
-    parseg.evaluate(dist, vel, accel, time);
-    R3 target_position = (R3)start_endpoint + endpoint_translation * dist;
-    // calculate the endpoint position error
-    R3 position_error = target_position - (R3)gfeplug->endpoint;
-
-    // calculate our trajectory rotation
-    so3 relative_rotation(endpoint_rotation.w(), endpoint_rotation.t() * dist);
-    SO3 target_rotation = (SO3)relative_rotation * (SO3)start_endpoint;
-
-    // Compute the endpoint rotation error by taking the net rotation from
-    // the current orientation to the target orientation and converting
-    // it to axis-angle format
-    so3 rotation_error1 = (so3)(target_rotation * (! (SO3)gfeplug->endpoint));
-    // represent as rotation about each of the axes
-    R3 rotation_error = rotation_error1.t() * rotation_error1.w();
-
-    // break down the position error into lateral and longitudinal components
-    R3 longitudinal_error = (position_error * movement_direction) 
-      * movement_direction;
-    R3 lateral_error = position_error - longitudinal_error;
-
     // map our current position to the closest point
     // on the trajectory.  this does not move us forward or
     // backward in time.
@@ -198,8 +173,41 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     }
     double traj_time = parseg.calc_time(traj_percent);
 
+    // check for ending condition
+    if (traj_time >= parseg.end_time) {
+      time = parseg.end_time;
+      runstate = DONE;
+      return;
+    }
+
+    // calculate our trajectory position
+    double dist, vel, accel;
+    parseg.evaluate(dist, vel, accel, time);
+    // MVW 10/24:
+    // need to compute our updated target position based on velocity
+    // limit before we get too far into calculating target rotation
+    R3 target_position = (R3)start_endpoint + endpoint_translation * dist;
+    // calculate the endpoint position error
+    R3 position_error = target_position - (R3)gfeplug->endpoint;
+
+    // calculate our trajectory rotation
+    so3 relative_rotation(endpoint_rotation.w(), endpoint_rotation.t() * dist);
+    SO3 target_rotation = (SO3)relative_rotation * (SO3)start_endpoint;
+
+    // Compute the endpoint rotation error by taking the net rotation from
+    // the current orientation to the target orientation and converting
+    // it to axis-angle format
+    so3 rotation_error = (so3)(target_rotation * (! (SO3)gfeplug->endpoint));
+    // represent as rotation about each of the axes
+    R3 rotation_correction = rotation_error.t() * rotation_error.w();
+
+    // break down the position error into lateral and longitudinal components
+    R3 longitudinal_error = (position_error * movement_direction) 
+      * movement_direction;
+    R3 lateral_error = position_error - longitudinal_error;
+
     // calculate our endpoint correction to keep us on course
-    R6 endpos_correction(lateral_error,rotation_error);
+    R6 endpos_correction(lateral_error,rotation_correction);
     OWD::JointPos joint_correction;
     try {
       joint_correction = 
@@ -268,6 +276,8 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     tc.t = joint_torques;
 
   } else {
+    // movement is purely time-based
+
     static R3 total_endpoint_movement;
     // advance our time by dt
     time += dt;
@@ -301,17 +311,17 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
      *   calculate the endpoint pose correction   *
      **********************************************/
     R3 target_position = (R3)start_endpoint + endpoint_translation * dist;
-
-    so3 relative_rotation(endpoint_rotation.w(), endpoint_rotation.t() * dist);
-    SO3 target_rotation = (SO3)relative_rotation * (SO3)start_endpoint;
     // calculate the endpoint position correction
     R3 position_correction = target_position - (R3)gfeplug->endpoint;
+
+    // calculate our trajectory rotation
+    so3 relative_rotation(endpoint_rotation.w(), endpoint_rotation.t() * dist);
+    SO3 target_rotation = (SO3)relative_rotation * (SO3)start_endpoint;
 
     // Compute the endpoint rotation error by taking the net rotation from
     // the current orientation to the target orientation and converting
     // it to axis-angle format
     so3 rotation_error = (so3)(target_rotation * (! (SO3)gfeplug->endpoint));
-
     // represent as rotation about each of the axes
     R3 rotation_correction = rotation_error.t() * rotation_error.w();
     
