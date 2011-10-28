@@ -1,4 +1,13 @@
 #include <deque>
+#include "butterworth_solver.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+/// Creates a butterworth filter with the specified order and 
+/// cutoff frequency.  Defaults to lowpass, but can also be created
+/// with types BUTTER_HIGHPASS, BUTTER_BANDPASS, or BUTTER_BANDSTOP.
+/// In the case of the pass or stop filters, the higher frequency is
+/// passed in as cutoff2.
 
 template<class value_t> class Butterworth {
 public:
@@ -8,40 +17,20 @@ public:
   std::deque<value_t> X;
   std::deque<value_t> Y;
   
-  inline void reset() {
-    X.resize(0);
-    Y.resize(0);
-  }
-
   Butterworth(unsigned int _order,
-	      double cutoff) 
+	      double cutoff,
+	      int filter_type=BUTTER_LOWPASS,
+	      double cutoff2 = 0) 
     : order(_order) {
     A=(double*)malloc(sizeof(double) * (order+1));
     B=(double*)malloc(sizeof(double) * (order+1));
-    if ((order == 2) && (cutoff==10.0)) {
-      // coefficients for a 2nd-order filter with a
-      // cutoff of 10hz
-      B[0]=0.0036;
-      B[1]=0.0072;
-      B[2]=0.0036;
-      A[0]=1.0;
-      A[1]=-1.8227;
-      A[2]= 0.8372;
-    } else {
-      throw "Unable to find coefficients for that filter";
+    
+    int err = butterworth_solver(filter_type, order, 500, 
+				 cutoff, cutoff2,
+				 A, B);
+    if (err) {
+      throw err;
     }
-    // coefficients for a 3rd-order filter with a
-    // cutoff of 10hz
-    /*
-      static const unsigned int order=3;
-      static const double B1=0.2196e-3;
-      static const double B2=0.6588e-3;
-      static const double B3=0.6588e-3;
-      static const double B4=0.2196e-3;
-      static const double A2=-2.7488;
-      static const double A3= 2.5282;
-      static const double A4=-0.7776;
-    */
   }
   
   ~Butterworth() {
@@ -69,4 +58,9 @@ public:
     return output;
   }
   
+  inline void reset() {
+    X.resize(0);
+    Y.resize(0);
+  }
+
 };
