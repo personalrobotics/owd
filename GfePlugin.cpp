@@ -247,6 +247,7 @@ R6 GfePlugin::workspace_forcetorque() {
 
 // Static member inside GfePlugin class
 std_msgs::Float64MultiArray GfePlugin::net_force;
+std_msgs::Float64MultiArray GfePlugin::tactile_debug;
 
 // Allocation for the pointer that will hold the single instantiation
 // of our plugin class.  We initialize it to NULL so that the register
