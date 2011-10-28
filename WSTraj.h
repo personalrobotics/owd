@@ -9,6 +9,7 @@
 #define WSTRAJ_HH
 
 #include "GfePlugin.hh"
+#include "ForceController.h"
 #include <openwam/Trajectory.hh>
 #include <openwam/ParabolicSegment.hh>
 #include <gfe_owd_plugin/AddWSTraj.h>
@@ -45,6 +46,7 @@ private:
   double vel_factor;
   double force_scale;
   static const double force_scale_gain = 5;
+  ForceController force_controller;
 
   /// Static members for handling the ROS service calls
   static ros::ServiceServer ss_AddWSTraj;

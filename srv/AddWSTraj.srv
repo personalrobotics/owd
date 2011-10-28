@@ -1,7 +1,18 @@
+# Endpoint change is the relative move expressed in the WAM0 frame
 geometry_msgs/Pose endpoint_change
+#
+# Starting and ending config are the joint angles corresponding to the
+# start and end positions.  By the time the robot has arrived at the
+# ending config, the endpoint should have moved by endpoint_change.
 float64[] starting_config
 float64[] ending_config
+#
+# wrench is the force/torque to apply for the motion, expressed in the
+# WAM0 frame.  If wrench is zero then the trajectory will be executed
+# as a timed position-based trajectory.
 geometry_msgs/Wrench wrench
+#
+# JS and WS speed limits
 float32 max_linear_velocity
 float32 max_angular_velocity
 float32 min_accel_time

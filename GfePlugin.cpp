@@ -23,7 +23,9 @@
 #include "openwam/CANdefs.hh"	// for HANDSTATE_* enumeration
 
 GfePlugin::GfePlugin()
-  : write_log_file(false),flush_recorder_data(false)
+  : write_log_file(false),flush_recorder_data(false),
+  ft_filter(2,10.0)
+
 {
   // ROS has already been initialized by OWD, so we can just
   // create our own NodeHandle in the same namespace
@@ -213,6 +215,27 @@ bool GfePlugin::PowerGrasp(pr_msgs::MoveHand::Request &req,
   OWD::WamDriver::bus->received_state_flags &= ~(0x7800); // clear the four hand bits
 
   return true;
+}
+
+R6 GfePlugin::workspace_forcetorque() {
+  // get the FT force+torque and smooth it
+  R6 current_ft(ft_force[0],
+		ft_force[1],
+		ft_force[2],
+		ft_torque[0],
+		ft_torque[1],
+		ft_torque[2]);
+  R6 force_torque_avg = ft_filter.eval(current_ft);
+  
+  // rotate the force and torque into workspace coordinates
+  // we negate each of the sensor readings because what we want is a
+  // measure of what the arm is producing, which is the opposite of
+  // what the F/T sensor feels.
+  R6 ws_force_torque((SO3)endpoint * (-1 * force_torque_avg.v),
+                     (SO3)endpoint * (-1 * force_torque_avg.w));
+
+
+  return ws_force_torque;
 }
 
 // Static member inside GfePlugin class

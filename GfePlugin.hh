@@ -14,6 +14,7 @@
 #include <std_msgs/Float64MultiArray.h>
 #include <ros/ros.h>
 #include <pthread.h>
+#include "Butterworth.h"
 
 // #define SIMULATION
 #ifdef SIMULATION
@@ -40,12 +41,15 @@ public:
   bool flush_recorder_data;
   bool PowerGrasp(pr_msgs::MoveHand::Request &req,
 		  pr_msgs::MoveHand::Response &res);
+  R6 workspace_forcetorque();
+  Butterworth<R6> ft_filter;
   
 private:
   ros::Publisher pub_net_force;
   ros::ServiceServer ss_PowerGrasp;
   pthread_mutex_t recorder_mutex,
     pub_mutex;
+
 };
 
 extern GfePlugin *gfeplug;

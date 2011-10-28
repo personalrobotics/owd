@@ -139,6 +139,9 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
 		    vel_factor);
   }
   parseg.dump();
+
+  // reset the force/torque filter (it may have old values from before)
+  gfeplug->ft_filter.reset();
 }
 
 WSTraj::~WSTraj() {
@@ -163,15 +166,28 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // map our current position to the closest point
     // on the trajectory.  this does not move us forward or
     // backward in time.
-    R3 traj_progress = (((R3)gfeplug->endpoint - (R3)start_endpoint) * 
-      movement_direction) * movement_direction;
-    double traj_percent = traj_progress.norm() / endpoint_translation.norm();
-    if ((traj_percent < 0) || (traj_percent > 1)) {
-      ROS_ERROR_NAMED("wstraj","Bad calculation of trajectory progress: %2.2f",traj_percent);
-      runstate=ABORT;
-      return;
+    double traj_progress = (((R3)gfeplug->endpoint - (R3)start_endpoint) * 
+			    movement_direction);
+
+    bool ignore_longitudinal_error(true);
+    double traj_time;
+    if (traj_progress < 0) {
+      // some external force pushed us back behind the start point,
+      // so instead of doing our force-based control we will correct
+      // the entire position error to try to pull us back to the start.
+      traj_time = 0;
+      time = 0;
+      ignore_longitudinal_error=false;
+    } else {
+      R3 traj_progress_vector = traj_progress * movement_direction;
+      double traj_percent = traj_progress_vector.norm() / endpoint_translation.norm();
+      if ((traj_percent < 0) || (traj_percent > 1)) {
+	// Bad calculation of trajectory progress
+	runstate=ABORT;
+	return;
+      }
+      traj_time = parseg.calc_time(traj_percent);
     }
-    double traj_time = parseg.calc_time(traj_percent);
 
     // check for ending condition
     if (traj_time >= parseg.end_time) {
@@ -180,12 +196,10 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
       return;
     }
 
-    // calculate our trajectory position
+    // calculate our trajectory values
     double dist, vel, accel;
-    parseg.evaluate(dist, vel, accel, time);
-    // MVW 10/24:
-    // need to compute our updated target position based on velocity
-    // limit before we get too far into calculating target rotation
+    parseg.evaluate(dist, vel, accel, traj_time);
+
     R3 target_position = (R3)start_endpoint + endpoint_translation * dist;
     // calculate the endpoint position error
     R3 position_error = target_position - (R3)gfeplug->endpoint;
@@ -201,13 +215,21 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // represent as rotation about each of the axes
     R3 rotation_correction = rotation_error.t() * rotation_error.w();
 
-    // break down the position error into lateral and longitudinal components
-    R3 longitudinal_error = (position_error * movement_direction) 
-      * movement_direction;
-    R3 lateral_error = position_error - longitudinal_error;
+    R3 position_correction;
+    if (ignore_longitudinal_error) {
+      // break down the position error into lateral and longitudinal components
+      R3 longitudinal_error = (position_error * movement_direction) 
+	* movement_direction;
+      R3 lateral_error = position_error - longitudinal_error;
+      position_correction = lateral_error;
+    } else {
+      position_correction = position_error;
+    }
 
-    // calculate our endpoint correction to keep us on course
-    R6 endpos_correction(lateral_error,rotation_correction);
+    // calculate our endpoint correction to keep us on course by doing the
+    // full rotation correction but only correcting the lateral error.  We
+    // will rely on the force controller to move us forward.
+    R6 endpos_correction(position_correction,rotation_correction);
     OWD::JointPos joint_correction;
     try {
       joint_correction = 
@@ -259,8 +281,8 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
       time = traj_time;
     } else if (time < traj_time) {
       force_scale -= (traj_time - time) / force_scale_gain;
-      if (force_scale < -1) {
-	force_scale = -1;
+      if (force_scale < 0) {
+	force_scale = 0;
       }
     }
 
@@ -268,12 +290,17 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // scale, and the trajectory's relative velocity.  By using the
     // trajectory's velocity we will get a soft start at the beginning
     // and a soft stop at the end.
-    R6 force = vel * vel_factor * force_scale * driving_force;
-    OWD::JointPos joint_torques = gfeplug->JacobianTranspose_times_vector(force);
+    R6 desired_ft = vel * vel_factor * force_scale * driving_force;
+    OWD::JointPos force_feedforward_torques = gfeplug->JacobianTranspose_times_vector(desired_ft);
+
+    R6 actual_ft = gfeplug->workspace_forcetorque();
+    R6 ft_error = desired_ft - actual_ft;
+    OWD::JointPos force_feedback_torques(tc.q.size());
+    force_feedback_torques = force_controller.control(ft_error);
 
     // return the new joint positions and the force
     tc.q += joint_correction;
-    tc.t = joint_torques;
+    tc.t = force_feedforward_torques + force_feedback_torques;
 
   } else {
     // movement is purely time-based

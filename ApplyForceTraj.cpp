@@ -65,7 +65,6 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   last_force_error(0), stopforce(false),
   distance_limit(dist_limit),
   last_travel(0),
-  ft_filter(2,10.0),
   velocity_filter(2,10.0),
   vibration(NULL),
   rotational_leeway(0)
@@ -148,6 +147,8 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   ros::NodeHandle n("~");
   ss_StopForce = n.advertiseService("StopForce",&ApplyForceTraj::StopForce, this);
 
+  // reset the force/torque filter (it may have old values from before)
+  gfeplug->ft_filter.reset();
 }
 
 void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
@@ -211,7 +212,7 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   // us the right endpoint force.
 
   // get the current smoothed sensor force/torque in WS coordinates
-  R6 current_force_torque = workspace_forcetorque();
+  R6 current_force_torque = gfeplug->workspace_forcetorque();
   gfeplug->net_force.data[48]=current_force_torque.v[0];
   gfeplug->net_force.data[49]=current_force_torque.v[1];
   gfeplug->net_force.data[50]=current_force_torque.v[2];
@@ -375,34 +376,6 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   end_position =tc.q;  // keep tracking the current position
   return;
 }
-
-R6 ApplyForceTraj::workspace_forcetorque() {
-  // get the FT force+torque and smooth it
-  // I make this a little more efficient by always keeping track
-  // of the sum of all the elements in the queue, so no matter how
-  // many elements we are averaging we can quickly compute the new
-  // average by just adjusting the sum and dividing by the count.
-
-  R6 current_ft(gfeplug->ft_force[0],
-		gfeplug->ft_force[1],
-		gfeplug->ft_force[2],
-		gfeplug->ft_torque[0],
-		gfeplug->ft_torque[1],
-		gfeplug->ft_torque[2]);
-
-  R6 force_torque_avg = ft_filter.eval(current_ft);
-  
-  // rotate the force and torque into workspace coordinates
-  // we negate each of the sensor readings because what we want is a
-  // measure of what the arm is producing, which is the opposite of
-  // what the F/T sensor feels.
-  R6 ws_force_torque((SO3)gfeplug->endpoint * (-1 * force_torque_avg.v),
-                     (SO3)gfeplug->endpoint * (-1 * force_torque_avg.w));
-
-
-  return ws_force_torque;
-}
-
 
 // Stop the trajectory when asked by a client
 bool ApplyForceTraj::StopForce(gfe_owd_plugin::StopForce::Request &req,
