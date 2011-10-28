@@ -60,6 +60,7 @@ GfePlugin::GfePlugin()
   }
 
   pub_net_force = n.advertise<std_msgs::Float64MultiArray>("net_force",1);
+  pub_tactile_debug = n.advertise<std_msgs::Float64MultiArray>("tactile_debug",1);
 
   recorder = new DataRecorder<double>(6000);
   pthread_mutex_init(&recorder_mutex,NULL);
@@ -86,8 +87,9 @@ GfePlugin::~GfePlugin() {
     write_recorder_data();
   }
 
-  // Shut down our publisher
+  // Shut down our publishers
   pub_net_force.shutdown();
+  pub_tactile_debug.shutdown();
 
   // Shut down our services
   ss_PowerGrasp.shutdown();
@@ -109,6 +111,11 @@ void GfePlugin::Publish() {
     pthread_mutex_unlock(&pub_mutex);
   }    
   
+  if (OWD::WamDriver::owam->jointstraj) {
+    tactile_debug.data = OWD::WamDriver::owam->jointstraj->tactile_debug_data;
+    pub_tactile_debug.publish(tactile_debug);
+  }
+
   if (write_log_file &&
       ((recorder->count > 2500) || flush_recorder_data)) {
     write_recorder_data();

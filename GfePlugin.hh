@@ -33,6 +33,7 @@ public:
   virtual void Publish();
 
   static std_msgs::Float64MultiArray net_force;
+  static std_msgs::Float64MultiArray tactile_debug;
  
   bool write_log_file;
   DataRecorder<double> *recorder;
@@ -46,6 +47,7 @@ public:
   
 private:
   ros::Publisher pub_net_force;
+  ros::Publisher pub_tactile_debug;
   ros::ServiceServer ss_PowerGrasp;
   pthread_mutex_t recorder_mutex,
     pub_mutex;
