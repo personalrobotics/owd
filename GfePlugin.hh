@@ -10,11 +10,11 @@
 
 #include <openwam/Plugin.hh>
 #include <openwam/DataRecorder.cc>
+#include <openwam/Butterworth.h>
 #include <pr_msgs/MoveHand.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <ros/ros.h>
 #include <pthread.h>
-#include "Butterworth.h"
 
 // #define SIMULATION
 #ifdef SIMULATION
