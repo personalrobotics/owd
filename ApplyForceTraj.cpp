@@ -89,10 +89,6 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
    }
     */
 
-    if (OWD::Kinematics::max_condition > 15) {
-      throw "Arm is too close to a singularity for accurate force control; please move it to a different configuration and try again";
-    }
-
     // Set the start position from the current position
     start_position=gfeplug->target_arm_position;
     end_position = start_position;
