@@ -41,16 +41,6 @@ bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
     res.id=0;
   }
 
-  // reset the errors in our static force controller
-  if ((req.f < 0.5) && (req.f > -0.5)) {
-    // must reduce the proportional gain for small forces or it oscillates
-    // too easily
-    force_controller.f_multiplier = 0.25;
-  } else {
-    force_controller.f_multiplier = 1.0;
-  }
-  force_controller.reset();
-
   // always return true for the service call so that the client knows that
   // the call was processed, as opposed to there being a
   // network communication error.
@@ -76,19 +66,16 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
 	(gfeplug->ft_torque.size() < 3)) {
       throw "ApplyForce requires that the Force/Torque sensor is installed and configured";
     }
-
-    /*  This check was removed so that we can call ApplyForce while we're
-	already in contact with something.
-    // make sure that the F/T sensor has already been tared
-    const double max_tared_force=1.0;
-    const double max_tared_torque=0.1;
-    for (int i=0; i<3; ++i) {
-      if ((gfeplug->ft_force[i] > max_tared_force) || 
-	  (gfeplug->ft_torque[i] > max_tared_torque)) {
-	throw "F/T sensor must be tared in the current configuration before calling ApplyForce";
-      }
-   }
-    */
+    
+    // reset the errors in our static force controller
+    if ((force_magnitude < 0.5) && (force_magnitude > -0.5)) {
+      // must reduce the proportional gain for small forces or it oscillates
+      // too easily
+      force_controller.f_multiplier = 0.25;
+    } else {
+      force_controller.f_multiplier = 1.0;
+    }
+    force_controller.reset();
 
     // Set the start position from the current position
     start_position=gfeplug->target_arm_position;

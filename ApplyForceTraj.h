@@ -44,7 +44,6 @@ public:
   static bool Register();
   static void Shutdown();
 
-private:
   OWD::JointPos limit_excursion_and_velocity(double travel);
   double limit_force_correction_movement(double correction_distance);
 
@@ -72,7 +71,6 @@ private:
   Vibration *vibration;
   static double velocity_damping_gain;
   static ApplyForceTraj *current_traj;
- public:
   double rotational_leeway;
   SO3 current_endpoint_target;
 
