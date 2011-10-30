@@ -111,10 +111,8 @@ void GfePlugin::Publish() {
     pthread_mutex_unlock(&pub_mutex);
   }    
   
-  if (OWD::WamDriver::owam->jointstraj) {
-    tactile_debug.data = OWD::WamDriver::owam->jointstraj->tactile_debug_data;
-    pub_tactile_debug.publish(tactile_debug);
-  }
+  tactile_debug.data = OWD::Trajectory::tactile_debug_data;
+  pub_tactile_debug.publish(tactile_debug);
 
   if (write_log_file &&
       ((recorder->count > 2500) || flush_recorder_data)) {

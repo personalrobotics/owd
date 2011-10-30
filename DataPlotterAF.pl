@@ -79,7 +79,7 @@ while (<>) {
 #	print {$GP[0]} "replot $f using 5 title \"X error\" with lines ls 8\n";
 #	print {$GP[0]} "replot $f using 6 title \"Y error\" with lines ls 9\n";
 #	print {$GP[0]} "replot $f using 7 title \"Z error\" with lines ls 10\n";
-#	print {$GP[0]} "replot $f using 1 title \"time factor\" with lines ls 22 axes x1y2\n";
+#	print {$GP[0]} "replot $f using 1 title \"time factor (y2)\" with lines ls 22 axes x1y2\n";
 #
 #
 #	print {$GP[1]} "set title \"Joint torques to correct force ($name)\"\n";
@@ -90,7 +90,7 @@ while (<>) {
 #	print {$GP[1]} "replot $f using 12 title \"J5 torque\" with lines ls 5\n";
 #	print {$GP[1]} "replot $f using 13 title \"J6 torque\" with lines ls 6\n";
 #	print {$GP[1]} "replot $f using 14 title \"J7 torque\" with lines ls 7\n";
-#	print {$GP[1]} "replot $f using 1 title \"time factor\" with lines ls 22 axes x1y2\n";
+#	print {$GP[1]} "replot $f using 1 title \"time factor (y2)\" with lines ls 22 axes x1y2\n";
 
 	print {$GP[2]} "set title \"Force controller values ($name)\"\n";
 #	print {$GP[2]} "  plot $f using 54 title \"Z force\" with lines ls 1\n";
@@ -99,9 +99,9 @@ while (<>) {
 	print {$GP[2]} "replot $f using 6 title \"delta error\" with lines ls 4\n";
 	print {$GP[2]} "replot $f using 7 title \"integral error / 3\" with lines ls 5\n";
 	print {$GP[2]} "replot $f using 55 title \"correction force\" with lines ls 6\n";
-	print {$GP[2]} "replot $f using 56 title \"travel (mm)\" with lines ls 7 axes x1y2\n";
+	print {$GP[2]} "replot $f using 56 title \"travel (mm y2)\" with lines ls 7 axes x1y2\n";
 	print {$GP[2]} "replot $f using 57 title \"excursion force\" with lines ls 8\n";
-	print {$GP[2]} "replot $f using 58 title \"velocity (mm)\" with lines ls 9 axes x1y2\n";
+	print {$GP[2]} "replot $f using 58 title \"velocity (mm y2)\" with lines ls 9 axes x1y2\n";
 	print {$GP[2]} "replot $f using 59 title \"damping force\" with lines ls 10\n";
 
 
@@ -114,7 +114,7 @@ while (<>) {
 #	print {$GP[0]} "replot $f using 46 title \"J5 delta\" with lines ls 5\n";
 #	print {$GP[0]} "replot $f using 47 title \"J6 delta\" with lines ls 6\n";
 #	print {$GP[0]} "replot $f using 48 title \"J7 delta\" with lines ls 7\n";
-#	print {$GP[0]} "replot $f using 1 title \"time factor\" with lines ls 22 axes x1y2\n";
+#	print {$GP[0]} "replot $f using 1 title \"time factor (y2)\" with lines ls 22 axes x1y2\n";
 
 
 	print {$GP[1]} "set title \"Positional errors ($name)\"\n";
@@ -124,10 +124,10 @@ while (<>) {
 	print {$GP[1]} "  plot $f using 18 title \"r error\" with lines ls 4\n";
 	print {$GP[1]} "replot $f using 19 title \"p error\" with lines ls 5\n ";
 	print {$GP[1]} "replot $f using 20 title \"y error\" with lines ls 6\n";
-	print {$GP[1]} "replot $f using 61 title \"total rotation\" with lines ls 8 axes x1y2\n";
-	print {$GP[1]} "replot $f using 62 title \"torque X rotation\" with lines ls 1 axes x1y2\n";
-	print {$GP[1]} "replot $f using 63 title \"torque Y rotation\" with lines ls 2 axes x1y2\n";
-	print {$GP[1]} "replot $f using 64 title \"torque Z rotation\" with lines ls 3 axes x1y2\n";
+	print {$GP[1]} "replot $f using 61 title \"total rotation (y2)\" with lines ls 8 axes x1y2\n";
+	print {$GP[1]} "replot $f using 62 title \"torque X rotation (y2)\" with lines ls 1 axes x1y2\n";
+	print {$GP[1]} "replot $f using 63 title \"torque Y rotation (y2)\" with lines ls 2 axes x1y2\n";
+	print {$GP[1]} "replot $f using 64 title \"torque Z rotation (y2)\" with lines ls 3 axes x1y2\n";
 
 	print {$GP[0]} "set title \"PID torques from previous cycle ($name)\"\n";
 	print {$GP[0]} "  plot $f using 35 title \"J1 PID\" with lines ls 1\n";

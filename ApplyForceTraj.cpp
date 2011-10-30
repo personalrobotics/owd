@@ -28,6 +28,7 @@ bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
     // send it to the arm
     res.id = OWD::Plugin::AddTrajectory(newtraj,res.reason);
     if (res.id > 0) {
+      current_traj = newtraj;
       res.ok=true;
       res.reason="";
     } else {
@@ -65,7 +66,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   last_force_error(0), stopforce(false),
   distance_limit(dist_limit),
   last_travel(0),
-  velocity_filter(2,10.0),
+  velocity_filter(2,50.0),
   vibration(NULL),
   rotational_leeway(0)
 {
@@ -133,7 +134,8 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     // 61:  endpoint WS X rotation due to torque values
     // 62:  endpoint WS Y rotation due to torque values
     // 63:  endpoint WS Z rotation due to torque values
-    gfeplug->net_force.data.resize(64);
+    // 64:  unbounded force/torque error magnitude
+    gfeplug->net_force.data.resize(65);
 
   } else {
     throw "Could not get current WAM values from GfePlugin";
@@ -224,6 +226,7 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   R6 workspace_forcetorque_error =
     forcetorque_vector - net_force_torque;
 
+  gfeplug->net_force.data[64]=workspace_forcetorque_error.norm();
   // Pass the F/T error to the force controller to get
   // the joint torques to apply
   OWD::JointPos correction_torques(tc.q.size());
@@ -382,8 +385,9 @@ bool ApplyForceTraj::StopForce(gfe_owd_plugin::StopForce::Request &req,
 
 bool ApplyForceTraj::SetForceGains(pr_msgs::SetJointOffsets::Request &req,
                                    pr_msgs::SetJointOffsets::Response &res) {
-  if (req.offset.size() != 6) {
-    res.reason = "Need 6 gains: force kP, kD, kI, torque kP, kD, kI";
+  if ((req.offset.size() != 6) && 
+      (req.offset.size() != 7)) {
+    res.reason = "Need 6 gains: force kP, kD, kI, torque kP, kD, kI, plus an optional velocity damping gain";
     res.ok=false;
   } else {
     force_controller.fkp=req.offset[0];
@@ -392,6 +396,9 @@ bool ApplyForceTraj::SetForceGains(pr_msgs::SetJointOffsets::Request &req,
     force_controller.tkp=req.offset[3];
     force_controller.tkd=req.offset[4];
     force_controller.tki=req.offset[5];
+    if (req.offset.size() == 7) {
+      velocity_damping_gain = req.offset[6];
+    }
     res.ok=true;
   }
   return true;
@@ -419,15 +426,15 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
     
   // We limit the velocity by creating a virtual dashpot that applies
   // a counter force proportional to the velocity.
-  const double velocity_gain = 0.5;
   double travel_delta = travel - last_travel;
   last_travel = travel;
   double velocity = velocity_filter.eval(travel_delta) / OWD::ControlLoop::PERIOD;
   double velocity_return_force=0;
   gfeplug->net_force.data[1] = travel / cartesian_vel_limit;
   velocity_return_force = 
-    - pow(velocity / cartesian_vel_limit, 3)
-    * velocity_gain;
+    //    - pow(velocity / cartesian_vel_limit, 3)
+    -velocity
+    * velocity_damping_gain;
   gfeplug->net_force.data[57] = velocity * 1000.0;
   gfeplug->net_force.data[58] = velocity_return_force;
 
@@ -461,6 +468,9 @@ ForceController ApplyForceTraj::force_controller;
 ros::ServiceServer ApplyForceTraj::ss_ApplyForce,
   ApplyForceTraj::ss_SetForceGains;
   
+double ApplyForceTraj::velocity_damping_gain(0.5);
+
+ApplyForceTraj *ApplyForceTraj::current_traj(NULL);
 
 // Set up our ROS service for receiving trajectory requests.
 bool ApplyForceTraj::Register() {
@@ -478,6 +488,9 @@ void ApplyForceTraj::Shutdown() {
 }
 
 ApplyForceTraj::~ApplyForceTraj() {
+  if (current_traj) {
+    current_traj = NULL;
+  }
   gfeplug->flush_recorder_data = true;
   ss_StopForce.shutdown();
   if (vibration) {

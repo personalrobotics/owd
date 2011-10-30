@@ -70,6 +70,8 @@ private:
   static ForceController force_controller;
   Butterworth<double> velocity_filter;
   Vibration *vibration;
+  static double velocity_damping_gain;
+  static ApplyForceTraj *current_traj;
  public:
   double rotational_leeway;
   SO3 current_endpoint_target;
