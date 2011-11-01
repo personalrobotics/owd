@@ -10,6 +10,7 @@
 
 #include "GfePlugin.hh"
 #include "ForceController.h"
+#include "ApplyForceTraj.h"
 #include <openwam/Trajectory.hh>
 #include <openwam/ParabolicSegment.hh>
 #include <gfe_owd_plugin/AddWSTraj.h>
@@ -33,7 +34,6 @@ public:
   static bool Register();
   static void Shutdown();
 
-private:
   R6 driving_force;
   SE3 start_endpoint;
   R3 endpoint_translation;
@@ -47,6 +47,7 @@ private:
   double force_scale;
   static const double force_scale_gain = 5;
   ForceController force_controller;
+  ApplyForceTraj *AFTraj;
 
   /// Static members for handling the ROS service calls
   static ros::ServiceServer ss_AddWSTraj;

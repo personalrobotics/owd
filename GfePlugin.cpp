@@ -23,8 +23,7 @@
 #include "openwam/CANdefs.hh"	// for HANDSTATE_* enumeration
 
 GfePlugin::GfePlugin()
-  : write_log_file(false),flush_recorder_data(false),
-  ft_filter(2,10.0)
+  : write_log_file(false),flush_recorder_data(false)
 
 {
   // ROS has already been initialized by OWD, so we can just
@@ -94,6 +93,8 @@ GfePlugin::~GfePlugin() {
   // Shut down our services
   ss_PowerGrasp.shutdown();
   
+  delete recorder;
+
   pthread_mutex_unlock(&pub_mutex);
 }
 
@@ -108,17 +109,18 @@ void GfePlugin::Publish() {
   // only if we are not shutting down
   if (pthread_mutex_trylock(&pub_mutex) == 0) {
     pub_net_force.publish(net_force);
+  
+    tactile_debug.data = OWD::Trajectory::tactile_debug_data;
+    pub_tactile_debug.publish(tactile_debug);
+
+    if (write_log_file &&
+	((recorder->count > 2500) || flush_recorder_data)) {
+      write_recorder_data();
+      flush_recorder_data=false;
+    }
+
     pthread_mutex_unlock(&pub_mutex);
   }    
-  
-  tactile_debug.data = OWD::Trajectory::tactile_debug_data;
-  pub_tactile_debug.publish(tactile_debug);
-
-  if (write_log_file &&
-      ((recorder->count > 2500) || flush_recorder_data)) {
-    write_recorder_data();
-    flush_recorder_data=false;
-  }
 }
 
 
@@ -223,14 +225,13 @@ bool GfePlugin::PowerGrasp(pr_msgs::MoveHand::Request &req,
 }
 
 R6 GfePlugin::workspace_forcetorque() {
-  // get the FT force+torque and smooth it
-  R6 current_ft(ft_force[0],
-		ft_force[1],
-		ft_force[2],
-		ft_torque[0],
-		ft_torque[1],
-		ft_torque[2]);
-  R6 force_torque_avg = ft_filter.eval(current_ft);
+  // get the filtered FT force+torque
+  R6 force_torque_avg(filtered_ft_force[0],
+		      filtered_ft_force[1],
+		      filtered_ft_force[2],
+		      filtered_ft_torque[0],
+		      filtered_ft_torque[1],
+		      filtered_ft_torque[2]);
   
   // rotate the force and torque into workspace coordinates
   // we negate each of the sensor readings because what we want is a

@@ -49,7 +49,8 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
     max_angular_vel(wst.max_angular_velocity),
     max_angular_accel(max_angular_vel/wst.min_accel_time),
     parseg(0,0,0,1),
-    force_scale(1.0)
+    force_scale(1.0),
+    AFTraj(NULL)
 {
   movement_direction.normalize();
   start_position = OWD::JointPos(wst.starting_config);
@@ -70,6 +71,24 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
 			     ep_qrot.getAxis().y(),
 			     ep_qrot.getAxis().z()),
 			  ep_qrot.getAngle());
+
+  if (wst.ApplyForce) {
+    AFTraj = new ApplyForceTraj(R3(wst.af_x,
+				   wst.af_y,
+				   wst.af_z),
+				wst.af_f);
+    if (wst.af_rotational_compliance) {
+      AFTraj->rotational_leeway = 10.0 / 180.0 * 3.14159; // 10 degrees
+    }
+    if (wst.Vibrate) {
+      AFTraj->SetVibration(wst.vibrate_hand_x,
+			   wst.vibrate_hand_y,
+			   wst.vibrate_hand_z,
+			   wst.vibrate_amplitude_m,
+			   wst.vibrate_frequency_hz);
+    }
+  }
+
   // #define SIMULATION
 #ifdef SIMULATION
   ROS_INFO_NAMED("wstraj","Moving in direction [%1.3f, %1.3f, %1.3f]",
@@ -140,8 +159,6 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
   }
   parseg.dump();
 
-  // reset the force/torque filter (it may have old values from before)
-  gfeplug->ft_filter.reset();
 }
 
 WSTraj::~WSTraj() {
@@ -423,35 +440,56 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
      **********************************************/
     // first, figure out where we are supposed to be
     OWD::JointPos target_jointpos = start_position + joint_change * dist;
-    OWD::JointPos jointpos_error = target_jointpos - tc.q;
-    try {
-      OWD::JointPos configuration_correction
-	= gfeplug->Nullspace_projection(jointpos_error);
-      for (unsigned int j=0; j<configuration_correction.size(); ++j) {
-	if (isnan(configuration_correction[j])) {
-	  configuration_correction[j]=0;
+
+    if (!AFTraj) {
+      // if we are using ApplyForce at the same time, it will do its
+      // own nullspace correction as long as we tell it the config we want
+      OWD::JointPos jointpos_error = target_jointpos - tc.q;
+      try {
+	OWD::JointPos configuration_correction
+	  = gfeplug->Nullspace_projection(jointpos_error);
+	for (unsigned int j=0; j<configuration_correction.size(); ++j) {
+	  if (isnan(configuration_correction[j])) {
+	    configuration_correction[j]=0;
+	  }
 	}
-      }
-      joint_correction += configuration_correction;
+	joint_correction += configuration_correction;
 #ifdef SIMULATION
-      ROS_DEBUG_NAMED("wstraj","Configuration corrected by %s",
-		      configuration_correction.sdump());
+	ROS_DEBUG_NAMED("wstraj","Configuration corrected by %s",
+			configuration_correction.sdump());
 #endif
-    } catch (const char *err) {
-      // stop the trajectory if we can't correct the configuration
-      ROS_WARN_NAMED("wstraj","Nullspace projection failed when correcting configuration");
-      runstate = STOP;
-      return;
+      } catch (const char *err) {
+	// stop the trajectory if we can't correct the configuration
+	ROS_WARN_NAMED("wstraj","Nullspace projection failed when correcting configuration");
+	runstate = STOP;
+	return;
+      }
     }
 
     /**********************************************
      *  set our new values                        *
      **********************************************/
-    // apply the position corrections
-    for (unsigned int j=0; (j<joint_correction.size()) 
-	   && (j<tc.q.size()); ++j) {
-      tc.q[j] += joint_correction[j];
+    if (AFTraj) {
+
+      // modify the AFTraj target position and target configuration to
+      // match our current values
+      AFTraj->start_position = target_jointpos;
+      AFTraj->endpoint_target = SE3(target_rotation,
+				    target_position);
+
+      // Let AFTraj compute the positions and torques needed to reach the
+      // desired position while also maintaining the force
+      AFTraj->evaluate(tc, dt);
+  
+    } else {
+
+      // apply the pure position corrections
+      for (unsigned int j=0; (j<joint_correction.size()) 
+	     && (j<tc.q.size()); ++j) {
+	tc.q[j] += joint_correction[j];
+      }
     }
+
 
     // apply the joint vels and use them to calculate the accels, too.
     for (unsigned int j=0; (j<joint_vel.size()) 

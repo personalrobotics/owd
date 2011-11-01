@@ -118,7 +118,7 @@ class Follow : public OWD::Trajectory {
   OWD::JointPos prev_acc;
 
   //Declare mutual exclusion variable (shared data)
-  pthread_mutex_t joy_msg_mutex;
+  pthread_mutex_t joy_msg_mutex, roscomm_mutex;
 
   bool StopFollow(gfe_owd_plugin::StopFollow::Request &req,
 		  gfe_owd_plugin::StopFollow::Response &res);

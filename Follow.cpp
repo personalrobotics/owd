@@ -123,6 +123,7 @@ Follow::Follow(int mode_in): OWD::Trajectory("Follow"), mode(mode_in), whatWeAre
   // Initialize the joy_msg_mutex mutex variable with default attributes, initially unlocked
   // Both ROS Callback function and evaluate threads look at this, so necessary to mutex
   pthread_mutex_init(&joy_msg_mutex,NULL);
+  pthread_mutex_init(&roscomm_mutex,NULL);
 
 }
 
@@ -142,6 +143,9 @@ Description:   The destructor shuts down publishing and subscription nodes.
 // BEGIN Follow Destructor
 
 Follow::~Follow() {
+
+  // stop the RosComm thread from trying to publish anything
+  pthread_mutex_lock(&roscomm_mutex); 
 
   // Shut down the service for stopping our trajectory
   ss_StopFollow.shutdown();
@@ -788,43 +792,47 @@ Description:     This function handles sending the values of the pos, vel and ac
 void Follow::RosComm() {
   while (mode != 0) {
 
-    // Create a message of position, velocity and acceleration information
-    sensor_msgs::JointState joint_state_msg;
-    joint_state_msg.header.frame_id = ros::this_node::getName();
-    joint_state_msg.header.stamp    = ros::Time::now();
-    joint_state_msg.position = prev_pos;
-    joint_state_msg.velocity = prev_vel;
-    joint_state_msg.effort = prev_acc;
+    // only if we are not shutting down
+    if (pthread_mutex_trylock(&roscomm_mutex) == 0) {
 
-    // Publish the joint state message with pos, vel, and accel information    
-    joint_state_pub.publish(joint_state_msg);
-    last_joint_state_pub_time = time;
-    
-    if(openrave_service) {
-
-      // Create the service to check the configuration of the arm
-      pr_msgs::ArmConfigCheck srv;
-      srv.request.joint_state = joint_state_msg;
-      if (openrave_service.call(srv)) {
-        bool self_collision = srv.response.current_self_collision || srv.response.future_self_collision;
-        bool env_collision = srv.response.current_env_collision || srv.response.future_env_collision;
-        bool joint_limits = srv.response.current_joint_limits_exceeded || srv.response.future_joint_limits_exceeded;
-        problem = self_collision || env_collision || joint_limits;
-        if (problem == false) {
-          last_good_pos = joint_state_msg.position;
-        }
-        ROS_DEBUG("Problem: %s", problem?"True":"False");
+      // Create a message of position, velocity and acceleration information
+      sensor_msgs::JointState joint_state_msg;
+      joint_state_msg.header.frame_id = ros::this_node::getName();
+      joint_state_msg.header.stamp    = ros::Time::now();
+      joint_state_msg.position = prev_pos;
+      joint_state_msg.velocity = prev_vel;
+      joint_state_msg.effort = prev_acc;
+      
+      // Publish the joint state message with pos, vel, and accel information    
+      joint_state_pub.publish(joint_state_msg);
+      last_joint_state_pub_time = time;
+      
+      if(openrave_service) {
+	
+	// Create the service to check the configuration of the arm
+	pr_msgs::ArmConfigCheck srv;
+	srv.request.joint_state = joint_state_msg;
+	if (openrave_service.call(srv)) {
+	  bool self_collision = srv.response.current_self_collision || srv.response.future_self_collision;
+	  bool env_collision = srv.response.current_env_collision || srv.response.future_env_collision;
+	  bool joint_limits = srv.response.current_joint_limits_exceeded || srv.response.future_joint_limits_exceeded;
+	  problem = self_collision || env_collision || joint_limits;
+	  if (problem == false) {
+	    last_good_pos = joint_state_msg.position;
+	  }
+	  ROS_DEBUG("Problem: %s", problem?"True":"False");
+	} else {
+	  ROS_DEBUG("openrave_service did not execute properly.");
+	  problem = false;
+	}
       } else {
-        ROS_DEBUG("openrave_service did not execute properly.");
-        problem = false;
+	ROS_DEBUG("openrave_service is not running.");
+	problem = false;
       }
-    } else {
-      ROS_DEBUG("openrave_service is not running.");
-      problem = false;
+     
+      pthread_mutex_unlock(&roscomm_mutex);
     }
-    
     if (mode == 0) break;
-    
     sleep(0.1);
   }
 }

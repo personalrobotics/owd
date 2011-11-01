@@ -132,8 +132,6 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   ros::NodeHandle n("~");
   ss_StopForce = n.advertiseService("StopForce",&ApplyForceTraj::StopForce, this);
 
-  // reset the force/torque filter (it may have old values from before)
-  gfeplug->ft_filter.reset();
 }
 
 void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
@@ -198,9 +196,16 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
   // get the current smoothed sensor force/torque in WS coordinates
   R6 current_force_torque = gfeplug->workspace_forcetorque();
-  gfeplug->net_force.data[48]=current_force_torque.v[0];
-  gfeplug->net_force.data[49]=current_force_torque.v[1];
-  gfeplug->net_force.data[50]=current_force_torque.v[2];
+
+  // we used to log these in WS coordinates
+  // gfeplug->net_force.data[48]=current_force_torque.v[0];
+  // gfeplug->net_force.data[49]=current_force_torque.v[1];
+  // gfeplug->net_force.data[50]=current_force_torque.v[2];
+
+  // now logging in hand coordinates
+  gfeplug->net_force.data[48]=gfeplug->filtered_ft_force[0];
+  gfeplug->net_force.data[49]=gfeplug->filtered_ft_force[1];
+  gfeplug->net_force.data[50]=gfeplug->filtered_ft_force[2];
 
   // take the dot product of the WS force with our force direction, so
   // that we just correct the on-axis forces.
@@ -283,6 +288,8 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // update our target to be only "leeway" away from original
     current_endpoint_target = (!total_endpoint_rotation_SO3) * (SO3)endpoint_target;
     current_endpoint_target.normalize();
+  } else {
+    current_endpoint_target = endpoint_target;
   }
 
   // Compute the rotation error by taking the net rotation from the

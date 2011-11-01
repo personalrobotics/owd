@@ -43,7 +43,6 @@ public:
   bool PowerGrasp(pr_msgs::MoveHand::Request &req,
 		  pr_msgs::MoveHand::Response &res);
   R6 workspace_forcetorque();
-  Butterworth<R6> ft_filter;
   
 private:
   ros::Publisher pub_net_force;

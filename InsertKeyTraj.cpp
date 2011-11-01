@@ -52,20 +52,32 @@ void InsertKeyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
    */
   switch (insertion_step) {
   case STEP1_FIND_SURFACE:
+    // run a regular forward trajectory with stop on force set to true.
+    // stop when the trajectory aborts.
 	break;
   case STEP2_FIND_CYLINDER:
+    // run a sliding trajectory and stop when we see the z impulse or
+    // when we hit some limit.  make sure z impulse was not too big (fell
+    // off the edge)
 	break;
   case STEP3_FIND_12OCLOCK:
+    // run a CCW sliding trajectory and stop when we're moving horizontally to left.
 	break;
   case STEP4_FIND_6OCLOCK:
+    // run a CW sliding trajectory and stop when we're moving horizontally to left.
 	break;
   case STEP5_MOVE_TO_KEYHOLE:
+    // run a sliding trajectory and stop when we see force/torque or when we
+    // hit the distance limit
 	break;
   case STEP6_VERIFY_KEYHOLE_TOP:
+    // slide up and stop on force/torque
 	break;
   case STEP7_VERIFY_KEYHOLE_BOTTOM:
+    // slide down and stop on force/torque
 	break;
   case STEP8_INSERT:
+    // force-driven AF while wiggling and vibrating
 	break;
   }
 
