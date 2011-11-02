@@ -33,12 +33,12 @@ bool WSTraj::AddWSTraj(gfe_owd_plugin::AddWSTraj::Request &req,
 
 WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst) 
   : OWD::Trajectory("WS Traj"),
-    driving_force(wst.wrench.force.x,
-		  wst.wrench.force.y,
-		  wst.wrench.force.z,
-		  wst.wrench.torque.x,
-		  wst.wrench.torque.y,
-		  wst.wrench.torque.z),
+    driving_force_direction(wst.wrench.force.x,
+			    wst.wrench.force.y,
+			    wst.wrench.force.z,
+			    wst.wrench.torque.x,
+			    wst.wrench.torque.y,
+			    wst.wrench.torque.z),
     start_endpoint(gfeplug->endpoint),
     endpoint_translation(wst.endpoint_change.position.x,
 			 wst.endpoint_change.position.y,
@@ -49,9 +49,10 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
     max_angular_vel(wst.max_angular_velocity),
     max_angular_accel(max_angular_vel/wst.min_accel_time),
     parseg(0,0,0,1),
-    force_scale(1.0),
+    force_scale(0.1),
     AFTraj(NULL)
 {
+  driving_forcetorque = driving_force_direction.normalize();
   movement_direction.normalize();
   start_position = OWD::JointPos(wst.starting_config);
   OWD::JointPos current_pos(gfeplug->target_arm_position);
@@ -159,6 +160,19 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
   }
   parseg.dump();
 
+  gfeplug->recorder->reset();
+  // log values:
+  //    0: how far ahead (behind) we are from computed time
+  //    1: force_scale
+  //    2: length of ft_error
+  //    3: magnitude of total feedback torque vector
+  //    4: X force error
+  //    5: Y force error
+  //    6: Z force error
+  //    7: desired Z force
+  //    8: actual Z force
+  gfeplug->net_force.data.resize(9);
+
 }
 
 WSTraj::~WSTraj() {
@@ -166,7 +180,7 @@ WSTraj::~WSTraj() {
 
 void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
  
-  if (driving_force.norm() > 0) {
+  if (driving_forcetorque > 0) {
     // When we come into this function, we will ideally be exactly at
     // the desired point on the trajectory.  We will have two kinds of
     // errors: lateral error (normal to the driving force direction),
@@ -291,30 +305,48 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // step for the next iteration.  If we are ahead, decrement our
     // force scale.
     if (traj_time < time) {
-      force_scale += (time - traj_time) / force_scale_gain;
+      force_scale += (time - traj_time) * force_scale_gain;
       if (force_scale > 1) {
 	force_scale = 1;
       }
-      time = traj_time;
+      if (traj_time + 0.1 < time) {
+	time = traj_time + 0.1; // don't fall behind by more than 0.1
+      }
     } else if (time < traj_time) {
-      force_scale -= (traj_time - time) / force_scale_gain;
+      force_scale -= (traj_time - time) * force_scale_gain;
       if (force_scale < 0) {
 	force_scale = 0;
       }
     }
+    gfeplug->net_force.data[0] = traj_time - time;
+    gfeplug->net_force.data[1] = force_scale;
 
     // Calculate the force to apply based on the max force, the force
     // scale, and the trajectory's relative velocity.  By using the
     // trajectory's velocity we will get a soft start at the beginning
-    // and a soft stop at the end.
-    R6 desired_ft = vel * vel_factor * force_scale * driving_force;
+    // and a soft stop at the end.  But we have to bump vel up a little
+    // at the beginning and end since it starts and ends at zero.
+    if (vel/parseg.max_vel < 0.05) {
+      vel = parseg.max_vel * 0.05;
+    }
+    R6 desired_ft = force_scale * driving_forcetorque * 
+      driving_force_direction;
     OWD::JointPos force_feedforward_torques = gfeplug->JacobianTranspose_times_vector(desired_ft);
 
-    R6 actual_ft = gfeplug->workspace_forcetorque();
+    // project the actual FT onto the direction we care about
+    R6 actual_ft = gfeplug->workspace_forcetorque() * driving_force_direction
+      * driving_force_direction;
     R6 ft_error = desired_ft - actual_ft;
+    gfeplug->net_force.data[2] = ft_error.norm();
+    gfeplug->net_force.data[4] = ft_error.v[0];
+    gfeplug->net_force.data[5] = ft_error.v[1];
+    gfeplug->net_force.data[6] = ft_error.v[2];
+    gfeplug->net_force.data[7] = desired_ft.v[2];
+    gfeplug->net_force.data[8] = actual_ft.v[2];
+    
     OWD::JointPos force_feedback_torques(tc.q.size());
     force_feedback_torques = force_controller.control(ft_error);
-
+    gfeplug->net_force.data[3] = force_feedback_torques.length();
     // return the new joint positions and the force
     tc.q += joint_correction;
     tc.t = force_feedforward_torques + force_feedback_torques;
@@ -508,7 +540,8 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   // to hold the point when we're done, and we have no guarrantee that we will
   // get to the requested config, so it's better to use the config we are in)
   end_position = tc.q;
-    
+
+  gfeplug->log_data(gfeplug->net_force.data);
   return;
 }
 

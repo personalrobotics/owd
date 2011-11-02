@@ -34,7 +34,8 @@ public:
   static bool Register();
   static void Shutdown();
 
-  R6 driving_force;
+  double driving_forcetorque;
+  R6 driving_force_direction;
   SE3 start_endpoint;
   R3 endpoint_translation;
   R3 movement_direction;
@@ -45,7 +46,7 @@ public:
   OWD::ParabolicSegment parseg;
   double vel_factor;
   double force_scale;
-  static const double force_scale_gain = 5;
+  static const double force_scale_gain = 0.002;
   ForceController force_controller;
   ApplyForceTraj *AFTraj;
 

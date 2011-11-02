@@ -330,7 +330,7 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   try {
     OWD::JointPos configuration_correction
       = gfeplug->Nullspace_projection(configuration_error);
-    joint_correction += 0.5 * configuration_correction;
+    joint_correction += configuration_correction;
   } catch (const char *err) {
     // don't worry about it
   }

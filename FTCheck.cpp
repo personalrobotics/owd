@@ -86,6 +86,7 @@ FTCheck::FTCheck(int _testtime) :
   filtered_sum.resize(6);
   strcpy(summary,"");
   done=false;
+  gfeplug->recorder->reset();
 }
 
 void FTCheck::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
@@ -164,6 +165,7 @@ FILTERED Y    % 1.3f   % 1.3f   % 1.3f   % 1.3f\n",
     gfeplug->net_force.data[36+i]=filtered_min[i];
     gfeplug->net_force.data[42+i]=filtered_sum[i] / samples;
   }
+  gfeplug->log_data(gfeplug->net_force.data);
   return;
 }
 
