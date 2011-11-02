@@ -54,7 +54,7 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
 {
   movement_direction.normalize();
   start_position = OWD::JointPos(wst.starting_config);
-  OWD::JointPos current_pos(gfeplug->arm_position);
+  OWD::JointPos current_pos(gfeplug->target_arm_position);
   if (start_position.closeto(current_pos)) {
     start_position = current_pos;
   }
