@@ -304,18 +304,18 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // time back to the actual position so that we take the right-sized
     // step for the next iteration.  If we are ahead, decrement our
     // force scale.
-    if (traj_time < time) {
-      force_scale += (time - traj_time) * force_scale_gain;
-      if (force_scale > 1) {
-	force_scale = 1;
-      }
+    double ahead = traj_time - time;
+    if (ahead < 0) {
+      // we are behind schedule, so apply the full force
+      force_scale =1;
       if (traj_time + 0.1 < time) {
 	time = traj_time + 0.1; // don't fall behind by more than 0.1
       }
-    } else if (time < traj_time) {
-      force_scale -= (traj_time - time) * force_scale_gain;
-      if (force_scale < 0) {
-	force_scale = 0;
+    } else {
+      if (ahead > 0.1) {
+	force_scale = 0;  // zero force when 0.1 sec ahead
+      } else {
+	force_scale = (0.1 - ahead) / 0.1;  // linear ratio
       }
     }
     gfeplug->net_force.data[0] = traj_time - time;
