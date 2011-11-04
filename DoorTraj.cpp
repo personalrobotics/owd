@@ -86,6 +86,7 @@ DoorTraj::DoorTraj(OWD::TrajType &vtraj, gfe_owd_plugin::OpenDoor::Request::_ee_
   current_pose_segment = pose_segments.begin();
       
   recorder = new DataRecorder<double>(500000);
+  gfeplug->current_traj=this;
 }
 
 
@@ -95,6 +96,7 @@ DoorTraj::~DoorTraj() {
   if (pthread_create(&recorder_thread,NULL,&write_recorder_data,(void*)recorder)) {
     ROS_WARN_NAMED("OpenDoor","Could not create thread to write log data");
   }
+  gfeplug->current_traj=NULL;
 }
 
 void DoorTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {

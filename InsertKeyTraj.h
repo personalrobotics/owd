@@ -2,6 +2,7 @@
 #include <gfe_owd_plugin/InsertKey.h>
 
 class InsertKeyTraj : public ApplyForceTraj {
+  public:
   InsertKeyTraj();
   ~InsertKeyTraj();
 
@@ -29,4 +30,23 @@ class InsertKeyTraj : public ApplyForceTraj {
   } INSERTION_STEP;
 
   INSERTION_STEP insertion_step;
+
+  class InsertKeyStep : public OWD::Trajectory {
+  public:
+    InsertKeyStep(INSERTION_STEP);
+    ~InsertKeyStep();
+    
+    INSERTION_STEP stepname;
+    virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+  };
+  
+  class InsertKeyStep8 : public InsertKeyStep {
+  public:
+    InsertKeyStep8();
+    ~InsertKeyStep8();
+    
+    virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+  };  
+
+  InsertKeyStep *current_step;
 };

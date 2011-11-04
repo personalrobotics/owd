@@ -171,11 +171,15 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
   //    6: Z force error
   //    7: desired Z force
   //    8: actual Z force
-  gfeplug->net_force.data.resize(9);
-
+  //    9: derivative of Z force
+  //   10: stapling success
+  gfeplug->net_force.data.resize(11);
+  gfeplug->net_force.data[10]=0;
+  gfeplug->current_traj=this;
 }
 
 WSTraj::~WSTraj() {
+  gfeplug->current_traj=NULL;
 }
 
 void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
@@ -343,6 +347,15 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     gfeplug->net_force.data[6] = ft_error.v[2];
     gfeplug->net_force.data[7] = desired_ft.v[2];
     gfeplug->net_force.data[8] = actual_ft.v[2];
+    static double last_z_force( actual_ft.v[0]);
+    double Z_diff = actual_ft.v[0] - last_z_force;
+    last_z_force=actual_ft.v[0];
+    if (fabs(Z_diff) < 30) {
+      gfeplug->net_force.data[9] = Z_diff;
+      if (Z_diff < -0.7) {
+	gfeplug->net_force.data[10]=1;
+      }
+    }
     
     OWD::JointPos force_feedback_torques(tc.q.size());
     force_feedback_torques = force_controller.control(ft_error);

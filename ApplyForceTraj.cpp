@@ -61,7 +61,6 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   rotational_leeway(0)
 {
   if (gfeplug) {
-
     if ((gfeplug->ft_force.size() < 3) ||
 	(gfeplug->ft_torque.size() < 3)) {
       throw "ApplyForce requires that the Force/Torque sensor is installed and configured";
@@ -131,6 +130,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   // create the service that the client can use to stop the force
   ros::NodeHandle n("~");
   ss_StopForce = n.advertiseService("StopForce",&ApplyForceTraj::StopForce, this);
+  gfeplug->current_traj=this;
 
 }
 
@@ -490,5 +490,6 @@ ApplyForceTraj::~ApplyForceTraj() {
   if (vibration) {
     delete vibration;
   }
+  gfeplug->current_traj=NULL;
 }
 

@@ -12,6 +12,7 @@
 #include <openwam/DataRecorder.cc>
 #include <openwam/Butterworth.h>
 #include <pr_msgs/MoveHand.h>
+#include <pr_msgs/Reset.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <ros/ros.h>
 #include <pthread.h>
@@ -37,9 +38,12 @@ public:
  
   bool write_log_file;
   DataRecorder<double> *recorder;
+  bool flush_recorder_data;
+  OWD::Trajectory *current_traj;
   void log_data(const std::vector<double> &data);
   bool write_recorder_data();
-  bool flush_recorder_data;
+  bool StopTraj(pr_msgs::Reset::Request &req,
+		pr_msgs::Reset::Response &res);
   bool PowerGrasp(pr_msgs::MoveHand::Request &req,
 		  pr_msgs::MoveHand::Response &res);
   R6 workspace_forcetorque();
@@ -47,7 +51,7 @@ public:
 private:
   ros::Publisher pub_net_force;
   ros::Publisher pub_tactile_debug;
-  ros::ServiceServer ss_PowerGrasp;
+  ros::ServiceServer ss_StopTraj, ss_PowerGrasp;
   pthread_mutex_t recorder_mutex,
     pub_mutex;
 

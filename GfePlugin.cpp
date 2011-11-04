@@ -24,12 +24,14 @@
 #include "openwam/CANdefs.hh"	// for HANDSTATE_* enumeration
 
 GfePlugin::GfePlugin()
-  : write_log_file(false),flush_recorder_data(false)
+  : write_log_file(false),flush_recorder_data(false),
+    current_traj(NULL)
 
 {
   // ROS has already been initialized by OWD, so we can just
   // create our own NodeHandle in the same namespace
   ros::NodeHandle n("~");
+  ss_StopTraj = n.advertiseService("StopTraj",&GfePlugin::StopTraj, this);
   ss_PowerGrasp = n.advertiseService("PowerGrasp",&GfePlugin::PowerGrasp, this);
 
   n.param("log_gfeplugin_data",write_log_file,false);
@@ -96,6 +98,7 @@ GfePlugin::~GfePlugin() {
   pub_tactile_debug.shutdown();
 
   // Shut down our services
+  ss_StopTraj.shutdown();
   ss_PowerGrasp.shutdown();
   
   delete recorder;
@@ -128,6 +131,15 @@ void GfePlugin::Publish() {
   }    
 }
 
+
+// Stop the trajectory when asked by a client
+bool GfePlugin::StopTraj(pr_msgs::Reset::Request &req,
+			 pr_msgs::Reset::Response &res) {
+  if (current_traj) {
+    current_traj->runstate=OWD::Trajectory::DONE;
+  }
+  return true;
+}
 
 bool GfePlugin::write_recorder_data() {
   char filename[200];

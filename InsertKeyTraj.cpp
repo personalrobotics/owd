@@ -32,9 +32,11 @@ bool InsertKeyTraj::InsertKey(gfe_owd_plugin::InsertKey::Request &req,
 
 InsertKeyTraj::InsertKeyTraj() :
   ApplyForceTraj((SO3)gfeplug->endpoint * R3(0,0,1), 0.8, 0.02),
-  insertion_step(STEP1_FIND_SURFACE)
+  insertion_step(STEP8_INSERT),
+  current_step(NULL)
 {
-
+  current_step = new InsertKeyStep8();
+  gfeplug->current_traj=this;
 }
 
 void InsertKeyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
@@ -48,9 +50,13 @@ void InsertKeyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
      5.  Estimate cylinder location and move directly to keyhole.
      6.  Verify we're in slot by trying to move gently up.
      7.  Verify we're in slot by trying to move gently down.
-     8.  Push while wiggling left/right.
+     8.  Push while keeping zero torque about Y axis (to keep key straight)
    */
-  switch (insertion_step) {
+  if (!current_step) {
+    runstate=ABORT;
+    return;
+  }
+  switch (current_step->stepname) {
   case STEP1_FIND_SURFACE:
     // run a regular forward trajectory with stop on force set to true.
     // stop when the trajectory aborts.
@@ -78,9 +84,30 @@ void InsertKeyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 	break;
   case STEP8_INSERT:
     // force-driven AF while wiggling and vibrating
-	break;
+    current_step->evaluate(tc,dt);
+    runstate=current_step->runstate;
+    end_position=current_step->end_position;
+    if ((runstate==DONE) || (runstate==ABORT)) {
+      delete current_step;
+      current_step=NULL;
+    }
+    break;
   }
+}
 
+InsertKeyTraj::InsertKeyStep::InsertKeyStep(INSERTION_STEP _stepname) :
+  Trajectory("InsertKey"),stepname(_stepname) {
+}
+
+InsertKeyTraj::InsertKeyStep8::InsertKeyStep8() :
+  InsertKeyStep(STEP8_INSERT) {
+}
+
+void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+  
+}
+
+InsertKeyTraj::InsertKeyStep8::~InsertKeyStep8() {
 }
 
 ros::ServiceServer InsertKeyTraj::ss_InsertKey;
@@ -99,6 +126,7 @@ void InsertKeyTraj::Shutdown() {
 
 InsertKeyTraj::~InsertKeyTraj() {
   gfeplug->flush_recorder_data = true;
+  gfeplug->current_traj=NULL;
 }
 
 
