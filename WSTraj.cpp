@@ -265,7 +265,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // full rotation correction but only correcting the lateral error.  We
     // will rely on the force controller to move us forward.
     R6 endpos_correction(position_correction,rotation_correction);
-    OWD::JointPos joint_correction;
+    OWD::JointPos joint_correction(tc.q.size());
     try {
       joint_correction = 
 	gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
@@ -416,7 +416,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     
     // calculate the joint change required to correct the endpoint pose
     R6 endpos_correction(position_correction,rotation_correction);
-    OWD::JointPos joint_correction;
+    OWD::JointPos joint_correction(tc.q.size());
     try {
       joint_correction = 
 	gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
@@ -469,7 +469,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 					    / endpoint_rotation.t());
     }
     R6 endpos_vel(endpos_trans_vel,R3(endpos_rot_vel.t() * endpos_rot_vel.w()));
-    OWD::JointPos joint_vel;
+    OWD::JointPos joint_vel(tc.q.size());
     try {
       joint_vel = gfeplug->JacobianPseudoInverse_times_vector(endpos_vel);
     } catch (const char *err) {

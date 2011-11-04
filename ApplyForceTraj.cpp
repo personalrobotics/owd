@@ -307,7 +307,7 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   R3 desired_endpoint = (R3)gfeplug->endpoint + endpos_correction.v;
   endpositions.push(desired_endpoint);
 
-  OWD::JointPos joint_correction;
+  OWD::JointPos joint_correction(tc.q.size());
   try {
     joint_correction = 
       gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
@@ -339,7 +339,7 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   for (unsigned int i=0; i<tc.q.size(); ++i) {
     tc.q[i] += isnan(joint_correction[i])? 0 : joint_correction[i];
   }
-  OWD::JointPos joint_change(7);
+  OWD::JointPos joint_change(tc.q.size());
   if (jointpositions.size() > 0) {
     joint_change = (tc.q - jointpositions.back());
   }
