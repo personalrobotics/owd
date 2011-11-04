@@ -137,6 +137,11 @@ bool GfePlugin::StopTraj(pr_msgs::Reset::Request &req,
 			 pr_msgs::Reset::Response &res) {
   if (current_traj) {
     current_traj->runstate=OWD::Trajectory::DONE;
+    res.reason="";
+    res.ok=true;
+  } else {
+    res.reason="No current gfe_owd_plugin trajectory.  Either the trajectory you are stopping has already ended, or it was not created by this plugin.";
+    res.ok=false;
   }
   return true;
 }
