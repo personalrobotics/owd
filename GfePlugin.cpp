@@ -19,6 +19,7 @@
 #include "HelixPlugin.h"
 #include "MoveDirection.h"
 #include "FTCheck.h"
+#include "InsertKeyTraj.h"
 #define PEAK_CAN
 #include "openwamdriver.h"
 #include "openwam/CANdefs.hh"	// for HANDSTATE_* enumeration
@@ -55,6 +56,9 @@ GfePlugin::GfePlugin()
  if (!FTCheck::Register()) {
    throw "FTCheck failed to register";
  }
+ if (!InsertKeyTraj::Register()) {
+   throw "InsertKeyTraj failed to register";
+ }
 #ifdef SIMULATION
   if (!JacobianTestTraj::Register()) {
     throw "JacobianTestTraj trajectory failed to register";
@@ -87,6 +91,7 @@ GfePlugin::~GfePlugin() {
   HelixTraj::Shutdown();
   MoveDirection::Shutdown();
   FTCheck::Shutdown();
+  InsertKeyTraj::Shutdown();
 
   if (write_log_file && (recorder->count > 0)) {
     // do a final write of any lingering log data
