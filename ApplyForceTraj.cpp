@@ -95,7 +95,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     // the general idea:
     //
     // 0: time factor (1=realtime)
-    // 1: endpoint motion factor (1=100% of limit)
+    // 1: (unused)
     // 2: joint motion factor (1=100% of limit)
     // 3: max condition number
     // 4: force controller Ferr
@@ -424,11 +424,7 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
   last_travel = travel;
   double velocity = velocity_filter.eval(travel_delta) / OWD::ControlLoop::PERIOD;
   double velocity_return_force=0;
-  gfeplug->net_force.data[1] = travel / cartesian_vel_limit;
-  velocity_return_force = 
-    //    - pow(velocity / cartesian_vel_limit, 3)
-    -velocity
-    * velocity_damping_gain;
+  velocity_return_force =  -velocity * velocity_damping_gain;
   gfeplug->net_force.data[57] = velocity * 1000.0;
   gfeplug->net_force.data[58] = velocity_return_force;
 
@@ -447,15 +443,6 @@ void ApplyForceTraj::SetVibration(double hand_x, double hand_y, double hand_z,
 			    amplitude,
 			    frequency);
 }
-
-
-double ApplyForceTraj::force_gain_kp = 1.6e-3;
-
-double ApplyForceTraj::force_gain_kd = 0;
-
-double ApplyForceTraj::xforce = 1.0;
-
-double ApplyForceTraj::cartesian_vel_limit=0.1;
 
 ForceController ApplyForceTraj::force_controller;
 

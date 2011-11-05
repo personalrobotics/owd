@@ -23,7 +23,7 @@ OWD::JointPos ForceController::control(R6 ft_error) {
                                        
   // limit the magnitude of the proportional error (and thus the
   // amount that gets added to the integral term, too)
-  static double ft_error_limit = 2.0;
+  static const double ft_error_limit = 2.0;
   if (ft_error.norm() > ft_error_limit) {
     bounded_ft_error = ft_error * ft_error_limit / ft_error.norm();
   } else {

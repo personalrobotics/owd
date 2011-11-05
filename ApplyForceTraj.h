@@ -51,7 +51,6 @@ public:
   R3 force_direction;
   R6 forcetorque_vector;
   R3 last_endpoint_velocity, last_endpoint;
-  static double cartesian_vel_limit; // m/s
   static const double joint_vel_limit=0.03927; // rad/s; .39 = 90deg/sec
   static const double hand_mass=1.405; // kg
   std::queue<OWD::JointPos> jointpositions;
@@ -63,9 +62,7 @@ public:
   bool stopforce;
   double distance_limit;
   double last_travel;  // for velocity estimate
-  static const unsigned int FT_window_size=64;
   ros::ServiceServer ss_StopForce;
-  static double force_gain_kp, force_gain_kd, xforce;
   static ForceController force_controller;
   Butterworth<double> velocity_filter;
   Vibration *vibration;
