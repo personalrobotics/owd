@@ -32,7 +32,6 @@ bool InsertKeyTraj::InsertKey(gfe_owd_plugin::InsertKey::Request &req,
 
 InsertKeyTraj::InsertKeyTraj() :
   ApplyForceTraj((SO3)gfeplug->endpoint * R3(0,0,1), 0.8, 0.02),
-  insertion_step(STEP8_INSERT),
   current_step(NULL)
 {
   current_step = new InsertKeyStep8();
@@ -85,8 +84,11 @@ void InsertKeyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   case STEP8_INSERT:
     // force-driven AF while wiggling and vibrating
     current_step->evaluate(tc,dt);
-    runstate=current_step->runstate;
     end_position=current_step->end_position;
+    if ((current_step->runstate == DONE) ||
+	(current_step->runstate == ABORT)) {
+      runstate = current_step->runstate;
+    }
     if ((runstate==DONE) || (runstate==ABORT)) {
       delete current_step;
       current_step=NULL;
@@ -99,12 +101,93 @@ InsertKeyTraj::InsertKeyStep::InsertKeyStep(INSERTION_STEP _stepname) :
   Trajectory("InsertKey"),stepname(_stepname) {
 }
 
+InsertKeyTraj::InsertKeyStep::~InsertKeyStep() {
+}
+
 InsertKeyTraj::InsertKeyStep8::InsertKeyStep8() :
-  InsertKeyStep(STEP8_INSERT) {
+  InsertKeyStep(STEP8_INSERT),
+  total_shift(0)
+{
+  start_jointpos = gfeplug->target_arm_position;
+  original_position = (R3) gfeplug->endpoint;
+  original_rotation = (SO3) gfeplug->endpoint;
 }
 
 void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+  const double torque_servo_gain=0.00012;
+  double y_torque = gfeplug->filtered_ft_torque[1];
+  double x_shift = -y_torque * torque_servo_gain;
+
+  // maintain our total amount of X correction so that we can limit it
+  // in each direction
+  total_shift += x_shift;
+  if (total_shift > 0.020) {
+    total_shift = 0.020;
+  } else if (total_shift < -0.020) {
+    total_shift = -0.020;
+  }
+
+  // change our correction to world coordinates
+  R3 ws_shift = (SO3)gfeplug->endpoint * R3(total_shift,0,0);
+
+  // update our target position
+  R3 target_position = original_position + ws_shift;
+
+  // calculate the endpoint position correction
+  R3 position_correction = target_position - (R3)gfeplug->endpoint;
   
+  // Compute the endpoint rotation error by taking the net rotation from
+  // the current orientation to the target orientation and converting
+  // it to axis-angle format
+  so3 rotation_error = (so3)(original_rotation * (! (SO3)gfeplug->endpoint));
+  // represent as rotation about each of the axes
+  R3 rotation_correction = rotation_error.t() * rotation_error.w();
+
+  // calculate our endpoint correction
+  R6 endpos_correction(position_correction,rotation_correction);
+  OWD::JointPos joint_correction(tc.q.size());
+  try {
+    joint_correction = 
+      gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
+    for (unsigned int j=0; j<joint_correction.size(); ++j) {
+      if (isnan(joint_correction[j])) {
+	joint_correction[j]=0;
+      }
+    }
+  } catch (const char *err) {
+    // no valid Jacobian, for whatever reason, so abort the trajectory
+    // and leave the joint values unchanged
+    ROS_WARN_NAMED("wstraj","JacobianPseudoInverse failed when correcting endpoint");
+      runstate = ABORT;
+      return;
+  }
+  
+  // calculate the nullspace joint correction to keep the rest of
+  // the arm out of trouble
+  OWD::JointPos jointpos_error = start_jointpos - tc.q;
+  try {
+    OWD::JointPos configuration_correction
+      = gfeplug->Nullspace_projection(jointpos_error);
+    for (unsigned int j=0; j<configuration_correction.size(); ++j) {
+      if (isnan(configuration_correction[j])) {
+	configuration_correction[j]=0;
+      }
+    }
+    joint_correction += configuration_correction;
+  } catch (const char *err) {
+    // abort the trajectory if we can't correct the configuration
+    ROS_WARN_NAMED("wstraj","Nullspace projection failed when correcting configuration");
+    runstate = ABORT;
+    return;
+  }
+
+  for (unsigned int j=0; (j<joint_correction.size()) 
+	 && (j<tc.q.size()); ++j) {
+    tc.q[j] += joint_correction[j];
+  }
+
+  end_position = tc.q;
+  return;
 }
 
 InsertKeyTraj::InsertKeyStep8::~InsertKeyStep8() {

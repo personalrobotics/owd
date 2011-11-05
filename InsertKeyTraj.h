@@ -29,15 +29,13 @@ class InsertKeyTraj : public ApplyForceTraj {
     STEP8_INSERT
   } INSERTION_STEP;
 
-  INSERTION_STEP insertion_step;
-
   class InsertKeyStep : public OWD::Trajectory {
   public:
     InsertKeyStep(INSERTION_STEP);
     ~InsertKeyStep();
     
     INSERTION_STEP stepname;
-    virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+    virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt) =0;
   };
   
   class InsertKeyStep8 : public InsertKeyStep {
@@ -46,6 +44,11 @@ class InsertKeyTraj : public ApplyForceTraj {
     ~InsertKeyStep8();
     
     virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+
+    double total_shift;
+    OWD::JointPos start_jointpos;
+    R3 original_position;
+    SO3 original_rotation;
   };  
 
   InsertKeyStep *current_step;
