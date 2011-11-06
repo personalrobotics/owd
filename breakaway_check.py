@@ -45,7 +45,8 @@ def breakaway_check():
     rh()
     print "Please place the drill battery in the palm and hit enter"
     cmd=raw_input()
-    mv(1,[1.4,1.4,1.4,0])
+    sht(2200,1100)
+    mv(1,[1.1,1.1,1.1,0])
     torque=600
     while (torque < 2200):
         print "Press enter to test grasp with torque of ",torque
