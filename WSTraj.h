@@ -26,6 +26,7 @@ public:
   virtual ~WSTraj();
 
   virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+  virtual void force_driven_evaluate(OWD::Trajectory::TrajControl &tc, double dt);
 
   static bool AddWSTraj(gfe_owd_plugin::AddWSTraj::Request &req,
 			gfe_owd_plugin::AddWSTraj::Response &res);
