@@ -131,7 +131,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   ros::NodeHandle n("~");
   ss_StopForce = n.advertiseService("StopForce",&ApplyForceTraj::StopForce, this);
   gfeplug->current_traj=this;
-
+  gfeplug->recorder->reset();  // clear out any records from previous plugin
 }
 
 void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {

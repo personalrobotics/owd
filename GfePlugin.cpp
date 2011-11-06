@@ -113,7 +113,14 @@ GfePlugin::~GfePlugin() {
 
 void GfePlugin::log_data(const std::vector<double> &data) {
   if (write_log_file && (pthread_mutex_trylock(&recorder_mutex) == 0)) {
-    recorder->add(data);
+    try {
+      recorder->add(data);
+    } catch (const char *err) {
+      // must have switched to using the recorder for
+      // a different record size, so reset and re-add.
+      recorder->reset();
+      recorder->add(data);
+    }
     pthread_mutex_unlock(&recorder_mutex);
   }
 }

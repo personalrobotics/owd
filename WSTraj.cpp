@@ -179,6 +179,7 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
 }
 
 WSTraj::~WSTraj() {
+  gfeplug->flush_recorder_data = true;
   gfeplug->current_traj=NULL;
 }
 
