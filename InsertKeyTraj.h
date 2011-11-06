@@ -1,7 +1,7 @@
 #include "ApplyForceTraj.h"
 #include <gfe_owd_plugin/InsertKey.h>
 
-class InsertKeyTraj : public ApplyForceTraj {
+class InsertKeyTraj : public OWD::Trajectory {
   public:
   InsertKeyTraj();
   ~InsertKeyTraj();
@@ -45,6 +45,7 @@ class InsertKeyTraj : public ApplyForceTraj {
     
     virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
 
+    ApplyForceTraj *AFTraj;
     double total_shift;
     OWD::JointPos start_jointpos;
     R3 original_position;

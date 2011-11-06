@@ -53,6 +53,16 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
     AFTraj(NULL)
 {
   driving_forcetorque = driving_force_direction.normalize();
+  if (driving_forcetorque > 0) {
+    ROS_INFO("WSTraj will use a feedforward force of x=%2.2f y=%2.2f z=%2.2f",
+	     driving_forcetorque*driving_force_direction.v[0],
+	     driving_forcetorque*driving_force_direction.v[1],
+	     driving_forcetorque*driving_force_direction.v[2]);
+    ROS_INFO("WSTraj will use a feedforward torque of x=%2.2f y=%2.2f z=%2.2f",
+	     driving_forcetorque*driving_force_direction.w[0],
+	     driving_forcetorque*driving_force_direction.w[1],
+	     driving_forcetorque*driving_force_direction.w[2]);
+  }
   movement_direction.normalize();
   start_position = OWD::JointPos(wst.starting_config);
   OWD::JointPos current_pos(gfeplug->target_arm_position);
@@ -173,7 +183,8 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
   //    8: actual Z force
   //    9: derivative of Z force
   //   10: stapling success
-  gfeplug->net_force.data.resize(11);
+  //   11-16: desired feedforward force/torque
+  gfeplug->net_force.data.resize(17);
   gfeplug->net_force.data[10]=0;
   gfeplug->current_traj=this;
 }
@@ -210,7 +221,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     parseg.evaluate(dist, vel, accel, time);
     // we'll use the segment velocity (relative to the max vel) to scale
     // the feedforward force, so that we get smooth starts and stops
-    double force_percent = vel / parseg.dir * parseg.accel * parseg.time_a;
+    double force_percent = vel / (parseg.dir * parseg.accel * parseg.time_a);
 
     R3 target_position = (R3)start_endpoint + endpoint_translation * dist;
     // calculate the endpoint position error
@@ -270,6 +281,12 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
     // Calculate the feedforward torques to produce our driving force
     R6 desired_ft = force_percent*driving_forcetorque*driving_force_direction;
+    gfeplug->net_force.data[11]=desired_ft.v[0];
+    gfeplug->net_force.data[12]=desired_ft.v[1];
+    gfeplug->net_force.data[13]=desired_ft.v[2];
+    gfeplug->net_force.data[14]=desired_ft.w[0];
+    gfeplug->net_force.data[15]=desired_ft.w[1];
+    gfeplug->net_force.data[16]=desired_ft.w[2];
     OWD::JointPos force_feedforward_torques = gfeplug->JacobianTranspose_times_vector(desired_ft);
 
     // return the new joint positions and the force
