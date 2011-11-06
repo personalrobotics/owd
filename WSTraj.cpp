@@ -1,6 +1,11 @@
 #include "WSTraj.h"
 #include <math.h>
 #include <LinearMath/btQuaternion.h>
+#define WRIST
+#include <openwam/Link.hh>
+#include <openwam/Kinematics.hh>
+#define PEAK_CAN
+#include <openwamdriver.h>
 
 bool WSTraj::AddWSTraj(gfe_owd_plugin::AddWSTraj::Request &req,
 		       gfe_owd_plugin::AddWSTraj::Response &res) {
@@ -39,7 +44,6 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
 			    wst.wrench.torque.x,
 			    wst.wrench.torque.y,
 			    wst.wrench.torque.z),
-    start_endpoint(gfeplug->endpoint),
     endpoint_translation(wst.endpoint_change.position.x,
 			 wst.endpoint_change.position.y,
 			 wst.endpoint_change.position.z),
@@ -64,6 +68,7 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
 	     driving_forcetorque*driving_force_direction.w[2]);
   }
   movement_direction.normalize();
+
   start_position = OWD::JointPos(wst.starting_config);
   OWD::JointPos current_pos(gfeplug->target_arm_position);
   if (start_position.closeto(current_pos)) {
@@ -72,6 +77,31 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
   end_position = OWD::JointPos(wst.ending_config);
   joint_change = OWD::JointPos(wst.ending_config) - start_position;
 
+  //  if (gfeplug->target_arm_position.size() != OWD::Link::Ln) {
+  //    ROS_ERROR("Warning: number of joints doesn't match number of links");
+  //  }
+
+  OWD::Link mylinks[gfeplug->target_arm_position.size()];
+  for (unsigned int i=0; i<=gfeplug->target_arm_position.size(); ++i) {
+    // copy the link geometry from the WAM class
+    mylinks[i]=OWD::WamDriver::owam->links[i];
+  }
+  for (unsigned int i=0; i<gfeplug->target_arm_position.size(); ++i) {
+    // update it to use our starting config
+    mylinks[i+1].theta(start_position[i]);
+  }
+  // use our own links to compute the target endpoint pose
+  start_endpoint=OWD::Kinematics::forward_kinematics(mylinks);
+  
+  // validate our start_endpoint
+  //  so3 ep_rot_diff = (so3)((SO3)start_endpoint * (! (SO3)gfeplug->endpoint));
+  //  R3 ep_trans_diff = (R3)gfeplug->endpoint - (R3)start_endpoint;
+  //  ROS_INFO("Start reference endpoint differs from actual by x=%1.3f y=%1.3f z=%1.3f theta=%1.3f",
+  //	   ep_trans_diff[0],
+  //	   ep_trans_diff[1],
+  //	   ep_trans_diff[2],
+  //	   ep_rot_diff.t());
+  
   // translate the desired endpoint rotation by extracting the
   // quanternion and converting it to axis/angle format
   btQuaternion ep_qrot(wst.endpoint_change.orientation.x,

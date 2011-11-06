@@ -108,6 +108,9 @@ InsertKeyTraj::InsertKeyStep8::InsertKeyStep8() :
   AFTraj(NULL),
   total_shift(0)
 {
+ 
+  start_position=gfeplug->target_arm_position;
+  end_position = start_position;
   start_jointpos = gfeplug->target_arm_position;
   original_position = (R3) gfeplug->endpoint;
   original_rotation = (SO3) gfeplug->endpoint;
