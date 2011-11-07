@@ -36,6 +36,15 @@ bool WSTraj::AddWSTraj(gfe_owd_plugin::AddWSTraj::Request &req,
   return true;
 }
 
+bool WSTraj::ForceFeedbackNextTrajSrv(pr_msgs::Reset::Request &req,
+					     pr_msgs::Reset::Response &res) {
+  ForceFeedbackNextTraj=true;
+  res.ok=true;
+  res.reason="";
+  return true;
+}
+
+
 WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst) 
   : OWD::Trajectory("WS Traj"),
     driving_force_direction(wst.wrench.force.x,
@@ -54,8 +63,11 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
     max_angular_accel(max_angular_vel/wst.min_accel_time),
     parseg(0,0,0,1),
     force_scale(0.1),
-    AFTraj(NULL)
+    AFTraj(NULL),
+    ForceFeedback(ForceFeedbackNextTraj)
 {
+  // reset our flag before the next trajectory
+  ForceFeedbackNextTraj=false;
   driving_forcetorque = driving_force_direction.normalize();
   if (driving_forcetorque > 0) {
     ROS_INFO("WSTraj will use a feedforward force of x=%2.2f y=%2.2f z=%2.2f",
@@ -225,6 +237,11 @@ WSTraj::~WSTraj() {
 }
 
 void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+  if (ForceFeedback) {
+    // use our older version as requested
+    force_feedback_evaluate(tc,dt);
+    return;
+  }
  
   if (driving_forcetorque > 0) {
     // When we come into this function, we will ideally be exactly at
@@ -518,8 +535,9 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 }
 
 // older version that modulates the force based on whether we are ahead of
-// or behind our trajectory time
-void WSTraj::force_driven_evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+// or behind our trajectory time.
+// this one works better for stapling, so it's still here
+void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
  
   if (driving_forcetorque > 0) {
     // When we come into this function, we will ideally be exactly at
@@ -899,11 +917,16 @@ void WSTraj::force_driven_evaluate(OWD::Trajectory::TrajControl &tc, double dt) 
 bool WSTraj::Register() {
   ros::NodeHandle n("~");
   ss_AddWSTraj = n.advertiseService("AddWSTraj",&WSTraj::AddWSTraj);
+  ss_ForceFeedbackNextTraj = n.advertiseService("ForceFeedbackNextWSTraj",
+						&WSTraj::ForceFeedbackNextTrajSrv);
   return true;
 }
 
 void WSTraj::Shutdown() {
   ss_AddWSTraj.shutdown();
+  ss_ForceFeedbackNextTraj.shutdown();
 }
 
-ros::ServiceServer WSTraj::ss_AddWSTraj;
+ros::ServiceServer WSTraj::ss_AddWSTraj, WSTraj::ss_ForceFeedbackNextTraj;
+
+bool WSTraj::ForceFeedbackNextTraj(false);
