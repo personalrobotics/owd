@@ -12,6 +12,9 @@ bool WSTraj::AddWSTraj(gfe_owd_plugin::AddWSTraj::Request &req,
   // compute a new workspace trajectory
   try {
     WSTraj *newtraj = new WSTraj(req);
+    newtraj->CancelOnStall=(req.options & pr_msgs::JointTraj::opt_CancelOnStall);
+    newtraj->CancelOnForceInput=(req.options & pr_msgs::JointTraj::opt_CancelOnForceInput);
+    newtraj->CancelOnTactileInput=(req.options & pr_msgs::JointTraj::opt_CancelOnTactileInput);
 
     // send it to the arm
     res.id = OWD::Plugin::AddTrajectory(newtraj,res.reason);

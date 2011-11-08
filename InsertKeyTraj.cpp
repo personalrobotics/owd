@@ -33,6 +33,8 @@ InsertKeyTraj::InsertKeyTraj() :
   OWD::Trajectory("InsertKeyTraj"),
   current_step(NULL)
 {
+  start_position=gfeplug->target_arm_position;
+  end_position = start_position;
   current_step = new InsertKeyStep8();
   gfeplug->current_traj=this;
 }
@@ -106,7 +108,12 @@ InsertKeyTraj::InsertKeyStep::~InsertKeyStep() {
 InsertKeyTraj::InsertKeyStep8::InsertKeyStep8() :
   InsertKeyStep(STEP8_INSERT),
   AFTraj(NULL),
-  total_shift(0)
+  total_shift(0),
+  extra_vibe(NULL),
+  vibe_count(0),
+  vibe_multiplier(1),
+  motion(0),
+  motiontime(5)
 {
  
   start_position=gfeplug->target_arm_position;
@@ -114,16 +121,34 @@ InsertKeyTraj::InsertKeyStep8::InsertKeyStep8() :
   start_jointpos = gfeplug->target_arm_position;
   original_position = (R3) gfeplug->endpoint;
   original_rotation = (SO3) gfeplug->endpoint;
-  AFTraj = new ApplyForceTraj((SO3)gfeplug->endpoint * R3(0,0,1), 0.8, 0.02);
-
+  AFTraj = new ApplyForceTraj((SO3)gfeplug->endpoint * R3(0,0,1), 5, 0.05);
+  AFTraj->SetVibration(1,0,0,0.001,60);
 }
 
 void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+  
+  motiontime -= dt;
+  if (motiontime < 0) {
+    if (++motion > 2) {
+      motion=0;
+    }
+    motiontime=5;
+  }
+  switch (motion) {
+  case 0:
+    // Straight pushing (might get lucky first time)
+    break;
+  case 1:
+    // find upper travel limit
+    //    if (
+    break;
+  }
+
   double y_torque = gfeplug->filtered_ft_torque[1];
   double x_shift(0);
   if (y_torque > 0.2) {
     x_shift -= .0025 / 500;  // at 500hz, this will move 2.5mm per second
-  } else if (y_torque < 0.2) {
+  } else if (y_torque < -0.2) {
     x_shift += .0025 / 500;
   }
 
@@ -140,7 +165,31 @@ void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, d
   R3 ws_shift = (SO3)gfeplug->endpoint * R3(total_shift,0,0);
 
   // update our target position
-  R3 target_position = original_position + ws_shift;
+  R3 target_position = original_position; // + ws_shift;
+
+  if (time/4 > vibe_count) {
+    if (extra_vibe) {
+      delete extra_vibe;
+      extra_vibe=NULL;
+    }
+    switch (vibe_count % 2) {
+    case 1:
+      extra_vibe=new Vibration((SO3)gfeplug->endpoint *R3(0,1,0),
+			       0.0005 * vibe_multiplier,
+			       2);
+      break;
+    case 0:
+      extra_vibe=new Vibration((SO3)gfeplug->endpoint *R3(1,0,0),
+			       0.001 * vibe_multiplier,
+			       1);
+      vibe_multiplier *= 1.5;
+      break;
+    }
+    vibe_count++;
+  }
+  if (extra_vibe) {
+    target_position += extra_vibe->eval(dt);
+  }
 
   // update the position target in the ApplyForce trajectory
   AFTraj->endpoint_target = SE3(original_rotation,

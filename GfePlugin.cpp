@@ -187,7 +187,7 @@ bool GfePlugin::PowerGrasp(pr_msgs::MoveHand::Request &req,
   }
   if (req.positions.size() != 4) {
     std::stringstream s;
-    s << "Expected 4 joints for MoveHand but received " << req.positions.size();
+    s << "Expected 4 joints for PowerGrasp but received " << req.positions.size();
     ROS_ERROR("%s",s.str().c_str());
     res.ok=false;
     res.reason=s.str().c_str();

@@ -33,6 +33,9 @@ float64 vibrate_frequency_hz
 float32 max_linear_velocity
 float32 max_angular_velocity
 float32 min_accel_time
+#
+# Trajectory options (same as OWD::AddTrajectory)
+uint32 options
 ---
 uint32 id
 bool ok

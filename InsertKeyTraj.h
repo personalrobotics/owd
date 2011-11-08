@@ -50,6 +50,11 @@ class InsertKeyTraj : public OWD::Trajectory {
     OWD::JointPos start_jointpos;
     R3 original_position;
     SO3 original_rotation;
+    Vibration *extra_vibe;
+    int vibe_count;
+    double vibe_multiplier;
+    int motion;
+    double motiontime;
   };  
 
   InsertKeyStep *current_step;
