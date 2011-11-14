@@ -6,4 +6,5 @@ uint32 options
 uint32 opt_WaitForStart=1
 uint32 opt_CancelOnStall=2
 uint32 opt_CancelOnForceInput=4
-#uint32 opt_          =8  # placeholder for next value
+uint32 opt_CancelOnTactileInput=8
+#uint32 opt_          =16  # placeholder for next value
