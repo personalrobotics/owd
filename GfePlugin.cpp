@@ -69,7 +69,6 @@ GfePlugin::GfePlugin()
   }
 
   pub_net_force = n.advertise<std_msgs::Float64MultiArray>("net_force",1);
-  pub_tactile_debug = n.advertise<std_msgs::Float64MultiArray>("tactile_debug",1);
 
   recorder = new DataRecorder<double>(6000);
   pthread_mutex_init(&recorder_mutex,NULL);
@@ -100,7 +99,6 @@ GfePlugin::~GfePlugin() {
 
   // Shut down our publishers
   pub_net_force.shutdown();
-  pub_tactile_debug.shutdown();
 
   // Shut down our services
   ss_StopTraj.shutdown();
@@ -130,9 +128,6 @@ void GfePlugin::Publish() {
   if (pthread_mutex_trylock(&pub_mutex) == 0) {
     pub_net_force.publish(net_force);
   
-    tactile_debug.data = OWD::Trajectory::tactile_debug_data;
-    pub_tactile_debug.publish(tactile_debug);
-
     if (write_log_file &&
 	((recorder->count > 2500) || flush_recorder_data)) {
       write_recorder_data();
@@ -280,7 +275,6 @@ R6 GfePlugin::workspace_forcetorque() {
 
 // Static member inside GfePlugin class
 std_msgs::Float64MultiArray GfePlugin::net_force;
-std_msgs::Float64MultiArray GfePlugin::tactile_debug;
 
 // Allocation for the pointer that will hold the single instantiation
 // of our plugin class.  We initialize it to NULL so that the register

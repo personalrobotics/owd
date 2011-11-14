@@ -2,6 +2,14 @@
 
 bool InsertKeyTraj::InsertKey(gfe_owd_plugin::InsertKey::Request &req,
 			      gfe_owd_plugin::InsertKey::Response &res) {
+
+  //  double max_distance=0;
+  //  for (int xstep=-1; xstep<2; ++xstep) {
+    //    for (int ystep=-1; ystep<2; ++ystep) {
+      // move to point
+      //      WSMove()
+      
+
   // compute a new trajectory
   try {
     InsertKeyTraj *newtraj = new InsertKeyTraj();
@@ -112,8 +120,10 @@ InsertKeyTraj::InsertKeyStep8::InsertKeyStep8() :
   extra_vibe(NULL),
   vibe_count(0),
   vibe_multiplier(1),
-  motion(0),
-  motiontime(5)
+  motion(1),
+  motiontime(20),
+  horiz_vibe((SO3)gfeplug->endpoint * R3(1,0,0), .004, 0.25),
+  vert_vibe((SO3)gfeplug->endpoint * R3(0,1,0), .002, 0.20)
 {
  
   start_position=gfeplug->target_arm_position;
@@ -127,21 +137,92 @@ InsertKeyTraj::InsertKeyStep8::InsertKeyStep8() :
 
 void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   
+
   motiontime -= dt;
   if (motiontime < 0) {
-    if (++motion > 2) {
-      motion=0;
-    }
-    motiontime=5;
+    ++motion;
+    motiontime=10;
   }
+  R3 target_position(original_position);
+  int i;
   switch (motion) {
   case 0:
     // Straight pushing (might get lucky first time)
+    if (motiontime > 4) {
+      motiontime=10;
+    }
     break;
   case 1:
-    // find upper travel limit
-    //    if (
+    i=0;
+  case 2:
+    i=0;
+  case 3:
+    i=0;
+  case 4:
+    i=0;
+  case 5:
+    i=0;
+  case 6:
+    i=0;
+  case 7:
+    // add our horiz. and vert. wiggles
+    target_position += horiz_vibe.eval(dt)
+      + vert_vibe.eval(dt);
     break;
+  case 8:
+    runstate=ABORT;
+    return;
+  }
+  R3 travel_in_hand_frame = (!(SO3)gfeplug->endpoint) * 
+    ((R3)gfeplug->endpoint - original_position);
+  if (travel_in_hand_frame[2] > .05) {
+    runstate=DONE; // yay!
+    return;
+  }
+
+
+
+
+
+    /*
+  case 1:
+    // initialize for upper travel limit
+    y_shift=0;
+    motion=2;
+    // fall_through
+  case 2:
+    // find upper travel limit
+    if (gfeplug->filtered_ft_force[1] > 1) {
+      upper_y=y_shift;
+      motiontime=0;
+    } else {
+      y_shift += .001/500; // 1mm/sec
+      if (y_shift > .020) {
+	upper_y=.020;
+	motiontime=0;
+      }
+    }
+    break;
+  case 3:
+    // find lower travel limit
+    if (gfeplug->filtered_ft_force[1] < -1) {
+      lower_y = y_shift;
+      center_y=(upper_y + lower_y)/2;
+      if (fabs(center_y) > .005) {
+	// we missed the slot, so try finding right edge
+	motion=XX;
+      }
+      motiontime=0;
+    } else {
+      y_shift -= .001/500; // 1mm/sec
+      if (y_shift < -0.020) {
+	lower_y = -0.020;
+	center_y=(upper_y + lower_y)/2;
+	motiontime=0;
+      }
+    }
+    break;
+  case 4:
   }
 
   double y_torque = gfeplug->filtered_ft_torque[1];
@@ -190,6 +271,9 @@ void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, d
   if (extra_vibe) {
     target_position += extra_vibe->eval(dt);
   }
+
+  */
+
 
   // update the position target in the ApplyForce trajectory
   AFTraj->endpoint_target = SE3(original_rotation,

@@ -229,7 +229,9 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
   //    9: derivative of Z force
   //   10: stapling success
   //   11-16: desired feedforward force/torque
-  gfeplug->net_force.data.resize(17);
+  //   17-19: X/Y/Z endpoint position error
+  //   20-22: R/P/Y endpoint rotation error
+  gfeplug->net_force.data.resize(23);
   gfeplug->net_force.data[10]=0;
   gfeplug->current_traj=this;
 }
@@ -276,7 +278,10 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     R3 target_position = (R3)start_endpoint + endpoint_translation * dist;
     // calculate the endpoint position error
     R3 position_error = target_position - (R3)gfeplug->endpoint;
-
+    gfeplug->net_force.data[17]=position_error[0];
+    gfeplug->net_force.data[18]=position_error[1];
+    gfeplug->net_force.data[19]=position_error[2];
+    
     // calculate our trajectory rotation
     so3 relative_rotation(endpoint_rotation.w(), endpoint_rotation.t() * dist);
     SO3 target_rotation = (SO3)relative_rotation * (SO3)start_endpoint;
@@ -287,7 +292,10 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     so3 rotation_error = (so3)(target_rotation * (! (SO3)gfeplug->endpoint));
     // represent as rotation about each of the axes
     R3 rotation_correction = rotation_error.t() * rotation_error.w();
-
+    gfeplug->net_force.data[21]=rotation_correction[0];
+    gfeplug->net_force.data[22]=rotation_correction[1];
+    gfeplug->net_force.data[23]=rotation_correction[2];
+    
     R3 position_correction = position_error;
 
     // calculate our endpoint correction

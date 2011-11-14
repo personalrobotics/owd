@@ -55,6 +55,7 @@ class InsertKeyTraj : public OWD::Trajectory {
     double vibe_multiplier;
     int motion;
     double motiontime;
+    Vibration horiz_vibe, vert_vibe;
   };  
 
   InsertKeyStep *current_step;
