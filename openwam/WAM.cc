@@ -50,7 +50,8 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   log_controller_data(log_ctrl_data), 
   bus(cb),ctrl_loop(cb->id, &control_loop_rt, this),
   motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000),
-  BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile)
+  BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
+  slip_joints_on_high_torque(false)
 {
 
 #ifdef OWD_RT
@@ -67,7 +68,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
     heldPositions[i] = 0;
     suppress_controller[i]=false;
   }
-
+  last_control_position = (double *)malloc((Joint::Jn+1)*sizeof(double));
   
   links[Link::L0]=Link( DH(  0.0000,   0.0000,   0.0000,   0.0000), 0.0000, 
                         R3(  0.0000,   0.0000,   0.0000), 
@@ -241,8 +242,6 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   for (int i=Link::L1; i<=Link::Ln; ++i) {
     sim_links[i] = links[i];
   }
-
-
 }
 
 int WAM::init(){
@@ -608,12 +607,16 @@ void control_loop_rt(void* argv){
 	break;
       }
 #endif
-
+      
       if (wam->bus->forcetorque_data) {
 	// REQUEST F/T DATA (every cycle)
-	wam->bus->request_forcetorque_rt();
+	if (wam->bus->request_forcetorque_rt() != OW_SUCCESS) {
+	  ROS_FATAL("control_loop: request_forcetorque_rt failed");
+	  failure=true;
+	  break;
+	}
       }
-
+      
       // While the pucks are receiving and processing the position request,
       // send out our secondary request for retrieval afterwards.
       // Each of these use a unique counter, so their update rates need
@@ -625,13 +628,21 @@ void control_loop_rt(void* argv){
 #ifndef BH280_ONLY
       static int state_cycles(0);
       if (++state_cycles==50) { // once every 50 cycles
-	wam->bus->request_puck_state_rt(1);
+	if (wam->bus->request_puck_state_rt(1) != OW_SUCCESS) {
+	  ROS_FATAL("control_loop: request_puck_state_rt failed");
+	  failure=true;
+	  break;
+	}
 	state_cycles=0;
       }
 #endif // ! BH280_ONLY
       if (wam->bus->BH280_installed) {
 	if (hand_counter==0) {
-	  wam->bus->request_hand_state_rt();
+	  if (wam->bus->request_hand_state_rt() != OW_SUCCESS) {
+	    ROS_FATAL("control_loop: request_hand_state_rt failed");
+	    failure=true;
+	    break;
+	  }
 	}
 
 	// if one or more fingers are in the process of performing a
@@ -648,25 +659,39 @@ void control_loop_rt(void* argv){
 	if (!pending_hi) {
           hand_cycles = 12;
 	  if (hand_counter==1) {
-	    wam->bus->request_positions_rt(GROUPID(5));
+	    if (wam->bus->request_positions_rt(GROUPID(5)) != OW_SUCCESS) {
+	      ROS_FATAL("control_loop: request_positions_rt failed");
+	      failure=true;
+	      break;
+	    }
 	  }
+	  
 	  if (hand_counter==2) {
-	    wam->bus->request_strain_rt();
+	    if (wam->bus->request_strain_rt() != OW_SUCCESS) {
+	      ROS_FATAL("control_loop: request_strain_rt failed");
+	      failure=true;
+	      break;
+	    }
 	  }
+
 	  if (wam->bus->tactile_data) {
 	    if (hand_counter==3) {
-	      wam->bus->request_tactile_rt();
+	      if (wam->bus->request_tactile_rt() != OW_SUCCESS) {
+		ROS_FATAL("control_loop: request_tactile_rt failed");
+		failure=true;
+		break;
+	      }
 	    }
 	  }
 	  
 	} // ! pending_hi
-
+	
 	// increment our counter
 	if (++hand_counter > hand_cycles) {
 	  hand_counter=0;
 	}
       }
-
+      
       // Now just read the response packets for as much time as we have
       // until the next control cycle.  As soon as we get back all seven
       // joint angles we will compute the new torques and send them out, then
@@ -699,7 +724,7 @@ void control_loop_rt(void* argv){
 	  wam->lock_rt("control_loop");
 	  if (wam->jointstraj) {
 	    // pass the new values to the running trajectory
-	    wam->jointstraj->ForceFeedback(wam->bus->forcetorque_data);
+	    wam->jointstraj->ForceFeedback(wam->bus->filtered_forcetorque_data);
 	  }
 	  wam->unlock("control_loop");
 	} else if (FROM_NODE == 10) {
@@ -708,6 +733,17 @@ void control_loop_rt(void* argv){
 	} else if ((FROM_NODE >= 11) && (FROM_NODE <= 14)) {
 	  // hand puck
 	  wam->bus->process_hand_response_rt(msgid,msg,msglen);
+	  // if this was tactile data and we're running a trajectory,
+	  // let the trajectory know about the new tactile readings
+	  if (((msgid & 0x41F) == 0x408) && // group 8 (tactile Top 10)
+	      wam->bus->valid_tactile_data &&
+	      wam->jointstraj) {
+	    wam->jointstraj->TactileFeedback(wam->bus->tactile_data,4);
+	  } else if (((msgid & 0x41F) == 0x409) // group 9 (tactile hi res)
+		     && wam->bus->valid_tactile_data
+		     && wam->jointstraj) {
+	    wam->jointstraj->TactileFeedback(wam->bus->tactile_data,20);
+	  }
 	} else if ((FROM_NODE >= 1) && (FROM_NODE <= 7)) {
 	  // arm puck
 	  wam->bus->process_arm_response_rt(msgid,msg,msglen);
@@ -1004,15 +1040,24 @@ void WAM::newcontrol_rt(double dt){
   OWD::Plugin::_endpoint = SE3_endpoint;
   for (int i=0; i<Joint::Jn; ++i) {
     OWD::Plugin::_arm_position[i]=q[i+1];
-    OWD::Plugin::_target_arm_position[i]=tc.q[i];
+    OWD::Plugin::_target_arm_position[i]=last_control_position[i+1];
     OWD::Plugin::_pid_torque[i]=pid_torq[i+1];
     OWD::Plugin::_dynamic_torque[i]=dyn_torq[i+1];
     OWD::Plugin::_trajectory_torque[i]=traj_torq[i+1];
   }
   if (bus->forcetorque_data) {
     for (unsigned int i=0; i<3; ++i) {
-      OWD::Plugin::_ft_force[i]=bus->forcetorque_data[i];
-      OWD::Plugin::_ft_torque[i]=bus->forcetorque_data[i+3];
+      if (bus->valid_forcetorque_data) {
+	OWD::Plugin::_ft_force[i]=bus->forcetorque_data[i];
+	OWD::Plugin::_ft_torque[i]=bus->forcetorque_data[i+3];
+	OWD::Plugin::_filtered_ft_force[i]=bus->filtered_forcetorque_data[i];
+	OWD::Plugin::_filtered_ft_torque[i]=bus->filtered_forcetorque_data[i+3];
+	
+      } else {
+	// recently tared and still waiting to collect the tare correction
+	OWD::Plugin::_ft_force[i] =OWD::Plugin::_filtered_ft_force[i]=0;
+	OWD::Plugin::_ft_torque[i]=OWD::Plugin::_filtered_ft_torque[i]=0;
+      }
     }
   }
   if (bus->BH280_installed) {
@@ -1120,7 +1165,9 @@ void WAM::newcontrol_rt(double dt){
 	  safety_torque_count++;
 	  safety_hold=true; // let the app know that we're hitting something
 	  if (jointstraj->CancelOnStall) {
-	    jointstraj->stop();  // still have to stop if the app wants to
+	    /*jointstraj->stop();*/ // still have to stop if the app wants to
+	    jointstraj->runstate = Trajectory::ABORT;
+	    last_traj_state = jointstraj->state();
 	    for(int i = Joint::J1; i<=Joint::Jn; i++) {
 	      heldPositions[i] = joints[i].q;
 	    }
@@ -1159,19 +1206,18 @@ void WAM::newcontrol_rt(double dt){
       abort=true;
     }
     if (abort) {
+      last_traj_state = OWD::Trajectory::ABORT;
       delete jointstraj;
       jointstraj = NULL;
-      double heldPositions[Joint::Jn+1];
-      hold_position(heldPositions,false);
-	      
-      for(int i = Joint::J1; i <= Joint::Jn; i++) {
+      for (int j=Joint::J1; j<Joint::Jn; ++j) {
+	traj_torq[j]=0;  // make sure we don't leave these non-zero
+      }
+      for(int i = Joint::J1; i<=Joint::Jn; i++) {
+	heldPositions[i] = joints[i].q;
 	tc.q[i-1] = heldPositions[i];
       }
-      // ask the controllers to compute the correction torques.
-      RTIME t1 = ControlLoop::get_time_ns_rt();
-      newJSControl_rt((&tc.q[0])-1,q,dt,pid_torq);
-      RTIME t2 = ControlLoop::get_time_ns_rt();
-      jscontroltime += (t2-t1) / 1e6;
+      holdpos = true;  // should have been true already, but just making sure
+
     }
       
   } else if (holdpos) {
@@ -1198,7 +1244,7 @@ void WAM::newcontrol_rt(double dt){
       }
     }
 
-    if (safety_torques_exceeded(pid_torq)) {
+    if (safety_torques_exceeded(pid_torq) && slip_joints_on_high_torque) {
       // NEW WAY:
 
       for(int jj = Joint::J1; jj <= Joint::Jn; jj++) {
@@ -1211,6 +1257,7 @@ void WAM::newcontrol_rt(double dt){
   } else {
     for(int i = Joint::J1; i <= Joint::Jn; i++) {
       pid_torq[i]=0.0f;  // zero out the torques otherwise
+      last_control_position[i] = joints[i].q;
     }
   }
   if (++trajcount == 1000) {
@@ -1328,7 +1375,9 @@ void WAM::newJSControl_rt(double q_target[],double q[],double dt,double pid_torq
     } else {
       pid_torq[j]= jointsctrl[j].evaluate(q_target[j], q[j], dt );
     }
+    last_control_position[j]=q_target[j];
   }
+  
 }
 
 int WAM::run_trajectory(OWD::Trajectory *traj) {
@@ -1387,10 +1436,16 @@ int WAM::cancel_trajectory() {
   }
   jointstraj->stop();
 
+  char endstr[200];
+  strcpy(endstr,"");
   for(int i = Joint::J1; i<=Joint::Jn; i++) {
     heldPositions[i] = joints[i].q;
+    sprintf(endstr+strlen(endstr)," %1.4f",heldPositions[i]);
   }
   holdpos = true;  // should have been true already, but just making sure
+  ROS_INFO_NAMED("AddTrajectory","Trajectory #%d has been cancelled; final reference position is [%s ]",
+		 jointstraj->id,endstr);
+
   delete jointstraj;
   jointstraj = NULL;
   this->unlock("cancel_traj");

@@ -30,6 +30,8 @@
 #include <pr_msgs/JointTraj.h>
 #include <pr_msgs/Joints.h>
 #include <pr_msgs/TrajInfo.h>
+#include <pr_msgs/MoveHand.h>
+#include <pr_msgs/ResetHand.h>
 #include <iostream>
 #include <boost/thread/mutex.hpp>
 #include <pthread.h>
@@ -40,6 +42,7 @@ public:
   ros::NodeHandle &node;
   ros::Subscriber sub_wamstate;
   pr_msgs::Joints p1, p2;
+  std::vector<double> h1, h2, h3, h4;
   bool running;
   int point;
   unsigned int last_traj_id;
@@ -57,14 +60,28 @@ public:
       }
       if ((last_traj_id == 0) // first time
           || (wamstate.prev_trajectory.id == last_traj_id)) {
-        if (++point > 2) {
-          point = 1;
-        }
+	++point;
         if (point == 1) {
           last_traj_id = MoveTo(p1,false);
-        } else {
+	  MoveHandTo(h1);
+        } else if (point == 2) {
+	  sleep(10);
           last_traj_id = MoveTo(p2,true);
-        }
+	  MoveHandTo(h2);
+        } else if (point == 3) {
+	  sleep(3);
+	  MoveHandTo(h3);
+        } else if (point == 4) {
+	  sleep(3);
+	  MoveHandTo(h4);
+	} else {
+	  sleep(6);
+	  ResetHand();
+	  sleep(4);
+	  point=0;
+	}
+	  
+	  
       }
       ROS_DEBUG("Moving to point %d",point);
     }
@@ -72,12 +89,12 @@ public:
   }
 
   Test(ros::NodeHandle &n) : node(n), running(false),
-                       point(0), last_traj_id(0)
+                       point(1), last_traj_id(0)
   {
     p1.j.resize(7);
     p2.j.resize(7);
-    static const double PI=3.141592654;
     /*
+    static const double PI=3.141592654;
     p1.j[0]=PI/2.0;      p2.j[0]=-PI/2;
     p1.j[1]=0.62;        p2.j[1]=-1.6;
     p1.j[2]=0;           p2.j[2]=0;
@@ -94,7 +111,6 @@ public:
     p1.j[4]=1.25;         p2.j[4]=1.25;
     p1.j[5]=0.0;         p2.j[5]=0.0;
     p1.j[6]=0;         p2.j[6]=0;
-*/
     // take_at_tm test
     p1.j[0]=3.77067;    p2.j[0]=3.79652;
     p1.j[1]=-1.33427;	p2.j[1]=-0.977628;
@@ -103,6 +119,51 @@ public:
     p1.j[4]=-2.94934;	p2.j[4]=-2.94048;
     p1.j[5]=0.95913;	p2.j[5]= 0.531323;
     p1.j[6]=0.814286;	p2.j[6]= 0.750784;
+    */
+
+    // screwdriver pickup
+    p1.j[0]= 3.954;
+    p1.j[1]=-1.380;
+    p1.j[2]=-1.675;
+    p1.j[3]= 1.839;
+    p1.j[4]= 0.453;
+    p1.j[5]= 0.605;
+    p1.j[6]=-0.155;
+
+    p2.j[0]= 4.0913;
+    p2.j[1]=-1.4305;
+    p2.j[2]=-1.7585;
+    p2.j[3]= 1.5729;
+    p2.j[4]= 0.4922;
+    p2.j[5]= 1.0382;
+    p2.j[6]=-0.1417;
+
+    // hand speed 0.2,0.2,0.2,0.2
+    // arm speed [1,1,1,1,1,0.2,1] 1
+    h1.resize(4); h2.resize(4); h3.resize(4); h4.resize(4);
+    /* start at 0.65,0.65,1.5,0
+       applyForce -- -1 0 0 0.8 1 0 0 0 0 0
+       move to 1.5,1.5,1.5,0
+       close with 3,3,3,0
+     */
+
+    h1[0]=1;
+    h1[1]=1;
+    h1[2]=1;
+    h1[3]=0;
+    h2[0]=1;
+    h2[1]=1;
+    h2[2]=1.5;
+    h2[3]=0;
+    h3[0]=1.5;
+    h3[1]=1.5;
+    h3[2]=1.5;
+    h3[3]=0;
+    h4[0]=3;
+    h4[1]=3;
+    h4[2]=3;
+    h4[3]=0;
+
   }
 
   void Subscribe() {
@@ -165,8 +226,19 @@ public:
     usleep(300000);  // get a joint update
 
     last_traj_id = MoveTo(p1,false);
+    MoveHandTo(h1);
     return true;
   }
+
+  int ResetHand() {
+    pr_msgs::ResetHand::Request r_req;
+    pr_msgs::ResetHand::Response r_res;
+    if (!ros::service::call("bhd/ResetHandQuick",r_req, r_res)) {
+      ROS_WARN("Could not call bhd/ResetHandQuick");
+    }
+    return 0;
+  }
+    
 
   int MoveTo(pr_msgs::Joints p, bool StopOnForce) {
     // build trajectory to move from current pos to preferred pos
@@ -207,6 +279,19 @@ public:
       ROS_WARN("Could not Add Trajectory");
       return -2;
     }
+  }
+
+  int MoveHandTo(std::vector<double> p) {
+    // build trajectory to move from current pos to preferred pos
+    pr_msgs::MoveHand::Request mh_req;
+    pr_msgs::MoveHand::Response mh_res;
+    mh_req.movetype=1;
+    mh_req.positions=p;
+    if (ros::service::call("bhd/MoveHand",mh_req,mh_res)) {
+      ROS_DEBUG("Move Hand %1.2f %1.2f %1.2f %1.2f",
+		p[0],p[1],p[2],p[3]);
+    }
+    return 0;
   }
 
   void go() {

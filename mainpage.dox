@@ -172,8 +172,8 @@ are supported for manipulating trajectories:
    - opt_CancelOnStall: Aborts the trajectory if the arm stalls (normally
      %OWD will try to resume a stalled trajectory automatically).
    - opt_CancelOnForceInput: Aborts the trajectory if the force/torque
-     sensor reports a force value along the -Z axis that exceeds the
-     threshold.
+     sensor reports a force or torque that exceeds the threshold set by
+     the owd/SetForceInputThreshold service.
 \note If the arm is idle (has 0 stiffness), and %OWD receives a
       trajectory, then the stiffness will be set to 1 and the
       trajectory will be run, as long as the starting point matches.
@@ -262,14 +262,26 @@ A few additional service calls are provided for manipulating %OWD:
    sensitive setting.
 
  - \b SetForceInputThreshold: Sets the termination criteria for
-   trajectories having the CancelOnForceInput option set.  Takes two
+   trajectories having the CancelOnForceInput option set.  Takes three
    arguments:
    - \b direction is a unit vector in the force/torque coordinate frame
     (which is in the same orientation as the hand frame)
    - \b force is a scalar representing the threshold value, in Newtons
+   - \b torque is a vector of the three torques
    The values you set will remain set until you change them again.  The
    initial value is (0,0,-1) and 6 (six Newtons of force pressing in
    towards the palm).
+
+ - \b SetTactileInputThreshold: Sets the termination criteria for
+   trajectories having the CancelOnTactileInput option set.  Takes four
+   arguments:
+   - \b pad_number is the tactile pad that should be watched (1-3 for
+   the three fingers or 4 for the palm)
+   - \b threshold is value that tactile cells will be compared to
+   - \b minimum_cells is the minimum number of cells in a pad that must
+        reach the threshold for a pad to be considered pressed
+   - \b minimum_readings is the number of successive times a pad must
+        register as pressed before the trajectory is stopped
 
  - \b GetArmDOF: Returns the number of joints
 
@@ -315,8 +327,13 @@ commands should be published to the following topic:
    torques from the dynamic simulators, and controller %PID gain
    values
 
- - \b forcetorque: A geometry_msgs/Wrench message containing the
-   values from the force/torque sensor (only published if installed)
+ - \b filtered_forcetorque: A geometry_msgs/Wrench message containing
+   the values from the force/torque sensor after being filtered by
+   a second-order Butterworth lowpass filter with a cutoff frequency
+   of 10hz.  This topic is only present if the sensor is installed.
+
+ - \b forcetorque: The raw unfiltered values from the force/torque
+   sensor (only published if the sensor is installed).
 
 Additionally, %OWD publishes a TF frame for every link, defining \b
 wam1 in terms of \b wam0, \b wam2 in terms of \b wam1, etc, all the

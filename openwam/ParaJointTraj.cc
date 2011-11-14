@@ -67,13 +67,15 @@ ParaJointTraj::ParaJointTraj(TrajType &vtraj,
                              const std::vector<double> &mja,
                              bool bWaitForStart,
                              bool bCancelOnStall,
-			     bool bCancelOnForceInput) :
+			     bool bCancelOnForceInput,
+			     bool bCancelOnTactileInput) :
   Trajectory("ParaJointTraj"),max_joint_vel(mjv),
   max_joint_accel(mja), restart(false)
 {
   WaitForStart=bWaitForStart;
   CancelOnStall=bCancelOnStall;
   CancelOnForceInput=bCancelOnForceInput;
+  CancelOnTactileInput=bCancelOnTactileInput;
   pthread_mutex_init(&mutex, NULL);
   runstate=STOP;
   time=0.0;

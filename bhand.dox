@@ -88,7 +88,13 @@ for the clients which communicate with them.
    spread.  The min_accel_time field in the service message is
    ignored.
 
-
+ - \b /bhd/SetHandTorque: type: \e pr_msgs/SetHandTorque.  Set the
+   torques that the hand will use for the position moves.  The \b initial
+   value will be used for the start of each move, and if the finger
+   gets stalled before it reaches its destination the torque will drop
+   to the \b sustained level.  Default is 2200 / 1100; do not exceed these
+   defaults or you will risk overheating the hand.  If you want to keep
+   the torques below the breakaway torques, try setting them to 1200/1100.
 
 \section topics Topics
 

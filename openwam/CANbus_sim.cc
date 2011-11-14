@@ -30,7 +30,8 @@
 CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
 	       bool ft, bool tactile,bool log_cb_data) : 
   puck_state(2),BH280_installed(bh280),id(bus_id),trq(NULL),
-  pos(NULL),jpos(NULL), forcetorque_data(NULL), tactile_data(NULL),
+  pos(NULL),jpos(NULL), forcetorque_data(NULL), filtered_forcetorque_data(NULL),
+  ft_force_filter(2,10.0),ft_torque_filter(2,10.0), tactile_data(NULL),
   valid_forcetorque_data(NULL), valid_tactile_data(NULL),
   tactile_top10(false), pucks(NULL),n_arm_pucks(num_pucks),
   simulation(true), received_position_flags(0), received_state_flags(0),
@@ -174,8 +175,8 @@ int CANbus::compile(int32_t property, int32_t value,
 }
 
 int CANbus::read_rt(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs){
-    //    ROS_ERROR("CANbus:: READ");
-  *msgid=0x403;
+  *msgid = 1<<5;    // from node #1
+  *msgid |= 0x403;  // to group #3
   msglen=0;
   usleep(2400); // have to spend some time here so that owdsim doesn't busy-wait
   return OW_SUCCESS;
@@ -240,12 +241,12 @@ int32_t CANbus::spread_radians_to_encoder(double radians) {
   return(radians * 180.0/3.1416 / 180.0 * 35950.0);
 }
 
-int CANbus::request_positions_rt(int32_t groupid) {}
-int CANbus::request_puck_state_rt(int32_t nodeid) {}
-int CANbus::request_hand_state_rt() {}
-int CANbus::request_tactile_rt() {}
-int CANbus::request_strain_rt() {}
-int CANbus::request_forcetorque_rt() {}
+int CANbus::request_positions_rt(int32_t groupid) {return OW_SUCCESS;}
+int CANbus::request_puck_state_rt(int32_t nodeid) {return OW_SUCCESS;}
+int CANbus::request_hand_state_rt() {return OW_SUCCESS;}
+int CANbus::request_tactile_rt() {return OW_SUCCESS;}
+int CANbus::request_strain_rt() {return OW_SUCCESS;}
+int CANbus::request_forcetorque_rt() {return OW_SUCCESS;}
 
 int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
   // make it look like we've already received all 7 joint values
@@ -277,6 +278,10 @@ int CANbus::hand_set_speed(const std::vector<double> &v) {
   return OW_SUCCESS;
 }
 
+int CANbus::hand_set_property(int32_t id, int32_t prop, int32_t val) {
+  return OW_SUCCESS;
+}
+  
 int CANbus::hand_get_state(int32_t *state) {
   if (state != NULL) {
     for (unsigned int i=0; i<4; ++i) {
@@ -287,6 +292,9 @@ int CANbus::hand_get_state(int32_t *state) {
   return OW_SUCCESS;
 }
 
+int CANbus::ft_get_data(double *values, double *filtered_values) {
+  return OW_SUCCESS;
+}
 
 
 void CANstats::rosprint()  {

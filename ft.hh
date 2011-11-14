@@ -27,12 +27,12 @@
 
 class FT {
 public:
-  ros::Publisher pub_ft;
+  ros::Publisher pub_ft, pub_filtered_ft;
   ros::ServiceServer ss_tare;
   CANbus *bus;
 
   ros::NodeHandle node;
-  geometry_msgs::WrenchStamped wrench;
+  geometry_msgs::WrenchStamped ft_vals;
   bool valid_data;
 
   FT(CANbus *cb);

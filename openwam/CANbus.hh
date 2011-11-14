@@ -61,6 +61,8 @@ typedef unsigned long long RTIME; // usually defined in xenomai types.h
 
 #include "Group.hh"
 #include "globals.h"
+#include "../openmath/R3.hh"
+#include "Butterworth.h"
 
 #include "DataRecorder.cc"
 
@@ -131,6 +133,8 @@ public:
   double* pos;
   double* jpos;
   double* forcetorque_data;
+  double* filtered_forcetorque_data;
+  Butterworth<R3> ft_force_filter, ft_torque_filter;
   float* tactile_data;
   bool valid_forcetorque_data;
   bool valid_tactile_data;
@@ -335,9 +339,11 @@ DataRecorder<canio_data> candata;
 #ifdef OWD_RT
   RT_MUTEX hand_queue_mutex;
   RT_MUTEX hand_cmd_mutex;
+  RT_MUTEX ft_mutex;
 #else // ! OWD_RT
   pthread_mutex_t hand_queue_mutex;
   pthread_mutex_t hand_cmd_mutex;
+  pthread_mutex_t ft_mutex;
 #endif // ! OWD_RT
   int32_t handstate[4];
   int32_t endpoint[4];
@@ -368,7 +374,7 @@ public:
   int send_finger_reset(int32_t id);
   int wait_for_finger_reset(int32_t id);
 
-  int ft_get_data(double *values);
+  int ft_get_data(double *values, double *filtered_values=NULL);
   int ft_tare();
 
   int tactile_get_data(float *f1, float *f2, float *f3, float *palm);
@@ -384,6 +390,15 @@ public:
 
   int32_t get_property_expecting_id;
   int32_t get_property_expecting_prop;
+
+  static const int ft_tare_values_to_average = 20;
+  int force_tare_values_collected, 
+    torque_tare_values_collected;
+  double ft_tare_avg[6];
+
+  int32_t hand_initial_torque;
+  int32_t hand_sustained_torque;
+  
 };
 
 #endif // __CANBUS_H__

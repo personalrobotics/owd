@@ -43,7 +43,7 @@ namespace OWD {
   }
 
   void ParabolicSegment::dump() {
-    ROS_DEBUG_NAMED("trajectory","spos=%1.2f epos=%1.2f st=%2.3f et=%2.3f ta=%2.3f tv=%2.5f a=%2.2f sidx=%d\n",
+    ROS_DEBUG_NAMED("trajectory","spos=%1.2f epos=%1.2f st=%2.3f et=%2.3f ta=%2.3f tv=%2.5f a=%2.2f sidx=%d",
 		    start_pos,end_pos,start_time,end_time,time_a,time_v,accel,start_index);
   }
 

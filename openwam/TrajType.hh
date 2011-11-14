@@ -26,8 +26,13 @@
 #include <vector>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <execinfo.h>
 
 namespace OWD {
+
+  const char *owd_backtrace(const char *msg);
 
 // a vector of joint angles defines a single Wam position
 class JointPos : public std::vector<double> {
@@ -63,6 +68,15 @@ public:
     return true;
   }
 
+  inline bool verycloseto(const JointPos &rhs) const {
+    for (unsigned int i = 0; i < this->size(); ++i) {
+      if (fabs(this->operator[](i) - rhs[i]) > 0.005f) {
+	return false;
+      }
+    }
+    return true;
+  }
+
   inline bool operator==(const JointPos &rhs) const {
     return ! operator!=(rhs);
   }
@@ -72,7 +86,7 @@ public:
   // add two vectors
   inline JointPos operator+(const JointPos &rhs) const {
     if (size() != rhs.size()) {
-      throw "Error: mismatched sizes";
+      throw owd_backtrace("Error: mismatched sizes when calling JointPos::operator+");
     }
     JointPos jp(*this);
     for (unsigned int i=0; i<jp.size(); ++i) {
@@ -84,7 +98,7 @@ public:
   // subtract two vectors
   inline JointPos operator-(const JointPos &rhs) const {
     if (size() != rhs.size()) {
-      throw "Error: mismatched sizes";
+      throw owd_backtrace("Error: mismatched sizes when calling JointPos::operator-");
     }
     JointPos jp(*this);
     for (unsigned int i=0; i<jp.size(); ++i) {
@@ -96,7 +110,7 @@ public:
   // add two vectors in place
   inline JointPos &operator+=(const JointPos &rhs) {
     if (size() != rhs.size()) {
-      throw "Error: mismatched sizes";
+      throw owd_backtrace("Error: mismatched sizes when calling JointPos::operator+=");
     }
     for (unsigned int i=0; i<size(); ++i) {
       this->operator[](i) += rhs[i];
@@ -107,7 +121,7 @@ public:
   // subtract two vectors in place
   inline JointPos &operator-=(const JointPos &rhs) {
     if (size() != rhs.size()) {
-      throw "Error: mismatched sizes";
+      throw owd_backtrace("Error: mismatched sizes when calling JointPos::operator-=");
     }
     for (unsigned int i=0; i<size(); ++i) {
       this->operator[](i) -= rhs[i];
@@ -152,7 +166,7 @@ public:
   // dot product
   inline double operator*(const JointPos &rhs) {
     if (size() != rhs.size()) {
-      throw "Error: mismatched sizes";
+      throw owd_backtrace("Error: mismatched sizes when calling JointPos::operator*");
     }
     double result = 0.0;
     for (unsigned int i=0; i<size(); ++i) {

@@ -29,7 +29,9 @@
 #ifndef __CONSTRAINEDFORCETRAJECTORY_HH
 #define __CONSTRAINEDFORCETRAJECTORY_HH
 
-class ConstrainedForceTrajectory : public OWD::Trajectory {
+using namespace OWD;
+
+class ConstrainedForceTrajectory : public Trajectory {
 public:
 
   class EndCondition {
@@ -43,8 +45,8 @@ public:
     double stall_vel;
   };
     
-  ConstrainedForceTrajectory(const OWD::JointPos &start,
-			     const OWD::JointPos &staring_force_vector,
+  ConstrainedForceTrajectory(const JointPos &start,
+			     const JointPos &staring_force_vector,
 			     const EndCondition end_condition,
 			     Link wam_links[],
 			     double max_velocity,
@@ -52,12 +54,12 @@ public:
   virtual ~ConstrainedForceTrajectory();
     
   //  void evaluate(double y[], double yd[], double ydd[], double dt);
-  void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+  void evaluate(Trajectory::TrajControl &tc, double dt);
   void update_torques(double t[]);
 
 private:
   int DOF;
-  OWD::JointPos initial_force_vector, current_force_vector;
+  JointPos initial_force_vector, current_force_vector;
   EndCondition end_cond;
   double max_vel;
   double *old_y;

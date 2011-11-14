@@ -33,6 +33,8 @@
 
 #include "Kinematics.hh"
 
+using namespace OWD;
+
 namespace Dynamics {
   extern R3 up; // direction of gravity vector
 }

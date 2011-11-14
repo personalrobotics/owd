@@ -190,9 +190,9 @@ namespace OWD {
     for (int i=0; i<NDIMS; ++i) {
       if (S[i] > 0) {
 	if ((i>0) && (max_eigen / S[i] > maxConditionNumber)) {
-	  S[i] = maxConditionNumber / max_eigen;
+	  S[i] = maxConditionNumber / max_eigen; // threshold and invert
 	} else {
-	  S[i] = 1.0/S[i];
+	  S[i] = 1.0/S[i]; // just invert
 	}
 	max_condition=max_eigen * S[i];
       } else {

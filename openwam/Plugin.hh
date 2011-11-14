@@ -207,6 +207,18 @@ namespace OWD {
     /// sensor is not present
     static const std::vector<double> &ft_torque;
 
+    /// \brief Current forces from F/T sensor
+    ///
+    /// A read-only reference to a filtered version of ft_force.
+    ///
+    static const std::vector<double> &filtered_ft_force;
+
+    /// \brief Current torques from F/T sensor
+    ///
+    /// A read-only reference to a filtered version of ft_torque
+    ///
+    static const std::vector<double> &filtered_ft_torque;
+
     /// \brief Current position of the hand joints
     ///
     /// A read-only reference to the position of the four hand joints
@@ -306,6 +318,8 @@ namespace OWD {
     static std::vector<double> _trajectory_torque;
     static std::vector<double> _ft_force;
     static std::vector<double> _ft_torque;
+    static std::vector<double> _filtered_ft_force;
+    static std::vector<double> _filtered_ft_torque;
     static std::vector<double> _hand_position;
     static std::vector<double> _target_hand_position;
     static std::vector<double> _strain;

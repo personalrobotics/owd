@@ -15,7 +15,7 @@ add_subdirectory(openwam)
 add_subdirectory(openmath)
 
 include_directories (openwam openmath)
-add_definitions("-ggdb3 -DWRIST -DBH8")
+add_definitions("-O0 -ggdb3 -DWRIST -DBH8")
 
 if (CANBUS_TYPE STREQUAL "ESD")
 message(STATUS "using ESD CANbus driver")

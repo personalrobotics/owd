@@ -25,6 +25,21 @@
 
 namespace OWD {
 
+  const char *owd_backtrace(const char *msg) {
+    static char errmsg[2000];
+    void **buf = (void **)malloc(20*sizeof(void*));
+    int tracecount = backtrace(buf,20);
+    char **bt_syms = backtrace_symbols(buf, tracecount);
+    strcpy(errmsg,msg);
+    strcat(errmsg,"\nbacktrace:\n");
+    for (int i=0; i<tracecount; ++i) {
+      snprintf(errmsg+strlen(errmsg),1999-strlen(errmsg)," %d: %s\n",
+	       i, bt_syms[i]);
+    }
+    free(bt_syms); free(buf);
+    return (const char *) errmsg;
+  }
+
 TrajPoint& TrajPoint::operator=(const TrajPoint &rhs) {
     *(JointPos*)this = *(const JointPos*)&rhs;
     absolute_time = rhs.absolute_time;

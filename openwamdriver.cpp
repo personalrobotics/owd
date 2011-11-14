@@ -170,6 +170,8 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   if (ForceTorque) {
     Plugin::_ft_force.resize(3);
     Plugin::_ft_torque.resize(3);
+    Plugin::_filtered_ft_force.resize(3);
+    Plugin::_filtered_ft_torque.resize(3);
   }
 
   // create a dummy previous trajectory
@@ -293,10 +295,6 @@ bool WamDriver::Init(const char *joint_cal_file)
   // initialize the Plugin pointers
   Plugin::wam = owam;
   Plugin::wamdriver = this;
-  //  this code doesn't compile
-  //  for (int i=0; i<=Link::Ln; ++i) {
-  //    Plugin::links.push_back(owam->links[i]);
-  //  }
 
   std::stringstream ss(wamhome_list);
   std::string item;
@@ -393,6 +391,9 @@ bool WamDriver::Init(const char *joint_cal_file)
 }
 
 void WamDriver::load_plugins(std::string plugin_list) {
+  // make sure we lock out any calls to the Publish functions
+  boost::mutex::scoped_lock lock(plugin_mutex);
+
   // try to load any specified plugins
   std::stringstream pp(plugin_list);
   std::string pname;
@@ -467,6 +468,10 @@ void WamDriver::load_plugins(std::string plugin_list) {
 
 void WamDriver::unload_plugins() {
   // shut down and unload all of the plugins
+
+  // make sure we lock out any calls to the Publish functions
+  boost::mutex::scoped_lock lock(plugin_mutex);
+
   for (unsigned int i=0; i<loaded_plugins.size(); ++i) {
     void *plib = loaded_plugins[i].first;
     bool (*pl_unregister)() = loaded_plugins[i].second;
@@ -529,6 +534,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("ReloadPlugins", &WamDriver::ReloadPlugins, this);
   ss_SetForceInputThreshold =
     n.advertiseService("SetForceInputThreshold", &WamDriver::SetForceInputThreshold, this);
+  ss_SetTactileInputThreshold =
+    n.advertiseService("SetTactileInputThreshold", &WamDriver::SetTactileInputThreshold, this);
 
 #ifdef BUILD_FOR_SEA
   sub_wam_joint_targets = 
@@ -632,13 +639,14 @@ OWD::Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
   bool bWaitForStart=(jt.options & jt.opt_WaitForStart);
   bool bCancelOnStall=(jt.options & jt.opt_CancelOnStall);
   bool bCancelOnForceInput=(jt.options & jt.opt_CancelOnForceInput);
-  ROS_DEBUG_NAMED("BuildTrajectory","Building trajectory with options WaitForStart=%d CancelOnStall=%d CancelOnForceInput=%d",int(bWaitForStart), int(bCancelOnStall), int(bCancelOnForceInput));
+  bool bCancelOnTactileInput(jt.options & jt.opt_CancelOnTactileInput);
+  ROS_DEBUG_NAMED("BuildTrajectory","Building trajectory with options WaitForStart=%d CancelOnStall=%d CancelOnForceInput=%d CancelOnTactileInput=%d",int(bWaitForStart), int(bCancelOnStall), int(bCancelOnForceInput), int(bCancelOnTactileInput));
 
   if (!blended_traj) {
     ROS_WARN_NAMED("BuildTrajectory","No blends found; using ParaJointTraj");
 
     try {
-      ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bCancelOnStall,bCancelOnForceInput);
+      ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bCancelOnStall,bCancelOnForceInput,bCancelOnTactileInput);
       ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
       ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
       
@@ -655,7 +663,8 @@ OWD::Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
 					       max_jerk,
 					       bWaitForStart,
 					       bCancelOnStall,
-					       bCancelOnForceInput);
+					       bCancelOnForceInput,
+					       bCancelOnTactileInput);
       ROS_DEBUG_NAMED("BuildTrajectory","MacFarlane blended trajectory built");
       return mactraj;
     } catch (const char *error) {
@@ -670,7 +679,7 @@ OWD::Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
       // can usually still succeed with a non-blended traj
       ROS_ERROR_NAMED("BuildTrajectory","Trying to use a ParaJointTraj instead");
       try {
-	ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bCancelOnStall,bCancelOnForceInput);
+	ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bCancelOnStall,bCancelOnForceInput,bCancelOnTactileInput);
 	ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
 	ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
 	return paratraj;
@@ -1408,7 +1417,7 @@ bool WamDriver::move_until_stop(int joint, double stop, double limit, double vel
     std::vector<double> modified_joint_accel(joint_accel);
     // rescale the acceleration to match the new velocity
     modified_joint_accel[joint-1]=joint_accel[joint-1]*velocity/joint_vel[joint-1];
-    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,true,false);
+    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,true,false,false);
     ROS_DEBUG_NAMED("calibration",
 		    "Moving joint %d from %2.2f to %2.2f",
 		    joint,original_joint_pos,limit);
@@ -1421,7 +1430,7 @@ bool WamDriver::move_until_stop(int joint, double stop, double limit, double vel
     // loop until the trajectory finishes or gets stuck
     owam->lock(); // lock before checking jointstraj
     while (owam->jointstraj) {
-        if (owam->jointstraj->state() == ParaJointTraj::STOP) {
+      if (owam->jointstraj->state() == OWD::Trajectory::STOP) {
             owam->unlock();
             // joint is stuck, so stop the trajectory
             ROS_DEBUG_NAMED("calibration","Joint hit torque limit.");
@@ -1471,7 +1480,7 @@ bool WamDriver::move_joint(int joint, double newpos, double velocity) {
     std::vector<double> modified_joint_accel(joint_accel);
     // rescale the acceleration to match the new velocity
     modified_joint_accel[joint-1]=joint_accel[joint-1]*velocity/joint_vel[joint-1];
-    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,false,false);
+    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,false,false,false);
     if (owam->run_trajectory(paratraj) == OW_FAILURE) {
       ROS_ERROR_NAMED("calibration",
 		      "Error starting joint %d trajectory",joint);
@@ -1481,7 +1490,7 @@ bool WamDriver::move_joint(int joint, double newpos, double velocity) {
     // loop until the trajectory finishes or gets stuck
     owam->lock(); // lock before checking jointstraj
     while (owam->jointstraj) {
-        if (owam->jointstraj->state()==ParaJointTraj::STOP) {
+      if (owam->jointstraj->state()==OWD::Trajectory::STOP) {
             owam->unlock();
             // joint got stuck
             owam->cancel_trajectory();
@@ -1617,7 +1626,8 @@ bool WamDriver::Publish() {
   owam->get_gains(waminternals.gains);
 
   for (unsigned int i=0; i<nJoints; ++i) {
-    wamstate.positions[i] = waminternals.positions[i] = jointpos[i+1];
+    wamstate.positions[i] = owam->last_control_position[i+1];
+    waminternals.positions[i] = jointpos[i+1];
     if (i<4) {
       wamstate.jpositions[i]=abs_jointpos[i+1];
     }
@@ -1643,14 +1653,46 @@ bool WamDriver::Publish() {
 
   owam->lock();
   if (owam->jointstraj) {
+    static bool stall_reported(false);
     if (owam->jointstraj->state() == OWD::Trajectory::STOP) {
       wamstate.state=pr_msgs::WAMState::state_traj_paused;
+      if (stall_reported) {
+	char endstr[200];
+	strcpy(endstr,"");
+	for(int i = Joint::J1; i<=Joint::Jn; i++) {
+	  sprintf(endstr+strlen(endstr)," %1.4f",owam->heldPositions[i]);
+	}
+	ROS_INFO_NAMED("AddTrajectory","Stalled trajectory #%d has been paused at position[%s ]",
+		       owam->jointstraj->id,endstr);
+	stall_reported=false;
+      }
+	
     } else {
       // trajectory is still running, but we still might be hitting something
       if (owam->safety_hold) {
         wamstate.state=pr_msgs::WAMState::state_traj_stalled;
+	if (!stall_reported) {
+	  char endstr[200];
+	  strcpy(endstr,"");
+	  for(int i = Joint::J1; i<=Joint::Jn; i++) {
+	    sprintf(endstr+strlen(endstr)," %1.4f",owam->heldPositions[i]);
+	  }
+	  ROS_INFO_NAMED("AddTrajectory","Trajectory #%d has stalled at position[%s ]; trying to continue...",
+			 owam->jointstraj->id,endstr);
+	  stall_reported=true;
+	}
       } else {
 	wamstate.state=pr_msgs::WAMState::state_traj_active;
+	if (stall_reported) {
+	  char endstr[200];
+	  strcpy(endstr,"");
+	  for(int i = Joint::J1; i<=Joint::Jn; i++) {
+	    sprintf(endstr+strlen(endstr)," %1.4f",owam->heldPositions[i]);
+	  }
+	  ROS_INFO_NAMED("AddTrajectory","Stalled trajectory #%d has resumed at position[%s ]",
+			 owam->jointstraj->id,endstr);
+	  stall_reported=false;
+	}
       }
     }
   } else if (owam->holdpos) {
@@ -1665,6 +1707,7 @@ bool WamDriver::Publish() {
   pub_wamstate.publish(wamstate);
   pub_waminternals.publish(waminternals);
   
+  boost::mutex::scoped_lock lock(plugin_mutex);
   OWD::Plugin::PublishAll();
 
   return true;
@@ -1850,6 +1893,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
     // failed
     res.ok=false;
   }
+
   return true;
 }
 
@@ -1878,7 +1922,7 @@ uint32_t WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_re
     curpoint.SetFromArray(nJoints,wampos+1);
 
     // make sure first point matches the current pos
-    if (traj->start_position != curpoint) {
+    if (!traj->start_position.verycloseto(curpoint)) {
       ROS_ERROR_NAMED("AddTrajectory","First traj point does not match current position");
       char firststr[200], curstr[200];
       strcpy(firststr,""); strcpy(curstr,"");
@@ -1947,6 +1991,13 @@ uint32_t WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_re
   owam->run_trajectory(traj);
   wamstate.trajectory_queue[0].state=pr_msgs::TrajInfo::state_active;
   ROS_INFO("Added trajectory #%d",traj->id);
+  char endstr[200];
+  strcpy(endstr,"");
+  for (unsigned int j=0; j<nJoints; ++j) {
+    sprintf(endstr+strlen(endstr)," %1.4f",traj->end_position[j]);
+  }
+  ROS_INFO_NAMED("AddTrajectory","Trajectory #%d will stop at [%s ]",
+		 traj->id,endstr);
   return traj->id;
 }
 
@@ -2326,10 +2377,19 @@ void WamDriver::Update() {
   
   if (wamstate.trajectory_queue.size() > 0) {
     wamstate.prev_trajectory = wamstate.trajectory_queue.front();
+    char endstr[200];
+    strcpy(endstr,"");
+    for(int i = Joint::J1; i<=Joint::Jn; i++) {
+      sprintf(endstr+strlen(endstr)," %1.4f",owam->heldPositions[i]);
+    }
     if (owam->last_traj_state == Trajectory::DONE) {
       wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_done;
+      ROS_INFO_NAMED("AddTrajectory","Trajectory #%d has finished; new reference position is [%s ]",
+		     wamstate.prev_trajectory.id,endstr);
     } else if (owam->last_traj_state == Trajectory::ABORT) {
       wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_aborted;
+      ROS_INFO_NAMED("AddTrajectory","Trajectory #%d has been cancelled; new reference position is [%s ]",
+		     wamstate.prev_trajectory.id,endstr);
     }
     wamstate.trajectory_queue.erase(wamstate.trajectory_queue.begin());
   }
@@ -2413,7 +2473,10 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> 
     for (unsigned int i=0; i<servo->joint.size(); ++i) {
       straj->SetVelocity(servo->joint[i],servo->velocity[i]);
     }
-    owam->run_trajectory(straj);
+    if (owam->run_trajectory(straj) != OW_SUCCESS) {
+      ROS_ERROR_NAMED("servo","Servo trajectory failed to start");
+      return;
+    }
     ROS_DEBUG_NAMED("servo","Starting servo trajectory %d",cmdnum);
     return;
   }
@@ -2459,10 +2522,26 @@ bool WamDriver::SetForceInputThreshold(pr_msgs::SetForceInputThreshold::Request 
   direction.normalize();
   Trajectory::forcetorque_threshold_direction = direction;
   Trajectory::forcetorque_threshold = req.force;
+
+  R3 torques(req.torques.x, req.torques.y, req.torques.z);
+  Trajectory::forcetorque_torque_threshold = torques.normalize();
+  Trajectory::forcetorque_torque_threshold_direction = torques;
   res.reason=std::string("");
   res.ok=true;
   return true;
 }
+
+bool WamDriver::SetTactileInputThreshold(pr_msgs::SetTactileInputThreshold::Request &req,
+				       pr_msgs::SetTactileInputThreshold::Response &res) {
+  Trajectory::tactile_pad = req.pad_number;
+  Trajectory::tactile_threshold = req.threshold;
+  Trajectory::tactile_minimum_cells = req.minimum_cells;
+  Trajectory::tactile_minimum_readings = req.minimum_readings;
+  res.reason=std::string("");
+  res.ok=true;
+  return true;
+}
+
 
 // storage for static members
 CANbus *WamDriver::bus = NULL;

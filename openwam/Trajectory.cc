@@ -72,19 +72,72 @@ namespace OWD {
 		     ft[3],ft[4],ft[5]);
     valid_ft=true;
     static int forcecount(0);
+    static int torquecount(0);
    
+    // check force threshold
     if ((runstate==RUN) &&
 	CancelOnForceInput &&
 	((forcetorque.v * forcetorque_threshold_direction) 
 	 > forcetorque_threshold)) {
-      if (++forcecount == 8) {
+      //      if (++forcecount == 8) {
 	// only stop if we have eight cycles in a row that exceed the threshold
 	runstate=ABORT;
-      }
-    } else {
-      forcecount=0;
+	//      }
+	//    } else {
+	//      forcecount=0;
+    }
+    // check torque threshold
+    if ((runstate==RUN) &&
+	CancelOnForceInput &&
+	((forcetorque.w * forcetorque_torque_threshold_direction) 
+	 > forcetorque_torque_threshold)) {
+      //      if (++torquecount == 8) {
+	// only stop if we have eight cycles in a row that exceed the threshold
+      	runstate=ABORT;
+      //      }
+	//    } else {
+	//      torquecount=0;
     }
   }
+
+  void Trajectory::TactileFeedback(float tactile[], int repetitions) {
+    // check whether we should stop the trajectory based on
+    // tactile sensor values.
+    // args:
+    //   tactile: array of 96 readings
+    //   repetitions: number of times that this function will be called
+    //       before every  cell has been updated.  OWD gets just a partial
+    //       update of the tactile data in each CAN message, so the
+    //       repetitions argument allows this function to take that
+    //       into account.
+    // preset values:
+    //   tactile_pad: the pad number (0 through 3) that we are watching
+    //   tactile_threshold: the reading that is considered "pressed"
+    //   tactile_minimum_cells: the number of cells that have to meet
+    //      or exceed the threshold in a single cycle for the pad to be
+    //      considered "pressed"
+    //   tactile_minimum_readings: the number of consecutive times the
+    //      cell should be "pressed" to stop the trajectory
+    static int tactilecount(0);
+    if ((runstate==RUN) &&
+	CancelOnTactileInput) {
+      int cellcount(0);
+      for (int i=0; i<24; ++i) {
+	if (tactile[i + tactile_pad*24] > tactile_threshold) {
+	  ++cellcount; 
+	}
+      }
+      if (cellcount > tactile_minimum_cells) {
+	++tactilecount;
+	if (tactilecount > tactile_minimum_readings * repetitions) {
+	  runstate = ABORT;
+	}
+      } else {
+	tactilecount=0;
+      }
+    }
+  }
+
 
   Trajectory::TrajControl::TrajControl(unsigned int nDOF) :
     q(nDOF), qd(nDOF), qdd(nDOF), t(nDOF)
@@ -93,4 +146,13 @@ namespace OWD {
 
   R3 Trajectory::forcetorque_threshold_direction(0,0,-1);  // negative Z (towards palm)
   double Trajectory::forcetorque_threshold(6.0);    // 6 newtons
+  R3 Trajectory::forcetorque_torque_threshold_direction(1,0,0);
+  double Trajectory::forcetorque_torque_threshold(999); // disabled at start
+
+  int Trajectory::tactile_pad(0);
+  float Trajectory::tactile_threshold(1.0);
+  int Trajectory::tactile_minimum_cells(8);
+  int Trajectory::tactile_minimum_readings(6);
+  std::vector<double> Trajectory::tactile_debug_data;
 }; // namespace OWD
+

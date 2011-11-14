@@ -118,16 +118,16 @@ public:
 #endif // ! OWD_RT
   Joint joints[Joint::Jn+1];               // Array of joints
   Motor motors[Motor::Mn+1];               // Array of motors
-  Link links[Link::Ln+1];                  // Array of links
-  Link original_links[Link::Ln+1];         // holds values before extra
+  OWD::Link links[Link::Ln+1];                  // Array of links
+  OWD::Link original_links[Link::Ln+1];         // holds values before extra
                                            //   mass props are set
-  Link sim_links[Link::Ln+1];              // Array of links (simulated)
-  Link L7_with_260_hand,
+  OWD::Link sim_links[Link::Ln+1];              // Array of links (simulated)
+  OWD::Link L7_with_260_hand,
     L7_with_280_hand,
     L7_with_280FT_hand,
     L7_without_hand,
     L7_with_ARMS_calibration_target;
-  Link L4_without_wrist_with_260_hand,
+  OWD::Link L4_without_wrist_with_260_hand,
     L4_without_wrist_without_hand;
   double heldPositions[Joint::Jn+1];
   bool suppress_controller[Joint::Jn+1];    // flag to disable PID control
@@ -248,6 +248,8 @@ public:
   bool ForceTorque;
   bool Tactile;
   SE3 SE3_endpoint; // result of forward kinematics calculation
+  double *last_control_position;
+  bool slip_joints_on_high_torque;
 };
 
 #endif

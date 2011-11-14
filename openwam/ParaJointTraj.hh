@@ -59,7 +59,8 @@ public:
 		const std::vector<double> &max_joint_accel,
 		bool bWaitForStart,
 		bool bCancelOnStall,
-		bool bCancelOnForceInput);
+		bool bCancelOnForceInput,
+		bool bCancelOnTactileInput);
   virtual ~ParaJointTraj();
   
   virtual void lock(){pthread_mutex_lock(&mutex);}

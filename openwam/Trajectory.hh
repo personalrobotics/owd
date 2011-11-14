@@ -33,6 +33,7 @@
 // #include "Profile.hh"
 #include "TrajType.hh"
 #include "../openmath/R6.hh"
+#include "Butterworth.h"
 // #include "WAM.hh"
 
 namespace OWD {
@@ -42,7 +43,7 @@ namespace OWD {
   /// only required function in a subclass is an implementation of
   /// the evaluate() function.
   class Trajectory{
-  protected:
+  public:
     pthread_mutex_t mutex;
 
     /// The start_position must match either OWD's current position,
@@ -74,8 +75,6 @@ namespace OWD {
 
     static OWD::WamDriver *wamdriver;
 
-  public:
-  
     static const int STOP = 0;
     static const int RUN  = 1;
     static const int DONE = 2;
@@ -121,11 +120,45 @@ namespace OWD {
     /// force/torque sensor are ignored.
     bool  CancelOnForceInput;
 
+    /// \brief Automatically cancel a trajectory based on sensed contact
+    ///
+    /// If true, OWD will cancel the trajectory if
+    /// the tactile sensor reports values that meet the criteria set
+    /// by the SetTactileInputThreshold service call.
+    /// This option defaults to false, in which case values from the 
+    /// force/torque sensor are ignored.
+    bool  CancelOnTactileInput;
+
+    /// \brief The pad number (0-3) used for CancelOnTactileInput
+    ///
+    static int tactile_pad;
+
+    /// \brief The value at which a cell is considered pressed
+    ///
+    static float tactile_threshold;
+
+    /// \brief The number of cells that must be pressed for the pad
+    ///        to be considered pressed
+    ///
+    static int tactile_minimum_cells;
+
+    /// \brief The number of consecutive times the pad must be pressed
+    ///        to stop the trajectory
+    ///
+    static int tactile_minimum_readings;
+
     R6 forcetorque;
     bool valid_ft;
+
     static R3 forcetorque_threshold_direction;
     static double forcetorque_threshold;
-  
+
+    static R3 forcetorque_torque_threshold_direction;
+    static double forcetorque_torque_threshold;
+
+    static std::vector<double> tactile_debug_data;
+    Butterworth<JointPos> tactile_filter;
+
     /// \brief The contructor requires a trajectory name
     ///
     /// \param name Unique identifier of the trajectory type (usually
@@ -137,7 +170,10 @@ namespace OWD {
     Trajectory(std::string name) :
       runstate(STOP),time(0.0),id(0), type(name),
       CancelOnStall(false),WaitForStart(false),
-      CancelOnForceInput(false),valid_ft(false)
+      CancelOnForceInput(false),
+      CancelOnTactileInput(false),
+      valid_ft(false),
+      tactile_filter(2,10) // 2nd-order, 10hz 
     {
       pthread_mutex_init(&mutex, NULL);
     }
@@ -242,6 +278,8 @@ namespace OWD {
     inline virtual double curtime() const {return time;}
 
     virtual void ForceFeedback(double ft[]);
+
+    virtual void TactileFeedback(float tactile[], int repetitions);
 
     friend class WamDriver;
     

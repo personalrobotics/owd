@@ -38,20 +38,20 @@ elseif (VENDOR_ID STREQUAL "CentaurHauls")
     add_definitions("-march=c3-2")
 endif (DEFINED ENV{OWD_MARCH_FLAGS})
 
-add_definitions("-ggdb3 -DWRIST -DBH8 -DRT_STATS")
+add_definitions("-O0 -ggdb3 -DWRIST -DBH8 -DRT_STATS")
 
 rosbuild_add_library(openwam Joint.cc Motor.cc Puck.cc Group.cc
                             Sigmoid.cc Kinematics.cc Dynamics.cc
 			    TrajType.cc PulseTraj.cc Trajectory.cc ParabolicSegment.cc
                             ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc
-                            ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc)
+                            ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc butterworth_solver.c)
 
 rosbuild_add_library(openwamsim Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc
                                ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc
                                TrajType.cc PulseTraj.cc Trajectory.cc ParabolicSegment.cc
                                ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc
                                ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc
-			       Plugin.cc)
+			       Plugin.cc butterworth_solver.c)
 rosbuild_add_compile_flags(openwamsim "-DOWDSIM")
 
 rosbuild_add_library(wamcan ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)

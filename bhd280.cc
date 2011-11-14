@@ -1,6 +1,6 @@
 /***********************************************************************
 
-  Copyright 2010 Carnegie Mellon University and Intel Corporation
+  Copyright 2010-2011 Carnegie Mellon University and Intel Corporation
   Author: Mike Vande Weghe <vandeweg@cmu.edu>
 
   This file is part of owd.
@@ -91,6 +91,8 @@ void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 				       &BHD_280::GetHandProperty,this);
   ss_setspeed = n.advertiseService("SetSpeed",
 				   &BHD_280::SetSpeed,this);
+  ss_sethandtorque = n.advertiseService("SetHandTorque",
+					&BHD_280::SetHandTorque,this);
 }
 
 void BHD_280::GetParameters(ros::NodeHandle &n) {
@@ -116,6 +118,7 @@ void BHD_280::Unadvertise() {
   ss_resetfinger.shutdown();
   ss_relaxhand.shutdown();
   ss_setspeed.shutdown();
+  ss_sethandtorque.shutdown();
 }
 
 void BHD_280::Pump(ros::TimerEvent const& e) {
@@ -301,12 +304,14 @@ bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
 
 bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
 			pr_msgs::ResetHand::Response &res) {
+  ROS_INFO_NAMED("service","Received ResetHand");
   res.ok=true;
   for (int cycles=0; cycles<3; ++cycles) {
     for (int i=11; i<=13; ++i) {
       if (bus->send_finger_reset(i) != OW_SUCCESS) {
 	res.ok=false;
 	res.reason="Failed to reset a finger";
+	ROS_WARN_NAMED("service","ResetHand aborted");
 	return true;
       }
       int waitcount = 0;
@@ -314,6 +319,7 @@ bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
 	if (++waitcount > 100) {
 	  res.ok=false;
 	  res.reason="Finger failed to reset after 10 seconds";
+	  ROS_WARN_NAMED("service","ResetHand aborted");
 	  return true;
 	}
 	usleep(100000);
@@ -323,6 +329,7 @@ bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
   if (bus->send_finger_reset(14) != OW_SUCCESS) {
     res.ok=false;
     res.reason="Failed to reset spread";
+    ROS_WARN_NAMED("service","ResetHand aborted");
     return true;
   }
   int waitcount=0;
@@ -330,21 +337,25 @@ bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
     if (++waitcount > 100) {
       res.ok=false;
       res.reason="Spread failed to reset after 10 seconds";
+      ROS_WARN_NAMED("service","ResetHand aborted");
       return true;
     }
     usleep(100000);
   }
+  ROS_INFO_NAMED("service","ResetHand done");
   return true;
 }
 
 bool BHD_280::ResetHandQuick(pr_msgs::ResetHand::Request &req,
 			     pr_msgs::ResetHand::Response &res) {
+  ROS_INFO_NAMED("service","Received ResetHandQuick");
   res.ok=true;
   // send reset commands to all the fingers at once
   for (int i=11; i<=13; ++i) {
     if (bus->send_finger_reset(i) != OW_SUCCESS) {
       res.ok=false;
       res.reason="Failed to reset a finger";
+      ROS_WARN_NAMED("service","ResetHandQuick aborted");
       return true;
     }
   }
@@ -355,6 +366,7 @@ bool BHD_280::ResetHandQuick(pr_msgs::ResetHand::Request &req,
       if (++waitcount > 100) {
 	res.ok=false;
 	res.reason="Finger failed to reset after 10 seconds";
+	ROS_WARN_NAMED("service","ResetHandQuick aborted");
 	return true;
       }
       usleep(100000);
@@ -363,6 +375,7 @@ bool BHD_280::ResetHandQuick(pr_msgs::ResetHand::Request &req,
   if (bus->send_finger_reset(14) != OW_SUCCESS) {
     res.ok=false;
     res.reason="Failed to reset spread";
+    ROS_WARN_NAMED("service","ResetHandQuick aborted");
     return true;
   }
   int waitcount=0;
@@ -370,24 +383,29 @@ bool BHD_280::ResetHandQuick(pr_msgs::ResetHand::Request &req,
     if (++waitcount > 100) {
       res.ok=false;
       res.reason="Spread failed to reset after 10 seconds";
+      ROS_WARN_NAMED("service","ResetHandQuick aborted");
       return true;
     }
     usleep(100000);
   }
+  ROS_INFO_NAMED("service","ResetHandQuick done");
   return true;
 }
 
 bool BHD_280::ResetFinger(pr_msgs::ResetFinger::Request &req,
 			  pr_msgs::ResetFinger::Response &res) {
+  ROS_INFO_NAMED("service","Received ResetFinger");
   res.ok=true;
   if ((req.finger < 1) || (req.finger > 4)) {
     res.ok=false;
     res.reason="Finger not in range 1-4";
+    ROS_WARN_NAMED("service","ResetFinger aborted");
     return true;
   }
   if (bus->send_finger_reset(req.finger + 10) != OW_SUCCESS) {
     res.ok=false;
     res.reason="Error sending reset command to finger";
+    ROS_WARN_NAMED("service","ResetFinger aborted");
     return true;
   }
   int waitcount=0;
@@ -395,10 +413,12 @@ bool BHD_280::ResetFinger(pr_msgs::ResetFinger::Request &req,
     if (++waitcount > 100) {
       res.ok=false;
       res.reason="Finger failed to reset after 10 seconds";
+      ROS_WARN_NAMED("service","ResetFinger aborted");
       return true;
     }
     usleep(100000);
   }
+  ROS_INFO_NAMED("service","ResetFinger done");
   return true;
 }
 
@@ -533,5 +553,32 @@ bool BHD_280::SetSpeed(pr_msgs::SetSpeed::Request &req,
   } else {
     res.ok=true;
   }
+  return true;
+}
+
+bool BHD_280::SetHandTorque(pr_msgs::SetHandTorque::Request &req,
+			    pr_msgs::SetHandTorque::Response &res) {
+  if (req.initial > 5000) {
+    ROS_ERROR("Initial torque exceeds safe limits");
+    res.reason="Initial torque exceeds safe limits";
+    res.ok=false;
+    return true;
+  }
+  if (req.sustained > 1800) {
+    ROS_ERROR("Sustained torque exceeds safe limits");
+    res.reason="Sustained torque exceeds safe limits";
+    res.ok=false;
+    return true;
+  }
+  if (req.initial > 2500) {
+    ROS_WARN("Dangerously high initial hand torque");
+  }
+  if (req.sustained > 1100) {
+    ROS_WARN("Dangerously high sustained hand torque");
+  }
+  bus->hand_initial_torque = req.initial;
+  bus->hand_sustained_torque = req.sustained;
+  res.reason="";
+  res.ok=true;
   return true;
 }

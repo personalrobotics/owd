@@ -99,8 +99,6 @@ namespace OWD {
     static double thresholded_values[NJOINTS];
     static double max_condition;
 
-  private:
-
     /// \brief Calculate the endpoint pose
     ///
     /// Runs through the current links, multiplying their
@@ -110,6 +108,7 @@ namespace OWD {
     /// \returns The transformation matrix of link7 in terms of link0
     static SE3 forward_kinematics(Link* links);
 
+  private:
     /// \brief Pre-calculate the Jacobian and friends
     ///
     /// Calculates the Jacobian and derived matrices based on the

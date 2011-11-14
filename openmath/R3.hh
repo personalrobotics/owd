@@ -19,6 +19,7 @@
 #include <iostream>
 #include <iomanip>
 #include <math.h>
+#include <strings.h>
 
 #ifndef __R3_HH__
 #define __R3_HH__
@@ -41,9 +42,16 @@ public:
 
   double normalize() {
     double d=norm();
-    x[0] /= d;
-    x[1] /= d;
-    x[2] /= d;
+    if (d > 0) {
+      x[0] /= d;
+      x[1] /= d;
+      x[2] /= d;
+    } else {
+      // just make a unit vector; direction doesn't matter since original
+      // vector was all zero
+      x[0]=1;
+      x[1]=x[2]=0;
+    }
     return d; // in case someone wants our original magnitude
   }
 
@@ -60,6 +68,12 @@ public:
   /// \brief Scale by a double
   inline R3 &operator *= (const double d) {
     x[0]*=d; x[1]*=d; x[2]*=d;
+    return *this;
+  }
+
+  /// \brief Scale by a double
+  inline R3 &operator /= (const double d) {
+    x[0]/=d; x[1]/=d; x[2]/=d;
     return *this;
   }
 

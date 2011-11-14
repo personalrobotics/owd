@@ -46,6 +46,7 @@
 #include <pr_msgs/Servo.h>
 #include <pr_msgs/Reset.h>
 #include <pr_msgs/SetForceInputThreshold.h>
+#include <pr_msgs/SetTactileInputThreshold.h>
 #include <owd/CalibrateJoints.h>
 #include <owd/StepJoint.h>
 #include <owd/SetGains.h>
@@ -130,6 +131,8 @@ public:
 		       pr_msgs::Reset::Response &res);
     bool SetForceInputThreshold(pr_msgs::SetForceInputThreshold::Request &req,
 				pr_msgs::SetForceInputThreshold::Response &res);
+    bool SetTactileInputThreshold(pr_msgs::SetTactileInputThreshold::Request &req,
+				pr_msgs::SetTactileInputThreshold::Response &res);
 
     void AdvertiseAndSubscribe(ros::NodeHandle &n);
 
@@ -238,6 +241,7 @@ private:
  private:
     boost::mutex queue_mutex;
     boost::mutex wscb_mutex;
+    boost::mutex plugin_mutex;
     bool modified_j1;
 
     ros::Publisher
@@ -266,7 +270,8 @@ private:
       ss_StepJoint,
       ss_SetGains,
       ss_ReloadPlugins,
-      ss_SetForceInputThreshold;
+      ss_SetForceInputThreshold,
+      ss_SetTactileInputThreshold;
 
     tf::TransformBroadcaster tf_broadcaster;
     btTransform wam_tf_base[7];

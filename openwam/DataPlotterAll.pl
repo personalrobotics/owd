@@ -62,7 +62,7 @@ while (<>) {
     } else {
 	$linenum = $linenum+1;
     }
-    $f = sprintf("wamstats41-%04d.csv",$linenum);
+    $f = sprintf("wamstats00-%04d.csv",$linenum);
 #    system("scp wam:/tmp/$f .");
     print "Plotting $f\n";
     
@@ -86,19 +86,19 @@ while (<>) {
 	print {$GP[1]} "replot $f using 23 title \"J7 act\"  with lines ls 14\n";
 
 	print {$GP[0]} "set title $f\n";
-	print {$GP[0]} "  plot $f using 32           title \"J1 dyn\" with lines ls 1\n";
+	print {$GP[0]} "  plot $f using 39           title \"J1 dyn\" with lines ls 1\n";
 	print {$GP[0]} "replot $f using 6  axes x1y2 title \"J1 PID\" with lines ls 8\n";
-	print {$GP[0]} "replot $f using 33           title \"J2 dyn\" with lines ls 2\n";
+	print {$GP[0]} "replot $f using 40           title \"J2 dyn\" with lines ls 2\n";
 	print {$GP[0]} "replot $f using 9  axes x1y2 title \"J2 PID\" with lines ls 9\n";
-	print {$GP[0]} "replot $f using 34           title \"J3 dyn\" with lines ls 3\n";
+	print {$GP[0]} "replot $f using 41           title \"J3 dyn\" with lines ls 3\n";
 	print {$GP[0]} "replot $f using 12 axes x1y2 title \"J3 PID\" with lines ls 10\n";
-	print {$GP[0]} "replot $f using 35           title \"J4 dyn\" with lines ls 4\n";
+	print {$GP[0]} "replot $f using 42           title \"J4 dyn\" with lines ls 4\n";
 	print {$GP[0]} "replot $f using 15 axes x1y2 title \"J4 PID\" with lines ls 11\n";
-	print {$GP[0]} "replot $f using 36           title \"J5 dyn\" with lines ls 5\n";
+	print {$GP[0]} "replot $f using 43           title \"J5 dyn\" with lines ls 5\n";
 	print {$GP[0]} "replot $f using 18 axes x1y2 title \"J5 PID\" with lines ls 12\n";
-	print {$GP[0]} "replot $f using 37           title \"J6 dyn\" with lines ls 6\n";
+	print {$GP[0]} "replot $f using 44           title \"J6 dyn\" with lines ls 6\n";
 	print {$GP[0]} "replot $f using 21 axes x1y2 title \"J6 PID\" with lines ls 13\n";
-	print {$GP[0]} "replot $f using 38           title \"J7 dyn\" with lines ls 7\n";
+	print {$GP[0]} "replot $f using 45           title \"J7 dyn\" with lines ls 7\n";
 	print {$GP[0]} "replot $f using 24 axes x1y2 title \"J7 PID\" with lines ls 14\n";
 	print {$GP[0]} "replot $f using 2 axes x1y2 title \"timescale\" with lines ls 15\n"; # timestep_factor
 

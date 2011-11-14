@@ -46,6 +46,18 @@ public:
 
   double norm() const {return sqrt(v*v + w*w); }
 
+  double normalize() {
+    double d = norm();
+    if (d>0) {
+      v /= d;
+      w /= d;
+    } else {
+      v=R3(1,0,0);
+      w=R3(1,0,0);
+    }
+    return d;
+  }
+
   void  clear(){v.clear(); w.clear();}
   
   friend R6 operator * (double s, const R6& x) {return R6(s*x.v,  s*x.w);}
@@ -58,6 +70,9 @@ public:
   friend R6 operator - (const R6& r1, const R6& r2)
   {return R6(r1.v - r2.v, r1.w - r2.w); }
 
+  friend double operator * (const R6& r1, const R6& r2)
+  {return r1.v*r2.v + r1.w*r2.w;}
+
   R6 &operator += (const R6 &rhs) {
     v += rhs.v;
     w += rhs.w;
@@ -69,7 +84,6 @@ public:
     w -= rhs.w;
     return *this;
   }
-
 
   friend ostream& operator <<  (ostream& s, const R6& r){
     int p;

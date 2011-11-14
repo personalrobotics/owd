@@ -32,6 +32,7 @@ FT::~FT() {
 
 void FT::AdvertiseAndSubscribe(ros::NodeHandle &n) {
   pub_ft = n.advertise<geometry_msgs::WrenchStamped>("forcetorque", 1);
+  pub_filtered_ft = n.advertise<geometry_msgs::WrenchStamped>("filtered_forcetorque", 1);
   ss_tare = n.advertiseService("ft_tare",&FT::Tare,this);
 }
 
@@ -47,26 +48,37 @@ void FT::Pump(const ros::TimerEvent& e) {
 
 bool FT::Publish() {
   static double ft_values[6];
-  if (bus->ft_get_data(ft_values) != OW_SUCCESS) {
+  static double ft_filtered_values[6];
+  if (bus->ft_get_data(ft_values,ft_filtered_values) != OW_SUCCESS) {
     ROS_WARN_NAMED("ft","Unable to get data from Force/Torque sensor");
     return false;
   }
 
-  wrench.header.stamp = ros::Time::now();
-  wrench.wrench.force.x=ft_values[0];
-  wrench.wrench.force.y=ft_values[1];
-  wrench.wrench.force.z=ft_values[2];
-  wrench.wrench.torque.x=ft_values[3];
-  wrench.wrench.torque.y=ft_values[4];
-  wrench.wrench.torque.z=ft_values[5];
-  pub_ft.publish(wrench);
-  
+  // set the time
+  ft_vals.header.stamp = ros::Time::now();
+  // fill in the raw values
+  ft_vals.wrench.force.x=ft_values[0];
+  ft_vals.wrench.force.y=ft_values[1];
+  ft_vals.wrench.force.z=ft_values[2];
+  ft_vals.wrench.torque.x=ft_values[3];
+  ft_vals.wrench.torque.y=ft_values[4];
+  ft_vals.wrench.torque.z=ft_values[5];
+  pub_ft.publish(ft_vals);
+  // overwrite with the filtered values
+  ft_vals.wrench.force.x= ft_filtered_values[0];
+  ft_vals.wrench.force.y= ft_filtered_values[1];
+  ft_vals.wrench.force.z= ft_filtered_values[2];
+  ft_vals.wrench.torque.x=ft_filtered_values[3];
+  ft_vals.wrench.torque.y=ft_filtered_values[4];
+  ft_vals.wrench.torque.z=ft_filtered_values[5];
+  pub_filtered_ft.publish(ft_vals);
   return true;
 }
   
 bool FT::Tare(pr_msgs::Reset::Request &req,
 	      pr_msgs::Reset::Response &res) {
   res.ok=true;
+  ROS_DEBUG_NAMED("ft","Taring the F/T sensor");
   if (bus->ft_tare() != OW_SUCCESS) {
     ROS_WARN_NAMED("ft","Unable to tare the sensor");
     res.ok=false;

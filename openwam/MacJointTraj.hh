@@ -59,7 +59,8 @@ public:
 	       double max_jerk,
 	       bool bWaitForStart,
 	       bool bCancelOnStall,
-	       bool bCancelOnForceInput);
+	       bool bCancelOnForceInput,
+	       bool bCancelOnTactileInput);
 
   virtual ~MacJointTraj();
     
