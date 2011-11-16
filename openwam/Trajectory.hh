@@ -137,11 +137,6 @@ namespace OWD {
     ///
     static float tactile_threshold;
 
-    /// \brief The number of cells that must be pressed for the pad
-    ///        to be considered pressed
-    ///
-    static int tactile_minimum_cells;
-
     /// \brief The number of consecutive times the pad must be pressed
     ///        to stop the trajectory
     ///
@@ -149,15 +144,13 @@ namespace OWD {
 
     R6 forcetorque;
     bool valid_ft;
+    Butterworth<OWD::JointPos> tactile_filter;
 
     static R3 forcetorque_threshold_direction;
     static double forcetorque_threshold;
 
     static R3 forcetorque_torque_threshold_direction;
     static double forcetorque_torque_threshold;
-
-    static std::vector<double> tactile_debug_data;
-    Butterworth<JointPos> tactile_filter;
 
     /// \brief The contructor requires a trajectory name
     ///
@@ -173,7 +166,7 @@ namespace OWD {
       CancelOnForceInput(false),
       CancelOnTactileInput(false),
       valid_ft(false),
-      tactile_filter(2,10) // 2nd-order, 10hz 
+      tactile_filter(3,5) // 3rd-order, 5hz
     {
       pthread_mutex_init(&mutex, NULL);
     }

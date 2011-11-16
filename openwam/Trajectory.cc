@@ -119,23 +119,74 @@ namespace OWD {
     //   tactile_minimum_readings: the number of consecutive times the
     //      cell should be "pressed" to stop the trajectory
     static int tactilecount(0);
-    if ((runstate==RUN) &&
-	CancelOnTactileInput) {
-      int cellcount(0);
-      for (int i=0; i<24; ++i) {
-	if (tactile[i + tactile_pad*24] > tactile_threshold) {
-	  ++cellcount; 
-	}
-      }
-      if (cellcount > tactile_minimum_cells) {
-	++tactilecount;
-	if (tactilecount > tactile_minimum_readings * repetitions) {
-	  runstate = ABORT;
-	}
-      } else {
-	tactilecount=0;
+    static int reps_counter = 0;
+    static JointPos tact_data_filtered(96);
+
+    const double DIFF_LAST_THRESH = 2.0;
+
+    static double tactile_last[96]={0.0};
+
+
+    JointPos tact_data(96);
+    for (int i=0; i < 24*4; i++)
+    {
+      tact_data[i] = (double)tactile[i];
+    }
+
+
+    //if gone through whole cycle, update the old values
+    reps_counter++;
+    if (reps_counter % repetitions == 0)
+    {
+      tact_data_filtered =  tactile_filter.eval(tact_data);
+    }
+
+    //subtract off lowpass
+    //also, since sensors have random spikes, simply threshhold to remove if the difference is too large
+    for (int i=0; i < 24*4; i++)
+    {
+      tact_data[i] -= tact_data_filtered[i];
+      if (abs(tact_data[i] - tactile_last[i]) > DIFF_LAST_THRESH)
+      {
+        tact_data[i] = 0.0;
       }
     }
+
+    if (reps_counter % repetitions == 0)
+    {
+      for (int i=0; i < 24*4; i++)
+      {
+        tactile_last[i] = tact_data[i];
+      }
+    }
+
+
+    // count the number of responses
+    if ((runstate==RUN) && CancelOnTactileInput) 
+    {
+      int cellcount(0);
+      double total_response(0.0);
+
+      for (int i=0; i<24; ++i) {
+        if (tact_data[i + tactile_pad*24] > tactile_threshold) {
+          ++cellcount; 
+        }
+        
+        total_response+= tact_data[i+tactile_pad*24];
+      }
+      //if (cellcount > tactile_minimum_cells) 
+      if (total_response > tactile_threshold) 
+      {
+        ++tactilecount;
+        if (tactilecount > tactile_minimum_readings * repetitions) {
+          runstate = ABORT;
+        }
+      } else {
+        tactilecount=0;
+      }
+
+    }
+
   }
 
 
@@ -149,10 +200,8 @@ namespace OWD {
   R3 Trajectory::forcetorque_torque_threshold_direction(1,0,0);
   double Trajectory::forcetorque_torque_threshold(999); // disabled at start
 
-  int Trajectory::tactile_pad(0);
-  float Trajectory::tactile_threshold(1.0);
-  int Trajectory::tactile_minimum_cells(8);
-  int Trajectory::tactile_minimum_readings(6);
-  std::vector<double> Trajectory::tactile_debug_data;
+  int Trajectory::tactile_pad(3);
+  float Trajectory::tactile_threshold(3.5);
+  int Trajectory::tactile_minimum_readings(0);
 }; // namespace OWD
 

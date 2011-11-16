@@ -2535,7 +2535,6 @@ bool WamDriver::SetTactileInputThreshold(pr_msgs::SetTactileInputThreshold::Requ
 				       pr_msgs::SetTactileInputThreshold::Response &res) {
   Trajectory::tactile_pad = req.pad_number;
   Trajectory::tactile_threshold = req.threshold;
-  Trajectory::tactile_minimum_cells = req.minimum_cells;
   Trajectory::tactile_minimum_readings = req.minimum_readings;
   res.reason=std::string("");
   res.ok=true;
