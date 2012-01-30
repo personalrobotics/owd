@@ -93,15 +93,12 @@ the trajectory is contained within a single class.
 
 \section plugin_examples Example plugin
 
-<!--
-The <a href=http://personalrobotics.intel-research.net/intel-pkg/owd_plugin_example/html/index.html>owd_plugin_example</a>
--->
-The <a href=http://personalrobotics.intel-research.net/intel-pkg/owd_plugin_example/html/index.html>owd_plugin_example</a>
+The <a href=http://personalrobotics.ri.cmu.edu/intel-pkg/owd_plugin_example/html/index.html>owd_plugin_example</a>
 node is a fully documented sample %OWD plugin which users are
 encouraged to modify as a starting point for their own plugins.
 
 \verbatim
-Copyright 2011 Carnegie Mellon University and Intel Corporation
+Copyright 2011-2012 Carnegie Mellon University and Intel Corporation
 \endverbatim
 
 */
