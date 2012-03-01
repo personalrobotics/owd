@@ -1,7 +1,7 @@
 #include "InsertKeyTraj.h"
 
-bool InsertKeyTraj::InsertKey(gfe_owd_plugin::InsertKey::Request &req,
-			      gfe_owd_plugin::InsertKey::Response &res) {
+bool InsertKeyTraj::InsertKey(owd_plugins::InsertKey::Request &req,
+			      owd_plugins::InsertKey::Response &res) {
 
   //  double max_distance=0;
   //  for (int xstep=-1; xstep<2; ++xstep) {
@@ -41,10 +41,10 @@ InsertKeyTraj::InsertKeyTraj() :
   OWD::Trajectory("InsertKeyTraj"),
   current_step(NULL)
 {
-  start_position=gfeplug->target_arm_position;
+  start_position=hybridplug->target_arm_position;
   end_position = start_position;
   current_step = new InsertKeyStep8();
-  gfeplug->current_traj=this;
+  hybridplug->current_traj=this;
 }
 
 void InsertKeyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
@@ -122,16 +122,16 @@ InsertKeyTraj::InsertKeyStep8::InsertKeyStep8() :
   vibe_multiplier(1),
   motion(1),
   motiontime(20),
-  horiz_vibe((SO3)gfeplug->endpoint * R3(1,0,0), .004, 0.25),
-  vert_vibe((SO3)gfeplug->endpoint * R3(0,1,0), .002, 0.20)
+  horiz_vibe((SO3)hybridplug->endpoint * R3(1,0,0), .004, 0.25),
+  vert_vibe((SO3)hybridplug->endpoint * R3(0,1,0), .002, 0.20)
 {
  
-  start_position=gfeplug->target_arm_position;
+  start_position=hybridplug->target_arm_position;
   end_position = start_position;
-  start_jointpos = gfeplug->target_arm_position;
-  original_position = (R3) gfeplug->endpoint;
-  original_rotation = (SO3) gfeplug->endpoint;
-  AFTraj = new ApplyForceTraj((SO3)gfeplug->endpoint * R3(0,0,1), 5, 0.05);
+  start_jointpos = hybridplug->target_arm_position;
+  original_position = (R3) hybridplug->endpoint;
+  original_rotation = (SO3) hybridplug->endpoint;
+  AFTraj = new ApplyForceTraj((SO3)hybridplug->endpoint * R3(0,0,1), 5, 0.05);
   AFTraj->SetVibration(1,0,0,0.001,60);
 }
 
@@ -173,8 +173,8 @@ void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, d
     runstate=ABORT;
     return;
   }
-  R3 travel_in_hand_frame = (!(SO3)gfeplug->endpoint) * 
-    ((R3)gfeplug->endpoint - original_position);
+  R3 travel_in_hand_frame = (!(SO3)hybridplug->endpoint) * 
+    ((R3)hybridplug->endpoint - original_position);
   if (travel_in_hand_frame[2] > .05) {
     runstate=DONE; // yay!
     return;
@@ -192,7 +192,7 @@ void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, d
     // fall_through
   case 2:
     // find upper travel limit
-    if (gfeplug->filtered_ft_force[1] > 1) {
+    if (hybridplug->filtered_ft_force[1] > 1) {
       upper_y=y_shift;
       motiontime=0;
     } else {
@@ -205,7 +205,7 @@ void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, d
     break;
   case 3:
     // find lower travel limit
-    if (gfeplug->filtered_ft_force[1] < -1) {
+    if (hybridplug->filtered_ft_force[1] < -1) {
       lower_y = y_shift;
       center_y=(upper_y + lower_y)/2;
       if (fabs(center_y) > .005) {
@@ -225,7 +225,7 @@ void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, d
   case 4:
   }
 
-  double y_torque = gfeplug->filtered_ft_torque[1];
+  double y_torque = hybridplug->filtered_ft_torque[1];
   double x_shift(0);
   if (y_torque > 0.2) {
     x_shift -= .0025 / 500;  // at 500hz, this will move 2.5mm per second
@@ -243,7 +243,7 @@ void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, d
   }
 
   // change our correction to world coordinates
-  R3 ws_shift = (SO3)gfeplug->endpoint * R3(total_shift,0,0);
+  R3 ws_shift = (SO3)hybridplug->endpoint * R3(total_shift,0,0);
 
   // update our target position
   R3 target_position = original_position; // + ws_shift;
@@ -255,12 +255,12 @@ void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, d
     }
     switch (vibe_count % 2) {
     case 1:
-      extra_vibe=new Vibration((SO3)gfeplug->endpoint *R3(0,1,0),
+      extra_vibe=new Vibration((SO3)hybridplug->endpoint *R3(0,1,0),
 			       0.0005 * vibe_multiplier,
 			       2);
       break;
     case 0:
-      extra_vibe=new Vibration((SO3)gfeplug->endpoint *R3(1,0,0),
+      extra_vibe=new Vibration((SO3)hybridplug->endpoint *R3(1,0,0),
 			       0.001 * vibe_multiplier,
 			       1);
       vibe_multiplier *= 1.5;
@@ -307,8 +307,8 @@ void InsertKeyTraj::Shutdown() {
 }
 
 InsertKeyTraj::~InsertKeyTraj() {
-  gfeplug->flush_recorder_data = true;
-  gfeplug->current_traj=NULL;
+  hybridplug->flush_recorder_data = true;
+  hybridplug->current_traj=NULL;
 }
 
 

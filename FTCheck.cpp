@@ -63,19 +63,19 @@ FTCheck::FTCheck(int _testtime) :
   testtime(_testtime),
   samples(0)
 {
-  if (gfeplug) {
+  if (hybridplug) {
 
-    if ((gfeplug->ft_force.size() < 3) ||
-	(gfeplug->ft_torque.size() < 3)) {
+    if ((hybridplug->ft_force.size() < 3) ||
+	(hybridplug->ft_torque.size() < 3)) {
       throw "FTCheck requires that the Force/Torque sensor is installed and configured";
     }
     
     // Set the start position from the current position
-    start_position=gfeplug->target_arm_position;
+    start_position=hybridplug->target_arm_position;
     end_position = start_position;
 
   } else {
-    throw "Could not get current WAM values from GfePlugin";
+    throw "Could not get current WAM values from Hybridplugin";
   }
 
   raw_max.resize(6);
@@ -86,7 +86,7 @@ FTCheck::FTCheck(int _testtime) :
   filtered_sum.resize(6);
   strcpy(summary,"");
   done=false;
-  gfeplug->recorder->reset();
+  hybridplug->recorder->reset();
 }
 
 void FTCheck::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
@@ -127,22 +127,22 @@ FILTERED Y    % 1.3f   % 1.3f   % 1.3f   % 1.3f\n",
   }
 
   ++samples;
-  gfeplug->net_force.data.resize(48);
-  gfeplug->net_force.data[0]=gfeplug->ft_force[0];
-  gfeplug->net_force.data[1]=gfeplug->ft_force[1];
-  gfeplug->net_force.data[2]=gfeplug->ft_force[2];
-  gfeplug->net_force.data[3]=gfeplug->ft_torque[0];
-  gfeplug->net_force.data[4]=gfeplug->ft_torque[1];
-  gfeplug->net_force.data[5]=gfeplug->ft_torque[2];
-  gfeplug->net_force.data[6]=gfeplug->filtered_ft_force[0];
-  gfeplug->net_force.data[7]=gfeplug->filtered_ft_force[1];
-  gfeplug->net_force.data[8]=gfeplug->filtered_ft_force[2];
-  gfeplug->net_force.data[9]=gfeplug->filtered_ft_torque[0];
-  gfeplug->net_force.data[10]=gfeplug->filtered_ft_torque[1];
-  gfeplug->net_force.data[11]=gfeplug->filtered_ft_torque[2];
+  hybridplug->net_force.data.resize(48);
+  hybridplug->net_force.data[0]=hybridplug->ft_force[0];
+  hybridplug->net_force.data[1]=hybridplug->ft_force[1];
+  hybridplug->net_force.data[2]=hybridplug->ft_force[2];
+  hybridplug->net_force.data[3]=hybridplug->ft_torque[0];
+  hybridplug->net_force.data[4]=hybridplug->ft_torque[1];
+  hybridplug->net_force.data[5]=hybridplug->ft_torque[2];
+  hybridplug->net_force.data[6]=hybridplug->filtered_ft_force[0];
+  hybridplug->net_force.data[7]=hybridplug->filtered_ft_force[1];
+  hybridplug->net_force.data[8]=hybridplug->filtered_ft_force[2];
+  hybridplug->net_force.data[9]=hybridplug->filtered_ft_torque[0];
+  hybridplug->net_force.data[10]=hybridplug->filtered_ft_torque[1];
+  hybridplug->net_force.data[11]=hybridplug->filtered_ft_torque[2];
   for (int i=0; i<6; ++i) {
-    double d=gfeplug->net_force.data[i];
-    double fd=gfeplug->net_force.data[i+6];
+    double d=hybridplug->net_force.data[i];
+    double fd=hybridplug->net_force.data[i+6];
     if (d>raw_max[i]) {
       raw_max[i]=d;
     }
@@ -158,14 +158,14 @@ FILTERED Y    % 1.3f   % 1.3f   % 1.3f   % 1.3f\n",
     }
     filtered_sum[i] += fd;
 
-    gfeplug->net_force.data[12+i]=raw_max[i];
-    gfeplug->net_force.data[18+i]=raw_min[i];
-    gfeplug->net_force.data[24+i]=raw_sum[i] / samples;
-    gfeplug->net_force.data[30+i]=filtered_max[i];
-    gfeplug->net_force.data[36+i]=filtered_min[i];
-    gfeplug->net_force.data[42+i]=filtered_sum[i] / samples;
+    hybridplug->net_force.data[12+i]=raw_max[i];
+    hybridplug->net_force.data[18+i]=raw_min[i];
+    hybridplug->net_force.data[24+i]=raw_sum[i] / samples;
+    hybridplug->net_force.data[30+i]=filtered_max[i];
+    hybridplug->net_force.data[36+i]=filtered_min[i];
+    hybridplug->net_force.data[42+i]=filtered_sum[i] / samples;
   }
-  gfeplug->log_data(gfeplug->net_force.data);
+  hybridplug->log_data(hybridplug->net_force.data);
   return;
 }
 
@@ -188,6 +188,6 @@ void FTCheck::Shutdown() {
 }
 
 FTCheck::~FTCheck() {
-  gfeplug->flush_recorder_data = true;
+  hybridplug->flush_recorder_data = true;
 }
 

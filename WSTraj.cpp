@@ -7,8 +7,8 @@
 #define PEAK_CAN
 #include <openwamdriver.h>
 
-bool WSTraj::AddWSTraj(gfe_owd_plugin::AddWSTraj::Request &req,
-		       gfe_owd_plugin::AddWSTraj::Response &res) {
+bool WSTraj::AddWSTraj(owd_plugins::AddWSTraj::Request &req,
+		       owd_plugins::AddWSTraj::Response &res) {
   // compute a new workspace trajectory
   try {
     WSTraj *newtraj = new WSTraj(req);
@@ -48,7 +48,7 @@ bool WSTraj::ForceFeedbackNextTrajSrv(pr_msgs::Reset::Request &req,
 }
 
 
-WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst) 
+WSTraj::WSTraj(owd_plugins::AddWSTraj::Request &wst) 
   : OWD::Trajectory("WS Traj"),
     driving_force_direction(wst.wrench.force.x,
 			    wst.wrench.force.y,
@@ -85,23 +85,23 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
   movement_direction.normalize();
 
   start_position = OWD::JointPos(wst.starting_config);
-  OWD::JointPos current_pos(gfeplug->target_arm_position);
+  OWD::JointPos current_pos(hybridplug->target_arm_position);
   if (start_position.closeto(current_pos)) {
     start_position = current_pos;
   }
   end_position = OWD::JointPos(wst.ending_config);
   joint_change = OWD::JointPos(wst.ending_config) - start_position;
 
-  //  if (gfeplug->target_arm_position.size() != OWD::Link::Ln) {
+  //  if (hybridplug->target_arm_position.size() != OWD::Link::Ln) {
   //    ROS_ERROR("Warning: number of joints doesn't match number of links");
   //  }
 
-  OWD::Link mylinks[gfeplug->target_arm_position.size()];
-  for (unsigned int i=0; i<=gfeplug->target_arm_position.size(); ++i) {
+  OWD::Link mylinks[hybridplug->target_arm_position.size()];
+  for (unsigned int i=0; i<=hybridplug->target_arm_position.size(); ++i) {
     // copy the link geometry from the WAM class
     mylinks[i]=OWD::WamDriver::owam->links[i];
   }
-  for (unsigned int i=0; i<gfeplug->target_arm_position.size(); ++i) {
+  for (unsigned int i=0; i<hybridplug->target_arm_position.size(); ++i) {
     // update it to use our starting config
     mylinks[i+1].theta(start_position[i]);
   }
@@ -109,8 +109,8 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
   start_endpoint=OWD::Kinematics::forward_kinematics(mylinks);
   
   // validate our start_endpoint
-  //  so3 ep_rot_diff = (so3)((SO3)start_endpoint * (! (SO3)gfeplug->endpoint));
-  //  R3 ep_trans_diff = (R3)gfeplug->endpoint - (R3)start_endpoint;
+  //  so3 ep_rot_diff = (so3)((SO3)start_endpoint * (! (SO3)hybridplug->endpoint));
+  //  R3 ep_trans_diff = (R3)hybridplug->endpoint - (R3)start_endpoint;
   //  ROS_INFO("Start reference endpoint differs from actual by x=%1.3f y=%1.3f z=%1.3f theta=%1.3f",
   //	   ep_trans_diff[0],
   //	   ep_trans_diff[1],
@@ -215,7 +215,7 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
   }
   parseg.dump();
 
-  gfeplug->recorder->reset();
+  hybridplug->recorder->reset();
   // log values:
   //    0: how far ahead (behind) we are from computed time
   //    1: force_scale
@@ -231,14 +231,14 @@ WSTraj::WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst)
   //   11-16: desired feedforward force/torque
   //   17-19: X/Y/Z endpoint position error
   //   20-22: R/P/Y endpoint rotation error
-  gfeplug->net_force.data.resize(23);
-  gfeplug->net_force.data[10]=0;
-  gfeplug->current_traj=this;
+  hybridplug->net_force.data.resize(23);
+  hybridplug->net_force.data[10]=0;
+  hybridplug->current_traj=this;
 }
 
 WSTraj::~WSTraj() {
-  gfeplug->flush_recorder_data = true;
-  gfeplug->current_traj=NULL;
+  hybridplug->flush_recorder_data = true;
+  hybridplug->current_traj=NULL;
 }
 
 void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
@@ -277,10 +277,10 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
     R3 target_position = (R3)start_endpoint + endpoint_translation * dist;
     // calculate the endpoint position error
-    R3 position_error = target_position - (R3)gfeplug->endpoint;
-    gfeplug->net_force.data[17]=position_error[0];
-    gfeplug->net_force.data[18]=position_error[1];
-    gfeplug->net_force.data[19]=position_error[2];
+    R3 position_error = target_position - (R3)hybridplug->endpoint;
+    hybridplug->net_force.data[17]=position_error[0];
+    hybridplug->net_force.data[18]=position_error[1];
+    hybridplug->net_force.data[19]=position_error[2];
     
     // calculate our trajectory rotation
     so3 relative_rotation(endpoint_rotation.w(), endpoint_rotation.t() * dist);
@@ -289,12 +289,12 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // Compute the endpoint rotation error by taking the net rotation from
     // the current orientation to the target orientation and converting
     // it to axis-angle format
-    so3 rotation_error = (so3)(target_rotation * (! (SO3)gfeplug->endpoint));
+    so3 rotation_error = (so3)(target_rotation * (! (SO3)hybridplug->endpoint));
     // represent as rotation about each of the axes
     R3 rotation_correction = rotation_error.t() * rotation_error.w();
-    gfeplug->net_force.data[21]=rotation_correction[0];
-    gfeplug->net_force.data[22]=rotation_correction[1];
-    gfeplug->net_force.data[23]=rotation_correction[2];
+    hybridplug->net_force.data[21]=rotation_correction[0];
+    hybridplug->net_force.data[22]=rotation_correction[1];
+    hybridplug->net_force.data[23]=rotation_correction[2];
     
     R3 position_correction = position_error;
 
@@ -303,7 +303,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     OWD::JointPos joint_correction(tc.q.size());
     try {
       joint_correction = 
-	gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
+	hybridplug->JacobianPseudoInverse_times_vector(endpos_correction);
       for (unsigned int j=0; j<joint_correction.size(); ++j) {
 	if (isnan(joint_correction[j])) {
 	  joint_correction[j]=0;
@@ -323,7 +323,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     OWD::JointPos jointpos_error = target_jointpos - tc.q;
     try {
       OWD::JointPos configuration_correction
-	= gfeplug->Nullspace_projection(jointpos_error);
+	= hybridplug->Nullspace_projection(jointpos_error);
       for (unsigned int j=0; j<configuration_correction.size(); ++j) {
 	if (isnan(configuration_correction[j])) {
 	  configuration_correction[j]=0;
@@ -339,13 +339,13 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
     // Calculate the feedforward torques to produce our driving force
     R6 desired_ft = force_percent*driving_forcetorque*driving_force_direction;
-    gfeplug->net_force.data[11]=desired_ft.v[0];
-    gfeplug->net_force.data[12]=desired_ft.v[1];
-    gfeplug->net_force.data[13]=desired_ft.v[2];
-    gfeplug->net_force.data[14]=desired_ft.w[0];
-    gfeplug->net_force.data[15]=desired_ft.w[1];
-    gfeplug->net_force.data[16]=desired_ft.w[2];
-    OWD::JointPos force_feedforward_torques = gfeplug->JacobianTranspose_times_vector(desired_ft);
+    hybridplug->net_force.data[11]=desired_ft.v[0];
+    hybridplug->net_force.data[12]=desired_ft.v[1];
+    hybridplug->net_force.data[13]=desired_ft.v[2];
+    hybridplug->net_force.data[14]=desired_ft.w[0];
+    hybridplug->net_force.data[15]=desired_ft.w[1];
+    hybridplug->net_force.data[16]=desired_ft.w[2];
+    OWD::JointPos force_feedforward_torques = hybridplug->JacobianTranspose_times_vector(desired_ft);
 
     // return the new joint positions and the force
     tc.q += joint_correction;
@@ -373,11 +373,11 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     parseg.evaluate(dist, vel, accel, time);
 
 #ifdef SIMULATION
-    static R3 last_endpoint = (R3) gfeplug->endpoint;
-    R3 ep_movement = (R3) gfeplug->endpoint - last_endpoint;
+    static R3 last_endpoint = (R3) hybridplug->endpoint;
+    R3 ep_movement = (R3) hybridplug->endpoint - last_endpoint;
     total_endpoint_movement+= ep_movement;
     ROS_DEBUG_STREAM_NAMED("wstraj","Endpoint movement since last time: " << ep_movement);
-    last_endpoint = (R3) gfeplug->endpoint;
+    last_endpoint = (R3) hybridplug->endpoint;
 
     ROS_DEBUG_NAMED("wstraj","WSTraj eval: dist=%2.3f, vel=%2.3f, accel=%2.3f, time=%2.3f, dt=%0.3f",
 		    dist,vel,accel,time,dt);
@@ -388,7 +388,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
      **********************************************/
     R3 target_position = (R3)start_endpoint + endpoint_translation * dist;
     // calculate the endpoint position correction
-    R3 position_correction = target_position - (R3)gfeplug->endpoint;
+    R3 position_correction = target_position - (R3)hybridplug->endpoint;
 
     // calculate our trajectory rotation
     so3 relative_rotation(endpoint_rotation.w(), endpoint_rotation.t() * dist);
@@ -397,7 +397,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // Compute the endpoint rotation error by taking the net rotation from
     // the current orientation to the target orientation and converting
     // it to axis-angle format
-    so3 rotation_error = (so3)(target_rotation * (! (SO3)gfeplug->endpoint));
+    so3 rotation_error = (so3)(target_rotation * (! (SO3)hybridplug->endpoint));
     // represent as rotation about each of the axes
     R3 rotation_correction = rotation_error.t() * rotation_error.w();
     
@@ -406,7 +406,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     OWD::JointPos joint_correction(tc.q.size());
     try {
       joint_correction = 
-	gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
+	hybridplug->JacobianPseudoInverse_times_vector(endpos_correction);
       for (unsigned int j=0; j<joint_correction.size(); ++j) {
 	if (isnan(joint_correction[j])) {
 	  joint_correction[j]=0;
@@ -458,7 +458,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     R6 endpos_vel(endpos_trans_vel,R3(endpos_rot_vel.t() * endpos_rot_vel.w()));
     OWD::JointPos joint_vel(tc.q.size());
     try {
-      joint_vel = gfeplug->JacobianPseudoInverse_times_vector(endpos_vel);
+      joint_vel = hybridplug->JacobianPseudoInverse_times_vector(endpos_vel);
     } catch (const char *err) {
       // no valid Jacobian, for whatever reason, so stop the trajectory
       // and leave the joint values unchanged
@@ -479,7 +479,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
       OWD::JointPos jointpos_error = target_jointpos - tc.q;
       try {
 	OWD::JointPos configuration_correction
-	  = gfeplug->Nullspace_projection(jointpos_error);
+	  = hybridplug->Nullspace_projection(jointpos_error);
 	for (unsigned int j=0; j<configuration_correction.size(); ++j) {
 	  if (isnan(configuration_correction[j])) {
 	    configuration_correction[j]=0;
@@ -541,7 +541,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   // get to the requested config, so it's better to use the config we are in)
   end_position = tc.q;
 
-  gfeplug->log_data(gfeplug->net_force.data);
+  hybridplug->log_data(hybridplug->net_force.data);
   return;
 }
 
@@ -567,7 +567,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     // map our current position to the closest point
     // on the trajectory.  this does not move us forward or
     // backward in time.
-    double traj_progress = (((R3)gfeplug->endpoint - (R3)start_endpoint) * 
+    double traj_progress = (((R3)hybridplug->endpoint - (R3)start_endpoint) * 
 			    movement_direction);
 
     bool ignore_longitudinal_error(true);
@@ -603,7 +603,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
 
     R3 target_position = (R3)start_endpoint + endpoint_translation * dist;
     // calculate the endpoint position error
-    R3 position_error = target_position - (R3)gfeplug->endpoint;
+    R3 position_error = target_position - (R3)hybridplug->endpoint;
 
     // calculate our trajectory rotation
     so3 relative_rotation(endpoint_rotation.w(), endpoint_rotation.t() * dist);
@@ -612,7 +612,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     // Compute the endpoint rotation error by taking the net rotation from
     // the current orientation to the target orientation and converting
     // it to axis-angle format
-    so3 rotation_error = (so3)(target_rotation * (! (SO3)gfeplug->endpoint));
+    so3 rotation_error = (so3)(target_rotation * (! (SO3)hybridplug->endpoint));
     // represent as rotation about each of the axes
     R3 rotation_correction = rotation_error.t() * rotation_error.w();
 
@@ -634,7 +634,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     OWD::JointPos joint_correction(tc.q.size());
     try {
       joint_correction = 
-	gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
+	hybridplug->JacobianPseudoInverse_times_vector(endpos_correction);
       for (unsigned int j=0; j<joint_correction.size(); ++j) {
 	if (isnan(joint_correction[j])) {
 	  joint_correction[j]=0;
@@ -654,7 +654,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     OWD::JointPos jointpos_error = target_jointpos - tc.q;
     try {
       OWD::JointPos configuration_correction
-	= gfeplug->Nullspace_projection(jointpos_error);
+	= hybridplug->Nullspace_projection(jointpos_error);
       for (unsigned int j=0; j<configuration_correction.size(); ++j) {
 	if (isnan(configuration_correction[j])) {
 	  configuration_correction[j]=0;
@@ -688,8 +688,8 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
 	force_scale = (0.1 - ahead) / 0.1;  // linear ratio
       }
     }
-    gfeplug->net_force.data[0] = traj_time - time;
-    gfeplug->net_force.data[1] = force_scale;
+    hybridplug->net_force.data[0] = traj_time - time;
+    hybridplug->net_force.data[1] = force_scale;
 
     // Calculate the force to apply based on the max force, the force
     // scale, and the trajectory's relative velocity.  By using the
@@ -701,31 +701,31 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     }
     R6 desired_ft = force_scale * driving_forcetorque * 
       driving_force_direction;
-    OWD::JointPos force_feedforward_torques = gfeplug->JacobianTranspose_times_vector(desired_ft);
+    OWD::JointPos force_feedforward_torques = hybridplug->JacobianTranspose_times_vector(desired_ft);
 
     // project the actual FT onto the direction we care about
-    R6 actual_ft = gfeplug->workspace_forcetorque() * driving_force_direction
+    R6 actual_ft = hybridplug->workspace_forcetorque() * driving_force_direction
       * driving_force_direction;
     R6 ft_error = desired_ft - actual_ft;
-    gfeplug->net_force.data[2] = ft_error.norm();
-    gfeplug->net_force.data[4] = ft_error.v[0];
-    gfeplug->net_force.data[5] = ft_error.v[1];
-    gfeplug->net_force.data[6] = ft_error.v[2];
-    gfeplug->net_force.data[7] = desired_ft.v[2];
-    gfeplug->net_force.data[8] = actual_ft.v[2];
+    hybridplug->net_force.data[2] = ft_error.norm();
+    hybridplug->net_force.data[4] = ft_error.v[0];
+    hybridplug->net_force.data[5] = ft_error.v[1];
+    hybridplug->net_force.data[6] = ft_error.v[2];
+    hybridplug->net_force.data[7] = desired_ft.v[2];
+    hybridplug->net_force.data[8] = actual_ft.v[2];
     static double last_z_force( actual_ft.v[0]);
     double Z_diff = actual_ft.v[0] - last_z_force;
     last_z_force=actual_ft.v[0];
     if (fabs(Z_diff) < 30) {
-      gfeplug->net_force.data[9] = Z_diff;
+      hybridplug->net_force.data[9] = Z_diff;
       if (Z_diff < -0.7) {
-	gfeplug->net_force.data[10]=1;
+	hybridplug->net_force.data[10]=1;
       }
     }
     
     OWD::JointPos force_feedback_torques(tc.q.size());
     force_feedback_torques = force_controller.control(ft_error);
-    gfeplug->net_force.data[3] = force_feedback_torques.length();
+    hybridplug->net_force.data[3] = force_feedback_torques.length();
     // return the new joint positions and the force
     tc.q += joint_correction;
     tc.t = force_feedforward_torques + force_feedback_torques;
@@ -752,11 +752,11 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     parseg.evaluate(dist, vel, accel, time);
 
 #ifdef SIMULATION
-    static R3 last_endpoint = (R3) gfeplug->endpoint;
-    R3 ep_movement = (R3) gfeplug->endpoint - last_endpoint;
+    static R3 last_endpoint = (R3) hybridplug->endpoint;
+    R3 ep_movement = (R3) hybridplug->endpoint - last_endpoint;
     total_endpoint_movement+= ep_movement;
     ROS_DEBUG_STREAM_NAMED("wstraj","Endpoint movement since last time: " << ep_movement);
-    last_endpoint = (R3) gfeplug->endpoint;
+    last_endpoint = (R3) hybridplug->endpoint;
 
     ROS_DEBUG_NAMED("wstraj","WSTraj eval: dist=%2.3f, vel=%2.3f, accel=%2.3f, time=%2.3f, dt=%0.3f",
 		    dist,vel,accel,time,dt);
@@ -767,7 +767,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
      **********************************************/
     R3 target_position = (R3)start_endpoint + endpoint_translation * dist;
     // calculate the endpoint position correction
-    R3 position_correction = target_position - (R3)gfeplug->endpoint;
+    R3 position_correction = target_position - (R3)hybridplug->endpoint;
 
     // calculate our trajectory rotation
     so3 relative_rotation(endpoint_rotation.w(), endpoint_rotation.t() * dist);
@@ -776,7 +776,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     // Compute the endpoint rotation error by taking the net rotation from
     // the current orientation to the target orientation and converting
     // it to axis-angle format
-    so3 rotation_error = (so3)(target_rotation * (! (SO3)gfeplug->endpoint));
+    so3 rotation_error = (so3)(target_rotation * (! (SO3)hybridplug->endpoint));
     // represent as rotation about each of the axes
     R3 rotation_correction = rotation_error.t() * rotation_error.w();
     
@@ -785,7 +785,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     OWD::JointPos joint_correction(tc.q.size());
     try {
       joint_correction = 
-	gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
+	hybridplug->JacobianPseudoInverse_times_vector(endpos_correction);
       for (unsigned int j=0; j<joint_correction.size(); ++j) {
 	if (isnan(joint_correction[j])) {
 	  joint_correction[j]=0;
@@ -837,7 +837,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     R6 endpos_vel(endpos_trans_vel,R3(endpos_rot_vel.t() * endpos_rot_vel.w()));
     OWD::JointPos joint_vel(tc.q.size());
     try {
-      joint_vel = gfeplug->JacobianPseudoInverse_times_vector(endpos_vel);
+      joint_vel = hybridplug->JacobianPseudoInverse_times_vector(endpos_vel);
     } catch (const char *err) {
       // no valid Jacobian, for whatever reason, so stop the trajectory
       // and leave the joint values unchanged
@@ -858,7 +858,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
       OWD::JointPos jointpos_error = target_jointpos - tc.q;
       try {
 	OWD::JointPos configuration_correction
-	  = gfeplug->Nullspace_projection(jointpos_error);
+	  = hybridplug->Nullspace_projection(jointpos_error);
 	for (unsigned int j=0; j<configuration_correction.size(); ++j) {
 	  if (isnan(configuration_correction[j])) {
 	    configuration_correction[j]=0;
@@ -920,7 +920,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
   // get to the requested config, so it's better to use the config we are in)
   end_position = tc.q;
 
-  gfeplug->log_data(gfeplug->net_force.data);
+  hybridplug->log_data(hybridplug->net_force.data);
   return;
 }
 

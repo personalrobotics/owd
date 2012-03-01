@@ -8,7 +8,7 @@
 #ifndef FTCHECK_H
 #define FTCHECK_H
 
-#include "GfePlugin.hh"
+#include "HybridPlugin.h"
 #include <openwam/Trajectory.hh>
 #include <pr_msgs/Reset.h>
 #include <string.h>

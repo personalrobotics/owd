@@ -8,11 +8,11 @@
 #ifndef APPLYFORCETRAJ_HH
 #define APPLYFORCETRAJ_HH
 
-#include "GfePlugin.hh"
+#include "HybridPlugin.h"
 #include "ForceController.h"
 #include <openwam/Trajectory.hh>
-#include <gfe_owd_plugin/ApplyForce.h>
-#include <gfe_owd_plugin/StopForce.h>
+#include <owd_plugins/ApplyForce.h>
+#include <owd_plugins/StopForce.h>
 #include <pr_msgs/SetJointOffsets.h> // for changing force gains
 #include <queue>
 #include "Vibration.h"
@@ -28,11 +28,11 @@ public:
 
   virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
 
-  static bool ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
-			 gfe_owd_plugin::ApplyForce::Response &res);
+  static bool ApplyForce(owd_plugins::ApplyForce::Request &req,
+			 owd_plugins::ApplyForce::Response &res);
 
-  bool StopForce(gfe_owd_plugin::StopForce::Request &req,
-		 gfe_owd_plugin::StopForce::Response &res);
+  bool StopForce(owd_plugins::StopForce::Request &req,
+		 owd_plugins::StopForce::Response &res);
 
   static bool SetForceGains(pr_msgs::SetJointOffsets::Request &req,
                             pr_msgs::SetJointOffsets::Response &res);

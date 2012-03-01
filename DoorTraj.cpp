@@ -15,15 +15,15 @@
    conversion from geometry_msgs::Pose to SE3
 */
 
-DoorTraj::DoorTraj(OWD::TrajType &vtraj, gfe_owd_plugin::OpenDoor::Request::_ee_pose_type &eep, R3 _PullDirection)
+DoorTraj::DoorTraj(OWD::TrajType &vtraj, owd_plugins::OpenDoor::Request::_ee_pose_type &eep, R3 _PullDirection)
   : MacJointTraj(vtraj,
 		 max_j_vel, 
 		 max_j_accel,
 		 maxjerk,
 		 false, false, false,false),
     PullDirection(_PullDirection),
-    endpoint_position_goal((R3)gfeplug->endpoint),
-    last_traj_endpoint((R3)gfeplug->endpoint)
+    endpoint_position_goal((R3)hybridplug->endpoint),
+    last_traj_endpoint((R3)hybridplug->endpoint)
 {
   type="DoorTraj";
   PullDirection.normalize();
@@ -33,7 +33,7 @@ DoorTraj::DoorTraj(OWD::TrajType &vtraj, gfe_owd_plugin::OpenDoor::Request::_ee_
   }
   last_pose = pose_to_SE3(eep[0]);
   ROS_INFO_STREAM_NAMED("OpenDoor","First endpoint pose: " << last_pose);
-  ROS_INFO_STREAM_NAMED("OpenDoor","Current endpoint pose: " << gfeplug->endpoint);
+  ROS_INFO_STREAM_NAMED("OpenDoor","Current endpoint pose: " << hybridplug->endpoint);
   std::vector<MacQuinticElement *>::iterator p_traj_element = macpieces.begin();
   for (unsigned int i=1; i<eep.size(); ++i) {
     if ((*p_traj_element)->end_pos == vtraj[i]) {
@@ -86,7 +86,7 @@ DoorTraj::DoorTraj(OWD::TrajType &vtraj, gfe_owd_plugin::OpenDoor::Request::_ee_
   current_pose_segment = pose_segments.begin();
       
   recorder = new DataRecorder<double>(500000);
-  gfeplug->current_traj=this;
+  hybridplug->current_traj=this;
 }
 
 
@@ -96,7 +96,7 @@ DoorTraj::~DoorTraj() {
   if (pthread_create(&recorder_thread,NULL,&write_recorder_data,(void*)recorder)) {
     ROS_WARN_NAMED("OpenDoor","Could not create thread to write log data");
   }
-  gfeplug->current_traj=NULL;
+  hybridplug->current_traj=NULL;
 }
 
 void DoorTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
@@ -132,19 +132,19 @@ void DoorTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   //  endpoint_position_goal = (R3) traj_endpoint_pose;
 
   ROS_DEBUG_STREAM_NAMED("OpenDoor","Current traj endpoint:   " << (R3)traj_endpoint_pose);
-  ROS_DEBUG_STREAM_NAMED("OpenDoor","Current actual endpoint: " << (R3)gfeplug->endpoint);
+  ROS_DEBUG_STREAM_NAMED("OpenDoor","Current actual endpoint: " << (R3)hybridplug->endpoint);
   ROS_DEBUG_STREAM_NAMED("OpenDoor","New endpoint goal:       " << endpoint_position_goal);
   
   // calculate the endpoint position error
-  R3 endpoint_error = endpoint_position_goal - (R3)gfeplug->endpoint;
-  memcpy(&pose[0],(const double *)gfeplug->endpoint,16*sizeof(double));
+  R3 endpoint_error = endpoint_position_goal - (R3)hybridplug->endpoint;
+  memcpy(&pose[0],(const double *)hybridplug->endpoint,16*sizeof(double));
   data.insert(data.end(),pose.begin(), pose.end()); // actual pose, col 32-47
   data.push_back(endpoint_error[0]); // endpoint error, col 48-50
   data.push_back(endpoint_error[1]);
   data.push_back(endpoint_error[2]);
 
   // project the position error onto the pull direction
-  R3 world_PullDirection = (SO3)gfeplug->endpoint * PullDirection;
+  R3 world_PullDirection = (SO3)hybridplug->endpoint * PullDirection;
   R3 endpoint_longitudinal_error = (endpoint_error * world_PullDirection) * world_PullDirection;
   R3 endpoint_lateral_error = endpoint_error - endpoint_longitudinal_error;
   if (OWD::Plugin::simulation) {
@@ -161,7 +161,7 @@ void DoorTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   endpoint_position_goal -= endpoint_lateral_error;
 
   // calculate the endpoint rotation error
-  so3 endpoint_rotation_error_so3 =(so3)((SO3)traj_endpoint_pose * (! (SO3)gfeplug->endpoint));
+  so3 endpoint_rotation_error_so3 =(so3)((SO3)traj_endpoint_pose * (! (SO3)hybridplug->endpoint));
   // rotation error in world frame
   R3 endpoint_rotation_error = endpoint_rotation_error_so3.t() * endpoint_rotation_error_so3.w();
   
@@ -178,7 +178,7 @@ void DoorTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
       ROS_DEBUG_STREAM_NAMED("OpenDoor","Endpoint pos/rot correction of" << std::endl << endpoint_correction);
     }
     joint_correction = 
-      gfeplug->JacobianPseudoInverse_times_vector(endpoint_correction);
+      hybridplug->JacobianPseudoInverse_times_vector(endpoint_correction);
     //    data.insert(data.end(),joint_correction.begin(),
     //		joint_correction.end());  // joint change to correct ep, col 60-66
     if (OWD::Plugin::simulation) {
@@ -211,7 +211,7 @@ void DoorTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   OWD::JointPos joint_error(tc2.q - tc.q);
   try {
     OWD::JointPos configuration_correction
-      = gfeplug->Nullspace_projection(joint_error);
+      = hybridplug->Nullspace_projection(joint_error);
     data.insert(data.end(),configuration_correction.begin(),
 		configuration_correction.end()); // joint change to correct config, col 67-73 (was 58-64)
     if (OWD::Plugin::simulation) {
@@ -287,8 +287,8 @@ SE3 DoorTraj::interpolate_ee_pose(const OWD::JointPos &current_pos) {
   return current_pose;
 }
 
-bool DoorTraj::OpenDoor(gfe_owd_plugin::OpenDoor::Request &req,
-			gfe_owd_plugin::OpenDoor::Response &res) {
+bool DoorTraj::OpenDoor(owd_plugins::OpenDoor::Request &req,
+			owd_plugins::OpenDoor::Response &res) {
 
   if (req.traj.positions.size() < 2) {
     ROS_ERROR_NAMED("OpenDoor","Minimum of 2 traj points required for door-opening trajectory");

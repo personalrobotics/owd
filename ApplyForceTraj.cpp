@@ -10,8 +10,8 @@
 #include <openwam/ControlLoop.hh>
 
 // Process our ApplyForce service calls from ROS
-bool ApplyForceTraj::ApplyForce(gfe_owd_plugin::ApplyForce::Request &req,
-				gfe_owd_plugin::ApplyForce::Response &res) {
+bool ApplyForceTraj::ApplyForce(owd_plugins::ApplyForce::Request &req,
+				owd_plugins::ApplyForce::Response &res) {
   // compute a new trajectory
   try {
     ApplyForceTraj *newtraj = new ApplyForceTraj(R3(req.x,req.y,req.z),req.f);
@@ -60,9 +60,9 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   vibration(NULL),
   rotational_leeway(0)
 {
-  if (gfeplug) {
-    if ((gfeplug->ft_force.size() < 3) ||
-	(gfeplug->ft_torque.size() < 3)) {
+  if (hybridplug) {
+    if ((hybridplug->ft_force.size() < 3) ||
+	(hybridplug->ft_torque.size() < 3)) {
       throw "ApplyForce requires that the Force/Torque sensor is installed and configured";
     }
     
@@ -77,11 +77,11 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     force_controller.reset();
 
     // Set the start position from the current position
-    start_position=gfeplug->target_arm_position;
+    start_position=hybridplug->target_arm_position;
     end_position = start_position;
 
     // Save the current Workspace endpoint position
-    current_endpoint_target = endpoint_target = gfeplug->endpoint;
+    current_endpoint_target = endpoint_target = hybridplug->endpoint;
     
     // Calculate the force/torque to apply at endpoint
     _force_direction.normalize();
@@ -115,56 +115,56 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
     // 56:  excursion return force
     // 57:  1-dim velocity in force direction
     // 58:  velocity damping force
-    // 59:  GfePlugin::recorder->count
+    // 59:  Hybridplugin::recorder->count
     // 60:  total_endpoint_rotation.theta
     // 61:  endpoint WS X rotation due to torque values
     // 62:  endpoint WS Y rotation due to torque values
     // 63:  endpoint WS Z rotation due to torque values
     // 64:  unbounded force/torque error magnitude
-    gfeplug->net_force.data.resize(65);
+    hybridplug->net_force.data.resize(65);
 
   } else {
-    throw "Could not get current WAM values from GfePlugin";
+    throw "Could not get current WAM values from Hybridplugin";
   }
 
   // create the service that the client can use to stop the force
   ros::NodeHandle n("~");
   ss_StopForce = n.advertiseService("StopForce",&ApplyForceTraj::StopForce, this);
-  gfeplug->current_traj=this;
-  gfeplug->recorder->reset();  // clear out any records from previous plugin
+  hybridplug->current_traj=this;
+  hybridplug->recorder->reset();  // clear out any records from previous plugin
 }
 
 void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   time += dt;
   times.push(dt);  time_sum += dt;
-  gfeplug->net_force.data[0 ]=dt/OWD::ControlLoop::PERIOD;
+  hybridplug->net_force.data[0 ]=dt/OWD::ControlLoop::PERIOD;
   
   if (stopforce) {
     runstate=OWD::Trajectory::DONE;
     return;
   }
   // record the joint positions
-  gfeplug->net_force.data[27]=tc.q[0];
-  gfeplug->net_force.data[28]=tc.q[1];
-  gfeplug->net_force.data[29]=tc.q[2];
-  gfeplug->net_force.data[30]=tc.q[3];
-  gfeplug->net_force.data[31]=tc.q[4];
-  gfeplug->net_force.data[32]=tc.q[5];
-  gfeplug->net_force.data[33]=tc.q[6];
+  hybridplug->net_force.data[27]=tc.q[0];
+  hybridplug->net_force.data[28]=tc.q[1];
+  hybridplug->net_force.data[29]=tc.q[2];
+  hybridplug->net_force.data[30]=tc.q[3];
+  hybridplug->net_force.data[31]=tc.q[4];
+  hybridplug->net_force.data[32]=tc.q[5];
+  hybridplug->net_force.data[33]=tc.q[6];
 
   // record the PID torques from the previous timestep
-  gfeplug->net_force.data[34]=gfeplug->pid_torque[0];
-  gfeplug->net_force.data[35]=gfeplug->pid_torque[1];
-  gfeplug->net_force.data[36]=gfeplug->pid_torque[2];
-  gfeplug->net_force.data[37]=gfeplug->pid_torque[3];
-  gfeplug->net_force.data[38]=gfeplug->pid_torque[4];
-  gfeplug->net_force.data[39]=gfeplug->pid_torque[5];
-  gfeplug->net_force.data[40]=gfeplug->pid_torque[6];
+  hybridplug->net_force.data[34]=hybridplug->pid_torque[0];
+  hybridplug->net_force.data[35]=hybridplug->pid_torque[1];
+  hybridplug->net_force.data[36]=hybridplug->pid_torque[2];
+  hybridplug->net_force.data[37]=hybridplug->pid_torque[3];
+  hybridplug->net_force.data[38]=hybridplug->pid_torque[4];
+  hybridplug->net_force.data[39]=hybridplug->pid_torque[5];
+  hybridplug->net_force.data[40]=hybridplug->pid_torque[6];
   
   // record the force readings
-  gfeplug->net_force.data[51]=gfeplug->ft_force[0];
-  gfeplug->net_force.data[52]=gfeplug->ft_force[1];
-  gfeplug->net_force.data[53]=gfeplug->ft_force[2];
+  hybridplug->net_force.data[51]=hybridplug->ft_force[0];
+  hybridplug->net_force.data[52]=hybridplug->ft_force[1];
+  hybridplug->net_force.data[53]=hybridplug->ft_force[2];
 
   // calculate the endpoint position error
   R3 position_goal = (R3)endpoint_target;
@@ -172,7 +172,7 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     position_goal += vibration->eval(dt);
   }
 
-  R3 position_err = position_goal - gfeplug->endpoint;
+  R3 position_err = position_goal - hybridplug->endpoint;
 
   // calculate the component of the error in the direction of the
   // desired force and subtract it out
@@ -185,9 +185,9 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   OWD::JointPos damping_torques = limit_excursion_and_velocity(-dot_prod);
 
   R3 position_correction = position_err - dot_prod * force_direction;
-  gfeplug->net_force.data[14]=position_correction[0];
-  gfeplug->net_force.data[15]=position_correction[1];
-  gfeplug->net_force.data[16]=position_correction[2];
+  hybridplug->net_force.data[14]=position_correction[0];
+  hybridplug->net_force.data[15]=position_correction[1];
+  hybridplug->net_force.data[16]=position_correction[2];
 
   // we now have position corrections to bring the endpoint back
   // into the desired configuration along the force direction.  Now
@@ -195,17 +195,17 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   // us the right endpoint force.
 
   // get the current smoothed sensor force/torque in WS coordinates
-  R6 current_force_torque = gfeplug->workspace_forcetorque();
+  R6 current_force_torque = hybridplug->workspace_forcetorque();
 
   // we used to log these in WS coordinates
-  // gfeplug->net_force.data[48]=current_force_torque.v[0];
-  // gfeplug->net_force.data[49]=current_force_torque.v[1];
-  // gfeplug->net_force.data[50]=current_force_torque.v[2];
+  // hybridplug->net_force.data[48]=current_force_torque.v[0];
+  // hybridplug->net_force.data[49]=current_force_torque.v[1];
+  // hybridplug->net_force.data[50]=current_force_torque.v[2];
 
   // now logging in hand coordinates
-  gfeplug->net_force.data[48]=gfeplug->filtered_ft_force[0];
-  gfeplug->net_force.data[49]=gfeplug->filtered_ft_force[1];
-  gfeplug->net_force.data[50]=gfeplug->filtered_ft_force[2];
+  hybridplug->net_force.data[48]=hybridplug->filtered_ft_force[0];
+  hybridplug->net_force.data[49]=hybridplug->filtered_ft_force[1];
+  hybridplug->net_force.data[50]=hybridplug->filtered_ft_force[2];
 
   // take the dot product of the WS force with our force direction, so
   // that we just correct the on-axis forces.
@@ -218,7 +218,7 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   R6 workspace_forcetorque_error =
     forcetorque_vector - net_force_torque;
 
-  gfeplug->net_force.data[64]=workspace_forcetorque_error.norm();
+  hybridplug->net_force.data[64]=workspace_forcetorque_error.norm();
   // Pass the F/T error to the force controller to get
   // the joint torques to apply
   OWD::JointPos correction_torques(tc.q.size());
@@ -226,28 +226,28 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     force_controller.control(workspace_forcetorque_error);
 
   // log the 1-dimensional values from force controller
-  gfeplug->net_force.data[4] = force_controller.bounded_ft_error.v 
+  hybridplug->net_force.data[4] = force_controller.bounded_ft_error.v 
     * force_direction;
-  gfeplug->net_force.data[5] = force_controller.ft_error_delta.v
+  hybridplug->net_force.data[5] = force_controller.ft_error_delta.v
     * force_direction;
-  gfeplug->net_force.data[6] = force_controller.ft_error_integral.v
+  hybridplug->net_force.data[6] = force_controller.ft_error_integral.v
     * force_direction / 3.0;
-  gfeplug->net_force.data[54] = force_controller.ft_correction.v
+  hybridplug->net_force.data[54] = force_controller.ft_correction.v
     * force_direction;
 
-  gfeplug->net_force.data[7] = correction_torques[0];
-  gfeplug->net_force.data[8] = correction_torques[1];
-  gfeplug->net_force.data[9] = correction_torques[2];
-  gfeplug->net_force.data[10] = correction_torques[3];
-  gfeplug->net_force.data[11] = correction_torques[4];
-  gfeplug->net_force.data[12] = correction_torques[5];
-  gfeplug->net_force.data[13] = correction_torques[6];
+  hybridplug->net_force.data[7] = correction_torques[0];
+  hybridplug->net_force.data[8] = correction_torques[1];
+  hybridplug->net_force.data[9] = correction_torques[2];
+  hybridplug->net_force.data[10] = correction_torques[3];
+  hybridplug->net_force.data[11] = correction_torques[4];
+  hybridplug->net_force.data[12] = correction_torques[5];
+  hybridplug->net_force.data[13] = correction_torques[6];
 
   // specify the feedforward torques that would ideally produce the
   // desired endpoint force.  this makes life easier for the force
   // controller.
   OWD::JointPos ideal_torques = 
-    gfeplug->JacobianTranspose_times_vector(forcetorque_vector);
+    hybridplug->JacobianTranspose_times_vector(forcetorque_vector);
 
   // sum the correction and feedforward torques
   for (unsigned int i=0; i<tc.t.size(); ++i) {
@@ -270,16 +270,16 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // scaling the torque by our gain
     double rotation_magnitude = current_torque.normalize() * rotational_gain;
     so3 world_torque_rotation(current_torque, rotation_magnitude);
-    gfeplug->net_force.data[61] = current_torque[0]*rotation_magnitude;
-    gfeplug->net_force.data[62] = current_torque[1]*rotation_magnitude;
-    gfeplug->net_force.data[63] = current_torque[2]*rotation_magnitude;
+    hybridplug->net_force.data[61] = current_torque[0]*rotation_magnitude;
+    hybridplug->net_force.data[62] = current_torque[1]*rotation_magnitude;
+    hybridplug->net_force.data[63] = current_torque[2]*rotation_magnitude;
 
     // see what it does to our endpoint
     SO3 new_endpoint = (SO3)world_torque_rotation * current_endpoint_target;
     SO3 total_endpoint_rotation_SO3 = (SO3)endpoint_target * (! new_endpoint);
     so3 total_endpoint_rotation = (so3) total_endpoint_rotation_SO3;
     
-    gfeplug->net_force.data[60] = total_endpoint_rotation.theta;
+    hybridplug->net_force.data[60] = total_endpoint_rotation.theta;
     if (total_endpoint_rotation.theta > rotational_leeway) {
       // bound the total rotation
       total_endpoint_rotation.theta = rotational_leeway;
@@ -295,41 +295,41 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   // Compute the rotation error by taking the net rotation from the
   // current orientation to the original orientation and converting
   // it to axis-angle format
-  SO3 rotation_correction_SO3 = current_endpoint_target * (! (SO3)gfeplug->endpoint);
+  SO3 rotation_correction_SO3 = current_endpoint_target * (! (SO3)hybridplug->endpoint);
   so3 rotation_correction = (so3) rotation_correction_SO3;
 
   R3 rotation_correction_R3 = rotation_correction.t() * rotation_correction.w();
-  gfeplug->net_force.data[17]=rotation_correction_R3[0];
-  gfeplug->net_force.data[18]=rotation_correction_R3[1];
-  gfeplug->net_force.data[19]=rotation_correction_R3[2];
+  hybridplug->net_force.data[17]=rotation_correction_R3[0];
+  hybridplug->net_force.data[18]=rotation_correction_R3[1];
+  hybridplug->net_force.data[19]=rotation_correction_R3[2];
 
   R6 endpos_correction(position_correction,rotation_correction_R3);
-  R3 desired_endpoint = (R3)gfeplug->endpoint + endpos_correction.v;
+  R3 desired_endpoint = (R3)hybridplug->endpoint + endpos_correction.v;
   endpositions.push(desired_endpoint);
 
   OWD::JointPos joint_correction(tc.q.size());
   try {
     joint_correction = 
-      gfeplug->JacobianPseudoInverse_times_vector(endpos_correction);
+      hybridplug->JacobianPseudoInverse_times_vector(endpos_correction);
   } catch (const char *err) {
     // no valid Jacobian, for whatever reason, so give up.
     runstate=OWD::Trajectory::ABORT;
     return;
   }
-  gfeplug->net_force.data[20]=joint_correction[0];
-  gfeplug->net_force.data[21]=joint_correction[1];
-  gfeplug->net_force.data[22]=joint_correction[2];
-  gfeplug->net_force.data[23]=joint_correction[3];
-  gfeplug->net_force.data[24]=joint_correction[4];
-  gfeplug->net_force.data[25]=joint_correction[5];
-  gfeplug->net_force.data[26]=joint_correction[6];
+  hybridplug->net_force.data[20]=joint_correction[0];
+  hybridplug->net_force.data[21]=joint_correction[1];
+  hybridplug->net_force.data[22]=joint_correction[2];
+  hybridplug->net_force.data[23]=joint_correction[3];
+  hybridplug->net_force.data[24]=joint_correction[4];
+  hybridplug->net_force.data[25]=joint_correction[5];
+  hybridplug->net_force.data[26]=joint_correction[6];
 
   // calculate a move in the nullspace that keeps the arm as close to its
   // original configuration as possible
   OWD::JointPos configuration_error = start_position - tc.q;
   try {
     OWD::JointPos configuration_correction
-      = gfeplug->Nullspace_projection(configuration_error);
+      = hybridplug->Nullspace_projection(configuration_error);
     joint_correction += configuration_correction;
   } catch (const char *err) {
     // don't worry about it
@@ -343,17 +343,17 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   if (jointpositions.size() > 0) {
     joint_change = (tc.q - jointpositions.back());
   }
-  gfeplug->net_force.data[41]=joint_change[0];
-  gfeplug->net_force.data[42]=joint_change[1];
-  gfeplug->net_force.data[43]=joint_change[2];
-  gfeplug->net_force.data[44]=joint_change[3];
-  gfeplug->net_force.data[45]=joint_change[4];
-  gfeplug->net_force.data[46]=joint_change[5];
-  gfeplug->net_force.data[47]=joint_change[6];
+  hybridplug->net_force.data[41]=joint_change[0];
+  hybridplug->net_force.data[42]=joint_change[1];
+  hybridplug->net_force.data[43]=joint_change[2];
+  hybridplug->net_force.data[44]=joint_change[3];
+  hybridplug->net_force.data[45]=joint_change[4];
+  hybridplug->net_force.data[46]=joint_change[5];
+  hybridplug->net_force.data[47]=joint_change[6];
 
   jointpositions.push(tc.q);  // remember the requested positions
   // update the values to be published
-  gfeplug->net_force.data[3]=OWD::Kinematics::max_condition;
+  hybridplug->net_force.data[3]=OWD::Kinematics::max_condition;
 
   while (time_sum > time_window) {
     // update our averaging windows
@@ -363,16 +363,16 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   }
 
   // record our data for logging
-  gfeplug->log_data(gfeplug->net_force.data);
-  gfeplug->net_force.data[59]=gfeplug->recorder->count;
+  hybridplug->log_data(hybridplug->net_force.data);
+  hybridplug->net_force.data[59]=hybridplug->recorder->count;
 
   end_position =tc.q;  // keep tracking the current position
   return;
 }
 
 // Stop the trajectory when asked by a client
-bool ApplyForceTraj::StopForce(gfe_owd_plugin::StopForce::Request &req,
-			       gfe_owd_plugin::StopForce::Response &res) {
+bool ApplyForceTraj::StopForce(owd_plugins::StopForce::Request &req,
+			       owd_plugins::StopForce::Response &res) {
   stopforce=true;
   return true;
 }
@@ -415,8 +415,8 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
     excursion_return_force = -pow((travel + 0.9*distance_limit) / (0.1*distance_limit),3)
       * excursion_gain;
   }
-  gfeplug->net_force.data[55] = travel * 1000.0;
-  gfeplug->net_force.data[56] = excursion_return_force;
+  hybridplug->net_force.data[55] = travel * 1000.0;
+  hybridplug->net_force.data[56] = excursion_return_force;
     
   // We limit the velocity by creating a virtual dashpot that applies
   // a counter force proportional to the velocity.
@@ -425,8 +425,8 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
   double velocity = velocity_filter.eval(travel_delta) / OWD::ControlLoop::PERIOD;
   double velocity_return_force=0;
   velocity_return_force =  -velocity * velocity_damping_gain;
-  gfeplug->net_force.data[57] = velocity * 1000.0;
-  gfeplug->net_force.data[58] = velocity_return_force;
+  hybridplug->net_force.data[57] = velocity * 1000.0;
+  hybridplug->net_force.data[58] = velocity_return_force;
 
   // compute the corresponding joint torques
   R3 correction_torque;
@@ -472,11 +472,11 @@ ApplyForceTraj::~ApplyForceTraj() {
   if (current_traj) {
     current_traj = NULL;
   }
-  gfeplug->flush_recorder_data = true;
+  hybridplug->flush_recorder_data = true;
   ss_StopForce.shutdown();
   if (vibration) {
     delete vibration;
   }
-  gfeplug->current_traj=NULL;
+  hybridplug->current_traj=NULL;
 }
 

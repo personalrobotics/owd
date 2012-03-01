@@ -8,12 +8,12 @@
 #ifndef WSTRAJ_HH
 #define WSTRAJ_HH
 
-#include "GfePlugin.hh"
+#include "HybridPlugin.h"
 #include "ForceController.h"
 #include "ApplyForceTraj.h"
 #include <openwam/Trajectory.hh>
 #include <openwam/ParabolicSegment.hh>
-#include <gfe_owd_plugin/AddWSTraj.h>
+#include <owd_plugins/AddWSTraj.h>
 #include <pr_msgs/Reset.h>
 
 
@@ -23,15 +23,15 @@ public:
   /// Holds the endpoint at the current position while applying
   /// force in the specified direction.  Endpoint is free to move
   /// in the direction of the force
-  WSTraj(gfe_owd_plugin::AddWSTraj::Request &wst);
+  WSTraj(owd_plugins::AddWSTraj::Request &wst);
   virtual ~WSTraj();
 
   virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
   virtual void force_feedback_evaluate(OWD::Trajectory::TrajControl &tc,
 				       double dt);
 
-  static bool AddWSTraj(gfe_owd_plugin::AddWSTraj::Request &req,
-			gfe_owd_plugin::AddWSTraj::Response &res);
+  static bool AddWSTraj(owd_plugins::AddWSTraj::Request &req,
+			owd_plugins::AddWSTraj::Response &res);
 
   static bool ForceFeedbackNextTrajSrv(pr_msgs::Reset::Request &req,
 				       pr_msgs::Reset::Response &res);

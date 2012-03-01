@@ -5,8 +5,8 @@
 
 **********************************************************************/
 
-#ifndef GFEPLUGIN_HH
-#define GFEPLUGIN_HH
+#ifndef HYBRIDPLUGIN_HH
+#define HYBRIDPLUGIN_HH
 
 #include <openwam/Plugin.hh>
 #include <openwam/DataRecorder.cc>
@@ -19,17 +19,17 @@
 
 // #define SIMULATION
 #ifdef SIMULATION
-#include <gfe_owd_plugin/ApplyForceDebug.h>
+#include <owd_plugins/ApplyForceDebug.h>
 #include <pr_msgs/Joints.h> // for debugging the Jacobian
 #endif // SIMULATION
 
 
-class GfePlugin : public OWD::Plugin {
+class HybridPlugin : public OWD::Plugin {
 public:
 
-  GfePlugin();
+  HybridPlugin();
 
-  ~GfePlugin();
+  ~HybridPlugin();
 
   virtual void Publish();
 
@@ -57,6 +57,6 @@ private:
 
 };
 
-extern GfePlugin *gfeplug;
+extern HybridPlugin *hybridplug;
 
-#endif // GFEPLUGIN_HH
+#endif // HYBRIDPLUGIN_HH

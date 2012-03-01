@@ -8,22 +8,22 @@
 #ifndef DOORTRAJ_HH
 #define DOORTRAJ_HH
 
-#include "GfePlugin.hh"
+#include "HybridPlugin.h"
 #include <openwam/MacJointTraj.hh>
-#include <gfe_owd_plugin/OpenDoor.h>
+#include <owd_plugins/OpenDoor.h>
 #include <pthread.h>
 #include <openwam/DataRecorder.cc>
 #include <geometry_msgs/Pose.h>
 
 class DoorTraj : public OWD::MacJointTraj {
 public:
-  DoorTraj(OWD::TrajType &vtraj, gfe_owd_plugin::OpenDoorRequest::_ee_pose_type &eep, R3 PullDirection);
+  DoorTraj(OWD::TrajType &vtraj, owd_plugins::OpenDoorRequest::_ee_pose_type &eep, R3 PullDirection);
   ~DoorTraj();
 
   virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
 
-  static bool OpenDoor(gfe_owd_plugin::OpenDoor::Request &req,
-		       gfe_owd_plugin::OpenDoor::Response &res);
+  static bool OpenDoor(owd_plugins::OpenDoor::Request &req,
+		       owd_plugins::OpenDoor::Response &res);
 
   /// functions for starting up and shutting down the service
   static bool Register();

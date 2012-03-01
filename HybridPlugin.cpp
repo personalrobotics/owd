@@ -5,7 +5,7 @@
 
 **********************************************************************/
 
-#include "GfePlugin.hh"
+#include "HybridPlugin.h"
 #include <ros/ros.h>
 #include <std_msgs/String.h>
 #include <math.h>
@@ -13,18 +13,14 @@
 #include "openwam/Kinematics.hh"
 #include "ApplyForceTraj.h"
 #include "DoorTraj.h"
-#include "JacobianTest.h"
 #include "WSTraj.h"
-#include "Follow.h"
-#include "HelixPlugin.h"
-#include "MoveDirection.h"
 #include "FTCheck.h"
 #include "InsertKeyTraj.h"
 #define PEAK_CAN
 #include "openwamdriver.h"
 #include "openwam/CANdefs.hh"	// for HANDSTATE_* enumeration
 
-GfePlugin::GfePlugin()
+HybridPlugin::HybridPlugin()
   : write_log_file(false),flush_recorder_data(false),
     current_traj(NULL)
 
@@ -32,10 +28,10 @@ GfePlugin::GfePlugin()
   // ROS has already been initialized by OWD, so we can just
   // create our own NodeHandle in the same namespace
   ros::NodeHandle n("~");
-  ss_StopTraj = n.advertiseService("StopTraj",&GfePlugin::StopTraj, this);
-  ss_PowerGrasp = n.advertiseService("PowerGrasp",&GfePlugin::PowerGrasp, this);
+  ss_StopTraj = n.advertiseService("StopTraj",&HybridPlugin::StopTraj, this);
+  ss_PowerGrasp = n.advertiseService("PowerGrasp",&HybridPlugin::PowerGrasp, this);
 
-  n.param("log_gfeplugin_data",write_log_file,false);
+  n.param("log_hybridplugin_data",write_log_file,false);
 
   // Let our Trajectory classes register themselves
   if (!ApplyForceTraj::Register()) {
@@ -44,21 +40,12 @@ GfePlugin::GfePlugin()
   if (!DoorTraj::Register()) {
     throw "DoorTraj trajectory failed to register";
   }
- if (!Follow::Register()) {
-    throw "Follow trajectory failed to register";
+  if (!FTCheck::Register()) {
+    throw "FTCheck failed to register";
   }
- if (!HelixTraj::Register()) {
-   throw "HelixTraj trajectory failed to registr";
- }
- if (!MoveDirection::Register()) {
-   throw "MoveDirection trajectory failed to register";
- }
- if (!FTCheck::Register()) {
-   throw "FTCheck failed to register";
- }
- if (!InsertKeyTraj::Register()) {
-   throw "InsertKeyTraj failed to register";
- }
+  if (!InsertKeyTraj::Register()) {
+    throw "InsertKeyTraj failed to register";
+  }
 #ifdef SIMULATION
   if (!JacobianTestTraj::Register()) {
     throw "JacobianTestTraj trajectory failed to register";
@@ -75,7 +62,7 @@ GfePlugin::GfePlugin()
   pthread_mutex_init(&pub_mutex,NULL);
 }
 
-GfePlugin::~GfePlugin() {
+HybridPlugin::~HybridPlugin() {
   // grabbing the lock will make sure that the publisher doesn't try
   // to use ROS at the same time (was causing occassional crashes when
   // reloading the plugin)
@@ -84,11 +71,7 @@ GfePlugin::~GfePlugin() {
   // Tell our Trajectory classes to clean up.
   ApplyForceTraj::Shutdown();
   DoorTraj::Shutdown();
-  JacobianTestTraj::Shutdown();
   WSTraj::Shutdown();
-  Follow::Shutdown();
-  HelixTraj::Shutdown();
-  MoveDirection::Shutdown();
   FTCheck::Shutdown();
   InsertKeyTraj::Shutdown();
 
@@ -109,7 +92,7 @@ GfePlugin::~GfePlugin() {
   pthread_mutex_unlock(&pub_mutex);
 }
 
-void GfePlugin::log_data(const std::vector<double> &data) {
+void HybridPlugin::log_data(const std::vector<double> &data) {
   if (write_log_file && (pthread_mutex_trylock(&recorder_mutex) == 0)) {
     try {
       recorder->add(data);
@@ -123,7 +106,7 @@ void GfePlugin::log_data(const std::vector<double> &data) {
   }
 }
 
-void GfePlugin::Publish() {
+void HybridPlugin::Publish() {
   // only if we are not shutting down
   if (pthread_mutex_trylock(&pub_mutex) == 0) {
     pub_net_force.publish(net_force);
@@ -140,25 +123,25 @@ void GfePlugin::Publish() {
 
 
 // Stop the trajectory when asked by a client
-bool GfePlugin::StopTraj(pr_msgs::Reset::Request &req,
+bool HybridPlugin::StopTraj(pr_msgs::Reset::Request &req,
 			 pr_msgs::Reset::Response &res) {
   if (current_traj) {
     current_traj->runstate=OWD::Trajectory::DONE;
     res.reason="";
     res.ok=true;
   } else {
-    res.reason="No current gfe_owd_plugin trajectory.  Either the trajectory you are stopping has already ended, or it was not created by this plugin.";
+    res.reason="No current owd_plugins trajectory.  Either the trajectory you are stopping has already ended, or it was not created by this plugin.";
     res.ok=false;
   }
   return true;
 }
 
-bool GfePlugin::write_recorder_data() {
+bool HybridPlugin::write_recorder_data() {
   char filename[200];
   static int filenum(0);
   ++filenum;
-  snprintf(filename,200,"/tmp/gfeplugin-%04d.csv",filenum);
-  ROS_INFO("Writing GfePlugin log to %s",filename);
+  snprintf(filename,200,"/tmp/hybridplugin-%04d.csv",filenum);
+  ROS_INFO("Writing HybridPlugin log to %s",filename);
   pthread_mutex_lock(&recorder_mutex);
   ROS_INFO("dumping log...");
   bool result = recorder->dump(filename);
@@ -168,7 +151,7 @@ bool GfePlugin::write_recorder_data() {
   return result;
 }
 
-bool GfePlugin::PowerGrasp(pr_msgs::MoveHand::Request &req,
+bool HybridPlugin::PowerGrasp(pr_msgs::MoveHand::Request &req,
 			   pr_msgs::MoveHand::Response &res) {
   int32_t state[4];
   OWD::WamDriver::bus->hand_get_state(state);
@@ -253,7 +236,7 @@ bool GfePlugin::PowerGrasp(pr_msgs::MoveHand::Request &req,
   return true;
 }
 
-R6 GfePlugin::workspace_forcetorque() {
+R6 HybridPlugin::workspace_forcetorque() {
   // get the filtered FT force+torque
   R6 force_torque_avg(filtered_ft_force[0],
 		      filtered_ft_force[1],
@@ -273,37 +256,37 @@ R6 GfePlugin::workspace_forcetorque() {
   return ws_force_torque;
 }
 
-// Static member inside GfePlugin class
-std_msgs::Float64MultiArray GfePlugin::net_force;
+// Static member inside HybridPlugin class
+std_msgs::Float64MultiArray HybridPlugin::net_force;
 
 // Allocation for the pointer that will hold the single instantiation
 // of our plugin class.  We initialize it to NULL so that the register
 // function can tell whether or not one has already been allocated.
-GfePlugin *gfeplug = NULL;
+HybridPlugin *hybridplug = NULL;
 
 // The register_owd_plugin() is the only function that OWD will call when
 // the plugin is loaded.  It has to initialize our custom Plugin and 
 // Trajectory classes.
 bool register_owd_plugin() {
-  if (gfeplug) {
-    delete gfeplug; // free the previous one in case register was called twice
+  if (hybridplug) {
+    delete hybridplug; // free the previous one in case register was called twice
   }
   try {
     // create an instantiation of our custom Plugin class
-    gfeplug = new GfePlugin();
+    hybridplug = new HybridPlugin();
   } catch (...) {
-    gfeplug=NULL;
+    hybridplug=NULL;
     return false;
   }
   return true;
 }
 
 void unregister_owd_plugin() {
-  if (gfeplug) {
+  if (hybridplug) {
     // remove our Plugin class, which will let it shut down any ROS
     // communications it created
-    delete gfeplug;
-    gfeplug=NULL;
+    delete hybridplug;
+    hybridplug=NULL;
   }
   return;
 }

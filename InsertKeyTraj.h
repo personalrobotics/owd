@@ -1,13 +1,13 @@
 #include "ApplyForceTraj.h"
-#include <gfe_owd_plugin/InsertKey.h>
+#include <owd_plugins/InsertKey.h>
 
 class InsertKeyTraj : public OWD::Trajectory {
   public:
   InsertKeyTraj();
   ~InsertKeyTraj();
 
-  static bool InsertKey(gfe_owd_plugin::InsertKey::Request &req,
-			gfe_owd_plugin::InsertKey::Response &res);
+  static bool InsertKey(owd_plugins::InsertKey::Request &req,
+			owd_plugins::InsertKey::Response &res);
 
   virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
 

@@ -10,7 +10,7 @@
 
 bool JacobianTestTraj::JacobianTest(pr_msgs::Reset::Request &req,
 				    pr_msgs::Reset::Response &res) {
-  ROS_INFO("GfePlugin: received JacobianTest service call");
+  ROS_INFO("OWDPlugin: received JacobianTest service call");
 
   // compute a new trajectory
   try {
@@ -31,11 +31,11 @@ bool JacobianTestTraj::JacobianTest(pr_msgs::Reset::Request &req,
   }
 }
 
-JacobianTestTraj::JacobianTestTraj(): OWD::Trajectory("GFE Jacobian Test"),
+JacobianTestTraj::JacobianTestTraj(): OWD::Trajectory("Jacobian Test"),
 				      stoptraj(false)
 {
-  if (gfeplug) {
-    start_position=gfeplug->target_arm_position;
+  if (hybridplug) {
+    start_position=hybridplug->target_arm_position;
     end_position = start_position;
 
     // create the service that the client can use to stop the force
@@ -76,12 +76,12 @@ void JacobianTestTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   
   // get the correction from the Jacobian Pseudo-Inverse
   OWD::JointPos joint_correction =
-    gfeplug->JacobianPseudoInverse_times_vector(ws_tweak);
+    hybridplug->JacobianPseudoInverse_times_vector(ws_tweak);
 
   // estimate the actual workspace movement
   R6 workspace_movement;
   try {
-    workspace_movement = gfeplug->Jacobian_times_vector(joint_correction);
+    workspace_movement = hybridplug->Jacobian_times_vector(joint_correction);
   } catch (const char *err) {
     ROS_ERROR_NAMED("applyforce","Could not multiply Jacobian times correction");
     return;
