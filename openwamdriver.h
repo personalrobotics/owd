@@ -47,9 +47,9 @@
 #include <pr_msgs/Reset.h>
 #include <pr_msgs/SetForceInputThreshold.h>
 #include <pr_msgs/SetTactileInputThreshold.h>
-#include <owd/CalibrateJoints.h>
-#include <owd/StepJoint.h>
-#include <owd/SetGains.h>
+#include <pr_msgs/CalibrateJoints.h>
+#include <pr_msgs/StepJoint.h>
+#include <pr_msgs/SetGains.h>
 #include <tf/transform_broadcaster.h>
 
 #ifdef BUILD_FOR_SEA
@@ -121,12 +121,12 @@ public:
 			     pr_msgs::SetStallSensitivity::Response &res);
     bool GetDOF(pr_msgs::GetDOF::Request &req,
                 pr_msgs::GetDOF::Response &res);
-    bool CalibrateJoints(owd::CalibrateJoints::Request &req,
-			 owd::CalibrateJoints::Response &res);
-    bool StepJoint(owd::StepJoint::Request &req,
-		   owd::StepJoint::Response &res);
-    bool SetGains(owd::SetGains::Request &req,
-		  owd::SetGains::Response &res);
+    bool CalibrateJoints(pr_msgs::CalibrateJoints::Request &req,
+			 pr_msgs::CalibrateJoints::Response &res);
+    bool StepJoint(pr_msgs::StepJoint::Request &req,
+		   pr_msgs::StepJoint::Response &res);
+    bool SetGains(pr_msgs::SetGains::Request &req,
+		  pr_msgs::SetGains::Response &res);
     bool ReloadPlugins(pr_msgs::Reset::Request &req,
 		       pr_msgs::Reset::Response &res);
     bool SetForceInputThreshold(pr_msgs::SetForceInputThreshold::Request &req,

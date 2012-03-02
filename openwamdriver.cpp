@@ -1725,8 +1725,8 @@ bool WamDriver::GetDOF(pr_msgs::GetDOF::Request &req,
   return true;
 }
 
-bool WamDriver::CalibrateJoints(owd::CalibrateJoints::Request &req,
-    owd::CalibrateJoints::Response &res) {
+bool WamDriver::CalibrateJoints(pr_msgs::CalibrateJoints::Request &req,
+    pr_msgs::CalibrateJoints::Response &res) {
     calibrate_joint_angles();
     return true;
 }
@@ -2482,8 +2482,8 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> 
   }
 } 
 
-bool WamDriver::StepJoint(owd::StepJoint::Request &req,
-			  owd::StepJoint::Response &res) {
+bool WamDriver::StepJoint(pr_msgs::StepJoint::Request &req,
+			  pr_msgs::StepJoint::Response &res) {
   cmdnum++;
 #ifdef BUILD_FOR_SEA
   owam->posSmoother.getSmoothedPVA(owam->heldPositions);
@@ -2494,8 +2494,8 @@ bool WamDriver::StepJoint(owd::StepJoint::Request &req,
   return true;
 }
 
-bool WamDriver::SetGains(owd::SetGains::Request &req,
-			 owd::SetGains::Response &res) {
+bool WamDriver::SetGains(pr_msgs::SetGains::Request &req,
+			 pr_msgs::SetGains::Response &res) {
   return owam->set_gains(req.joint,req.gains);
 }
 
