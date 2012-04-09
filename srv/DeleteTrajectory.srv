@@ -1,4 +1,4 @@
-uint32[] ids
+string[] ids
 ---
 bool ok
 string reason
