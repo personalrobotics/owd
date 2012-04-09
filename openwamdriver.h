@@ -29,6 +29,7 @@
 #include <ros/ros.h>
 #include <boost/thread/mutex.hpp>
 #include <pr_msgs/AddTrajectory.h>
+#include <pr_msgs/AddTimedTrajectory.h>
 #include <pr_msgs/DeleteTrajectory.h>
 #include <pr_msgs/CancelAllTrajectories.h>
 #include <pr_msgs/PauseTrajectory.h>
@@ -38,6 +39,7 @@
 #include <pr_msgs/SetJointStiffness.h>
 #include <pr_msgs/SetJointOffsets.h>
 #include <pr_msgs/SetSpeed.h>
+#include <pr_msgs/GetSpeed.h>
 #include <pr_msgs/SetExtraMass.h>
 #include <pr_msgs/SetStallSensitivity.h>
 #include <pr_msgs/WAMState.h>
@@ -94,10 +96,12 @@ public:
 
     void Update();
 
-    uint32_t AddTrajectory(Trajectory *traj, std::string &failure_reason);
+    bool AddTrajectory(Trajectory *traj, std::string &failure_reason);
 
     bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
                        pr_msgs::AddTrajectory::Response &res);
+    bool AddTimedTrajectory(pr_msgs::AddTimedTrajectory::Request &req,
+                       pr_msgs::AddTimedTrajectory::Response &res);
     bool DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
                           pr_msgs::DeleteTrajectory::Response &res);
     bool CancelAllTrajectories(pr_msgs::CancelAllTrajectories::Request &req,
@@ -112,9 +116,10 @@ public:
                       pr_msgs::SetJointStiffness::Response &res);
     bool SetJointOffsets(pr_msgs::SetJointOffsets::Request &req,
                       pr_msgs::SetJointOffsets::Response &res);
-
     bool SetSpeed(pr_msgs::SetSpeed::Request &req,
                   pr_msgs::SetSpeed::Response &res);
+    bool GetSpeed(pr_msgs::GetSpeed::Request &req,
+		  pr_msgs::GetSpeed::Response &res);
     bool SetExtraMass(pr_msgs::SetExtraMass::Request &req,
 		      pr_msgs::SetExtraMass::Response &res);
     bool SetStallSensitivity(pr_msgs::SetStallSensitivity::Request &req,
@@ -189,8 +194,6 @@ private:
 
     bool discard_movements;
 
-    int cmdnum; // command counter
-
     // internal structures
     char *joint_calibration_file;
     unsigned int nJoints;
@@ -255,6 +258,7 @@ private:
 
     ros::ServiceServer 
       ss_AddTrajectory,
+      ss_AddTimedTrajectory,
       ss_SetStiffness,
       ss_SetJointStiffness,
       ss_SetJointOffsets,
@@ -263,6 +267,7 @@ private:
       ss_PauseTrajectory,
       ss_ReplaceTrajectory,
       ss_SetSpeed,
+      ss_GetSpeed,
       ss_SetExtraMass,
       ss_SetStallSensitivity,
       ss_GetArmDOF,

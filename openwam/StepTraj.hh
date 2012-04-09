@@ -36,11 +36,11 @@ private:
 
 public:
 
-  StepTraj(int trajid, int DOF, unsigned int joint, double *start_pos, double step_size);
+  StepTraj(std::string trajid, int DOF, unsigned int joint, double *start_pos, double step_size);
   virtual ~StepTraj();
 
   // mandatory functions inherited from Trajectory
-  virtual void evaluate(Trajectory::TrajControl &tc, double dt);
+  virtual void evaluate_abs(Trajectory::TrajControl &tc, double t);
 };
 
 }; // namespace OWD

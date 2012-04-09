@@ -30,11 +30,10 @@
 #include <string>
 #include <stdint.h>
 
-// #include "Profile.hh"
 #include "TrajType.hh"
 #include "../openmath/R6.hh"
 #include "Butterworth.h"
-// #include "WAM.hh"
+#include "BinaryData.hh"
 
 namespace OWD {
   class WamDriver;
@@ -81,17 +80,22 @@ namespace OWD {
     static const int LOG  = 3;
     static const int ABORT =4;
 
-    /// \brief ID number
+    /// \brief Identification string
     ///
-    /// The unique identification number for this trajectory.  This field
-    /// gets assigned by OWD once the trajectory is added to the queue.
-    int id;
+    /// The unique identification string for this trajectory.  This field
+    /// is normally set by the client, but will gets assigned by OWD if the
+    /// client fails to provide one.
+    std::string id;
 
     /// \brief Trajectory type
     ///
     /// A string naming the type of trajectory.  This name shows up in
     /// the trajectory queue that is part of the WAMState message.
     std::string type;
+
+    /// \brief Total planned execution time
+    double duration;
+
 
     /// \brief Automatically cancel a trajectory when the arm stalls
     ///
@@ -109,6 +113,13 @@ namespace OWD {
     /// call.  Defaults to false, in which case OWD will start the
     /// trajectory in the RUN state.
     bool WaitForStart;
+
+    /// \brief Synchronize execution with other controllers
+    ///
+    /// If true, OWD will use the MultiSync class to synchronize
+    /// execution with one or more additional controllers.  Defaults
+    /// to false, in which case OWD will run independently.
+    bool Synchronize;
 
     /// \brief Automatically cancel a trajectory based on sensed force
     ///
@@ -160,9 +171,10 @@ namespace OWD {
     /// \attention When subclassing the Trajectory you will have to
     /// explicitly call this contructor from your own constructor in
     /// order to set the name.
-    Trajectory(std::string name) :
-      runstate(STOP),time(0.0),id(0), type(name),
+    Trajectory(std::string name, std::string identification) :
+      runstate(STOP),time(0.0), id(identification), type(name),
       CancelOnStall(false),WaitForStart(false),
+      Synchronize(false),
       CancelOnForceInput(false),
       CancelOnTactileInput(false),
       valid_ft(false),
@@ -170,6 +182,10 @@ namespace OWD {
     {
       pthread_mutex_init(&mutex, NULL);
     }
+
+    // serialization and deserialization routines
+    virtual BinaryData serialize(int firstdof=0, int lastdof=-1);
+    Trajectory(BinaryData &bd);
 
     virtual ~Trajectory(){}
     
@@ -182,6 +198,10 @@ namespace OWD {
 
     virtual void stop() {
       runstate=STOP;
+    }
+
+    virtual void abort() {
+      runstate=ABORT;
     }
 
     virtual int  state() {
@@ -260,7 +280,12 @@ namespace OWD {
     ///  \param[in] dt Time that has elapsed since the previous call
     ///         to evaluate().  The evaluate() function should increment
     ///         the ::time variable by dt.
-    virtual void evaluate(TrajControl &trajcontrol, double dt) = 0;
+    virtual void evaluate(TrajControl &trajcontrol, double dt);
+    // note: the default evaluate function is really just here for backwards
+    // compatibility, but new Trajectory classes should focus on implementing
+    // evaluate_abs(), which is required for multi-controller synchronization.
+
+    virtual void evaluate_abs(TrajControl &trajcontrol, double t) = 0;
 
     inline virtual const JointPos &endPosition() const {return end_position;}
   
@@ -274,8 +299,15 @@ namespace OWD {
 
     virtual void TactileFeedback(float tactile[], int repetitions);
 
+    std::string static random_id();
+
     friend class WamDriver;
     
+    // define types for each of the trajectories with serialization support
+    typedef enum {
+      TRAJTYPE_MACJOINTTRAJ
+    } TRAJTYPES;
+
   };
 
 }; // namespace OWD

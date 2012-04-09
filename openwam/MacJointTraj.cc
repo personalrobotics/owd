@@ -24,41 +24,40 @@
 #include <syslog.h>
 #include "MacQuinticBlend.hh"
 
-#define VERBOSE 0
+#define VERBOSE 1
 
 namespace OWD {
 
-MacJointTraj::~MacJointTraj() {
-  for (unsigned int i=0; i<macpieces.size(); ++i) {
-    delete macpieces[i];
+  MacJointTraj::~MacJointTraj() {
+    for (unsigned int i=0; i<macpieces.size(); ++i) {
+      delete macpieces[i];
+    }
   }
-}
 
 
-MacJointTraj::MacJointTraj(TrajType &vtraj, 
-			   const JointPos &mjv, 
-			   const JointPos &mja,
-			   double max_jerk,
-			   bool bWaitForStart,
-			   bool bCancelOnStall,
-			   bool bCancelOnForceInput,
-			   bool bCancelOnTactileInput) :
-  OWD::Trajectory("MacJointTraj"), max_joint_vel(mjv), max_joint_accel(mja)
-{
-  // initialize the base class members
-  id = 0;
-  WaitForStart=bWaitForStart;
-  CancelOnStall=bCancelOnStall;
-  CancelOnForceInput=bCancelOnForceInput;
-  CancelOnTactileInput=bCancelOnTactileInput;
+  MacJointTraj::MacJointTraj(TrajType &vtraj, 
+			     const JointPos &mjv, 
+			     const JointPos &mja,
+			     double max_jerk,
+			     bool bWaitForStart,
+			     bool bCancelOnStall,
+			     bool bCancelOnForceInput,
+			     bool bCancelOnTactileInput) :
+    OWD::Trajectory("MacJointTraj", ""), max_joint_vel(mjv), max_joint_accel(mja)
+  {
+    // initialize the base class members
+    WaitForStart=bWaitForStart;
+    CancelOnStall=bCancelOnStall;
+    CancelOnForceInput=bCancelOnForceInput;
+    CancelOnTactileInput=bCancelOnTactileInput;
 
-  // unlike previous trajectory code, this package assumes that
-  // extraneous co-linear points have already been removed, so that
-  // every remaining point is a bend or inflection.
+    // unlike previous trajectory code, this package assumes that
+    // extraneous co-linear points have already been removed, so that
+    // every remaining point is a bend or inflection.
 
     //    pthread_mutex_init(&mutex, NULL);
     if (vtraj.size() < 2) {
-        throw "Trajectories must have 2 or more points";
+      throw "Trajectories must have 2 or more points";
     }
 
     DOF = vtraj[0].size();
@@ -212,63 +211,123 @@ MacJointTraj::MacJointTraj(TrajType &vtraj,
       }
     }
 
-    traj_duration = macpieces.back()->EndTime();
+    duration = macpieces.back()->EndTime();
     end_position = vtraj.back();
 
     current_piece =macpieces.begin();
     return;
-}
+  }
 
-void MacJointTraj::get_path_values(double *path_vel, double *path_accel) const {
-  *path_vel = (*current_piece)->PathVelocity();
-  *path_accel = (*current_piece)->PathAcceleration();
-}
+  MacJointTraj::MacJointTraj(BinaryData &bd)
+    // first let the base class extract itself
+    : OWD::Trajectory(bd) {
 
-void MacJointTraj::get_limits(double *max_path_vel, double *max_path_accel) const {
-  *max_path_vel = (*current_piece)->MaxPathVelocity();
-  *max_path_accel = (*current_piece)->MaxPathAcceleration();
-}
+    // now extract our own members
+    DOF             =bd.GetInt();
+    max_joint_vel   =bd.GetDoubleVector();
+    max_joint_accel =bd.GetDoubleVector();
 
-void MacJointTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+    int macpieces_size(bd.GetInt());
+    for (int i=0; i<macpieces_size; ++i) {
+      int type(bd.GetInt());
+      BinaryData bd2(bd.GetString());
+      if (type == 0) {
+	macpieces.push_back(new MacQuinticSegment(bd2));
+      } else if (type == 1) {
+	macpieces.push_back(new MacQuinticBlend(bd2));
+      } else {
+	throw "Unexpected type for MacQuinticElement list";
+      }
+    }
+    current_piece = macpieces.begin();
+  }
+  
+  BinaryData MacJointTraj::serialize(int firstdof, int lastdof) {
+    if (lastdof == -1) {
+      lastdof = start_position.size()-1;
+    }
 
-  if (tc.q.size() < (unsigned int) DOF) {
-    runstate = DONE;
+    // first let the base class serialize itself
+    BinaryData bd(Trajectory::serialize(firstdof,lastdof));
+
+    // create scaled-down versions of the joint speed limits that include
+    // just the DOFS that were asked for
+    OWD::JointPos mjv, mja;
+    mjv.insert(mjv.begin(),
+	      max_joint_vel.begin()+firstdof,
+	      max_joint_vel.begin()+lastdof+1);
+    mja.insert(mja.begin(),
+	      max_joint_accel.begin()+firstdof,
+	      max_joint_accel.begin()+lastdof+1);
+
+    // now insert our own members
+    bd.PutInt(lastdof-firstdof+1);
+
+    bd.PutDoubleVector(mjv);
+    bd.PutDoubleVector(mja);
+
+    bd.PutInt(macpieces.size());
+    for (unsigned int i=0; i<macpieces.size(); ++i) {
+      // put a marker in for the type of each piece
+      if (dynamic_cast<MacQuinticSegment *>(macpieces[i])) {
+	bd.PutInt(0);
+      } else if (dynamic_cast<MacQuinticBlend *>(macpieces[i])) {
+	bd.PutInt(1);
+      } else {
+	throw "Unknown element type in macpieces pointer list";
+      }
+      bd.PutString(macpieces[i]->serialize(firstdof, lastdof));
+    }
+    
+    return bd;
+  }
+  
+  void MacJointTraj::get_path_values(double *path_vel, double *path_accel) const {
+    *path_vel = (*current_piece)->PathVelocity();
+    *path_accel = (*current_piece)->PathAcceleration();
+  }
+
+  void MacJointTraj::get_limits(double *max_path_vel, double *max_path_accel) const {
+    *max_path_vel = (*current_piece)->MaxPathVelocity();
+    *max_path_accel = (*current_piece)->MaxPathAcceleration();
+  }
+
+  void MacJointTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
+
+    if (tc.q.size() < (unsigned int) DOF) {
+      runstate = DONE;
+      return;
+    }
+
+    time = t;
+  
+    while ((current_piece != macpieces.end()) &&
+	   (time > (*current_piece)->EndTime())) {
+      // keep skipping forward until we find the one that includes this time
+      ++current_piece;
+    }
+    if (current_piece == macpieces.end()) {
+      // even though time is past the end, the piece will return the ending
+      // values
+      current_piece--;
+      (*current_piece)->evaluate(tc,time);
+      runstate = DONE;
+    } else {
+      (*current_piece)->evaluate(tc,time);
+    }
+    if (runstate == STOP) {
+      // if we're supposed to be stationary, keep the position values we
+      // calculated, but zero out the vel and accel
+      for (int j=0; j < DOF; ++j) {
+	tc.qd[j]=tc.qdd[j]=0.0;
+      }
+    }
     return;
   }
 
-  // if we're running, then increment the time.  Otherwise, stay where we are
-  if ((runstate == RUN) || (runstate == LOG)) {
-    time += dt;
-  }
-  
-  while ((current_piece != macpieces.end()) &&
-	 (time > (*current_piece)->EndTime())) {
-           
-    // keep skipping forward until we find the one that includes this time
-    ++current_piece;
-  }
-  if (current_piece == macpieces.end()) {
-    // even though time is past the end, the piece will return the ending
-    // values
-    current_piece--;
-    (*current_piece)->evaluate(tc,time);
-    runstate = DONE;
-  } else {
-    (*current_piece)->evaluate(tc,time);
-  }
-  if (runstate == STOP) {
-    // if we're supposed to be stationary, keep the position values we
-    // calculated, but zero out the vel and accel
-    for (int j=0; j < DOF; ++j) {
-      tc.qd[j]=tc.qdd[j]=0.0;
-    }
-  }
-  return;
-}
-
-void MacJointTraj::run() {
+  void MacJointTraj::run() {
     if (runstate==DONE || runstate==RUN) {
-        return;
+      return;
     }
     if (time > 0.0f) {
       syslog(LOG_ERR,"ERROR: Attempted to restart a trajectory in the middle");
@@ -276,9 +335,9 @@ void MacJointTraj::run() {
     }
     runstate=RUN;
     return;
-}
+  }
 
-void MacJointTraj::log(char *trajname) {
+  void MacJointTraj::log(char *trajname) {
     if ((runstate != STOP) && (runstate != DONE)) {
       throw "can't log a running trajectory";
     }
@@ -290,43 +349,43 @@ void MacJointTraj::log(char *trajname) {
     FILE *csv = fopen(simfname,"w");
     if (csv) {
       OWD::Trajectory::TrajControl tc(DOF);
-        runstate=LOG;
-        time=0.0;
-        while (runstate == LOG) {
-            evaluate(tc,0.01);
-            fprintf(csv,"%3.8f, ",time);
-            for (int j=0; j<DOF; ++j) {
-                fprintf(csv,"%2.8f, ",tc.q[j]);
-            }
-            for (int j=0; j<DOF; ++j) {
-                fprintf(csv,"%2.8f, ",tc.qd[j]);
-            }
-            for (int j=0; j<DOF; ++j) {
-                fprintf(csv,"%2.8f, ",tc.qdd[j]);
-            }
-            for (int j=0; j<DOF; ++j) {
-                fprintf(csv,"%2.8f, ",tc.t[j]);
-            }
-        }
-        fclose(csv);
+      runstate=LOG;
+      time=0.0;
+      while (runstate == LOG) {
+	evaluate(tc,0.01);
+	fprintf(csv,"%3.8f, ",time);
+	for (int j=0; j<DOF; ++j) {
+	  fprintf(csv,"%2.8f, ",tc.q[j]);
+	}
+	for (int j=0; j<DOF; ++j) {
+	  fprintf(csv,"%2.8f, ",tc.qd[j]);
+	}
+	for (int j=0; j<DOF; ++j) {
+	  fprintf(csv,"%2.8f, ",tc.qdd[j]);
+	}
+	for (int j=0; j<DOF; ++j) {
+	  fprintf(csv,"%2.8f, ",tc.t[j]);
+	}
+      }
+      fclose(csv);
     }
     reset(oldtime);
     runstate=STOP;
     free(simfname);
     return;
-}
-
-void MacJointTraj::dump() {
-  printf("MacJointTraj: %zd pieces, %2.3fs total duration\n",
-	 macpieces.size(), traj_duration);
-  for (unsigned int i=0; i<macpieces.size(); ++i) {
-    macpieces[i]->dump();
   }
-}
 
-void MacJointTraj::reset(double t) {
-  time=t;
-  current_piece=macpieces.begin();
-}
+  void MacJointTraj::dump() {
+    printf("MacJointTraj: %zd pieces, %2.3fs total duration\n",
+	   macpieces.size(), duration);
+    for (unsigned int i=0; i<macpieces.size(); ++i) {
+      macpieces[i]->dump();
+    }
+  }
+
+  void MacJointTraj::reset(double t) {
+    time=t;
+    current_piece=macpieces.begin();
+  }
 
 }; // namespace OWD

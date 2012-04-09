@@ -49,7 +49,7 @@ public:
 
   JointsTraj( const double Q1[Joint::Jn+1], 
 	      const double Q2[Joint::Jn+1], 
-	      Profile* p[Joint::Jn+1] ) : OWD::Trajectory("JointsTraj"){
+	      Profile* p[Joint::Jn+1] ) : OWD::Trajectory("JointsTraj",""){
 
     for(int j=Joint::J1; j<=Joint::Jn; j++){
       q1[j] = Q1[j];

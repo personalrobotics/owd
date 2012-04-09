@@ -44,7 +44,7 @@ extern int MODE;  // puck parameter
 WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 	 bool log_ctrl_data) :
   check_safety_torques(true),stall_sensitivity(1.0),
-  tc(Joint::Jn), rec(false),wsdyn(false),
+  tc(Joint::Jn), ms(NULL), rec(false),wsdyn(false),
   jsdyn(false), holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
   pid_count(0),safety_hold(false),
   log_controller_data(log_ctrl_data), 
@@ -1007,6 +1007,7 @@ void WAM::newcontrol_rt(double dt){
     
   double traj_timestep;
   static double timestep_factor = 1.0f;
+  static bool stall_recovery=false;
   traj_timestep = dt;
   /*    if (dt > .004) {
 	traj_timestep = .004; // bound the time in case the system got delayed; don't want to lurch
@@ -1083,7 +1084,19 @@ void WAM::newcontrol_rt(double dt){
     bool abort(false);
     try {
       RTIME t3 = ControlLoop::get_time_ns_rt();        
-      jointstraj->evaluate(tc, traj_timestep * timestep_factor);
+      if (ms && jointstraj->Synchronize) {
+	try {
+	  double trajtime = ms->traj_sync_time();
+	  jointstraj->evaluate_abs(tc, trajtime);
+	  timestep_factor = ms->time_factor();
+	} catch (char *errmsg) {
+	  // the ms->traj_sync_time() call must have thrown an
+	  // exception, so we have to abort
+	  jointstraj->abort();
+	}
+      } else {
+	jointstraj->evaluate(tc, traj_timestep * timestep_factor);
+      } 
       RTIME t4 = ControlLoop::get_time_ns_rt();
       for (int j=0; j<Joint::Jn; ++j) {
 	traj_torq[j+1] = tc.t[j];
@@ -1096,7 +1109,8 @@ void WAM::newcontrol_rt(double dt){
 	tc.qdd[j] *= timestep_factor * timestep_factor;
       }
       last_traj_state = jointstraj->state();
-      if(jointstraj->state() == OWD::Trajectory::DONE){
+      if ((jointstraj->state() == OWD::Trajectory::DONE) ||
+	  (ms && jointstraj->Synchronize && (ms->status() == ms->DONE))) {
 	// we've gone past the last time in the trajectory,
 	// so set up to hold at the final position.  we'll let
 	// the trajectory control values persist for the rest of this
@@ -1104,20 +1118,27 @@ void WAM::newcontrol_rt(double dt){
 	// the next time around we'll start holding at the endpoint
 	jointstraj->endPosition().cpy(&heldPositions[Joint::J1]);
 	holdpos = true;  // should have been true already, but just making sure
-	delete jointstraj;
-	jointstraj = NULL;
 	for (int j=Joint::J1; j<Joint::Jn; ++j) {
 	  traj_torq[j]=0;  // make sure we don't leave these non-zero
 	}
-      } else if(jointstraj->state() == OWD::Trajectory::ABORT){
+	if (ms && jointstraj->Synchronize) {
+	  // notify the others that we've finished
+	  ms->done();
+	}
+	OWD::Trajectory *t = jointstraj; jointstraj = NULL; delete t;
+      } else if ((jointstraj->state() == OWD::Trajectory::ABORT) ||
+		 (ms && jointstraj->Synchronize && (ms->status() == ms->ABORTED))){
 	// The trajectory wants us to end right where we are,
 	// so hold the current position and delete the trajectory.
 	for(int i = Joint::J1; i<=Joint::Jn; i++) {
 	  heldPositions[i] = joints[i].q;
 	}
 	holdpos = true;  // should have been true already, but just making sure
-	delete jointstraj;
-	jointstraj = NULL;
+	if (ms && jointstraj->Synchronize) {
+	  // notify the others that we've aborted
+	  ms->abort();
+	}
+	OWD::Trajectory *t = jointstraj; jointstraj = NULL; delete t;
 	for (int j=Joint::J1; j<Joint::Jn; ++j) {
 	  traj_torq[j]=0;  // make sure we don't leave these non-zero
 	}
@@ -1147,46 +1168,66 @@ void WAM::newcontrol_rt(double dt){
 
 #ifndef OWDSIM
       if (safety_torques_exceeded(pid_torq)) {
-	// hold here with zero target velocity and acceleration,
-	// and wait until the limit condition goes away.
+	safety_torque_count++;
 	if (jointstraj  // might have ended and been cleared (above)
 	    && (jointstraj->state()
 		== OWD::Trajectory::RUN)) { // only mess with the traj if
-	  //                              we are still running
+	  //                                   we are still running
+	  
+	  stall_recovery=true;
 
-	  // just slow down the time, and take a smaller step.
-	  // as long as we keep exceeding, keep trying smaller steps.
-	  // as we free up, we can start taking bigger steps again.
-	  if (timestep_factor > 0.05f) {
-	    timestep_factor *= 0.97; // at 3% decrease per control loop
-	    // it will take 100ms to reach
-	    // 5% real-time.
-	  }
-	  safety_torque_count++;
-	  safety_hold=true; // let the app know that we're hitting something
 	  if (jointstraj->CancelOnStall) {
-	    /*jointstraj->stop();*/ // still have to stop if the app wants to
-	    jointstraj->runstate = Trajectory::ABORT;
+	    jointstraj->abort();
 	    last_traj_state = jointstraj->state();
 	    for(int i = Joint::J1; i<=Joint::Jn; i++) {
 	      heldPositions[i] = joints[i].q;
 	    }
 	    holdpos = true;  // should have been true already, but just making sure
-	    delete jointstraj;
-	    jointstraj = NULL;
+	    if (ms && jointstraj->Synchronize) {
+	      // notify the others that we've aborted
+	      ms->abort();
+	    }
+	    OWD::Trajectory *t = jointstraj; jointstraj = NULL; delete t;
+	  } else {
+	    safety_hold=true; // let the client know that we're hitting something
+	    if (ms && jointstraj->Synchronize) {
+	      // notify the others that we've stalled
+	      ms->stall();
+	    } else {
+	      // just slow down the time, and take a smaller step.
+	      // as long as we keep exceeding, keep trying smaller steps.
+	      // as we free up, we can start taking bigger steps again.
+	      if (timestep_factor > 0.05f) {
+		timestep_factor *= 0.97; // at 3% decrease per control loop
+		// it will take 100ms to reach
+		// 5% real-time.
+	      }
+	    }
 	  }
+
 	}
-      } else if (timestep_factor < 1.0f) {
-	// we're back within the safety thresholds, so start 
-	// increasing our stepsize again
-	timestep_factor *= 1.03f;
-	if (timestep_factor > 1.0f) {
-	  timestep_factor = 1.0f;
+      } else if (stall_recovery) {
+	if (ms && jointstraj && jointstraj->Synchronize) {
+	  // notify the others that we're running again
+	  try {
+	    ms->run();
+	    stall_recovery=false;
+	  } catch (char *errmsg) {
+	    ms->abort();
+	    jointstraj->abort();
+	  }
+	} else if (timestep_factor < 1.0f) {
+	  // we're back within the safety thresholds, so start 
+	  // increasing our stepsize again
+	  timestep_factor *= 1.03f;
+	  if (timestep_factor > 1.0f) {
+	    timestep_factor = 1.0f;
+	  }
+	  if (jointstraj != NULL) {
+	    jointstraj->run();
+	  }
+	  safety_hold=false;
 	}
-	if (jointstraj != NULL) {
-	  jointstraj->run();
-	}
-	safety_hold=false;
       }
 #endif // OWDSIM
     } catch (char *error) {
@@ -1207,8 +1248,6 @@ void WAM::newcontrol_rt(double dt){
     }
     if (abort) {
       last_traj_state = OWD::Trajectory::ABORT;
-      delete jointstraj;
-      jointstraj = NULL;
       for (int j=Joint::J1; j<Joint::Jn; ++j) {
 	traj_torq[j]=0;  // make sure we don't leave these non-zero
       }
@@ -1217,7 +1256,11 @@ void WAM::newcontrol_rt(double dt){
 	tc.q[i-1] = heldPositions[i];
       }
       holdpos = true;  // should have been true already, but just making sure
-
+      if (ms && jointstraj->Synchronize) {
+	// notify the others that we've aborted
+	ms->abort();
+      }
+      OWD::Trajectory *t = jointstraj; jointstraj = NULL; delete t;
     }
       
   } else if (holdpos) {
@@ -1264,7 +1307,7 @@ void WAM::newcontrol_rt(double dt){
     stats.trajtime = trajtime/1000.0;
     stats.jsctrltime=jscontroltime/1000.0;
     stats.safetycount=safety_torque_count;
-    for (unsigned int i=0; i<Joint::Jn; ++i) {
+    for (int i=0; i<Joint::Jn; ++i) {
       stats.hitorquecount[i]=safetytorquecount[i];
       stats.hitorqueavg[i]=safetytorquesum[i] / safetytorquecount[i];
       safetytorquesum[i]=safetytorquecount[i]=0;
@@ -1383,7 +1426,7 @@ void WAM::newJSControl_rt(double q_target[],double q[],double dt,double pid_torq
 int WAM::run_trajectory(OWD::Trajectory *traj) {
   if (jointstraj) {
     // we still have a previous active trajectory
-    ROS_WARN("Previous trajectory (id=%d) still active; cannot run new one (id=%d)",jointstraj->id,traj->id);
+    ROS_WARN("Previous trajectory (id=%s) still active; cannot run new one (id=%s)",jointstraj->id.c_str(),traj->id.c_str());
     return OW_FAILURE;
   }
   if (!holdpos) {
@@ -1393,22 +1436,72 @@ int WAM::run_trajectory(OWD::Trajectory *traj) {
     ROS_ERROR("Cannot start a trajectory without first holding position");
     return OW_FAILURE;
   }
+  if (traj->Synchronize) {
+    if (!ms) {
+      ROS_ERROR("Cannot synchronize trajectory %s because this controller has not joined a MultiSync group", traj->id.c_str());
+      return OW_FAILURE;
+    }
+
+    ROS_INFO("Waiting to start synchronized trajectory %s",
+	     traj->id.c_str());
+    // must synchronize the start with the other controller(s)
+    if (!ms->register_traj(traj->id, traj->duration, 10)) {
+      ROS_ERROR("Failed to register trajectory %s with the synchronization master within the time limit: %s",
+		traj->id.c_str(),
+		ms->last_error);
+      traj->abort();
+      return OW_FAILURE;
+    } else {
+      ROS_INFO("Registered trajectory %s with other synchronization controllers",
+	       traj->id.c_str());
+    }
+    // wait to initiate
+    if (!ms->wait_for_traj_start()) {
+      ROS_ERROR("Trajectory %s aborted while waiting for synchronized start: %s",
+		traj->id.c_str(),
+		ms->last_error);
+      traj->abort();
+      return OW_FAILURE;
+    }
+    ROS_INFO("Starting synchronized trajectory %s, duration is %2.2fs",
+	     traj->id.c_str(), traj->duration);
+    try {
+      ms->run();
+      
+    } catch (char *errmsg) {
+      ms->abort();
+      traj->abort();
+      ROS_ERROR("Failed to start synchronized trajectory %s: %s",
+		traj->id.c_str(),errmsg);
+      return OW_FAILURE;
+    }
+
+    // mark the traj as ready to run
+    traj->run();
+
+    // load up the trajectory
+    jointstraj=traj;
+    return OW_SUCCESS;
+  }
+
   if (! traj->WaitForStart) {
     traj->run(); // put into running state
-    ROS_DEBUG("Starting trajectory %d",traj->id);
+    ROS_DEBUG("Starting trajectory %s",traj->id.c_str());
   } else {
-    ROS_DEBUG("Starting trajectory %d in paused state",traj->id);
-    // app must call resume_trajectory() to start
+    ROS_DEBUG("Starting trajectory %s in paused state",traj->id.c_str());
+    // client must call resume_trajectory() to start
   }
-  //    this->lock("run_traj");
   jointstraj = traj;
-  //    this->unlock("run_traj");
   return OW_SUCCESS;
 }
 
 int WAM::pause_trajectory() {
   if (!jointstraj) {
     // there was no trajectory running
+    return OW_FAILURE;
+  }
+  if (ms && jointstraj->Synchronize) {
+    ROS_ERROR("Cannot pause synchronized trajectories");
     return OW_FAILURE;
   }
   jointstraj->stop();
@@ -1434,21 +1527,11 @@ int WAM::cancel_trajectory() {
     this->unlock("cancel_traj");
     return OW_SUCCESS;
   }
-  jointstraj->stop();
-
-  char endstr[200];
-  strcpy(endstr,"");
-  for(int i = Joint::J1; i<=Joint::Jn; i++) {
-    heldPositions[i] = joints[i].q;
-    sprintf(endstr+strlen(endstr)," %1.4f",heldPositions[i]);
-  }
-  holdpos = true;  // should have been true already, but just making sure
-  ROS_INFO_NAMED("AddTrajectory","Trajectory #%d has been cancelled; final reference position is [%s ]",
-		 jointstraj->id,endstr);
-
-  delete jointstraj;
-  jointstraj = NULL;
+  jointstraj->abort();
   this->unlock("cancel_traj");
+  if (ms && jointstraj->Synchronize) {
+    ms->abort();
+  }
   return OW_SUCCESS;
 }
 
@@ -1640,7 +1723,7 @@ void WAMstats::rosprint(int recorder_count) const {
   if (safetycount > 0) {
     ROS_DEBUG_NAMED("times",
 		    "Safety torque exception counts and averages:\n");
-    for (unsigned int i=0; i<Joint::Jn; ++i) {
+    for (int i=0; i<Joint::Jn; ++i) {
       if (hitorquecount[i]>0) {
 	ROS_DEBUG_NAMED("times",
 			"J%d: %4d %2.2f", i+1, hitorquecount[i],
@@ -1660,8 +1743,9 @@ WAM::~WAM() {
     recorder.dump(filename);
   }
   if (jointstraj) {
-    delete jointstraj;
-    jointstraj=NULL;
+    OWD::Trajectory *t = jointstraj;
+    jointstraj = NULL;
+    delete t;
   }
   if (bus) {
     delete bus;

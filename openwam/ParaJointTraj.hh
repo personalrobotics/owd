@@ -52,8 +52,6 @@ public:
   std::vector <ParabolicSegment> restart_parsegs;
   bool restart;
   
-  double traj_duration;
-  
   ParaJointTraj(TrajType &vtraj, 
 		const std::vector<double> &max_joint_vel, 
 		const std::vector<double> &max_joint_accel,
@@ -70,7 +68,7 @@ public:
   virtual void run();
   virtual void stop();
   virtual int  state();
-  virtual void evaluate(Trajectory::TrajControl &tc, double dt);
+  virtual void evaluate_abs(Trajectory::TrajControl &tc, double t);
   virtual void reset(double t);
   //  virtual void rebuild_from_current();
 };

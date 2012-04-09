@@ -71,6 +71,9 @@ target_link_libraries(puck_find_mofst wamcan openwam ${CANBUS_LIBS})
 rosbuild_add_compile_flags(puck_find_mofst "${CANBUS_DEFS}")
 rosbuild_add_link_flags(puck_find_mofst "${CANBUS_LDFLAGS}")
 
+rosbuild_add_executable(owd_traj_timer owd_traj_timer.cpp)
+target_link_libraries(owd_traj_timer openwam)
+
 if (RT_BUILD)
   rosbuild_add_executable(owdrt owd.cpp openwamdriver.cpp bhd280.cc
                                 ft.cc tactile.cc)

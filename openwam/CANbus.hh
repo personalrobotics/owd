@@ -388,8 +388,8 @@ public:
   int hand_puck_temp[4];
   int hand_motor_temp[4];
 
-  int32_t get_property_expecting_id;
-  int32_t get_property_expecting_prop;
+  uint32_t get_property_expecting_id;
+  uint32_t get_property_expecting_prop;
 
   static const int ft_tare_values_to_average = 20;
   int force_tare_values_collected, 

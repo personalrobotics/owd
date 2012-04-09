@@ -25,21 +25,22 @@
 
 namespace OWD {
 
-ServoTraj::ServoTraj(int dof, int id_num, double *start_pos,
+  ServoTraj::ServoTraj(int dof, std::string id, double *start_pos,
 		     double *lower_joint_limits,
 		     double *upper_joint_limits)
-  : Trajectory("ServoTraj"),
+  : Trajectory("ServoTraj", id),
     nDOF(dof),
     vlimit(0.5),
-    accel(2.5)
+    accel(2.5),
+    lasttime(time)
 {
-  id = id_num;
   stoptime.resize(nDOF,0.0);
   target_velocity.resize(nDOF,0.0);
   current_velocity.resize(nDOF,0.0);
   start_position.SetFromArray(nDOF,start_pos);
   current_position = start_position;
   end_position.resize(nDOF);
+  duration=99999999999; // we might want to run a long time
 
   if (lower_joint_limits) {
     memcpy(lower_jlimit,lower_joint_limits,7*sizeof(double));
@@ -91,12 +92,14 @@ void ServoTraj::stop() {
   Trajectory::stop();
 }
 
-void ServoTraj::evaluate(Trajectory::TrajControl &tc, double dt) {
+void ServoTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
   if (tc.q.size() < (unsigned int)nDOF) {
     runstate=DONE;
     return;
   }
-  time += dt;
+  time = t;
+  double dt = time - lasttime;  // need delta time for accel
+  lasttime=time;
   bool active = false;
   for (unsigned int i = 0; i<(unsigned int)nDOF; ++i) {
     if (time < stoptime[i]) {

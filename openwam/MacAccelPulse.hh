@@ -26,8 +26,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdio.h>
+#include "BinaryData.hh"
 
-#define VERBOSE 0
+#define VERBOSE 1
 
 class MacAccelElement {
 protected:
@@ -46,6 +47,31 @@ public:
 		  double accel, double jerk, double start_time) :
     start_p(start_pos), start_v(start_vel), a(accel),
     j(jerk), start_t(start_time) {};
+
+  MacAccelElement(BinaryData &bd) {
+    start_p =bd.GetDouble();
+    dist    =bd.GetDouble();
+    start_v =bd.GetDouble();
+    a       =bd.GetDouble();
+    j       =bd.GetDouble();
+    start_t =bd.GetDouble();
+    dur     =bd.GetDouble();
+    atime   =bd.GetDouble();
+  }
+
+  virtual BinaryData serialize() {
+    BinaryData bd;
+    bd.PutDouble(start_p);
+    bd.PutDouble(dist);
+    bd.PutDouble(start_v);
+    bd.PutDouble(a);
+    bd.PutDouble(j);
+    bd.PutDouble(start_t);
+    bd.PutDouble(dur);
+    bd.PutDouble(atime);
+    return bd;
+  }
+
   inline virtual double start_pos() const {return start_p;}
   inline virtual double start_vel() const {return start_v;}
   inline virtual double start_time() const {return start_t;}
@@ -79,6 +105,8 @@ protected:
   double sustain_t;
   double pa, sa, pb, sb; // intermediate positions and speeds
   double delta_v, end_v;
+
+  MacAccelPulse() {}
 
   void fit_curve() {
     // delta_v has already been set positive
@@ -279,6 +307,38 @@ public:
 	   start_t+2*atime+sustain_t,q,qd);
   }
     
+public:
+  MacAccelPulse(BinaryData &bd) 
+    // first let the base class extract itself
+    : MacAccelElement(bd) {
+
+    // now get our own members
+    sustain_t=bd.GetDouble();
+    pa       =bd.GetDouble();
+    sa       =bd.GetDouble();
+    pb       =bd.GetDouble();
+    sb       =bd.GetDouble();
+    delta_v  =bd.GetDouble();
+    end_v    =bd.GetDouble();
+    
+  }
+
+  virtual BinaryData serialize() {
+    // first let the base class serialize itself
+    BinaryData bd(MacAccelElement::serialize());
+
+    // now add our own members
+    bd.PutDouble(sustain_t);
+    bd.PutDouble(pa);
+    bd.PutDouble(sa);
+    bd.PutDouble(pb);
+    bd.PutDouble(sb);
+    bd.PutDouble(delta_v);
+    bd.PutDouble(end_v);
+
+    return bd;
+  }
+
 };
 
 class MacZeroAccel : public MacAccelElement {
@@ -300,6 +360,23 @@ public:
     start_t = start_time;
     dur = dist/start_v;
     a=j=0;
+  }
+
+  MacZeroAccel(BinaryData &bd)
+    // first let the base class extract itself
+    : MacAccelElement(bd) {
+
+    // now get our own members
+    vel = bd.GetDouble();
+  }
+
+  virtual BinaryData serialize() {
+    // first let the base class serialize itself
+    BinaryData bd(MacAccelElement::serialize());
+
+    // now put our own members
+    bd.PutDouble(vel);
+    return bd;
   }
   
   inline double end_vel() const {

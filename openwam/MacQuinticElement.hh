@@ -25,6 +25,7 @@
 
 #include "MacAccelPulse.hh"
 #include "Trajectory.hh"
+#include "BinaryData.hh"
 #include <string.h>
 
 class MacQuinticElement {
@@ -71,13 +72,50 @@ public:
     reason = strdup("initial limits");
   }
 
+  virtual ~MacQuinticElement() {}
+
   virtual void dump() {
     //    printf("  start_pos=%2.3f  end_pos=%2.3f\n",start_pos,end_pos);
     printf("  start_time=%2.3f  dur=%2.3f  end_time=%2.3f\n",
 	   start_time,duration,start_time+duration);
   }
 
-  virtual ~MacQuinticElement() {}
+  MacQuinticElement(BinaryData &bd) {
+    start_pos            =bd.GetDoubleVector();
+    end_pos              =bd.GetDoubleVector();
+    start_time           =bd.GetDouble();
+    duration             =bd.GetDouble();
+    max_path_velocity    =bd.GetDouble();
+    max_path_acceleration=bd.GetDouble();
+    reason=strdup(        bd.GetString().c_str());
+  }
+
+  virtual BinaryData serialize(int firstdof=0, int lastdof=-1) {
+    if (lastdof == -1) {
+      lastdof = start_pos.size()-1;
+    }
+
+    OWD::JointPos sp,ep;
+    sp.insert(sp.begin(),
+	      start_pos.begin()+firstdof,
+	      start_pos.begin()+lastdof+1);
+    ep.insert(ep.begin(),
+	      end_pos.begin()+firstdof,
+	      end_pos.begin()+lastdof+1);
+
+    BinaryData bd;
+    // Insert all our data members
+    bd.PutDoubleVector(sp);
+    bd.PutDoubleVector(ep);
+    bd.PutDouble(      start_time);
+    bd.PutDouble(      duration);
+    bd.PutDouble(      max_path_velocity);
+    bd.PutDouble(      max_path_acceleration);
+    std::string s(     reason); bd.PutString(s);
+
+    return bd;
+  }
+
 };
 
 #endif // MACQUINTICELEMENT_H

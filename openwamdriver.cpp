@@ -84,7 +84,7 @@ extern double fs[8];  // static friction from Dynamics.cc
 namespace OWD {
 
 WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tactile) :
-  cmdnum(0), nJoints(Joint::Jn),
+  nJoints(Joint::Jn),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
   running(true),
   modified_j1(false)
@@ -176,7 +176,7 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
 
   // create a dummy previous trajectory
   pr_msgs::TrajInfo ti;
-  ti.id=cmdnum;  // next will be incremented, so it will never match
+  ti.id="(none)";
   ti.type="(none)";
 #ifdef FAKE7
   ti.end_position.resize(7,0.0f);
@@ -224,8 +224,8 @@ bool WamDriver::Init(const char *joint_cal_file)
   char speedstr[200], accelstr[200];
   strcpy(speedstr,""); strcpy(accelstr,"");
   for (unsigned int j = 0; j < nJoints; ++j) {
-    sprintf(speedstr+strlen(speedstr),"%3.0f ",joint_vel[j] * 180.0/3.141592654);
-    sprintf(accelstr+strlen(accelstr),"%3.0f ",joint_accel[j]*180.0/3.141592654);
+    snprintf(speedstr+strlen(speedstr),199-strlen(speedstr),"%3.0f ",joint_vel[j] * 180.0/3.141592654);
+    snprintf(accelstr+strlen(accelstr),199-strlen(accelstr),"%3.0f ",joint_accel[j]*180.0/3.141592654);
   }
   
   ROS_DEBUG("Max motion limits: joint speed (deg/s) = [ %s]",speedstr);
@@ -327,6 +327,49 @@ bool WamDriver::Init(const char *joint_cal_file)
     }
   }
 
+  bool synchronize;
+  n.param("synchronize_with_other_controllers",synchronize,false);
+  if (synchronize) {
+    int sync_id;
+    n.param("synchronization_id",sync_id,-1);
+    if (sync_id == -1) {
+      ROS_FATAL("Must specify unique synchronization_id values for each synchronized controller.");
+      return false;
+    }
+    int sync_count;
+    n.param("synchronization_controller_count",sync_count,0);
+    if (sync_count == 0) {
+      ROS_FATAL("Must specify synchronization_controller_count");
+      return false;
+    }
+    std::string sync_name("owd_");
+    std::string tf_prefix;
+    n.param("tf_prefix",tf_prefix,std::string("controller"));
+    sync_name += tf_prefix;
+    if (sync_id == 0) {
+      ROS_INFO("Creating master synchronization controller");
+      try {
+	owam->ms = new MultiSyncMaster(sync_name, sync_count);
+      } catch (const char *errmsg) {
+	std::string e("Error while creating master synchronization controller:");
+	e += errmsg;
+	ROS_ERROR("%s",e.c_str());
+	throw e.c_str();
+      }
+    } else {
+      ROS_INFO("Attempting to contact master synchronization controller");
+      try {
+	owam->ms = new MultiSync(sync_name, sync_id);
+      } catch (const char *errmsg) {
+	std::string e("Error while contacting master synchronization controller:");
+	e += errmsg;
+	ROS_ERROR("%s",e.c_str());
+	throw e.c_str();
+      }
+    }
+    ROS_INFO("Synchronization established");
+  }
+
   // Read our motor offsets from file (if found) and apply them
   // to the encoder values
   if (bus->simulation) {
@@ -385,8 +428,8 @@ bool WamDriver::Init(const char *joint_cal_file)
   
   owam->exit_on_pendant_press=true; // from now on, exit if the user hits e-stop or idle
   
-
   load_plugins(plugin_list);
+
   return true;
 }
 
@@ -498,6 +541,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertise<pr_msgs::WAMInternals>("waminternals", 1);
   ss_AddTrajectory = 
     n.advertiseService("AddTrajectory",&WamDriver::AddTrajectory,this);
+  ss_AddTimedTrajectory = 
+    n.advertiseService("AddTimedTrajectory",&WamDriver::AddTimedTrajectory,this);
   ss_SetStiffness =
     n.advertiseService("SetStiffness",&WamDriver::SetStiffness,this);
   ss_SetJointStiffness =
@@ -514,6 +559,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("ReplaceTrajectory",&WamDriver::ReplaceTrajectory,this);
   ss_SetSpeed =
     n.advertiseService("SetSpeed",&WamDriver::SetSpeed,this);
+  ss_GetSpeed =
+    n.advertiseService("GetSpeed",&WamDriver::GetSpeed,this);
   ss_SetExtraMass = 
     n.advertiseService("SetExtraMass",&WamDriver::SetExtraMass,this);
   ss_SetStallSensitivity = 
@@ -650,6 +697,14 @@ OWD::Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
       ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
       ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
       
+      if (jt.options & jt.opt_Synchronize) {
+	paratraj->Synchronize=true;
+      }
+      if (jt.id == "") {
+	paratraj->id = Trajectory::random_id();
+      } else {
+	paratraj->id = jt.id;
+      }
       return paratraj;
     } catch (const char * error) {
       snprintf(last_trajectory_error,200,"Error building parabolic traj: %s",error);
@@ -665,7 +720,16 @@ OWD::Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
 					       bCancelOnStall,
 					       bCancelOnForceInput,
 					       bCancelOnTactileInput);
-      ROS_DEBUG_NAMED("BuildTrajectory","MacFarlane blended trajectory built");
+      if (jt.options & jt.opt_Synchronize) {
+	mactraj->Synchronize=true;
+      }
+      if (jt.id == "") {
+	mactraj->id = Trajectory::random_id();
+      } else {
+	mactraj->id = jt.id;
+      }
+      
+      ROS_DEBUG_NAMED("BuildTrajectory","MacFarlane blended trajectory %s built", mactraj->id.c_str());
       return mactraj;
     } catch (const char *error) {
       snprintf(last_trajectory_error,200,"Error building blended traj: %s",error);
@@ -682,6 +746,14 @@ OWD::Trajectory *WamDriver::BuildTrajectory(pr_msgs::JointTraj &jt) {
 	ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bCancelOnStall,bCancelOnForceInput,bCancelOnTactileInput);
 	ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
 	ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
+	if (jt.options & jt.opt_Synchronize) {
+	  paratraj->Synchronize=true;
+	}
+	if (jt.id == "") {
+	  paratraj->id = Trajectory::random_id();
+	} else {
+	  paratraj->id = jt.id;
+	}
 	return paratraj;
       } catch (const char * error) {
 	snprintf(last_trajectory_error,200,"Error building parabolic traj: %s",error);
@@ -1168,7 +1240,7 @@ void WamDriver::calibrate_wam_mass_model() {
                         //                    } else if (ScreenBuf::mode == ScreenBuf::TRAJ_RECORD) {
                         // write list of points to file
                         char point_fname[100];
-                        sprintf(point_fname,"collected_points_%d",point_filenum++);
+                        snprintf(point_fname,100,"collected_points_%d",point_filenum++);
                         log_rave_trajectory(point_fname,vtraj);
                         vtraj.clear();
                         ScreenBuf::savedpoints=0;
@@ -1660,10 +1732,10 @@ bool WamDriver::Publish() {
 	char endstr[200];
 	strcpy(endstr,"");
 	for(int i = Joint::J1; i<=Joint::Jn; i++) {
-	  sprintf(endstr+strlen(endstr)," %1.4f",owam->heldPositions[i]);
+	  snprintf(endstr+strlen(endstr),199-strlen(endstr)," %1.4f",owam->heldPositions[i]);
 	}
-	ROS_INFO_NAMED("AddTrajectory","Stalled trajectory #%d has been paused at position[%s ]",
-		       owam->jointstraj->id,endstr);
+	ROS_INFO_NAMED("AddTrajectory","Stalled trajectory %s has been paused at position[%s ]",
+		       owam->jointstraj->id.c_str(),endstr);
 	stall_reported=false;
       }
 	
@@ -1675,10 +1747,10 @@ bool WamDriver::Publish() {
 	  char endstr[200];
 	  strcpy(endstr,"");
 	  for(int i = Joint::J1; i<=Joint::Jn; i++) {
-	    sprintf(endstr+strlen(endstr)," %1.4f",owam->heldPositions[i]);
+	    snprintf(endstr+strlen(endstr),199-strlen(endstr)," %1.4f",owam->heldPositions[i]);
 	  }
-	  ROS_INFO_NAMED("AddTrajectory","Trajectory #%d has stalled at position[%s ]; trying to continue...",
-			 owam->jointstraj->id,endstr);
+	  ROS_INFO_NAMED("AddTrajectory","Trajectory %s has stalled at position[%s ]; trying to continue...",
+			 owam->jointstraj->id.c_str(),endstr);
 	  stall_reported=true;
 	}
       } else {
@@ -1687,10 +1759,10 @@ bool WamDriver::Publish() {
 	  char endstr[200];
 	  strcpy(endstr,"");
 	  for(int i = Joint::J1; i<=Joint::Jn; i++) {
-	    sprintf(endstr+strlen(endstr)," %1.4f",owam->heldPositions[i]);
+	    snprintf(endstr+strlen(endstr),199-strlen(endstr)," %1.4f",owam->heldPositions[i]);
 	  }
-	  ROS_INFO_NAMED("AddTrajectory","Stalled trajectory #%d has resumed at position[%s ]",
-			 owam->jointstraj->id,endstr);
+	  ROS_INFO_NAMED("AddTrajectory","Stalled trajectory %s has resumed at position[%s ]",
+			 owam->jointstraj->id.c_str(),endstr);
 	  stall_reported=false;
 	}
       }
@@ -1750,7 +1822,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   // check number of points
   if (req.traj.positions.size() < 2) {
     ROS_ERROR_NAMED("AddTrajectory","Minimum of 2 traj points required");
-    res.id = 0;
+    res.id = req.traj.id;
     res.ok=false;
     res.reason="Minimum of 2 traj points required";
     return true;
@@ -1760,7 +1832,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   if (nJoints !=4) {
     ROS_ERROR("FAKE7 was defined but openwam was compiled with 7 DOF");
     ROS_ERROR("Remove -DWRIST from openwam and relink");
-    res.id = 0;
+    res.id = req.traj.id;
     res.ok=false;
     res.reason="FAKE7 was defined but openwam was compiled with 7 DOF";
     return true;
@@ -1796,14 +1868,14 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
       char firststr[200], curstr[200];
       strcpy(firststr,""); strcpy(curstr,"");
       for (unsigned int j=0; j<nJoints; ++j) {
-        sprintf(firststr+strlen(firststr)," %1.4f",firstpoint[j]);
-        sprintf(curstr+strlen(curstr)," %1.4f",curpoint[j]);
+        snprintf(firststr+strlen(firststr),199-strlen(firststr)," %1.4f",firstpoint[j]);
+        snprintf(curstr+strlen(curstr),199-strlen(curstr)," %1.4f",curpoint[j]);
       }
       ROS_ERROR_NAMED("AddTrajectory","Current point: %s",curstr);
 
       ROS_ERROR_NAMED("AddTrajectory","First point: %s",firststr);
       res.reason="First traj point is too far from current position";
-      res.id = 0;
+      res.id = req.traj.id;
       res.ok=false;
       return true;
     }
@@ -1853,7 +1925,7 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
     if (firstpoint !=  curpoint) {
       ROS_ERROR_NAMED("AddTrajectory","First traj point doesn't match last queued point");
       res.reason="First traj point doesn't match last queued point";
-      res.id = 0;
+      res.id = req.traj.id;
       res.ok=false;
       return true;
     }
@@ -1882,22 +1954,73 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   if (!t) {
     res.reason="BuildTrajectory failed: ";
     res.reason += std::string(last_trajectory_error);
-    res.id = 0;
+    res.id = req.traj.id;
     res.ok=false;
     return true;
   }
 
-  // Add the built trajectory to the run queue
-  res.id = AddTrajectory(t,res.reason);
-  if (res.id == 0) {
-    // failed
-    res.ok=false;
-  }
+  // Return success/failure and the traj id
+  res.ok = AddTrajectory(t,res.reason);
+  res.id = t->id;
 
   return true;
 }
 
-uint32_t WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_reason) {
+bool WamDriver::AddTimedTrajectory(pr_msgs::AddTimedTrajectory::Request &req,
+				   pr_msgs::AddTimedTrajectory::Response &res) {
+  
+  ROS_WARN("About to deserialize a trajectory from a string of len %zd",
+	   req.SerializedTrajectory.size());
+  BinaryData bd(req.SerializedTrajectory);
+  int trajtype = bd.GetInt();
+  BinaryData bd2(bd.GetString());
+  OWD::Trajectory *t;
+  if (trajtype == Trajectory::TRAJTYPE_MACJOINTTRAJ) {
+    try {
+      t = new MacJointTraj(bd2);
+    } catch (const char *errmsg) {
+      ROS_ERROR("Could not deserialize trajectory: %s",errmsg);
+      res.ok=false;
+      res.reason = std::string("Could not deserialize trajectory: ");
+      res.reason += std::string(errmsg);
+      res.id = std::string("");
+      return true;
+    }
+  } else {
+    ROS_ERROR("Could not deserialize trajectory: unknown type");
+    res.ok=false;
+    res.reason = std::string("Did not recognize serialized trajectory type: was it created by an OWD class?");
+    res.id = std::string("");
+    return true;
+  }
+    
+  if (req.options & pr_msgs::JointTraj::opt_WaitForStart) {
+    t->WaitForStart=true;
+  }
+  if (req.options & pr_msgs::JointTraj::opt_CancelOnStall) {
+    t->CancelOnStall=true;
+  }
+  if (req.options & pr_msgs::JointTraj::opt_CancelOnForceInput) {
+    t->CancelOnForceInput=true;
+  }
+  if (req.options & pr_msgs::JointTraj::opt_CancelOnTactileInput) {
+    t->CancelOnTactileInput=true;
+  }
+  if (req.options & pr_msgs::JointTraj::opt_Synchronize) {
+    t->Synchronize=true;
+  }
+
+  if (req.id == "") {
+    t->id = Trajectory::random_id();
+  } else {
+    t->id = req.id;
+  }
+
+  res.ok = AddTrajectory(t,res.reason);
+  return true;
+}
+
+bool WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_reason) {
   // this function takes a precomputed trajectory object and either runs it
   // (if no other traj is running) or queues it for later execution.
   // the first point of the trajectory must exactly match either the current
@@ -1907,14 +2030,14 @@ uint32_t WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_re
   // figure out where robot will be at start of trajectory
   JointPos curpoint(nJoints);
   double wampos[nJoints+1];
-  if (! owam->jointstraj) {
+  if (!owam->jointstraj) {
 
     // if we weren't already holding position, then abort, because
     // it's extremely unlikely that the start position of the new trajectory
     // will exactly match
     if (!owam->holdpos) {
       failure_reason="Must hold position before calling AddTrajectory";
-      return 0;
+      return false;
     }
 
     // get position from WAM
@@ -1927,17 +2050,17 @@ uint32_t WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_re
       char firststr[200], curstr[200];
       strcpy(firststr,""); strcpy(curstr,"");
       for (unsigned int j=0; j<nJoints; ++j) {
-        sprintf(firststr+strlen(firststr)," %1.4f",traj->start_position[j]);
-        sprintf(curstr+strlen(curstr)," %1.4f",curpoint[j]);
+        snprintf(firststr+strlen(firststr),199-strlen(firststr)," %1.4f",traj->start_position[j]);
+        snprintf(curstr+strlen(curstr),199-strlen(curstr)," %1.4f",curpoint[j]);
       }
       ROS_ERROR_NAMED("AddTrajectory","Current point: %s",curstr);
       ROS_ERROR_NAMED("AddTrajectory","First point: %s",firststr);
       failure_reason="First traj point is too far from current position";
-      return 0;
+      return false;
     }
 
   } else {
-    // compare against the last queued point
+    // compare start against the last queued point
     if (trajectory_list.size() > 0) {
       curpoint = trajectory_list.back()->end_position;
 #ifdef FAKE7
@@ -1958,23 +2081,20 @@ uint32_t WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_re
     if (traj->start_position !=  curpoint) {
       ROS_ERROR_NAMED("AddTrajectory","First traj point doesn't match last queued point");
       failure_reason="First traj point doesn't match last queued point";
-      return 0;
+      return false;
     }
   }
 
-  // Everything looks ok at this point, so increment the trajectory
-  // number and add the traj info to the list we publish
-  cmdnum++;
-
+  // Everything looks ok at this point, so add the traj info to 
+  // the list we publish
   pr_msgs::TrajInfo ti;
-  ti.id = traj->id=cmdnum;
+  ti.id = traj->id;
   ti.type = traj->type;
   ti.end_position = traj->end_position;
 #ifdef FAKE7
   ti.end_position.resize(7);
 #endif
   ti.state = pr_msgs::TrajInfo::state_pending;
-  wamstate.trajectory_queue.push_back(ti);
 
   // if there are already running / queued trajectories, just add ours.
   // note: the order of these conditional checks is important.  only want to
@@ -1982,23 +2102,31 @@ uint32_t WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_re
   // enter a race condition with the Update loop (both of you will notice
   // jointtraj is null, and both will start changing it).  by making sure
   // the queue is empty first, we know the Update loop will have nothing to do.
-  if ((trajectory_list.size() > 0) || owam->jointstraj) {
+  // Synchronized trajectories always get queued, so that the service
+  // call can return right away without waiting for the sync start
+  if ((trajectory_list.size() > 0) || owam->jointstraj || traj->Synchronize) {
+    ROS_INFO("Trajectory %s queued for execution", traj->id.c_str());
     trajectory_list.push_back(traj);
-    return traj->id;
+    wamstate.trajectory_queue.push_back(ti);
+    return true;
   }
 
   // run the trajectory
-  owam->run_trajectory(traj);
+  if (owam->run_trajectory(traj) == OW_FAILURE) {
+    wamstate.trajectory_queue.push_back(ti);
+    return false;
+  }
+  wamstate.trajectory_queue.push_back(ti);
   wamstate.trajectory_queue[0].state=pr_msgs::TrajInfo::state_active;
-  ROS_INFO("Added trajectory #%d",traj->id);
+  ROS_INFO("Added trajectory %s",traj->id.c_str());
   char endstr[200];
   strcpy(endstr,"");
   for (unsigned int j=0; j<nJoints; ++j) {
-    sprintf(endstr+strlen(endstr)," %1.4f",traj->end_position[j]);
+    snprintf(endstr+strlen(endstr),199-strlen(endstr)," %1.4f",traj->end_position[j]);
   }
-  ROS_INFO_NAMED("AddTrajectory","Trajectory #%d will stop at [%s ]",
-		 traj->id,endstr);
-  return traj->id;
+  ROS_INFO_NAMED("AddTrajectory","Trajectory %s will stop at [%s ]",
+		 traj->id.c_str(),endstr);
+  return true;
 }
 
 bool WamDriver::DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
@@ -2014,7 +2142,7 @@ bool WamDriver::DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
   // lock against re-queuing by Update() function
   boost::mutex::scoped_lock lock(queue_mutex);
   for (unsigned int x=0; x<req.ids.size(); ++x) {
-    int delete_id = req.ids[x];
+    std::string delete_id = req.ids[x];
     owam->lock();
     if (owam->jointstraj && (owam->jointstraj->id == delete_id)) {
       owam->unlock();
@@ -2079,7 +2207,7 @@ bool WamDriver::SetJointStiffness(pr_msgs::SetJointStiffness::Request &req,
                              pr_msgs::SetJointStiffness::Response &res) {
   if (req.stiffness.size() != nJoints) {
     char errmsg[200];
-    sprintf(errmsg,"SetJointStiffness expects a vector of %d stiffness values, but %zd were sent",nJoints,req.stiffness.size());
+    snprintf(errmsg,200,"SetJointStiffness expects a vector of %d stiffness values, but %zd were sent",nJoints,req.stiffness.size());
     ROS_WARN("%s",errmsg);
     res.reason=errmsg;
     res.ok=false;
@@ -2141,7 +2269,7 @@ bool WamDriver::SetJointOffsets(pr_msgs::SetJointOffsets::Request &req,
                              pr_msgs::SetJointOffsets::Response &res) {
   if (req.offset.size() != nJoints) {
     char errmsg[200];
-    sprintf(errmsg,"SetJointOffsets expects a vector of %d offset values, but %zd were sent",nJoints,req.offset.size());
+    snprintf(errmsg,200,"SetJointOffsets expects a vector of %d offset values, but %zd were sent",nJoints,req.offset.size());
     ROS_WARN("%s",errmsg);
     res.reason=errmsg;
     res.ok=false;
@@ -2263,6 +2391,14 @@ bool WamDriver::SetSpeed(pr_msgs::SetSpeed::Request &req,
   return true;
 }
 
+bool WamDriver::GetSpeed(pr_msgs::GetSpeed::Request &req,
+                         pr_msgs::GetSpeed::Response &res) {
+  res.max_velocity = joint_vel;
+  res.max_acceleration = joint_accel;
+  res.max_jerk = max_jerk;
+  return true;
+}
+    
 bool WamDriver::SetExtraMass(pr_msgs::SetExtraMass::Request &req,
 			     pr_msgs::SetExtraMass::Response &res) {
   owam->lock("SetExtraMass");
@@ -2375,25 +2511,32 @@ void WamDriver::Update() {
     return; // still running a trajectory
   }
   
-  if (wamstate.trajectory_queue.size() > 0) {
+  if ((wamstate.trajectory_queue.size() > 0) &&
+      (wamstate.trajectory_queue.front().state !=
+       pr_msgs::TrajInfo::state_pending)) {
+    // we are not currently executing a trajectory, but if there's one in the
+    // queue that's not still pending, then it must have just finished, so
+    // move it from the queue to the previous field
+    
     wamstate.prev_trajectory = wamstate.trajectory_queue.front();
     char endstr[200];
     strcpy(endstr,"");
     for(int i = Joint::J1; i<=Joint::Jn; i++) {
-      sprintf(endstr+strlen(endstr)," %1.4f",owam->heldPositions[i]);
+      snprintf(endstr+strlen(endstr),199-strlen(endstr)," %1.4f",owam->heldPositions[i]);
     }
     if (owam->last_traj_state == Trajectory::DONE) {
       wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_done;
-      ROS_INFO_NAMED("AddTrajectory","Trajectory #%d has finished; new reference position is [%s ]",
-		     wamstate.prev_trajectory.id,endstr);
+      ROS_INFO_NAMED("AddTrajectory","Trajectory %s has finished; new reference position is [%s ]",
+		     wamstate.prev_trajectory.id.c_str(),endstr);
     } else if (owam->last_traj_state == Trajectory::ABORT) {
       wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_aborted;
-      ROS_INFO_NAMED("AddTrajectory","Trajectory #%d has been cancelled; new reference position is [%s ]",
-		     wamstate.prev_trajectory.id,endstr);
+      ROS_INFO_NAMED("AddTrajectory","Trajectory %s has been cancelled; new reference position is [%s ]",
+		     wamstate.prev_trajectory.id.c_str(),endstr);
     }
     wamstate.trajectory_queue.erase(wamstate.trajectory_queue.begin());
   }
 
+  // now look for any new trajectories to start
   boost::mutex::scoped_lock lock(queue_mutex);
   if (trajectory_list.size()==0) {
     return; // nothing to do
@@ -2431,7 +2574,9 @@ void WamDriver::Update() {
   }
 
   // load next trajectory
-  owam->run_trajectory(trajectory_list.front());
+  if (owam->run_trajectory(trajectory_list.front()) == OW_FAILURE) {
+    ROS_ERROR("Could not start queued trajectory");
+  }
   trajectory_list.pop_front();
   if (wamstate.trajectory_queue.size() > 0) {
     wamstate.trajectory_queue.front().state=pr_msgs::TrajInfo::state_active;
@@ -2452,7 +2597,7 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> 
   if (owam->jointstraj) {
     ServoTraj *straj = dynamic_cast<ServoTraj *>(owam->jointstraj);
     if (straj) {
-      ROS_DEBUG_NAMED("servo","Updating servo trajectory %d",straj->id);
+      ROS_DEBUG_NAMED("servo","Updating servo trajectory %s",straj->id.c_str());
       for (unsigned int i=0; i<servo->joint.size(); ++i) {
         straj->SetVelocity(servo->joint[i],servo->velocity[i]);
       }
@@ -2465,11 +2610,11 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> 
     }
   } else {
     owam->unlock();
-    cmdnum++;
 #ifdef BUILD_FOR_SEA
     owam->posSmoother.getSmoothedPVA(owam->heldPositions);
 #endif // BUILD_FOR_SEA
-    ServoTraj *straj = new ServoTraj(nJoints, cmdnum, owam->heldPositions+1, &Plugin::_lower_jlimit[0], &Plugin::_upper_jlimit[0]);
+    std::string trajid = Trajectory::random_id();
+    ServoTraj *straj = new ServoTraj(nJoints, trajid, owam->heldPositions+1, &Plugin::_lower_jlimit[0], &Plugin::_upper_jlimit[0]);
     for (unsigned int i=0; i<servo->joint.size(); ++i) {
       straj->SetVelocity(servo->joint[i],servo->velocity[i]);
     }
@@ -2477,20 +2622,23 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> 
       ROS_ERROR_NAMED("servo","Servo trajectory failed to start");
       return;
     }
-    ROS_DEBUG_NAMED("servo","Starting servo trajectory %d",cmdnum);
+    ROS_DEBUG_NAMED("servo","Starting servo trajectory %s",trajid.c_str());
     return;
   }
 } 
 
 bool WamDriver::StepJoint(pr_msgs::StepJoint::Request &req,
 			  pr_msgs::StepJoint::Response &res) {
-  cmdnum++;
 #ifdef BUILD_FOR_SEA
   owam->posSmoother.getSmoothedPVA(owam->heldPositions);
 #endif // BUILD_FOR_SEA
-  StepTraj *straj = new StepTraj(cmdnum, nJoints, req.joint, owam->heldPositions+1, req.radians);
-  owam->run_trajectory(straj);
-  ROS_DEBUG_NAMED("servo","Starting servo trajectory %d",cmdnum);
+  std::string trajid = Trajectory::random_id();
+  StepTraj *straj = new StepTraj(trajid, nJoints, req.joint, owam->heldPositions+1, req.radians);
+  if (owam->run_trajectory(straj) != OW_SUCCESS) {
+    ROS_ERROR("Could not start Servo traj");
+    return false;
+  }
+  ROS_DEBUG_NAMED("servo","Starting servo trajectory %s",trajid.c_str());
   return true;
 }
 

@@ -25,6 +25,7 @@
 #include "MacQuinticSegment.hh"
 #include "TrajType.hh"
 #include "Trajectory.hh"
+#include "BinaryData.hh"
 #include <vector>
 
 #ifndef __MACJOINTTRAJ_HH__
@@ -35,11 +36,12 @@ namespace OWD {
 class MacJointTraj : public Trajectory {
 public:
   int DOF;
+private:
   JointPos max_joint_vel;
   JointPos max_joint_accel;
+public:
   std::vector<MacQuinticElement *>::iterator current_piece;
   std::vector<MacQuinticElement *> macpieces;
-  double traj_duration;
 
 private:
   int rescale_to_slowest(int slowest_joint,
@@ -62,12 +64,15 @@ public:
 	       bool bCancelOnForceInput,
 	       bool bCancelOnTactileInput);
 
+  MacJointTraj(BinaryData &bd);
+  virtual BinaryData serialize(int firstdof=0, int lastdof=-1);
+
   virtual ~MacJointTraj();
     
   virtual void log(char *prefix);
     
   virtual void run();
-  virtual void evaluate(Trajectory::TrajControl &tc, double dt);
+  virtual void evaluate_abs(Trajectory::TrajControl &tc, double t);
   virtual void get_path_values(double *path_vel, double *path_accel) const;
   virtual void get_limits(double *max_path_vel, double *max_path_accel) const;
   //  virtual void rebuild_from_current();

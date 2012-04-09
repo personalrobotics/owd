@@ -35,8 +35,8 @@ ConstrainedForceTrajectory::ConstrainedForceTrajectory(
       const EndCondition end_condition,
       Link wam_links[],
       double max_velocity,
-      int trajid) :
-  OWD::Trajectory("ConstrainedForceTrajectory"),
+      std::string trajid) :
+  OWD::Trajectory("ConstrainedForceTrajectory", trajid),
   initial_force_vector(starting_force_vector),
   current_force_vector(starting_force_vector),
   end_cond(end_condition),
@@ -45,7 +45,6 @@ ConstrainedForceTrajectory::ConstrainedForceTrajectory(
 {
   // initialize the base-class members
   start_position=startpos;
-  id=trajid;
   WaitForStart=false;
   CancelOnStall=false;
   

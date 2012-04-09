@@ -27,7 +27,7 @@
 #include <assert.h>
 #include "MacQuinticSegment.hh"
 
-#define VERBOSE 0
+#define VERBOSE 1
 
 MacQuinticSegment::MacQuinticSegment( OWD::TrajPoint first_p,
 				      OWD::TrajPoint second_p,
@@ -1128,3 +1128,67 @@ double MacQuinticSegment::cubic_solve(double A, double B, double C) {
 }
 
 const double MacAccelElement::epsilon;
+
+MacQuinticSegment::MacQuinticSegment(BinaryData &bd) 
+  // first let the base class extract itself
+  : MacQuinticElement(bd) {
+
+  // now get our own members
+  direction              =bd.GetDoubleVector();
+  jmax                   =bd.GetDouble();
+  distance               =bd.GetDouble();
+  start_vel              =bd.GetDouble();
+  end_vel                =bd.GetDouble();
+  condition              =bd.GetInt();
+  current_path_vel       =bd.GetDouble();
+  current_path_accel     =bd.GetDouble();
+  int accel_elements_size=bd.GetInt();
+  for (int i=0; i<accel_elements_size; ++i) {
+    int type=bd.GetInt();
+    BinaryData bd2(bd.GetString());
+    if (type == 0) {
+      accel_elements.push_back(new MacAccelPulse(bd2));
+    } else if (type == 1) {
+      accel_elements.push_back(new MacZeroAccel(bd2));
+    } else {
+      throw "Unknown type while extracting MacAccelElements";
+    }
+  }
+}
+
+BinaryData MacQuinticSegment::serialize(int firstdof, int lastdof) {
+  if (lastdof == -1) {
+    lastdof = direction.size()-1;
+  }
+
+  // first have the Element base class put in its info
+  BinaryData bd(MacQuinticElement::serialize(firstdof, lastdof));
+  
+  // now add our additional members
+  OWD::JointPos d;
+  d.insert(d.begin(),
+	   direction.begin()+firstdof,
+	   direction.begin()+lastdof+1);
+
+  bd.PutDoubleVector(d);
+  bd.PutDouble(      jmax);
+  bd.PutDouble(      distance);
+  bd.PutDouble(      start_vel);
+  bd.PutDouble(      end_vel);
+  bd.PutInt(         condition);
+  bd.PutDouble(      current_path_vel);
+  bd.PutDouble(      current_path_accel);
+  bd.PutInt(         accel_elements.size());
+  for (unsigned int i=0; i<accel_elements.size(); ++i) {
+      if (dynamic_cast<MacAccelPulse *>(accel_elements[i])) {
+	bd.PutInt(0);
+      } else if (dynamic_cast<MacZeroAccel *>(accel_elements[i])) {
+	bd.PutInt(1);
+      } else {
+	throw "Unknown element type in macpieces pointer list";
+      }
+    bd.PutString(accel_elements[i]->serialize());
+  }
+  return bd;
+}
+

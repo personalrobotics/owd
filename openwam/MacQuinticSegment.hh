@@ -52,6 +52,8 @@ public:
 
 
   double current_path_vel, current_path_accel;
+  std::vector<MacAccelElement *> accel_elements;
+
   void enforceSpeedLimits();
   void reverse_accel_pulses();
   void verify_end_conditions();
@@ -61,13 +63,14 @@ public:
   MacAccelElement *check_for_cruise(double distance,
 				    MacAccelElement *ae1,
 				    MacAccelElement *ae2);
-  std::vector<MacAccelElement *> accel_elements;
 
   MacQuinticSegment( OWD::TrajPoint first_p,
                      OWD::TrajPoint second_p,
 		     OWD::JointPos max_joint_vel,
 		     OWD::JointPos max_joint_accel,
 		     double max_jerk);
+
+  MacQuinticSegment(BinaryData &bd);
 
   // functions required by the base class
   void setStartVelocity(double v);
@@ -96,6 +99,7 @@ public:
   static double safe_sqrt(double val);
 
   void dump();
+  virtual BinaryData serialize(int firstdof=0, int lastdof=-1);
 };
 
 

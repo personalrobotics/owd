@@ -46,11 +46,11 @@ public:
   };
     
   ConstrainedForceTrajectory(const JointPos &start,
-			     const JointPos &staring_force_vector,
+			     const JointPos &starting_force_vector,
 			     const EndCondition end_condition,
 			     Link wam_links[],
 			     double max_velocity,
-			     int trajid);
+			     std::string trajid);
   virtual ~ConstrainedForceTrajectory();
     
   //  void evaluate(double y[], double yd[], double ydd[], double dt);

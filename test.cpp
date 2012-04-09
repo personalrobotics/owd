@@ -45,20 +45,14 @@ public:
   std::vector<double> h1, h2, h3, h4;
   bool running;
   int point;
-  unsigned int last_traj_id;
+  std::string last_traj_id;
 
   boost::mutex cb_mutex;
 
   void wamstate_callback(const boost::shared_ptr<const pr_msgs::WAMState> &ws) {
     wamstate = *ws;
     if (running) {
-      if ((wamstate.trajectory_queue.size() > 0) &&
-          (wamstate.trajectory_queue[0].state == pr_msgs::TrajInfo::state_paused)) {
-        // reverse direction shortly after it stalls
-        DeleteTrajectory(wamstate.trajectory_queue[0].id);
-        return;
-      }
-      if ((last_traj_id == 0) // first time
+      if ((last_traj_id == "") // first time
           || (wamstate.prev_trajectory.id == last_traj_id)) {
 	++point;
         if (point == 1) {
@@ -89,7 +83,7 @@ public:
   }
 
   Test(ros::NodeHandle &n) : node(n), running(false),
-                       point(1), last_traj_id(0)
+                       point(1), last_traj_id("")
   {
     p1.j.resize(7);
     p2.j.resize(7);
@@ -185,7 +179,7 @@ public:
     }
   }
 
-  void DeleteTrajectory(int id) {
+  void DeleteTrajectory(std::string id) {
     pr_msgs::DeleteTrajectory::Request delete_req;
     pr_msgs::DeleteTrajectory::Response delete_res;
     delete_req.ids.push_back(id);
@@ -240,7 +234,7 @@ public:
   }
     
 
-  int MoveTo(pr_msgs::Joints p, bool StopOnForce) {
+  std::string MoveTo(pr_msgs::Joints p, bool StopOnForce) {
     // build trajectory to move from current pos to preferred pos
     pr_msgs::AddTrajectory::Request traj_req;
     pr_msgs::AddTrajectory::Response traj_res;
@@ -268,16 +262,16 @@ public:
       traj_req.traj.options = traj_req.traj.opt_CancelOnForceInput;
     }
     if (ros::service::call("owd/AddTrajectory",traj_req,traj_res)) {
-      ROS_DEBUG("Added Trajectory %d",traj_res.id);
-      if (traj_res.id == 0) {
+      ROS_DEBUG("Added Trajectory %s",traj_res.id.c_str());
+      if (!traj_res.ok) {
         ROS_WARN("Adding trajectory failed");
-        return -2;
+        return std::string("-2");
       } else {
         return traj_res.id;
       }
     } else {
       ROS_WARN("Could not Add Trajectory");
-      return -2;
+      return std::string("-2");
     }
   }
 
@@ -336,8 +330,6 @@ int main(int argc, char** argv)
   test.Subscribe();
 
   test.SetStiffness(0.0);
-  //  wagon.CancelTrajectory();
-  // test.DeleteTrajectory(1);
 
   pthread_t mainthread;
   if (pthread_create(&mainthread,NULL,&mainloop,&test)) {

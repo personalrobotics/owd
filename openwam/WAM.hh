@@ -46,6 +46,7 @@
 #include "MacJointTraj.hh"
 #include "Sigmoid.hh"
 #include "JointCtrlPID.hh"
+#include "MultiSync.hh"
 #include <pr_msgs/PIDgains.h>
 
 #include "DataRecorder.cc"
@@ -150,6 +151,7 @@ public:
   int safetytorquecount[7];
   double safetytorquesum[7];
 
+  MultiSync *ms;
 
   JointCtrlPID jointsctrl[Joint::Jn+1];    // joint controllers
 

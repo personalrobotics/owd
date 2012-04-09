@@ -25,44 +25,45 @@
 
 namespace OWD {
 
-StepTraj::StepTraj(int trajid, int dof, unsigned int joint,
-		   double *start_pos, double step_size)
-  : Trajectory("StepTraj"),
-    nDOF(dof)
-{
-  id=trajid;
-  start_position.SetFromArray(nDOF,start_pos);
-  end_position = start_position;
-  if ((joint<1) || (joint>Joint::Jn)) {
-    char msg[200];
-    snprintf(msg,200,"Joint must be between 1 and %d",Joint::Jn);
-    throw((const char *)msg);
+  StepTraj::StepTraj(std::string trajid, int dof, unsigned int joint,
+		     double *start_pos, double step_size)
+    : Trajectory("StepTraj", trajid),
+      nDOF(dof)
+  {
+    start_position.SetFromArray(nDOF,start_pos);
+    end_position = start_position;
+    duration=3.0;  // always 3 seconds total
+    if ((joint<1) || (joint>Joint::Jn)) {
+      char msg[200];
+      snprintf(msg,200,"Joint must be between 1 and %d",Joint::Jn);
+      throw((const char *)msg);
+    }
+    end_position[joint-1] += step_size;
   }
-  end_position[joint-1] += step_size;
-}
 
-StepTraj::~StepTraj() {
-}
+  StepTraj::~StepTraj() {
+  }
+  
+  void StepTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
+    if (tc.q.size() < (unsigned int)nDOF) {
+      runstate=DONE;
+      return;
+    }
+    time = t;
+    if (time < 1.0) {
+      tc.q=start_position;
+      tc.qd.resize(nDOF,0);
+      tc.qdd.resize(nDOF,0);
+    } else {
+      // after the 1 second point we step the joints to the final position
+      tc.q=end_position;
+      tc.qd.resize(nDOF,0);
+      tc.qdd.resize(nDOF,0);
+    }
+    if (time>duration) {
+      runstate = DONE;
+    }
     
-void StepTraj::evaluate(Trajectory::TrajControl &tc, double dt) {
-  if (tc.q.size() < (unsigned int)nDOF) {
-    runstate=DONE;
-    return;
   }
-  time += dt;
-  if (time < 1.0) {
-    tc.q=start_position;
-    tc.qd.resize(nDOF,0);
-    tc.qdd.resize(nDOF,0);
-  } else {
-    tc.q=end_position;
-    tc.qd.resize(nDOF,0);
-    tc.qdd.resize(nDOF,0);
-  }
-  if (time>3.0) {
-    runstate = DONE;
-  }
-
-}
-
+  
 }; // namespace OWD

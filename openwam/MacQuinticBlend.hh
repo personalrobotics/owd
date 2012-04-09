@@ -82,6 +82,8 @@ public:
 		  OWD::JointPos max_joint_accel,
 		  double max_jerk);
 
+  MacQuinticBlend(BinaryData &bd);
+
   // functions required by the base class
   // blends start and end with the same velocity, so these next two
   //   functions do the same thing
@@ -109,6 +111,7 @@ public:
 
   void dump();
 
+  virtual BinaryData serialize(int firstdof=0, int lastdof=-1);
 };
 
 

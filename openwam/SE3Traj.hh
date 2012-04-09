@@ -50,7 +50,7 @@ protected:
 public:
 
   SE3Traj(const SE3& e01, const SE3& e02, 
-	  Profile* lp, Profile* rp) : OWD::Trajectory("SE3Traj"){
+	  Profile* lp, Profile* rp) : OWD::Trajectory("SE3Traj",""){
     E01=e01; 
     linprof=lp;
     rotprof=rp;
@@ -105,7 +105,7 @@ public:
     }
   }
 
-  void evaluate(OWD::Trajectory::TrajControl &tc, double dt) {};
+  void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {};
 };
 
 #endif

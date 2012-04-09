@@ -122,7 +122,7 @@ int main(int argc, char** argv)
     ROS_FATAL("Error during WamDriver::Init(); exiting.");
     delete wamdriver;
     exit(1);
-  } catch (char *errmsg) {
+  } catch (const char *errmsg) {
     ROS_FATAL("Error during WamDriver::Init(): %s",errmsg);
     delete wamdriver;
     exit(1);

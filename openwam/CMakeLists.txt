@@ -44,14 +44,15 @@ rosbuild_add_library(openwam Joint.cc Motor.cc Puck.cc Group.cc
                             Sigmoid.cc Kinematics.cc Dynamics.cc
 			    TrajType.cc PulseTraj.cc Trajectory.cc ParabolicSegment.cc
                             ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc
-                            ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc butterworth_solver.c)
+                            ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc 
+			    butterworth_solver.c MultiSync.cc BinaryData.cc)
 
 rosbuild_add_library(openwamsim Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc
                                ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc
                                TrajType.cc PulseTraj.cc Trajectory.cc ParabolicSegment.cc
                                ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc
                                ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc
-			       Plugin.cc butterworth_solver.c)
+			       Plugin.cc butterworth_solver.c MultiSync.cc BinaryData.cc)
 rosbuild_add_compile_flags(openwamsim "-DOWDSIM")
 
 rosbuild_add_library(wamcan ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)

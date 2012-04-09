@@ -69,7 +69,7 @@ ParaJointTraj::ParaJointTraj(TrajType &vtraj,
                              bool bCancelOnStall,
 			     bool bCancelOnForceInput,
 			     bool bCancelOnTactileInput) :
-  Trajectory("ParaJointTraj"),max_joint_vel(mjv),
+  Trajectory("ParaJointTraj",""),max_joint_vel(mjv),
   max_joint_accel(mja), restart(false)
 {
   WaitForStart=bWaitForStart;
@@ -79,7 +79,6 @@ ParaJointTraj::ParaJointTraj(TrajType &vtraj,
   pthread_mutex_init(&mutex, NULL);
   runstate=STOP;
   time=0.0;
-  id=0;
     if (vtraj.size() < 2) {
       throw "Trajectories must have 2 or more points; do a move instead";
     }
@@ -194,7 +193,7 @@ ParaJointTraj::ParaJointTraj(TrajType &vtraj,
             // if there was only one segment, and it has all constant joint values, we
             // don't even need the trajectory.  But it's probably better to keep it and
             // let it eval for one cycle, so that the calling function doesn't freak out.
-            traj_duration = parsegs[0].back().end_time;
+            duration = parsegs[0].back().end_time;
             end_position = vtraj.back();
             // set the current_segment[] iterators
             for (int j = 0; j<DOF; ++j) {
@@ -211,7 +210,7 @@ ParaJointTraj::ParaJointTraj(TrajType &vtraj,
                            max_joint_vel,max_joint_accel)) {
       ROS_ERROR("ParaJointTraj: error occured at traj point %d\n",i+1);
     }
-    traj_duration = parsegs[0].back().end_time;
+    duration = parsegs[0].back().end_time;
     end_position = vtraj.back();
 
     // set the current_segment[] iterators
@@ -285,7 +284,7 @@ int ParaJointTraj::rescale_to_slowest(int slowest_joint,double max_end_time,doub
     return 0;
 }
 
-void ParaJointTraj::evaluate(Trajectory::TrajControl &tc, double dt) {
+void ParaJointTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
 
   // DANGER: cannot call any ROSOUT functions (ROS_DEBUG, etc) from within
   // this function, or it will kill our realtime performance.  Instead, the
@@ -302,42 +301,37 @@ void ParaJointTraj::evaluate(Trajectory::TrajControl &tc, double dt) {
   if ((runstate == RUN) || (runstate == LOG)) {
     // check for restart segment
     if (restart) { 
-      restart_time += dt;
+      restart_time = t - current_segment[0]->end_time;
       if (restart_time > restart_parsegs[0].end_time) {
 	// we're done with the restart segment, so switch
 	// back to the regular segment
-	restart_time -= restart_parsegs[0].end_time; // extra time
-	time=current_segment[0]->end_time + restart_time;
 	restart_parsegs.clear();
 	restart=false;
       } 
-    } else {
-      // regular segment
-      time += dt;
     }
+    time = t;
     //    ROS_DEBUG_NAMED("trajectory","ParaJointTraj eval: time=%3.3f",time);
   }
   int finished_joints = 0;
   for (int j = 0; j < DOF; j++) {
-    if (dt>0) {
-      while ((time > current_segment[j]->end_time) &&
-	     (current_segment[j] != parsegs[j].end())) {
-	// keep skipping segments until we find the one that includes this time
-	//	ROS_DEBUG_NAMED("trajectory","ParaJointTraj: incrementing segment for joint %d, time=%2.2f, et=%2.2f\n",j,time,current_segment[j]->end_time);
-	++current_segment[j];
-      }
-    } else if (dt < 0) {
-      while ((time < current_segment[j]->start_time) &&
-	     (current_segment[j] != parsegs[j].begin())) {
-	// keep skipping segments until we find the one that includes this time
-	//	ROS_DEBUG_NAMED("trajectory","ParaJointTraj: decrementing segment for joint %d, time=%2.2f, et=%2.2f\n",j,time,current_segment[j]->end_time);
-	--current_segment[j];
-      }
-      if (time < current_segment[j]->start_time) {
-	//	ROS_ERROR_NAMED("trajectory","Could not locate proper segment for trajectory.");
-	//	ROS_ERROR_NAMED("trajectory","time %2.2f, current segment start %2.2f, end %2.2f",time,current_segment[j]->start_time,current_segment[j]->end_time);
-	throw "Could not locate matching segment";
-      }
+    // check to see if we need to go forward
+    while ((time > current_segment[j]->end_time) &&
+	   (current_segment[j] != parsegs[j].end())) {
+      // keep skipping segments until we find the one that includes this time
+      //	ROS_DEBUG_NAMED("trajectory","ParaJointTraj: incrementing segment for joint %d, time=%2.2f, et=%2.2f\n",j,time,current_segment[j]->end_time);
+      ++current_segment[j];
+    }
+    // check to see if we need to go backwards
+    while ((time < current_segment[j]->start_time) &&
+	   (current_segment[j] != parsegs[j].begin())) {
+      // keep skipping segments until we find the one that includes this time
+      //	ROS_DEBUG_NAMED("trajectory","ParaJointTraj: decrementing segment for joint %d, time=%2.2f, et=%2.2f\n",j,time,current_segment[j]->end_time);
+      --current_segment[j];
+    }
+    if (time < current_segment[j]->start_time) {
+      //	ROS_ERROR_NAMED("trajectory","Could not locate proper segment for trajectory.");
+      //	ROS_ERROR_NAMED("trajectory","time %2.2f, current segment start %2.2f, end %2.2f",time,current_segment[j]->start_time,current_segment[j]->end_time);
+      throw "Could not locate matching segment";
     }
     if (current_segment[j] == parsegs[j].end()) {
       // we're done
@@ -366,7 +360,7 @@ void ParaJointTraj::evaluate(Trajectory::TrajControl &tc, double dt) {
 	  }
 	} else {
 	  //	  ROS_ERROR("ParaJointTraj: Error occurred within joint %d, time %3.3f of %3.3f\n",
-	  //		    j+1,time,traj_duration);
+	  //		    j+1,time,duration);
 	  //	  ROS_ERROR("ParaJointTraj: Dump of all joints for that segment:\n");
 	  for (int k = 0; k < DOF; k++) {
 	    //	    ROS_ERROR("ParaJointTraj: %d: ",k+1);

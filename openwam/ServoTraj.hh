@@ -41,10 +41,11 @@ private:
   double jlimit_buffer;
   JointPos current_position;
   double lower_jlimit[7], upper_jlimit[7];
+  double lasttime;
 
 public:
 
-  ServoTraj(int DOF, int id, double *start_pos,
+  ServoTraj(int DOF, std::string id, double *start_pos,
 	    double *lower_joint_limits = NULL,
 	    double *upper_joint_limits = NULL);
   virtual ~ServoTraj();
@@ -53,7 +54,7 @@ public:
   virtual void stop(); // override of base class stop()
   
   // mandatory functions inherited from Trajectory
-  virtual void evaluate(Trajectory::TrajControl &tc, double dt);
+  virtual void evaluate_abs(Trajectory::TrajControl &tc, double t);
 };
 
 }; // namespace OWD

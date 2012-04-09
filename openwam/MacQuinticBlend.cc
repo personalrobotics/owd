@@ -24,7 +24,7 @@
 #include <math.h>
 #include <stdio.h>
 
-#define VERBOSE 0
+#define VERBOSE 1
 
 #define PI MacAccelElement::PI
 
@@ -290,3 +290,55 @@ void MacQuinticBlend::dump() {
 
   printf("  velocity=%2.3f  blend_radius=%2.3f\n",velocity,blend_radius);
 }
+
+MacQuinticBlend::MacQuinticBlend(BinaryData &bd)
+  // first let the base class extract itself
+  : MacQuinticElement(bd) {
+
+  // now get our own members
+  start_direction=bd.GetDoubleVector();
+  end_direction=bd.GetDoubleVector();
+  velocity=bd.GetDouble();
+  max_joint_vel=bd.GetDoubleVector();
+  max_joint_accel=bd.GetDoubleVector();
+  b1=bd.GetDoubleVector();
+  b2=bd.GetDoubleVector();
+  m1=bd.GetDoubleVector();
+  m2=bd.GetDoubleVector();
+  m2_minus_m1=bd.GetDoubleVector();
+  blend_radius=bd.GetDouble();
+  current_path_vel=bd.GetDouble();
+  current_path_accel=bd.GetDouble();
+}
+
+OWD::JointPos strip_vector(OWD::JointPos j, int firstdof, int lastdof) {
+  OWD::JointPos jp;
+  jp.insert(jp.begin(), j.begin()+firstdof, j.begin()+lastdof+1);
+  return jp;
+}
+ 
+BinaryData MacQuinticBlend::serialize(int firstdof, int lastdof) {
+  if (lastdof == -1) {
+    lastdof = start_direction.size()-1;
+  }
+  // first have the Element base class put in its info
+  BinaryData bd(MacQuinticElement::serialize(firstdof, lastdof));
+
+  // now add our additional members
+  bd.PutDoubleVector(strip_vector(start_direction,firstdof,lastdof));
+  bd.PutDoubleVector(strip_vector(end_direction,firstdof,lastdof));
+  bd.PutDouble(velocity);
+  bd.PutDoubleVector(strip_vector(max_joint_vel,firstdof,lastdof));
+  bd.PutDoubleVector(strip_vector(max_joint_accel,firstdof,lastdof));
+  bd.PutDoubleVector(strip_vector(b1,firstdof,lastdof));
+  bd.PutDoubleVector(strip_vector(b2,firstdof,lastdof));
+  bd.PutDoubleVector(strip_vector(m1,firstdof,lastdof));
+  bd.PutDoubleVector(strip_vector(m2,firstdof,lastdof));
+  bd.PutDoubleVector(strip_vector(m2_minus_m1,firstdof,lastdof));
+  bd.PutDouble(blend_radius);
+  bd.PutDouble(current_path_vel);
+  bd.PutDouble(current_path_accel);
+
+  return bd;
+}
+

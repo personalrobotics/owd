@@ -27,6 +27,18 @@
 
 namespace OWD {
 
+
+  // the default evaluate function is really just here for backwards
+  // compatibility, but new Trajectory classes should focus on implementing
+  // evaluate_abs(), which is required for multi-controller synchronization.
+  void Trajectory::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+    // if we're running, then increment the time.  Otherwise, stay where we are
+    if ((runstate == RUN) || (runstate == LOG)) {
+      time += dt;
+    }
+    evaluate_abs(tc,time);
+  }
+  
   bool Trajectory::log(const char *trajname) {
     if ((runstate != Trajectory::STOP) && (runstate != Trajectory::DONE)) {
       // can't log a running trajectory; it would mess up the times
@@ -189,6 +201,70 @@ namespace OWD {
 
   }
 
+  BinaryData Trajectory::serialize(int firstdof, int lastdof) {
+    if (lastdof == -1) {
+      lastdof = start_position.size()-1;
+    }
+    if (firstdof > start_position.size()) {
+      throw "Invalid firstdof";
+    }
+    if (lastdof >= start_position.size()) {
+      throw "Invalid lastdof";
+    }
+    // create scaled-down versions of our start and end position
+    // vectors with just the DOFS that were requested
+    JointPos sp,ep;
+    sp.insert(sp.begin(),
+	      start_position.begin()+firstdof,
+	      start_position.begin()+lastdof+1);
+    ep.insert(ep.begin(),
+	      end_position.begin()+firstdof,
+	      end_position.begin()+lastdof+1);
+    
+    BinaryData bd;
+    bd.PutDoubleVector(sp);
+    bd.PutDoubleVector(ep);
+    bd.PutString(      id);
+    bd.PutString(      type);
+    bd.PutDouble(      duration);
+    bd.PutBoolean(     CancelOnStall);
+    bd.PutBoolean(     WaitForStart);
+    bd.PutBoolean(     Synchronize);
+    bd.PutBoolean(     CancelOnForceInput);
+    bd.PutBoolean(     CancelOnTactileInput);
+    
+    return bd;
+  }
+
+  Trajectory::Trajectory(BinaryData &bd)
+    : runstate(STOP), time(0),
+      CancelOnStall(false),WaitForStart(false),
+      Synchronize(false),
+      CancelOnForceInput(false),
+      CancelOnTactileInput(false),
+      valid_ft(false),
+      tactile_filter(3,5)
+  {
+    start_position       =bd.GetDoubleVector();
+    end_position         =bd.GetDoubleVector();
+    id                   =bd.GetString();
+    type                 =bd.GetString();
+    duration             =bd.GetDouble();
+    CancelOnStall        =bd.GetBoolean();
+    WaitForStart         =bd.GetBoolean();
+    Synchronize          =bd.GetBoolean();
+    CancelOnForceInput   =bd.GetBoolean();
+    CancelOnTactileInput =bd.GetBoolean();
+    
+    pthread_mutex_init(&mutex,NULL);
+    
+  }
+
+  std::string Trajectory::random_id() {
+    char idstr[20];
+    snprintf(idstr,20,"%x", rand() * 1<<16 / RAND_MAX);
+    return std::string(idstr);
+  }
 
   Trajectory::TrajControl::TrajControl(unsigned int nDOF) :
     q(nDOF), qd(nDOF), qdd(nDOF), t(nDOF)
