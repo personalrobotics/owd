@@ -1960,8 +1960,8 @@ bool WamDriver::AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   }
 
   // Return success/failure and the traj id
-  res.ok = AddTrajectory(t,res.reason);
   res.id = t->id;
+  res.ok = AddTrajectory(t,res.reason);
 
   return true;
 }
@@ -2118,14 +2118,14 @@ bool WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_reason
   }
   wamstate.trajectory_queue.push_back(ti);
   wamstate.trajectory_queue[0].state=pr_msgs::TrajInfo::state_active;
-  ROS_INFO("Added trajectory %s",traj->id.c_str());
+  ROS_INFO("Added trajectory %s",ti.id.c_str());
   char endstr[200];
   strcpy(endstr,"");
   for (unsigned int j=0; j<nJoints; ++j) {
-    snprintf(endstr+strlen(endstr),199-strlen(endstr)," %1.4f",traj->end_position[j]);
+    snprintf(endstr+strlen(endstr),199-strlen(endstr)," %1.4f",ti.end_position[j]);
   }
   ROS_INFO_NAMED("AddTrajectory","Trajectory %s will stop at [%s ]",
-		 traj->id.c_str(),endstr);
+		 ti.id.c_str(),endstr);
   return true;
 }
 
