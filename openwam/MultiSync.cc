@@ -306,7 +306,7 @@ double MultiSync::time_factor() {
   return master_info->time_factor;
 }
 
-void MultiSync::run() throw (char *) {
+void MultiSync::run() {
   master_info->controller_info[id].status=RUNNING;
 }
 
@@ -388,7 +388,7 @@ bool MultiSyncMaster::wait_for_traj_start(double timeout) {
     }
   }
   if (!ready) {
-    snprintf(last_error,200,"%s","Timed out while waiting for slave controllers to switch to ready, waitcount=%d",waitcount);
+    snprintf(last_error,200,"Timed out while waiting for slave controllers to switch to ready, waitcount=%d",waitcount);
     return false;
   }
   // Once everyone is ready, we'll switch to RUNNING

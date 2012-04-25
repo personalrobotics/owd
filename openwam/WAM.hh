@@ -147,6 +147,7 @@ public:
   SE3CtrlPD    se3ctrl;                    // basic Cartesian controller
   OWD::Trajectory *jointstraj;
   int last_traj_state;
+  char last_traj_error[500];
   PulseTraj   *pulsetraj;                  // trajectory of joint acceleration pulses
   int safetytorquecount[7];
   double safetytorquesum[7];

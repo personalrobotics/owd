@@ -2530,8 +2530,10 @@ void WamDriver::Update() {
 		     wamstate.prev_trajectory.id.c_str(),endstr);
     } else if (owam->last_traj_state == Trajectory::ABORT) {
       wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_aborted;
-      ROS_INFO_NAMED("AddTrajectory","Trajectory %s has been cancelled; new reference position is [%s ]",
-		     wamstate.prev_trajectory.id.c_str(),endstr);
+      ROS_INFO_NAMED("AddTrajectory","Trajectory %s has been cancelled (%s); new reference position is [%s ]",
+		     wamstate.prev_trajectory.id.c_str(),
+		     owam->last_traj_error,
+		     endstr);
     }
     wamstate.trajectory_queue.erase(wamstate.trajectory_queue.begin());
   }

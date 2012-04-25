@@ -76,7 +76,7 @@ class MultiSync {
 
   virtual double traj_sync_time() throw (char *);
   double time_factor();
-  void run() throw (char *);
+  void run();
   void stall();
   void abort();
   void done();

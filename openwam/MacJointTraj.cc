@@ -307,9 +307,9 @@ namespace OWD {
       ++current_piece;
     }
     if (current_piece == macpieces.end()) {
-      // even though time is past the end, the piece will return the ending
-      // values
+      // since the time is past the end, evaluate at the end time
       current_piece--;
+      time = (*current_piece)->EndTime();
       (*current_piece)->evaluate(tc,time);
       runstate = DONE;
     } else {
