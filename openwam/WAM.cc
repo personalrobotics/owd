@@ -1094,7 +1094,7 @@ void WAM::newcontrol_rt(double dt){
 	// either the ms->traj_sync_time() or the evalute_abs()
 	// call threw an exception, so we have to abort
 	jointstraj->abort();
-	strncpy(last_traj_error,errmsg,500);
+	snprintf(last_traj_error,500,"Caught exception while evaluating synchronized trajectory: ",errmsg);
       }
     } else {
       try {
@@ -1102,7 +1102,7 @@ void WAM::newcontrol_rt(double dt){
       } catch (const char *errmsg) {
 	// abort trajectory
 	jointstraj->abort();
-	strncpy(last_traj_error,errmsg,500);
+	snprintf(last_traj_error,500,"Caught exception while evaluating trajectory: %s",errmsg);
       }
     } 
     RTIME t4 = ControlLoop::get_time_ns_rt();
@@ -1119,7 +1119,7 @@ void WAM::newcontrol_rt(double dt){
     last_traj_state = jointstraj->state();
     if ((jointstraj->state() == OWD::Trajectory::DONE) ||
 	(ms && jointstraj->Synchronize && (ms->status() == ms->DONE))) {
-      // we've gone past the last time in the trajectory,
+      // Either our trajectory or the master trajectory has reached the end,
       // so set up to hold at the final position.  we'll let
       // the trajectory control values persist for the rest of this
       // iteration (to help deccelerate if we're still moving), but
@@ -1132,6 +1132,8 @@ void WAM::newcontrol_rt(double dt){
       if (ms && jointstraj->Synchronize) {
 	// notify the others that we've finished
 	ms->done();
+        // update our own state
+	last_traj_state = OWD::Trajectory::DONE;
       }
       strncpy(last_traj_error,"completed without error",500);
       OWD::Trajectory *t = jointstraj; jointstraj = NULL; delete t;
@@ -1146,6 +1148,11 @@ void WAM::newcontrol_rt(double dt){
       if (ms && jointstraj->Synchronize) {
 	// notify the others that we've aborted
 	ms->abort();
+	if (jointstraj->state() != OWD::Trajectory::ABORT) {
+	  // update our own state and record why we stopped
+	  last_traj_state = OWD::Trajectory::ABORT;
+	  strncpy(last_traj_error,"Aborted by an external synchronized controller",500);
+	}
       }
       OWD::Trajectory *t = jointstraj; jointstraj = NULL; delete t;
       for (int j=Joint::J1; j<Joint::Jn; ++j) {
@@ -1422,6 +1429,7 @@ int WAM::run_trajectory(OWD::Trajectory *traj) {
 		traj->id.c_str(),
 		ms->last_error);
       traj->abort();
+      strncpy(last_traj_error,"Failed to register trajectory with the synchronization master within the time limit",500);
       return OW_FAILURE;
     } else {
       ROS_INFO("Registered trajectory %s with other synchronization controllers",
@@ -1433,6 +1441,8 @@ int WAM::run_trajectory(OWD::Trajectory *traj) {
 		traj->id.c_str(),
 		ms->last_error);
       traj->abort();
+      snprintf(last_traj_error,500,"aborted while waiting for synchronized start: %s",
+		ms->last_error);
       return OW_FAILURE;
     }
     ROS_INFO("Starting synchronized trajectory %s, duration is %2.2fs",

@@ -154,7 +154,7 @@ bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   ROS_WARN("Created timed trajectory for both arms");
   ROS_WARN("Traj will start at %s",mjt.start_position.sdump());
   ROS_WARN("Traj will end at %s",mjt.end_position.sdump());
-  ROS_WARN("Serialized synchronized right trajectory into a string of len %d",
+  ROS_WARN("Serialized synchronized right trajectory into a string of len %ld",
 	   at_req.SerializedTrajectory.size());
   at_req.options = pr_msgs::JointTraj::opt_Synchronize;
   at_req.id=mjt.id;
@@ -183,14 +183,14 @@ bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
     ROS_WARN("/right/owd/AddTimedTrajectory failed: %s",res.reason.c_str());
     return true;
   } else {
-    ROS_WARN("Synchronized trajectory sent to right arm");
+    ROS_WARN("Synchronized trajectory %s sent to right arm", at_req.id.c_str());
   }
 
   BinaryData bd2;
   bd2.PutInt(OWD::Trajectory::TRAJTYPE_MACJOINTTRAJ);
   bd2.PutString(mjt.serialize(7,13));
   at_req.SerializedTrajectory = bd2;
-  ROS_WARN("Serialized synchronized left trajectory into a string of len %d",
+  ROS_WARN("Serialized synchronized left trajectory into a string of len %ld",
 	   at_req.SerializedTrajectory.size());
   if (!left_AddTimedTrajectory.isValid()) {
     ROS_WARN("Lost connection to /left/owd/AddTimedTrajectory; trying to resubscribe...");
@@ -212,11 +212,12 @@ bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
     return true;
   }
   res.ok=at_res.ok;
+  res.id=at_req.id;
   res.reason=at_res.reason;
   if (!res.ok) {
     ROS_WARN("/left/owd/AddTimedTrajectory failed: %s",res.reason.c_str());
   } else {
-    ROS_WARN("Synchronized trajectory sent to left arm");
+    ROS_WARN("Synchronized trajectory %s sent to left arm", at_req.id.c_str());
   }
   return true;
 }

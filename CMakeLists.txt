@@ -51,6 +51,8 @@ rosbuild_add_compile_flags(owdsim "-DOWDSIM")
 
 rosbuild_add_executable(owd_test test.cpp)
 
+rosbuild_add_executable(synctest synctest.cpp)
+
 rosbuild_add_executable(puck_update puck_update.cpp)
 target_link_libraries(puck_update wamcan openwam ${CANBUS_LIBS})
 rosbuild_add_compile_flags(puck_update "${CANBUS_DEFS}")

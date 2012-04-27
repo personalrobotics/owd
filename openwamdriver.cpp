@@ -2016,6 +2016,7 @@ bool WamDriver::AddTimedTrajectory(pr_msgs::AddTimedTrajectory::Request &req,
     t->id = req.id;
   }
 
+  res.id = t->id;
   res.ok = AddTrajectory(t,res.reason);
   return true;
 }
@@ -2530,7 +2531,12 @@ void WamDriver::Update() {
 		     wamstate.prev_trajectory.id.c_str(),endstr);
     } else if (owam->last_traj_state == Trajectory::ABORT) {
       wamstate.prev_trajectory.state = pr_msgs::TrajInfo::state_aborted;
-      ROS_INFO_NAMED("AddTrajectory","Trajectory %s has been cancelled (%s); new reference position is [%s ]",
+      ROS_WARN_NAMED("AddTrajectory","Trajectory %s has been cancelled/aborted (%s); new reference position is [%s ]",
+		     wamstate.prev_trajectory.id.c_str(),
+		     owam->last_traj_error,
+		     endstr);
+    } else {
+      ROS_ERROR_NAMED("AddTrajectory","Trajectory %s is done but the last_traj_state was not set; Error may be %s; new reference position is [%s ]",
 		     wamstate.prev_trajectory.id.c_str(),
 		     owam->last_traj_error,
 		     endstr);
