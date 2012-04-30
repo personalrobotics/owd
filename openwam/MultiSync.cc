@@ -16,7 +16,7 @@ void MultiSync::MasterInfo::Init(int c) {
   // for the count to go non-zero (assuming the system clears it in
   // the first place)
   time_factor=1.0;
-  allowance = 0.004;
+  allowance = 0.010;
   controller_count = c;
 }
 
@@ -60,7 +60,7 @@ MultiSync::~MultiSync() {
   SharedMemDisconnect();
 }
 
-void MultiSync::SharedMemConnect(unsigned int shm_key, bool master, int timeout) throw (char *) {
+void MultiSync::SharedMemConnect(unsigned int shm_key, bool master, int timeout) throw (const char *) {
   int shm_id;
   int retry(timeout*2);
   if (master) {
@@ -137,7 +137,7 @@ void MultiSync::SharedMemConnect(unsigned int shm_key, bool master, int timeout)
   return;
 }
 
-void MultiSync::SharedMemDisconnect() throw (char *) {
+void MultiSync::SharedMemDisconnect() throw (const char *) {
   if (shmdt(master_info) == -1) {
     throw "Could not detach shared memory segment for master_info; perhaps the pointer was corrupted?";
   }
@@ -251,7 +251,7 @@ bool MultiSync::wait_for_traj_start(double timeout) {
   return false;
 }
 
-double MultiSync::traj_sync_time() throw (char *) {
+double MultiSync::traj_sync_time() throw (const char *) {
   if (strncmp(master_info->controller_info[0].traj_id,
 	     master_info->controller_info[id].traj_id, 50)) {
     snprintf(last_error,200,"Master has switched to trajectory ID %s so we cannot continue trajectory ID %s",
@@ -269,13 +269,13 @@ double MultiSync::traj_sync_time() throw (char *) {
     }
     if (master_info->controller_info[c].status == ABORTED) {
       // we should also abort now
-      master_info->controller_info[id].status = ABORTED;
+      abort();
       // use the same time that the aborted controller stopped at
       master_info->controller_info[id].last_traj_time =
 	master_info->controller_info[c].last_traj_time;
       snprintf(last_error,200,"Controller %s aborted",
 	       master_info->controller_info[c].controller_name);
-      return master_info->controller_info[id].last_traj_time;
+      throw last_error;
     }
   }
   timeval now;
@@ -297,7 +297,9 @@ double MultiSync::traj_sync_time() throw (char *) {
     // the master stopped incrementing the time; must have died, so
     // abort and alert the others.
     // the will eventually stop at our last_traj_time
-    master_info->controller_info[id].status = ABORTED;
+    snprintf(last_error,200,"Master controller has not updated for %1.3fs; presumed dead",elapsed);
+    abort();
+    throw last_error;
   }
   return master_info->controller_info[id].last_traj_time;
 }
@@ -403,7 +405,7 @@ bool MultiSyncMaster::wait_for_traj_start(double timeout) {
   return true;
 }
 
-double MultiSyncMaster::traj_sync_time() throw (char *) {
+double MultiSyncMaster::traj_sync_time() throw (const char *) {
   // each time the master calculates the time, it needs to also check for
   // any stalled, aborted, or unresponsive slaves
   bool stalled=false;
@@ -421,7 +423,7 @@ double MultiSyncMaster::traj_sync_time() throw (char *) {
       }
       snprintf(last_error,200,"Controller %s aborted",
 	       master_info->controller_info[c].controller_name);
-      return master_info->controller_info[0].last_traj_time;
+      throw last_error;
     }
     if (master_info->controller_info[c].status == STALLED) {
       // at least one slave is stalled, but we have to keep
@@ -440,7 +442,7 @@ double MultiSyncMaster::traj_sync_time() throw (char *) {
       }
       snprintf(last_error,200,"Controller %s fell too far behind",
 	       master_info->controller_info[c].controller_name);
-      return master_info->controller_info[0].last_traj_time;
+      throw last_error;
     }
   }
   // if a slave or ourself has stalled

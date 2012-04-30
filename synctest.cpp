@@ -43,6 +43,7 @@ public:
   bool running;
   int point;
   std::string last_traj_id, left_prev_trajectory_id;
+  bool left_prev_trajectory_aborted;
 
   boost::mutex cb_mutex;
 
@@ -60,6 +61,13 @@ public:
       if ((last_traj_id == "") // first time
           || ((wamstate.prev_trajectory.id == last_traj_id)
 	      && (left_prev_trajectory_id == last_traj_id))) {
+	if ((wamstate.prev_trajectory.state == wamstate.prev_trajectory.state_aborted) ||
+	    left_prev_trajectory_aborted) {
+	  ROS_ERROR("Previous trajectory aborted; stopping test");
+	  stop();
+	  return;
+	}
+
 	ROS_INFO("Trajectory %s has ended", last_traj_id.c_str());
 	++point;
         if (point == 1) {
@@ -92,11 +100,13 @@ public:
     }
     //    ROS_INFO("Last left position was %s",pos_str);
     left_prev_trajectory_id = ws->prev_trajectory.id;
+    left_prev_trajectory_aborted = (ws->prev_trajectory.state == ws->prev_trajectory.state_aborted);
     return;
   }
 
   Test(ros::NodeHandle &n) : node(n), running(false),
-                       point(1), last_traj_id("")
+			     point(1), last_traj_id(""),
+			     left_prev_trajectory_aborted(false)
   {
     p1.j.resize(14);
     p2.j.resize(14);
@@ -206,7 +216,7 @@ public:
 #endif // SIMULATION
 
     SetStiffness(1.0);
-    usleep(5000000);  // get a joint update
+    usleep(500000);  // get a joint update
 
     last_traj_id = MoveTo(p1,false);
     return true;

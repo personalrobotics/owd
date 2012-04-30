@@ -74,7 +74,7 @@ class MultiSync {
   ///                  controllers aborted.
   virtual bool wait_for_traj_start(double timeout=10.0);
 
-  virtual double traj_sync_time() throw (char *);
+  virtual double traj_sync_time() throw (const char *);
   double time_factor();
   void run();
   void stall();
@@ -84,8 +84,8 @@ class MultiSync {
   char last_error[200];
 
 protected:
-  void SharedMemConnect(unsigned int shm_key, bool master, int timeout=-1) throw (char *);
-  void SharedMemDisconnect() throw (char *);
+  void SharedMemConnect(unsigned int shm_key, bool master, int timeout=-1) throw (const char *);
+  void SharedMemDisconnect() throw (const char *);
   MultiSync::MasterInfo *master_info;
   unsigned int id;
 };
@@ -102,7 +102,7 @@ class MultiSyncMaster : public MultiSync {
 
   virtual bool wait_for_traj_start(double timeout=10.0);
 
-  virtual double traj_sync_time() throw (char *);
+  virtual double traj_sync_time() throw (const char *);
   
 };
 

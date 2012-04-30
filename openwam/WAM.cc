@@ -1094,7 +1094,7 @@ void WAM::newcontrol_rt(double dt){
 	// either the ms->traj_sync_time() or the evalute_abs()
 	// call threw an exception, so we have to abort
 	jointstraj->abort();
-	snprintf(last_traj_error,500,"Caught exception while evaluating synchronized trajectory: ",errmsg);
+	snprintf(last_traj_error,500,"Caught exception while evaluating synchronized trajectory: %s",errmsg);
       }
     } else {
       try {
@@ -1151,7 +1151,7 @@ void WAM::newcontrol_rt(double dt){
 	if (jointstraj->state() != OWD::Trajectory::ABORT) {
 	  // update our own state and record why we stopped
 	  last_traj_state = OWD::Trajectory::ABORT;
-	  strncpy(last_traj_error,"Aborted by an external synchronized controller",500);
+	  snprintf(last_traj_error,500,"Aborted by synchronization controller: %s",ms->last_error);
 	}
       }
       OWD::Trajectory *t = jointstraj; jointstraj = NULL; delete t;
