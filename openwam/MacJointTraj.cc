@@ -24,7 +24,7 @@
 #include <syslog.h>
 #include "MacQuinticBlend.hh"
 
-#define VERBOSE 1
+#define VERBOSE 0
 
 namespace OWD {
 

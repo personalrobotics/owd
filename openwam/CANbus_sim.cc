@@ -186,10 +186,7 @@ int CANbus::send_rt(int32_t msgid, uint8_t* msg, int32_t msglen, int32_t usecs){
   return OW_SUCCESS;
 }
 
-// set safety limits (does it really work?)
-// it always sets the same property!!
-// 4.2 rad/s corresponds to 240deg/sec
-int CANbus::limits(double jointVel, double tipVel, double elbowVel){
+int CANbus::set_limits() {
   return OW_SUCCESS;
 }
 

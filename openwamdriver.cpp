@@ -99,16 +99,18 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   bus=new CANbus(canbus_number, 0, bh_model==280, forcetorque, tactile, log_canbus_data);
 #endif // BH280_ONLY
 
+  
+
   // motion limits
   gravity_comp_value=1.0;
-  min_accel_time=1.0;
-  max_joint_vel.push_back(1.0); // J1
-  max_joint_vel.push_back(1.0); // J2
-  max_joint_vel.push_back(1.0); // J3
-  max_joint_vel.push_back(1.0); // J4
-  max_joint_vel.push_back(2.0); // J5
-  max_joint_vel.push_back(2.0); // J6
-  max_joint_vel.push_back(1.0); // J7
+  min_accel_time=0.75;
+  max_joint_vel.push_back(2.5); // J1
+  max_joint_vel.push_back(2.5); // J2
+  max_joint_vel.push_back(2.5); // J3
+  max_joint_vel.push_back(2.5); // J4
+  max_joint_vel.push_back(2.5); // J5
+  max_joint_vel.push_back(2.5); // J6
+  max_joint_vel.push_back(2.5); // J7
   max_jerk = 10.0 * 3.141592654;
   last_trajectory_error[0]=0;
   
@@ -287,6 +289,10 @@ bool WamDriver::Init(const char *joint_cal_file)
 #endif // BH280_ONLY
   
   owam = new WAM(bus, BH_model, ForceTorque, Tactile, log_controller_data);
+
+  // Read the transmission ratios from ROS parameters
+  get_transmission_ratios();
+
   if (owam->init() == OW_FAILURE) {
     ROS_FATAL("Failed to initialize WAM instance");
     return false;
@@ -432,6 +438,19 @@ bool WamDriver::Init(const char *joint_cal_file)
 
   return true;
 }
+
+  void WamDriver::get_transmission_ratios() {
+    static ros::NodeHandle n("~");
+    n.param("motor1_transmission_ratio",owam->mN1, owam->mN1);
+    n.param("motor2_transmission_ratio",owam->mN2, owam->mN2);
+    n.param("motor3_transmission_ratio",owam->mN3, owam->mN3);
+    n.param("motor4_transmission_ratio",owam->mN4, owam->mN4);
+    n.param("motor5_transmission_ratio",owam->mN5, owam->mN5);
+    n.param("motor6_transmission_ratio",owam->mN6, owam->mN6);
+    n.param("motor7_transmission_ratio",owam->mN7, owam->mN7);
+    n.param("differential3_ratio",      owam->mn3, owam->mn3);
+    n.param("differential6_ratio",      owam->mn6, owam->mn6);
+  }
 
 void WamDriver::load_plugins(std::string plugin_list) {
   // make sure we lock out any calls to the Publish functions
@@ -591,28 +610,28 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
   sub_wam_seactrl_settl =
     n.subscribe("wam_seactrl_settl", 10, &WamDriver::wam_seactrl_settl_callback, this);
   pub_wam_seactrl_curtl = 
-    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curtl", 10);
+    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curtl", 1);
   ss_WamRequestSeaCtrlTorqLimit =
     n.advertiseService("WamRequestSeaCtrlTorqLimit",&WamDriver::WamRequestSeaCtrlTorqLimit,this);
 
   sub_wam_seactrl_setkp =
     n.subscribe("wam_seactrl_setkp", 10, &WamDriver::wam_seactrl_setkp_callback, this); 
   pub_wam_seactrl_curkp =
-    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curkp", 10);
+    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curkp", 1);
   ss_WamRequestSeaCtrlKp =
     n.advertiseService("WamRequestSeaCtrlKp",&WamDriver::WamRequestSeaCtrlKp,this);
 
   sub_wam_seactrl_setkd =
     n.subscribe("wam_seactrl_setkd", 10, &WamDriver::wam_seactrl_setkd_callback, this); 
   pub_wam_seactrl_curkd =
-    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curkd", 10);
+    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curkd", 1);
   ss_WamRequestSeaCtrlKd =
     n.advertiseService("WamRequestSeaCtrlKd",&WamDriver::WamRequestSeaCtrlKd,this);
 
   sub_wam_seactrl_setki =
     n.subscribe("wam_seactrl_setki", 10, &WamDriver::wam_seactrl_setki_callback, this); 
   pub_wam_seactrl_curki =
-    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curki", 10);
+    n.advertise<pr_msgs::IndexedJointValues>("wam_seactrl_curki", 1);
   ss_WamRequestSeaCtrlKi =
     n.advertiseService("WamRequestSeaCtrlKi",&WamDriver::WamRequestSeaCtrlKi,this);
 #endif // BUILD_FOR_SEA
@@ -2377,17 +2396,17 @@ bool WamDriver::SetSpeed(pr_msgs::SetSpeed::Request &req,
     if (req.velocities[i] > max_joint_vel[i]) {
       // limit to max
       joint_vel[i] = max_joint_vel[i];
-      ROS_WARN("Limited joint %d velocity to max %2.2f",i,joint_vel[i]);
+      ROS_WARN("Limited joint %d velocity to max %2.2f radians/s",i,joint_vel[i]);
     } else if (req.velocities[i] < 0.05 * max_joint_vel[i]) {
       // limit to no less than 5% of max
       joint_vel[i] = 0.05 * max_joint_vel[i];
-      ROS_WARN("Limited joint %d velocity to min %2.2f",i,joint_vel[i]);
+      ROS_WARN("Limited joint %d velocity to min %2.2f radians/s",i,joint_vel[i]);
     } else {
       joint_vel[i] = req.velocities[i];
+      ROS_INFO("Set joint %d velocity limit to %2.2f radians/s",i,joint_vel[i]);
     }
     joint_accel[i] = joint_vel[i] / req.min_accel_time;
   }
-  ROS_INFO("Processed SetSpeed command");
   res.ok=true;
   return true;
 }
@@ -2512,6 +2531,7 @@ void WamDriver::Update() {
     return; // still running a trajectory
   }
   
+  // look for a recently-completed trajectory
   if ((wamstate.trajectory_queue.size() > 0) &&
       (wamstate.trajectory_queue.front().state !=
        pr_msgs::TrajInfo::state_pending)) {
@@ -2547,9 +2567,25 @@ void WamDriver::Update() {
   // now look for any new trajectories to start
   boost::mutex::scoped_lock lock(queue_mutex);
   if (trajectory_list.size()==0) {
-    return; // nothing to do
+    // If there are no queued trajectories, then take advantage of this opportunity
+    // to look for updated ROS parameters that can't be changed while running
+    // trajectories.
+    update_xmission_ratio("motor1_transmission_ratio",owam->mN1,42);
+    update_xmission_ratio("motor2_transmission_ratio",owam->mN2,28);
+    update_xmission_ratio("motor3_transmission_ratio",owam->mN3,28);
+    update_xmission_ratio("motor4_transmission_ratio",owam->mN4,18);
+    update_xmission_ratio("motor5_transmission_ratio",owam->mN5,10);
+    update_xmission_ratio("motor6_transmission_ratio",owam->mN6,10);
+    update_xmission_ratio("motor7_transmission_ratio",owam->mN7,15);
+    update_xmission_ratio("differential3_ratio"      ,owam->mn3,1.7);
+    update_xmission_ratio("differential6_ratio"      ,owam->mn6,1);
+
+    return; // nothing else to do
   }
+
+  // we have a trajectory ready to run
   
+
   // make sure already holding position
   if (!owam->holdpos || (owam->stiffness < 1.0)) {
     ROS_ERROR("WAM not holding position; cannot start trajectory");
@@ -2588,6 +2624,40 @@ void WamDriver::Update() {
   trajectory_list.pop_front();
   if (wamstate.trajectory_queue.size() > 0) {
     wamstate.trajectory_queue.front().state=pr_msgs::TrajInfo::state_active;
+  }
+}
+
+void WamDriver::update_xmission_ratio(const char *param_name, double &current_value, double nominal_value) {
+  static ros::NodeHandle n("~");
+  double new_value;
+  if (!n.getParamCached(std::string(param_name), new_value)) {
+    // nothing new
+    return;
+  }
+  if (new_value != current_value) {
+    if ((new_value > nominal_value * 1.1) ||
+	(new_value < nominal_value * 0.9)) {
+      ROS_WARN("New value for %s=%2.3f is outside the +/- 10%% range of the nominal; ignored.", param_name, new_value);
+      return;
+    }
+    // prevent the control loop from running
+    owam->lock("update_xmission_ratio");
+    // remember how far away the target position is from the current joint vals
+    static double heldPositionsDelta[Joint::Jn+1];
+    for (int i=1; i<=Joint::Jn; ++i) {
+      heldPositionsDelta[i] = owam->heldPositions[i] - owam->joints[i].q;
+    }
+    // set the new transmission ratio
+    current_value=new_value;
+    // recalculate the joint positions using the new ratio
+    owam->mpos2jpos();
+    // recalculate the held position based on the new joint positions
+    for (int i=1; i<=Joint::Jn; ++i) {
+      owam->heldPositions[i] = owam->joints[i].q + heldPositionsDelta[i];
+    }
+    // let the control loop resume
+    owam->unlock();
+    ROS_INFO("Using new value for %s = %2.3f",param_name, new_value);
   }
 }
 

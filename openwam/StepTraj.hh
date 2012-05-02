@@ -36,7 +36,7 @@ private:
 
 public:
 
-  StepTraj(std::string trajid, int DOF, unsigned int joint, double *start_pos, double step_size);
+  StepTraj(std::string trajid, int DOF, int joint, double *start_pos, double step_size);
   virtual ~StepTraj();
 
   // mandatory functions inherited from Trajectory

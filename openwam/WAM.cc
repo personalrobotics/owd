@@ -43,6 +43,15 @@ extern int MODE;  // puck parameter
 
 WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 	 bool log_ctrl_data) :
+  mN1(41.782),  //joint ratios
+  mN2(27.836),
+  mN3(27.836),
+  mN4(17.860),
+  mN5( 9.68163),
+  mN6( 9.68163),
+  mN7(14.962),
+  mn3(1.68),
+  mn6(1.00),
   check_safety_torques(true),stall_sensitivity(1.0),
   tc(Joint::Jn), ms(NULL), rec(false),wsdyn(false),
   jsdyn(false), holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
@@ -723,12 +732,13 @@ void control_loop_rt(void* argv){
 	} else if (FROM_NODE == 8) {
 	  // forcetorque puck
 	  wam->bus->process_forcetorque_response_rt(msgid,msg,msglen);
-	  wam->lock_rt("control_loop");
-	  if (wam->jointstraj) {
-	    // pass the new values to the running trajectory
-	    wam->jointstraj->ForceFeedback(wam->bus->filtered_forcetorque_data);
+	  if (wam->lock_rt("control_loop")) {
+	    if (wam->jointstraj) {
+	      // pass the new values to the running trajectory
+	      wam->jointstraj->ForceFeedback(wam->bus->filtered_forcetorque_data);
+	    }
+	    wam->unlock("control_loop");
 	  }
-	  wam->unlock("control_loop");
 	} else if (FROM_NODE == 10) {
 	  // safety puck
 	  wam->bus->process_safety_response_rt(msgid,msg,msglen);
@@ -786,9 +796,10 @@ void control_loop_rt(void* argv){
 	  control_start_time = ControlLoop::get_time_ns_rt();
 	  // tell the control function how long it was between successive
 	  // request_position_rt() calls.  
-	  wam->lock_rt("control_loop");
-	  wam->newcontrol_rt( ((double)(loopstart_time - last_loopstart_time)) * 1e-9); // ns to s
-	  wam->unlock("control_loop");
+	  if (wam->lock_rt("control_loop")) {
+	    wam->newcontrol_rt( ((double)(loopstart_time - last_loopstart_time)) * 1e-9); // ns to s
+	    wam->unlock("control_loop");
+	  }
 	  last_loopstart_time = loopstart_time;
 	  sendtorque_start_time = ControlLoop::get_time_ns_rt();
 	  if(wam->bus->send_torques_rt() == OW_FAILURE){
@@ -1346,7 +1357,7 @@ void WAM::newcontrol_rt(double dt){
     // as if they instantly moved to where we wanted.
     this->unlock();
     set_jpos((&tc.q[0])-1);
-    this->lock_rt("control_loop");
+    this->lock("control_loop");
   }
 
 }
@@ -1489,9 +1500,7 @@ int WAM::resume_trajectory() {
     return OW_FAILURE;
   }
 
-  //    this->lock("resume_traj");
   jointstraj->run();
-  //    this->unlock("resume_traj");
   return OW_SUCCESS;
 }
 
@@ -1537,14 +1546,6 @@ int WAM::hold_position(double jval[],bool grab_lock)
 
   if (grab_lock) {
     this->lock("hold pos");
-  }
-
-  if(pulsetraj != NULL && !pulsetraj->done) {
-    ROS_WARN("Cannot hold position, pulse trajectory is running\n");
-    if (grab_lock) {
-      this->unlock("hold pos");
-    }
-    return OW_FAILURE;
   }
 
   if(jointstraj != NULL) {
@@ -1624,13 +1625,6 @@ void WAM::lock(const char *name) {
 #endif // ! OWD_RT
   strncpy(last_locked_by,name,100);
   last_locked_by[99]=0; // just in case it was more than 99 chars long
-  //if (name) {
-    //static char msg[200];
-    //      sprintf(msg,"OPENWAM locked by %s",name);
-    //      syslog(LOG_ERR,msg);
-    //    } else {
-    //        syslog(LOG_ERR,"OPENWAM locked by (unknown)");
-  //  }
 }
 
 bool WAM::lock_rt(const char *name) {

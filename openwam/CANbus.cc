@@ -51,6 +51,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   hand_motion_state_sequence(0),
   ignore_breakaway_encoders(true),
   hsg_value(0),
+  squeeze_after_stalling(false),
   log_canbus_data(log_cb_data),
   candata(0),
   unread_packets(0),
@@ -159,7 +160,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   can_accept[4] = 0x040B;  mask[2] = 0x03E0;
 #endif // PEAK_CAN
 
-  snprintf(last_error,200,"");
+  strcpy(last_error,"");
 }
 
 int CANbus::init(){ 
@@ -404,7 +405,7 @@ int CANbus::check(){
 
     ROS_DEBUG_NAMED("cancheck","Setting group ID values...");
     if (set_puck_group_id(pucks[p].id()) != OW_SUCCESS) {
-      ROS_WARN("CANbus::check: set_puck_group_id($d) failed", pucks[p].id());
+      ROS_WARN("CANbus::check: set_puck_group_id(%d) failed", pucks[p].id());
       return OW_FAILURE;
     }
     ROS_DEBUG_NAMED("cancheck","OK");
@@ -470,6 +471,11 @@ int CANbus::check(){
     ROS_INFO_NAMED("cancheck","Puck %d: GRPA=%d, GRPB=%d, GRPC=%d, VERS=%d",
 		   nodeid,a,b,c,v);
   }
+
+  if (set_limits() != OW_SUCCESS) {
+    ROS_WARN("Canbus::check: Failed to set safety puck limits");
+  }
+
   int32_t voltlevel;
   if (get_property_rt(SAFETY_MODULE,VOLTL1,&voltlevel) == OW_SUCCESS) {
     ROS_DEBUG_NAMED("safety","VOLTL1 = %d",voltlevel);
@@ -1371,7 +1377,6 @@ int CANbus::compile(int32_t property, int32_t value,
 
 int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t usecs){
 
-  int32_t len;
   int i, err;
   
   RTIME sleeptime; // time to wait for interrupts, in microseconds
@@ -1476,7 +1481,7 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
   CMSG cmsg;
 
   int zerocount(0);
-  len=1;
+  int32_t len(1);
   bool done=false;
   while (!done) {
     err=canTake(handle, &cmsg, &len);
@@ -1561,7 +1566,7 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
     cdata.send=false;
     cdata.msgid = *msgid;
     cdata.msglen = *msglen;
-    for (unsigned int i=0; i<8; ++i) {
+    for (int i=0; i<8; ++i) {
       if (i < *msglen) {
 	cdata.msgdata[i] = msgdata[i];
       } else {
@@ -1602,7 +1607,7 @@ int CANbus::send_rt(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t use
     cdata.send=true;
     cdata.msgid = msgid;
     cdata.msglen = msglen;
-    for (unsigned int i=0; i<8; ++i) {
+    for (int i=0; i<8; ++i) {
       if (i < msglen) {
 	cdata.msgdata[i] = msgdata[i];
       } else {
@@ -1688,19 +1693,27 @@ int CANbus::send_rt(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t use
 #endif // ESD_CAN
 }
 
-// set safety limits (does it really work?)
-// it always sets the same property!!
-// 4.2 rad/s corresponds to 240deg/sec
-int CANbus::limits(double jointVel, double tipVel, double elbowVel){
+// Set warning/fault levels on safety puck
+int CANbus::set_limits(){
   int32_t conversion;
    
-  // MVW 04-29-08
+  // Set max torque level on safety puck
   if ((set_property_rt(SAFETY_MODULE,TL1,6000,false,15000) == OW_FAILURE) ||
-      (set_property_rt(SAFETY_MODULE,TL2,9000,false,15000) == OW_FAILURE) ||
-      (set_property_rt(SAFETY_MODULE,VL1,(int32_t)(2*0x1000),false,15000) == OW_FAILURE) ||
-      (set_property_rt(SAFETY_MODULE,VL2,(int32_t)(3*0x1000),false,15000) == OW_FAILURE)) {
+      (set_property_rt(SAFETY_MODULE,TL2,9000,false,15000) == OW_FAILURE)) {
     return OW_FAILURE;
   }
+
+  // Set max velocity in safety puck
+  if ((set_property_rt(SAFETY_MODULE,VL1,
+		       static_cast<int32_t>(SAFETY_VELOCITY_LIMIT_WARN * 0x1000), 
+		       false, 15000) == OW_FAILURE) ||
+      (set_property_rt(SAFETY_MODULE,VL2,
+		       static_cast<int32_t>(SAFETY_VELOCITY_LIMIT_FAULT * 0x1000),
+		       false, 15000) == OW_FAILURE)) {
+    return OW_FAILURE;
+  }
+  ROS_INFO("Setting safety puck velocity limits to VL1 = %2.2f and VL2 = %2.2f", SAFETY_VELOCITY_LIMIT_WARN, SAFETY_VELOCITY_LIMIT_FAULT);
+
 
   int32_t voltlevel;
 #ifdef SET_VOLTAGE_LIMITS
@@ -1727,33 +1740,6 @@ int CANbus::limits(double jointVel, double tipVel, double elbowVel){
 #endif
 
   return OW_SUCCESS;
-  
-#ifdef OLD_VEL_LIMITS
-  if(0<jointVel && jointVel<7){           // If the vel (rad/s) is reasonable
-    conversion = (int32_t)(jointVel*0x1000); // Convert to Q4.12 rad/s
-    if(set_property_rt(SAFETY_MODULE, VL2, conversion, false,15000) == OW_FAILURE){
-      ROS_ERROR("WAM::set_limits: set_prop failed.");
-      return OW_FAILURE;
-    }
-  }
-   
-  if(0<tipVel && tipVel<7){               // If the vel (m/s) is reasonable
-    conversion = (int32_t)(tipVel*0x1000);   // Convert to Q4.12 rad/s
-    if(set_property_rt(SAFETY_MODULE, VL2, conversion, false,15000) == OW_FAILURE){
-      ROS_ERROR("WAM::set_limits: set_prop failed.");
-      return OW_FAILURE;
-    }
-  }
-   
-  if(0<elbowVel && elbowVel<7){           // If the vel (m/s) is reasonable
-    conversion = (int32_t)(elbowVel*0x1000); // Convert to Q4.12 rad/s
-    if(set_property_rt(SAFETY_MODULE, VL2, conversion, false,15000) == OW_FAILURE){
-      ROS_ERROR("WAM::set_limits: set_prop failed.");
-      return OW_FAILURE;
-    }
-  }
-  return OW_SUCCESS;
-#endif // OLD_VEL_LIMITS
 }
 
 int CANbus::run(){
@@ -2118,23 +2104,7 @@ int CANbus::request_hand_state_rt() {
     return OW_FAILURE;
   }
   
-
-
-
-  // If we were already stationary, assume we're still
-  // stationary.
-  bool moving(false);
-  for (unsigned int i=0; i<4; ++i) {
-    if (handstate[i] != HANDSTATE_DONE) {
-      moving=true;
-      break;
-    }
-  }
-  if (!moving) {
-    return OW_SUCCESS;
-  }
-
-  // otherwise, request state from hand pucks
+  // request state from hand pucks
   if (request_property_rt(GROUPID(5),MODE) != OW_SUCCESS) {
     ROS_WARN_NAMED("can_bh280",
 		   "Failed to request MODE from hand pucks: %s",
@@ -2493,15 +2463,6 @@ int CANbus::hand_reset() {
       break;
     }
   }
-  int32_t tstop;
-  if (get_property_rt(14,TSTOP,&tstop,4000) != OW_SUCCESS) {
-      ROS_ERROR("Could not get TSTOP property from hand puck 14");
-      return OW_FAILURE;
-  }
-  if (tstop != 200) {
-    ready=false;
-  }
-  
   
   if (ready) {
     // all the fingers have already been HI'd
@@ -2698,12 +2659,15 @@ int CANbus::hand_move(std::vector<double> p) {
     return OW_FAILURE;
   }
 
-  for (unsigned int i=0; i<4; ++i) {
-    // record the fact that once the hand stops, we want to keep
-    // applying pressure.  this helps to ensure that even if a gripped
-    // object slips, we will still adjust until we reach the goal position.
-    apply_squeeze[i]=true;
+  if (squeeze_after_stalling) {
+    for (unsigned int i=0; i<4; ++i) {
+      // record the fact that once the hand stops, we want to keep
+      // applying pressure.  this helps to ensure that even if a gripped
+      // object slips, we will still adjust until we reach the goal position.
+      apply_squeeze[i]=true;
+    }
   }
+
   for (unsigned int i=0; i<4; ++i) {
     handstate[i] = HANDSTATE_MOVING;
     encoder_changed[i] = 6;

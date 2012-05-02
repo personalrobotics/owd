@@ -25,7 +25,7 @@
 
 namespace OWD {
 
-  StepTraj::StepTraj(std::string trajid, int dof, unsigned int joint,
+  StepTraj::StepTraj(std::string trajid, int dof, int joint,
 		     double *start_pos, double step_size)
     : Trajectory("StepTraj", trajid),
       nDOF(dof)

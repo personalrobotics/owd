@@ -28,7 +28,7 @@
 #include <stdio.h>
 #include "BinaryData.hh"
 
-#define VERBOSE 1
+#define VERBOSE 0
 
 class MacAccelElement {
 protected:

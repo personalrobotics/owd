@@ -67,7 +67,6 @@
 // forward declaration of a few classes we keep pointers to, 
 // so that we don't have to include their .hh files right now
 #include "openwam/WAM.hh"
-//class WAM;
 class CANbus;
 
 namespace OWD {
@@ -145,6 +144,7 @@ public:
     pr_msgs::AddTrajectory::Response AddTrajectory(
 						   pr_msgs::AddTrajectory::Request *);
 
+    void update_xmission_ratio(const char *param_name, double &current_value, double nominal_value);
     void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &message);
     void MassProperties_callback(const boost::shared_ptr<const pr_msgs::MassProperties> &message);
 
@@ -233,6 +233,7 @@ private:
     double get_nearest_joint_value(double jointval, double tolerance);
     void apply_joint_offsets(double *joint_offsets);
     TrajType ros2owd_traj (pr_msgs::JointTraj &jt);
+    void get_transmission_ratios();
     void load_plugins(std::string plugin_list);
     void unload_plugins();
 

@@ -76,15 +76,17 @@ using namespace std;
 // it looks like NUM_NODES is 1 too many, since +1 seems to be added elsewhere.
 #define NUM_NODES (NODE_MAX - NODE_MIN + 2)
 
-#define MODE_IDLE      0
-#define MODE_TORQUE    2
-#define MODE_PID       3
-#define MODE_VELOCITY  4
-#define MODE_TRAPEZOID 5
+const int MODE_IDLE      = 0;
+const int MODE_TORQUE    = 2;
+const int MODE_PID       = 3;
+const int MODE_VELOCITY  = 4;
+const int MODE_TRAPEZOID = 5;
 
-#define CMD_HI 13
-#define CMD_M 19
+const int CMD_HI = 13;
+const int CMD_M  = 19;
 
+const double SAFETY_VELOCITY_LIMIT_WARN = 2.6; // rad/sec
+const double SAFETY_VELOCITY_LIMIT_FAULT = 3.0; // rad/sec
 
 class CANstats{
 public:
@@ -148,6 +150,7 @@ public:
   int hand_motion_state_sequence;
   bool ignore_breakaway_encoders;
   int32_t hsg_value;
+  bool squeeze_after_stalling;
 
   static std::map<int,std::string> propname; // reverse number-to-name lookup
 
@@ -380,7 +383,7 @@ public:
   int tactile_get_data(float *f1, float *f2, float *f3, float *palm);
   int tactile_set_hires(bool hires);
 
-  int limits(double jointVel, double tipVel, double elbowVel);
+  int set_limits();
   friend void* canbus_handler(void* argv);
 
   bool finger_hi_pending[4];

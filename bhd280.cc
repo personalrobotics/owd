@@ -98,6 +98,7 @@ void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 void BHD_280::GetParameters(ros::NodeHandle &n) {
   n.param("max_velocity",max_velocity,6.0);
   n.param("hsg_value",bus->hsg_value,0);
+  n.param("apply_squeeze_after_stalling",bus->squeeze_after_stalling,true);
 }
   
 void BHD_280::SetPuckValues() {

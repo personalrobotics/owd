@@ -99,15 +99,15 @@ public:
 
 class WAM{
 public:
-  static const double mN1 = 41.782;  //joint ratios
-  static const double mN2 = 27.836;
-  static const double mN3 = 27.836;
-  static const double mN4 = 17.860;
-  static const double mN5 =  9.68163;
-  static const double mN6 =  9.68163;
-  static const double mN7 = 14.962;
-  static const double mn3 = 1.68;
-  static const double mn6 = 1.00;
+  double mN1;  //joint ratios
+  double mN2;
+  double mN3;
+  double mN4;
+  double mN5;
+  double mN6;
+  double mN7;
+  double mn3;
+  double mn6;
 
   static const double M2_MM2 = 1.0/1000000;
 
