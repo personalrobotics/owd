@@ -15,3 +15,10 @@ uint8 state_done=1
 uint8 state_moving=2
 uint8 state_stalled=3
 uint8 state_uninitialized=255
+
+# Refer to CANbus.cc for these definitions
+int32 MODE_IDLE=0
+int32 MODE_TORQUE=2
+int32 MODE_PID=3
+int32 MODE_VELOCITY=4
+int32 MODE_TRAPEZOID=5
