@@ -293,6 +293,11 @@ bool WamDriver::Init(const char *joint_cal_file)
   // Read the transmission ratios from ROS parameters
   get_transmission_ratios();
 
+  // Set our transmission ratio values on the parameter server so that
+  // others know what we're using in case we are using the compiled-in
+  // defaults
+  set_transmission_ratios();
+
   if (owam->init() == OW_FAILURE) {
     ROS_FATAL("Failed to initialize WAM instance");
     return false;
@@ -450,6 +455,19 @@ bool WamDriver::Init(const char *joint_cal_file)
     n.param("motor7_transmission_ratio",owam->mN7, owam->mN7);
     n.param("differential3_ratio",      owam->mn3, owam->mn3);
     n.param("differential6_ratio",      owam->mn6, owam->mn6);
+  }
+
+  void WamDriver::set_transmission_ratios() {
+    static ros::NodeHandle n("~");
+    n.setParam("motor1_transmission_ratio",owam->mN1);
+    n.setParam("motor2_transmission_ratio",owam->mN2);
+    n.setParam("motor3_transmission_ratio",owam->mN3);
+    n.setParam("motor4_transmission_ratio",owam->mN4);
+    n.setParam("motor5_transmission_ratio",owam->mN5);
+    n.setParam("motor6_transmission_ratio",owam->mN6);
+    n.setParam("motor7_transmission_ratio",owam->mN7);
+    n.setParam("differential3_ratio",      owam->mn3);
+    n.setParam("differential6_ratio",      owam->mn6);
   }
 
 void WamDriver::load_plugins(std::string plugin_list) {

@@ -234,6 +234,7 @@ private:
     void apply_joint_offsets(double *joint_offsets);
     TrajType ros2owd_traj (pr_msgs::JointTraj &jt);
     void get_transmission_ratios();
+    void set_transmission_ratios();
     void load_plugins(std::string plugin_list);
     void unload_plugins();
 
