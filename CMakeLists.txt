@@ -26,11 +26,12 @@ message(STATUS "using PEAK CANbus driver")
 set (CANBUS_DEFS "-DPEAK_CAN")
 set (CANBUS_LIBS "pcan")
 else (CANBUS_TYPE STREQUAL "ESD")
-message(SEND_ERROR "No CANbus type recognized")
+message(STATUS "No CANbus type recognized; only building owdsim.")
 set (CANBUS_DEFS "")
 set (CANBUS_LIBS "")
 endif (CANBUS_TYPE STREQUAL "ESD")
 
+if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 rosbuild_add_executable(owd owd.cpp openwamdriver.cpp bhd280.cc
                             ft.cc tactile.cc)
 target_link_libraries(owd wamcan openwam openmath lapack blas
@@ -44,13 +45,14 @@ target_link_libraries(canbhd bhdcan openwam openmath lapack blas
 			     gfortran ${CANBUS_LIBS})
 rosbuild_add_compile_flags(canbhd "-DBH280 -DBH280_ONLY ${CANBUS_DEFS}")
 rosbuild_add_link_flags(canbhd "${CANBUS_LDFLAGS}")
+endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
 rosbuild_add_executable(owdsim owd.cpp openwamdriver.cpp)
 target_link_libraries(owdsim openwamsim openmath lapack blas gfortran)
 rosbuild_add_compile_flags(owdsim "-DOWDSIM")
 
+if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 rosbuild_add_executable(owd_test test.cpp)
-
 rosbuild_add_executable(synctest synctest.cpp)
 
 rosbuild_add_executable(puck_update puck_update.cpp)
@@ -72,10 +74,16 @@ rosbuild_add_executable(puck_find_mofst puck_find_mofst.cpp)
 target_link_libraries(puck_find_mofst wamcan openwam ${CANBUS_LIBS})
 rosbuild_add_compile_flags(puck_find_mofst "${CANBUS_DEFS}")
 rosbuild_add_link_flags(puck_find_mofst "${CANBUS_LDFLAGS}")
+endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
 rosbuild_add_executable(owd_traj_timer owd_traj_timer.cpp)
-target_link_libraries(owd_traj_timer openwam)
+if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
+  target_link_libraries(owd_traj_timer openwam)
+else (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
+  target_link_libraries(owd_traj_timer openwamsim)
+endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
+if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 if (RT_BUILD)
   rosbuild_add_executable(owdrt owd.cpp openwamdriver.cpp bhd280.cc
                                 ft.cc tactile.cc)
@@ -91,6 +99,7 @@ if (RT_BUILD)
   rosbuild_add_compile_flags(canbhdrt "-DBH280 -DBH280_ONLY ${CANBUS_DEFS} ${RT_DEFS}")
   rosbuild_add_link_flags(canbhdrt "${CANBUS_LDFLAGS}")
 endif (RT_BUILD)
+endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
 include(detect_cpu.cmake)
 

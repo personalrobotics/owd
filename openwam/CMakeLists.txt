@@ -19,7 +19,7 @@ set (CANBUS_DEFS "-DPEAK_CAN")
 set (CANBUS_LIBS "pcan")
 
 else (CANBUS_TYPE STREQUAL "ESD")
-message(SEND_ERROR "No CANbus type recognized")
+message(STATUS "No CANbus type recognized; only building owdsim.")
 set (CANBUS_DEFS "")
 set (CANBUS_LIBS "")
 endif (CANBUS_TYPE STREQUAL "ESD")
@@ -40,12 +40,14 @@ endif (DEFINED ENV{OWD_MARCH_FLAGS})
 
 add_definitions("-O0 -ggdb3 -DWRIST -DBH8 -DRT_STATS")
 
+if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 rosbuild_add_library(openwam Joint.cc Motor.cc Puck.cc Group.cc
                             Sigmoid.cc Kinematics.cc Dynamics.cc
 			    TrajType.cc PulseTraj.cc Trajectory.cc ParabolicSegment.cc
                             ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc
                             ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc 
 			    butterworth_solver.c MultiSync.cc BinaryData.cc)
+endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
 rosbuild_add_library(openwamsim Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc
                                ControlLoop.cc Sigmoid.cc WAM.cc Kinematics.cc Dynamics.cc
@@ -55,6 +57,7 @@ rosbuild_add_library(openwamsim Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc
 			       Plugin.cc butterworth_solver.c MultiSync.cc BinaryData.cc)
 rosbuild_add_compile_flags(openwamsim "-DOWDSIM")
 
+if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 rosbuild_add_library(wamcan ControlLoop.cc CANbus.cc WAM.cc Plugin.cc)
 rosbuild_add_compile_flags(wamcan "${CANBUS_DEFS}")
 rosbuild_add_link_flags(wamcan "${CANBUS_LIBS}")
@@ -72,5 +75,6 @@ if (RT_BUILD)
   rosbuild_add_compile_flags(bhdcanrt "${CANBUS_DEFS} ${RT_DEFS} -DBH280_ONLY")
   rosbuild_add_link_flags(bhdcanrt "${CANBUS_LIBS} ${RT_LIBS}")
 endif (RT_BUILD)
+endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
 include_directories (../openmath)
