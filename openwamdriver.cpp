@@ -2068,6 +2068,14 @@ bool WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_reason
   // figure out where robot will be at start of trajectory
   JointPos curpoint(nJoints);
   double wampos[nJoints+1];
+  if (traj->start_position.size() != nJoints) {
+    failure_reason="start_position field is the wrong size";
+    return false;
+  }
+  if (traj->end_position.size() != nJoints) {
+    failure_reason="end_position field is the wrong size";
+    return false;
+  }
   if (!owam->jointstraj) {
 
     // if we weren't already holding position, then abort, because
