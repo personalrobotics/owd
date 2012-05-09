@@ -227,11 +227,44 @@ int main(int argc, char** argv)
   ros::init(argc, argv, std::string("owd_sync"));
   ros::NodeHandle n("~");
   left_AddTimedTrajectory = n.serviceClient<pr_msgs::AddTimedTrajectory>("/left/owd/AddTimedTrajectory",true);
+  if (! left_AddTimedTrajectory.exists()) {
+    ROS_WARN("Waiting for service /left/owd/AddTimedTrajectory.");
+    if (!left_AddTimedTrajectory.waitForExistence()) {
+      ROS_WARN("Failed while waiting for /left/owd/AddTimedTrajectory service; exiting");
+      return 1;
+    }
+    ROS_WARN("Connected to service /left/owd/AddTimedTrajectory.");
+  }
   right_AddTimedTrajectory = n.serviceClient<pr_msgs::AddTimedTrajectory>("/right/owd/AddTimedTrajectory",true);
+  if (! right_AddTimedTrajectory.exists()) {
+    ROS_WARN("Waiting for service /right/owd/AddTimedTrajectory.");
+    if (!right_AddTimedTrajectory.waitForExistence()) {
+      ROS_WARN("Failed while waiting for /right/owd/AddTimedTrajectory service; exiting");
+      return 1;
+    }
+    ROS_WARN("Connected to service /right/owd/AddTimedTrajectory.");
+  }
   left_GetSpeed = n.serviceClient<pr_msgs::GetSpeed>("/left/owd/GetSpeed",true);
+  if (! left_GetSpeed.exists()) {
+    ROS_WARN("Could not connect to service /left/owd/GetSpeed; perhaps the message types have changed?  Waiting for connection.");
+    if (!left_GetSpeed.waitForExistence()) {
+      ROS_WARN("Failed while waiting for /left/owd/GetSpeed service; exiting");
+      return 1;
+    }
+    ROS_WARN("Connected to service /left/owd/GetSpeed.");
+  }
   right_GetSpeed = n.serviceClient<pr_msgs::GetSpeed>("/right/owd/GetSpeed",true);
+  if (! right_GetSpeed.exists()) {
+    ROS_WARN("Could not connect to service /right/owd/GetSpeed; perhaps the message types have changed?  Waiting for connection.");
+    if (!right_GetSpeed.waitForExistence()) {
+      ROS_WARN("Failed while waiting for /right/owd/GetSpeed service; exiting");
+      return 1;
+    }
+    ROS_WARN("Connected to service /right/owd/GetSpeed.");
+  }
   ros::ServiceServer ss_AddTrajectory = 
     n.advertiseService("AddTrajectory",&AddTrajectory);
+  ROS_INFO("owd_traj_timer ready");
   ros::spin();
   return 0;
 }
