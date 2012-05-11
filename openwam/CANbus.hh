@@ -152,6 +152,7 @@ public:
   int32_t hsg_value;
   bool squeeze_after_stalling;
   RTIME *jumptime;
+  bool *firstupdate;
 
   static std::map<int,std::string> propname; // reverse number-to-name lookup
 
