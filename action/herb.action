@@ -1,8 +1,20 @@
+# Goal message
+
 string target
 geometry_msgs/TransformStamped location
 float64[] data
+
+
+
 ---
+# Result message
+
 string info
+
+
+
 ---
+# Feedback message
+
 string status
 float32 progress
