@@ -52,6 +52,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   ignore_breakaway_encoders(true),
   hsg_value(0),
   squeeze_after_stalling(false),
+  jumptime(NULL),
   log_canbus_data(log_cb_data),
   candata(0),
   unread_packets(0),
@@ -112,6 +113,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   trq = new int32_t[n_arm_pucks+1];
   pos = new double[n_arm_pucks+1];
   jpos = new double[n_arm_pucks+1];
+  jumptime = new RTIME[n_arm_pucks+1];
   if (ft) {
     forcetorque_data = new double[6];
     filtered_forcetorque_data = new double[6];
@@ -143,6 +145,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
     }
     pucks[p].cpr = 4096;
     pucks[p].j_cpr = 4096;
+    jumptime[p]=0;
   }
 
   for(int p=1; p<=n_arm_pucks; p++){
@@ -982,8 +985,19 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
 
   // convert the result
   if ((nodeid >= 1) && (nodeid <=n_arm_pucks)) {
+
+    // check to see if the puck encoder value jumped by more than 1000
+    // counts in a single cycle, and if so log the time (to capture a
+    // puck problem we've been seeing on the ARM-S right arm joint 1)
+    int32_t oldvalue = pos[ pucks[nodeid].motor() ] / 2.0 / M_PI * pucks[nodeid].CPR();
+    if (fabs(value - oldvalue) > 1000) {
+      jumptime[pucks[nodeid].motor()] = time_now_ns();
+    }
+
+    // update the new value
     pos[ pucks[nodeid].motor() ] = 2.0*M_PI*( (double) value )/ 
       ( (double) pucks[nodeid].CPR() );
+
     if (msglen==6) {
       // this puck also sent a joint encoder value
       jpos[pucks[nodeid].motor() ] = 2.0*M_PI*( (double) value2 )/ 

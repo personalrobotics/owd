@@ -455,6 +455,15 @@ bool WamDriver::Init(const char *joint_cal_file)
     n.param("motor7_transmission_ratio",owam->mN7, owam->mN7);
     n.param("differential3_ratio",      owam->mn3, owam->mn3);
     n.param("differential6_ratio",      owam->mn6, owam->mn6);
+    ROS_INFO("motor1_transmission_ratio=%f",owam->mN1);
+    ROS_INFO("motor2_transmission_ratio=%f",owam->mN2);
+    ROS_INFO("motor3_transmission_ratio=%f",owam->mN3);
+    ROS_INFO("motor4_transmission_ratio=%f",owam->mN4);
+    ROS_INFO("motor5_transmission_ratio=%f",owam->mN5);
+    ROS_INFO("motor6_transmission_ratio=%f",owam->mN6);
+    ROS_INFO("motor7_transmission_ratio=%f",owam->mN7);
+    ROS_INFO("differential3_ratio=%f",owam->mn3);
+    ROS_INFO("differential6_ratio=%f",owam->mn6);
   }
 
   void WamDriver::set_transmission_ratios() {
@@ -2552,6 +2561,20 @@ void WamDriver::Update() {
     statcount=0;
   }
 #endif // ! OWDSIM
+
+  // Look for any joints that have suddenly changed in value due to
+  // a suspected puck firmware bug
+  for (int i=1; i<Joint::Jn; ++i) {
+    if (bus->jumptime[i] > 0) {
+      char timestring[100];
+      time_t seconds = bus->jumptime[i] / 1e6;
+      int useconds = bus->jumptime[i] - seconds * 1e6;
+      strftime(timestring,100,"%F %T",localtime(&seconds));
+	
+      ROS_WARN("Motor %d jumped by more than 1000 encoder ticks at time [%s.%06d]",i,timestring,useconds);
+      bus->jumptime[i]=0;
+    }
+  }
 
   if (owam->jointstraj) {
     return; // still running a trajectory

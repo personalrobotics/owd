@@ -151,6 +151,7 @@ public:
   bool ignore_breakaway_encoders;
   int32_t hsg_value;
   bool squeeze_after_stalling;
+  RTIME *jumptime;
 
   static std::map<int,std::string> propname; // reverse number-to-name lookup
 
