@@ -116,15 +116,19 @@ void ServoTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
       if (target_velocity[i] > current_velocity[i]) {
 	// still accelerating to target
 	current_velocity[i] += accel * dt;
+	tc.qdd[i]=accel;
 	if (current_velocity[i] > target_velocity[i]) {
 	  current_velocity[i] = target_velocity[i];
 	}
       } else if (target_velocity[i] < current_velocity[i]) {
 	// still decelerating
 	current_velocity[i] -= accel * dt;
+	tc.qdd[i]=-accel;
 	if (current_velocity[i] < target_velocity[i]) {
 	  current_velocity[i] = target_velocity[i];
 	}
+      } else {
+	tc.qdd[i]=0.0;
       }
 
       // update position and velocity
@@ -133,9 +137,9 @@ void ServoTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
       active = true;
     } else {
       tc.qd[i]=0.0;
+      tc.qdd[i]=0.0;
     }
     tc.q[i] = current_position[i];
-    tc.qdd[i] = 0.0;
   }
   if (!active) {
     end_position = current_position;
