@@ -9,7 +9,7 @@ class InsertKeyTraj : public OWD::Trajectory {
   static bool InsertKey(owd_plugins::InsertKey::Request &req,
 			owd_plugins::InsertKey::Response &res);
 
-  virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+  virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
 
   /// functions for starting up and shutting down the service
   static bool Register();
@@ -35,7 +35,9 @@ class InsertKeyTraj : public OWD::Trajectory {
     ~InsertKeyStep();
     
     INSERTION_STEP stepname;
-    virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt) =0;
+    virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) =0;
+
+    double last_time;
   };
   
   class InsertKeyStep8 : public InsertKeyStep {
@@ -43,7 +45,7 @@ class InsertKeyTraj : public OWD::Trajectory {
     InsertKeyStep8();
     ~InsertKeyStep8();
     
-    virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+    virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
 
     ApplyForceTraj *AFTraj;
     double total_shift;

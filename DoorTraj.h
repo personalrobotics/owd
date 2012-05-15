@@ -20,7 +20,7 @@ public:
   DoorTraj(OWD::TrajType &vtraj, owd_plugins::OpenDoorRequest::_ee_pose_type &eep, R3 PullDirection);
   ~DoorTraj();
 
-  virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+  virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
 
   static bool OpenDoor(owd_plugins::OpenDoor::Request &req,
 		       owd_plugins::OpenDoor::Response &res);
@@ -40,7 +40,7 @@ private:
   std::vector<SE3> endpoint_poses;
   DataRecorder<double> *recorder;
   static void *write_recorder_data(void *);
-  static int last_traj_id;
+  static std::string last_traj_id;
   static pthread_t recorder_thread;
   SE3 last_pose;
 

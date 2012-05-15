@@ -26,7 +26,7 @@ public:
   WSTraj(owd_plugins::AddWSTraj::Request &wst);
   virtual ~WSTraj();
 
-  virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+  virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
   virtual void force_feedback_evaluate(OWD::Trajectory::TrajControl &tc,
 				       double dt);
 

@@ -59,7 +59,7 @@ bool FTCheck::FTCheckSrv(pr_msgs::Reset::Request &req,
 }
 
 FTCheck::FTCheck(int _testtime) :
-  OWD::Trajectory("FTCheck"),
+  OWD::Trajectory("FTCheck",OWD::Trajectory::random_id()),
   testtime(_testtime),
   samples(0)
 {
@@ -89,8 +89,8 @@ FTCheck::FTCheck(int _testtime) :
   hybridplug->recorder->reset();
 }
 
-void FTCheck::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
-  time += dt;
+void FTCheck::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
+  time = t;
   
   if (samples == testtime * 500) {
 

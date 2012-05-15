@@ -99,7 +99,7 @@ DoorTraj::~DoorTraj() {
   hybridplug->current_traj=NULL;
 }
 
-void DoorTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+void DoorTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   if (OWD::Kinematics::max_condition > 25) {
     ROS_ERROR_NAMED("OpenDoor","Jacobian Psuedo-Inverse condition number reached %2f; aborting", OWD::Kinematics::max_condition);
     runstate=ABORT;
@@ -112,7 +112,7 @@ void DoorTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   // First, call evaluate on the base class to see where we would want
   // to be if we weren't also dealing with the door
   TrajControl tc2(tc);
-  OWD::MacJointTraj::evaluate(tc2,dt);
+  OWD::MacJointTraj::evaluate_abs(tc2,t);
   SE3 traj_endpoint_pose = interpolate_ee_pose(tc2.q);
 
   data.push_back(time); // time, column 1
@@ -292,14 +292,14 @@ bool DoorTraj::OpenDoor(owd_plugins::OpenDoor::Request &req,
 
   if (req.traj.positions.size() < 2) {
     ROS_ERROR_NAMED("OpenDoor","Minimum of 2 traj points required for door-opening trajectory");
-    res.id = 0;
+    res.id = std::string("");
     res.ok=false;
     res.reason="Minimum of 2 traj points required for door-opening trajectory";
     return true;
   }
   if (req.ee_pose.size() != req.traj.positions.size()) {
     ROS_ERROR_NAMED("OpenDoor","Length of ee_pose array (%zd) does not match number of trajectory positions (%zd)",req.ee_pose.size(),req.traj.positions.size());
-    res.id = 0;
+    res.id = std::string("");
     res.ok=false;
     res.reason="Length of ee_pose array does not match number of trajectory positions";
     return true;
@@ -312,7 +312,7 @@ bool DoorTraj::OpenDoor(owd_plugins::OpenDoor::Request &req,
     char last_trajectory_error[200];
     snprintf(last_trajectory_error,200,"Could not extract valid trajectory: %s",error);
     ROS_ERROR_NAMED("OpenDoor","%s",last_trajectory_error);
-    res.id=0;
+    res.id=std::string("");
     res.ok=false;
     res.reason=last_trajectory_error;
     return true;
@@ -325,18 +325,19 @@ bool DoorTraj::OpenDoor(owd_plugins::OpenDoor::Request &req,
 							   req.pull_direction.z));
 
     // send it to the arm
-    res.id = OWD::Plugin::AddTrajectory(newtraj,res.reason);
-    if (res.id > 0) {
+    if (OWD::Plugin::AddTrajectory(newtraj,res.reason)) {
       res.ok=true;
+      res.id = newtraj->id;
       res.reason="";
     } else {
       delete newtraj;
+      res.id = std::string("");
       res.ok=false;
     }
   } catch (const char *err) {
     res.ok=false;
     res.reason=err;
-    res.id=0;
+    res.id=std::string("");
   }
 
   // always return true for the service call so that the client knows that
@@ -368,7 +369,7 @@ void DoorTraj::Shutdown() {
 
 void *DoorTraj::write_recorder_data(void *recorder) {
   char filename[200];
-  snprintf(filename,200,"/tmp/doortraj-%02d.csv",last_traj_id);
+  snprintf(filename,200,"/tmp/doortraj-%s.csv",last_traj_id);
   ROS_INFO("Writing doortraj log to %s",filename);
   ((DataRecorder<double> *)recorder)->dump(filename);
   delete (DataRecorder<double> *)recorder;
@@ -394,5 +395,5 @@ SE3 pose_to_SE3(geometry_msgs::Pose &p) {
 std::vector<double> DoorTraj::max_j_vel;
 std::vector<double> DoorTraj::max_j_accel;
 ros::ServiceServer  DoorTraj::ss_OpenDoor;
-int DoorTraj::last_traj_id = 0;
+std::string DoorTraj::last_traj_id;
 pthread_t DoorTraj::recorder_thread;

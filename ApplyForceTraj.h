@@ -26,7 +26,7 @@ public:
   ApplyForceTraj(R3 direction, double force, double distance_limit = 0.1);
   ~ApplyForceTraj();
 
-  virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+  virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
 
   static bool ApplyForce(owd_plugins::ApplyForce::Request &req,
 			 owd_plugins::ApplyForce::Response &res);
@@ -55,9 +55,7 @@ public:
   static const double hand_mass=1.405; // kg
   std::queue<OWD::JointPos> jointpositions;
   std::queue<R3> endpositions;
-  std::queue<double> times;
-  double time_sum;
-  static const double time_window = 0.1; // seconds
+  double last_time;
   double last_force_error;
   bool stopforce;
   double distance_limit;

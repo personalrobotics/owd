@@ -14,6 +14,7 @@
 #include "ApplyForceTraj.h"
 #include "DoorTraj.h"
 #include "WSTraj.h"
+#include "Servo2Traj.h"
 #include "FTCheck.h"
 #include "InsertKeyTraj.h"
 #define PEAK_CAN
@@ -54,6 +55,9 @@ HybridPlugin::HybridPlugin()
   if (!WSTraj::Register()) {
     throw "WSTraj trajectory failed to register";
   }
+  if (!Servo2Traj::Register()) {
+    throw "Servo2Traj trajectory failed to register";
+  }
 
   pub_net_force = n.advertise<std_msgs::Float64MultiArray>("net_force",1);
 
@@ -74,6 +78,7 @@ HybridPlugin::~HybridPlugin() {
   WSTraj::Shutdown();
   FTCheck::Shutdown();
   InsertKeyTraj::Shutdown();
+  Servo2Traj::Shutdown();
 
   if (write_log_file && (recorder->count > 0)) {
     // do a final write of any lingering log data

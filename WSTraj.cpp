@@ -49,7 +49,7 @@ bool WSTraj::ForceFeedbackNextTrajSrv(pr_msgs::Reset::Request &req,
 
 
 WSTraj::WSTraj(owd_plugins::AddWSTraj::Request &wst) 
-  : OWD::Trajectory("WS Traj"),
+  : OWD::Trajectory("WS Traj",OWD::Trajectory::random_id()),
     driving_force_direction(wst.wrench.force.x,
 			    wst.wrench.force.y,
 			    wst.wrench.force.z,
@@ -241,10 +241,10 @@ WSTraj::~WSTraj() {
   hybridplug->current_traj=NULL;
 }
 
-void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+void WSTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   if (ForceFeedback) {
     // use our older version as requested
-    force_feedback_evaluate(tc,dt);
+    force_feedback_evaluate(tc,t);
     return;
   }
  
@@ -257,10 +257,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // position adjustment, and we will correct the speed error by
     // modulating the force we are applying.
 
-
-    // increment our time by dt, to figure out where we want to be
-    // based on how much time elapsed since the last call
-    time += dt;
+    time = t;
 
     // check for ending condition
     if (time >= parseg.end_time) {
@@ -355,8 +352,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     // movement is purely time-based
 
     static R3 total_endpoint_movement;
-    // advance our time by dt
-    time += dt;
+    time = t;
     if (time > parseg.end_time) {
       time = parseg.end_time;
       runstate = DONE;
@@ -379,8 +375,8 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
     ROS_DEBUG_STREAM_NAMED("wstraj","Endpoint movement since last time: " << ep_movement);
     last_endpoint = (R3) hybridplug->endpoint;
 
-    ROS_DEBUG_NAMED("wstraj","WSTraj eval: dist=%2.3f, vel=%2.3f, accel=%2.3f, time=%2.3f, dt=%0.3f",
-		    dist,vel,accel,time,dt);
+    ROS_DEBUG_NAMED("wstraj","WSTraj eval: dist=%2.3f, vel=%2.3f, accel=%2.3f, time=%2.3f",
+		    dist,vel,accel,time);
 #endif // SIMULATION
 
     /**********************************************
@@ -511,7 +507,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 
       // Let AFTraj compute the positions and torques needed to reach the
       // desired position while also maintaining the force
-      AFTraj->evaluate(tc, dt);
+      AFTraj->evaluate_abs(tc, t);
   
     } else {
 
@@ -548,7 +544,7 @@ void WSTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 // older version that modulates the force based on whether we are ahead of
 // or behind our trajectory time.
 // this one works better for stapling, so it's still here
-void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double t) {
  
   if (driving_forcetorque > 0) {
     // When we come into this function, we will ideally be exactly at
@@ -559,10 +555,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     // position adjustment, and we will correct the speed error by
     // modulating the force we are applying.
 
-
-    // increment our time by dt, to figure out where we want to be
-    // based on how much time elapsed since the last call
-    time += dt;
+    time = t;
 
     // map our current position to the closest point
     // on the trajectory.  this does not move us forward or
@@ -734,8 +727,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     // movement is purely time-based
 
     static R3 total_endpoint_movement;
-    // advance our time by dt
-    time += dt;
+    time = t;
     if (time > parseg.end_time) {
       time = parseg.end_time;
       runstate = DONE;
@@ -758,8 +750,8 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
     ROS_DEBUG_STREAM_NAMED("wstraj","Endpoint movement since last time: " << ep_movement);
     last_endpoint = (R3) hybridplug->endpoint;
 
-    ROS_DEBUG_NAMED("wstraj","WSTraj eval: dist=%2.3f, vel=%2.3f, accel=%2.3f, time=%2.3f, dt=%0.3f",
-		    dist,vel,accel,time,dt);
+    ROS_DEBUG_NAMED("wstraj","WSTraj eval: dist=%2.3f, vel=%2.3f, accel=%2.3f, time=%2.3f",
+		    dist,vel,accel,time);
 #endif // SIMULATION
 
     /**********************************************
@@ -890,7 +882,7 @@ void WSTraj::force_feedback_evaluate(OWD::Trajectory::TrajControl &tc, double dt
 
       // Let AFTraj compute the positions and torques needed to reach the
       // desired position while also maintaining the force
-      AFTraj->evaluate(tc, dt);
+      AFTraj->evaluate_abs(tc, t);
   
     } else {
 

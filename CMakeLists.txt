@@ -6,5 +6,5 @@ rosbuild_init()
 rosbuild_genmsg()
 rosbuild_gensrv()
 
-rosbuild_add_library(owd_hybrid_plugin HybridPlugin.cpp ApplyForceTraj.cpp DoorTraj.cpp WSTraj.cpp ForceController.cpp Vibration.cpp InsertKeyTraj.cpp FTCheck.cpp)
+rosbuild_add_library(owd_hybrid_plugin HybridPlugin.cpp ApplyForceTraj.cpp DoorTraj.cpp WSTraj.cpp ForceController.cpp Vibration.cpp InsertKeyTraj.cpp FTCheck.cpp Servo2Traj.cpp)
 

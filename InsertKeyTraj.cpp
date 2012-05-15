@@ -38,7 +38,7 @@ bool InsertKeyTraj::InsertKey(owd_plugins::InsertKey::Request &req,
 }
 
 InsertKeyTraj::InsertKeyTraj() :
-  OWD::Trajectory("InsertKeyTraj"),
+  OWD::Trajectory("InsertKeyTraj",OWD::Trajectory::random_id()),
   current_step(NULL)
 {
   start_position=hybridplug->target_arm_position;
@@ -47,7 +47,7 @@ InsertKeyTraj::InsertKeyTraj() :
   hybridplug->current_traj=this;
 }
 
-void InsertKeyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+void InsertKeyTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   /* Procedure:
      0.  Tare the F/T sensor
      1.  Approach the face of the handle to the side of the cylinder and stop.
@@ -92,7 +92,7 @@ void InsertKeyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 	break;
   case STEP8_INSERT:
     // force-driven AF while wiggling and vibrating
-    current_step->evaluate(tc,dt);
+    current_step->evaluate_abs(tc,t);
     end_position=current_step->end_position;
     if ((current_step->runstate == DONE) ||
 	(current_step->runstate == ABORT)) {
@@ -107,7 +107,10 @@ void InsertKeyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
 }
 
 InsertKeyTraj::InsertKeyStep::InsertKeyStep(INSERTION_STEP _stepname) :
-  Trajectory("InsertKey"),stepname(_stepname) {
+  Trajectory("InsertKey",OWD::Trajectory::random_id()),
+  stepname(_stepname),
+  last_time(-1)
+ {
 }
 
 InsertKeyTraj::InsertKeyStep::~InsertKeyStep() {
@@ -135,9 +138,13 @@ InsertKeyTraj::InsertKeyStep8::InsertKeyStep8() :
   AFTraj->SetVibration(1,0,0,0.001,60);
 }
 
-void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+void InsertKeyTraj::InsertKeyStep8::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   
-
+  if (last_time < 0) {
+    last_time = t;
+  }
+  double dt = t - last_time;
+  last_time = t;
   motiontime -= dt;
   if (motiontime < 0) {
     ++motion;
@@ -280,7 +287,7 @@ void InsertKeyTraj::InsertKeyStep8::evaluate(OWD::Trajectory::TrajControl &tc, d
 				target_position);
 
   // let ApplyForce calculate the joint positions and torques
-  AFTraj->evaluate(tc,dt);
+  AFTraj->evaluate_abs(tc,t);
 
   // track the updated joint values
   end_position = tc.q;

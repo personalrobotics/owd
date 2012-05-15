@@ -26,10 +26,10 @@ bool ApplyForceTraj::ApplyForce(owd_plugins::ApplyForce::Request &req,
       newtraj->rotational_leeway = 10.0/180.0*3.14159; // 10 degrees
     }
     // send it to the arm
-    res.id = OWD::Plugin::AddTrajectory(newtraj,res.reason);
-    if (res.id > 0) {
+    if (OWD::Plugin::AddTrajectory(newtraj,res.reason)) {
       current_traj = newtraj;
       res.ok=true;
+      res.id = newtraj->id;
       res.reason="";
     } else {
       delete newtraj;
@@ -38,7 +38,7 @@ bool ApplyForceTraj::ApplyForce(owd_plugins::ApplyForce::Request &req,
   } catch (const char *err) {
     res.ok=false;
     res.reason=err;
-    res.id=0;
+    res.id=std::string("");
   }
 
   // always return true for the service call so that the client knows that
@@ -51,14 +51,14 @@ bool ApplyForceTraj::ApplyForce(owd_plugins::ApplyForce::Request &req,
 
 ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
 			       double dist_limit):
-  OWD::Trajectory("GFE Apply Force"),
-  time_sum(0), 
+  OWD::Trajectory("GFE Apply Force",OWD::Trajectory::random_id()),
   last_force_error(0), stopforce(false),
   distance_limit(dist_limit),
   last_travel(0),
   velocity_filter(2,50.0),
   vibration(NULL),
-  rotational_leeway(0)
+  rotational_leeway(0),
+  last_time(-1)
 {
   if (hybridplug) {
     if ((hybridplug->ft_force.size() < 3) ||
@@ -134,9 +134,15 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   hybridplug->recorder->reset();  // clear out any records from previous plugin
 }
 
-void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
-  time += dt;
-  times.push(dt);  time_sum += dt;
+void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
+  time = t;
+  double dt;
+  if (last_time < 0) {
+    dt = 0;
+  } else {
+    dt = time - last_time;
+  }
+  last_time = time;
   hybridplug->net_force.data[0 ]=dt/OWD::ControlLoop::PERIOD;
   
   if (stopforce) {
@@ -354,13 +360,6 @@ void ApplyForceTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   jointpositions.push(tc.q);  // remember the requested positions
   // update the values to be published
   hybridplug->net_force.data[3]=OWD::Kinematics::max_condition;
-
-  while (time_sum > time_window) {
-    // update our averaging windows
-    time_sum -= times.front();  times.pop();
-    jointpositions.pop();
-    endpositions.pop();
-  }
 
   // record our data for logging
   hybridplug->log_data(hybridplug->net_force.data);

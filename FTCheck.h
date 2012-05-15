@@ -20,7 +20,7 @@ public:
   FTCheck(int testtime);
   ~FTCheck();
 
-  virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+  virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
 
   static bool FTCheckSrv(pr_msgs::Reset::Request &req,
 			 pr_msgs::Reset::Response &res);
