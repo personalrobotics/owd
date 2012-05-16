@@ -4,6 +4,7 @@
 #include <openwam/Butterworth.h>
 #include <ros/ros.h>
 #include <pr_msgs/Servo.h>
+#include <pr_msgs/SetGains.h>
 
 
 class Servo2Traj : public OWD::Trajectory {
@@ -15,10 +16,15 @@ class Servo2Traj : public OWD::Trajectory {
 
   static bool Register();
   static bool Shutdown();
+  static void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &servo);
+  static bool SetServoGains(pr_msgs::SetGains::Request &req,
+                            pr_msgs::SetGains::Response &res);
+
   static Servo2Traj *current_traj;
   static std::vector<double> Kp, Kd;
   static ros::Subscriber wamservo_sub;
-  static void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &servo);
+  static ros::ServiceServer ss_SetServoGains;
+  static double lower_jlimit[], upper_jlimit[], jlimit_buffer;
 
   std::vector<double> target_velocity;
   std::vector<double> last_jpos;
@@ -27,6 +33,5 @@ class Servo2Traj : public OWD::Trajectory {
   std::vector<bool> active;
   std::vector<double> static_q;
   std::vector<Butterworth<double> *> vel_filter;
-  double lower_jlimit[7], upper_jlimit[7], jlimit_buffer;
   double last_time;
 };
