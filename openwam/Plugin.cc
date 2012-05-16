@@ -50,7 +50,7 @@ namespace OWD {
   }
 
 
-  uint32_t Plugin::AddTrajectory(Trajectory *traj,
+  bool Plugin::AddTrajectory(Trajectory *traj,
 				 std::string &failure_reason) {
     if (!wamdriver) {
       failure_reason="invalid WamDriver pointer; should have been set by openwamdriver.cpp";

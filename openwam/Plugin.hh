@@ -61,8 +61,8 @@ namespace OWD {
     /// \param traj A pointer to a Trajectory instance
     /// \param failure_reason A string describing why the trajectory
     ///                       was rejected (if it was)
-    /// \returns The non-zero trajectory id on success, or zero on failure.
-    static uint32_t AddTrajectory(Trajectory *traj,
+    /// \returns True on success, False on failure
+    static bool AddTrajectory(Trajectory *traj,
 				  std::string &failure_reason);
 
     /// \brief Move the hand
