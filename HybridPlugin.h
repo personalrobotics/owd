@@ -16,6 +16,7 @@
 #include <std_msgs/Float64MultiArray.h>
 #include <ros/ros.h>
 #include <pthread.h>
+#include <sys/time.h>
 
 // #define SIMULATION
 #ifdef SIMULATION
@@ -48,6 +49,13 @@ public:
 		  pr_msgs::MoveHand::Response &res);
   R6 workspace_forcetorque();
   
+  inline unsigned long long time_now_usec() {
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    return (tv.tv_sec * 1e6 + tv.tv_usec);
+  }
+    
+
 private:
   ros::Publisher pub_net_force;
   ros::Publisher pub_tactile_debug;
