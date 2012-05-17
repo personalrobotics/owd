@@ -369,7 +369,7 @@ void DoorTraj::Shutdown() {
 
 void *DoorTraj::write_recorder_data(void *recorder) {
   char filename[200];
-  snprintf(filename,200,"/tmp/doortraj-%s.csv",last_traj_id);
+  snprintf(filename,200,"/tmp/doortraj-%s.csv",last_traj_id.c_str());
   ROS_INFO("Writing doortraj log to %s",filename);
   ((DataRecorder<double> *)recorder)->dump(filename);
   delete (DataRecorder<double> *)recorder;

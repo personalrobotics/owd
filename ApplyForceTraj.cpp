@@ -52,13 +52,14 @@ bool ApplyForceTraj::ApplyForce(owd_plugins::ApplyForce::Request &req,
 ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
 			       double dist_limit):
   OWD::Trajectory("GFE Apply Force",OWD::Trajectory::random_id()),
-  last_force_error(0), stopforce(false),
+  last_time(-1),
+  last_force_error(0),
+  stopforce(false),
   distance_limit(dist_limit),
   last_travel(0),
   velocity_filter(2,50.0),
   vibration(NULL),
-  rotational_leeway(0),
-  last_time(-1)
+  rotational_leeway(0)
 {
   if (hybridplug) {
     if ((hybridplug->ft_force.size() < 3) ||
