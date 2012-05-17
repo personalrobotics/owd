@@ -33,5 +33,5 @@ class Servo2Traj : public OWD::Trajectory {
   std::vector<bool> active;
   std::vector<double> static_q;
   std::vector<Butterworth<double> *> vel_filter;
-  double last_time;
+  double last_time, start_time;
 };

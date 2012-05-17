@@ -10,7 +10,7 @@ double Servo2Traj::lower_jlimit[7],
   Servo2Traj::jlimit_buffer;
 
 bool Servo2Traj::Register() {
-  Kp.resize(7,0);
+  Kp.resize(7,64);
   Kd.resize(7,0);
 
   ros::NodeHandle n("~");
@@ -77,7 +77,9 @@ void Servo2Traj::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo>
 }
 
 Servo2Traj::Servo2Traj(const std::vector<double> &start) :
-  OWD::Trajectory("Servo2 Trajectory", OWD::Trajectory::random_id())
+  OWD::Trajectory("Servo2 Trajectory", OWD::Trajectory::random_id()),
+  last_time(0),
+  start_time(0)
 {
   start_position=start;
   end_position=start;
@@ -89,7 +91,7 @@ Servo2Traj::Servo2Traj(const std::vector<double> &start) :
   static_q = start;
   vel_filter.resize(start.size());
   for (unsigned int i=0; i<start.size(); ++i) {
-    vel_filter[i] = new Butterworth<double>(2,50);
+    vel_filter[i] = new Butterworth<double>(2,20);
   }
 
   if (start.size() > 7) {
@@ -108,7 +110,11 @@ Servo2Traj::~Servo2Traj() {
 }
 
 void Servo2Traj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
-  time = t;
+  double clock_time = hybridplug->time_now_usec() / 1.0e6;
+  if (start_time == 0) {
+    start_time = clock_time;
+  }
+  time = clock_time - start_time;
   double dt = time - last_time;
   last_time = time;
   for (unsigned int i = 0; i<(unsigned int)tc.q.size(); ++i) {
@@ -133,17 +139,19 @@ void Servo2Traj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
       }
     }
     if (active[i]) {
-      // check for approaching joint limits
-      if ((target_velocity[i] > 0) &&
-	  (tc.q[i] + jlimit_buffer > upper_jlimit[i])) {
-	target_velocity[i] = 0.0; // come to a stop before hitting limit
-      } else if ((target_velocity[i] < 0) &&
-		 (tc.q[i] - jlimit_buffer < lower_jlimit[i])) {
+      // check for approaching joint limits: if our current velocity
+      // will cause us to hit the limit in the next 0.1 seconds, then
+      // stop now.
+      if ((tc.q[i] + target_velocity[i] * 0.1 > upper_jlimit[i]) ||
+	  (tc.q[i] + target_velocity[i] * 0.1 < lower_jlimit[i])) {
 	target_velocity[i] = 0.0; // come to a stop before hitting limit
       }
 
       // compute our velocity correction
-      double actual_velocity = vel_filter[i]->eval((tc.q[i] - last_jpos[i])/dt);
+      double actual_velocity(0); // initialize to zero for case dt=0
+      if (dt > 0) {
+	actual_velocity = vel_filter[i]->eval((tc.q[i] - last_jpos[i])/dt);
+      }
       double vel_error = target_velocity[i] - actual_velocity;
       double vel_error_delta = vel_error - last_vel_error[i];
       double correction = Kp[i] * vel_error + Kd[i] * vel_error_delta;
