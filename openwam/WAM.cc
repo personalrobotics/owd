@@ -296,7 +296,7 @@ int WAM::init(){
 
 
 bool WAM::set_gains(int joint,
-		    pr_msgs::PIDgains &gains) {
+		    owd_msgs::PIDgains &gains) {
   if ((joint < Joint::J1) || (joint >> Joint::Jn)) {
     return false;
   }
@@ -304,7 +304,7 @@ bool WAM::set_gains(int joint,
   return true;
 }
 
-bool WAM::get_gains(std::vector<pr_msgs::PIDgains > &gains) {
+bool WAM::get_gains(std::vector<owd_msgs::PIDgains > &gains) {
   gains.resize(Joint::Jn);
   for (int j=1; j<=Joint::Jn; ++j) {
     jointsctrl[j].get_gains(gains[j-1].kp, gains[j-1].kd, gains[j-1].ki);

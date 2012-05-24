@@ -22,9 +22,9 @@
 
 #include <ros/ros.h>
 #include <ros/time.h>
-#include <pr_msgs/WAMState.h>
-#include <pr_msgs/IndexedJointValues.h>
-#include <pr_msgs/WamSetupSeaCtrl.h>
+#include <owd_msgs/WAMState.h>
+#include <owd_msgs/IndexedJointValues.h>
+#include <owd_msgs/WamSetupSeaCtrl.h>
 #include "openwamdriver.h"
 #include "bhd280.hh"
 #include "ft.hh"

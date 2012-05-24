@@ -145,7 +145,7 @@ namespace OWD {
     return jp;
   }
 
-  TrajType Plugin::ros2owd_traj (pr_msgs::JointTraj &jt) {
+  TrajType Plugin::ros2owd_traj (owd_msgs::JointTraj &jt) {
     TrajType traj;
     if (jt.positions.size() != jt.blend_radius.size()) {
       throw "Bad ROS trajectory: mismatched number of points";

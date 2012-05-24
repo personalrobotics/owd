@@ -10,7 +10,7 @@
   </export>
   <depend package="roscpp"/>
   <depend package="std_msgs"/>
-  <depend package="pr_msgs"/>
+  <depend package="owd_msgs"/>
   <depend package="geometry_msgs"/>
   <depend package="tf"/>
   <rosdep name="blas"/>

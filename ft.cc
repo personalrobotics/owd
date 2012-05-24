@@ -75,8 +75,8 @@ bool FT::Publish() {
   return true;
 }
   
-bool FT::Tare(pr_msgs::Reset::Request &req,
-	      pr_msgs::Reset::Response &res) {
+bool FT::Tare(owd_msgs::Reset::Request &req,
+	      owd_msgs::Reset::Response &res) {
   res.ok=true;
   ROS_DEBUG_NAMED("ft","Taring the F/T sensor");
   if (bus->ft_tare() != OW_SUCCESS) {

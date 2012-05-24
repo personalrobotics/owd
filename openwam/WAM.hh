@@ -47,7 +47,7 @@
 #include "Sigmoid.hh"
 #include "JointCtrlPID.hh"
 #include "MultiSync.hh"
-#include <pr_msgs/PIDgains.h>
+#include <owd_msgs/PIDgains.h>
 
 #include "DataRecorder.cc"
 
@@ -207,8 +207,8 @@ public:
   int  set_targ_jpos(double* pos);          // set the target joint positions online 
   int  set_jpos(double pos[]);   // set the joint positions offline
   int  set_joint_offsets(double offsets[]); // set fixed offset for each joint
-  bool set_gains(int joint, pr_msgs::PIDgains &gains);
-  bool get_gains(std::vector<pr_msgs::PIDgains> &gains);
+  bool set_gains(int joint, owd_msgs::PIDgains &gains);
+  bool get_gains(std::vector<owd_msgs::PIDgains> &gains);
 
   void get_current_data(double *pos, double *trq, double *nettrq, 
 			double *sim_torq=NULL, double *traj_torq=NULL);

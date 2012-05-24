@@ -22,9 +22,9 @@
 
 #include <ros/ros.h>
 #include <ros/time.h>
-#include <pr_msgs/AddTrajectory.h>
-#include <pr_msgs/AddTimedTrajectory.h>
-#include <pr_msgs/GetSpeed.h>
+#include <owd_msgs/AddTrajectory.h>
+#include <owd_msgs/AddTimedTrajectory.h>
+#include <owd_msgs/GetSpeed.h>
 #include "openwam/MacJointTraj.hh"
 #include "openwam/Plugin.hh"
 // #include "TrajType.hh"
@@ -36,8 +36,8 @@ ros::ServiceClient
     right_GetSpeed;
 
 
-bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
-		   pr_msgs::AddTrajectory::Response &res) {
+bool AddTrajectory(owd_msgs::AddTrajectory::Request &req,
+		   owd_msgs::AddTrajectory::Response &res) {
 
   res.ok=true;
   res.reason="";
@@ -52,11 +52,11 @@ bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   }
 
   // retrieve the current joint speed limits from the right arm
-  pr_msgs::GetSpeed speed;
+  owd_msgs::GetSpeed speed;
   if (!right_GetSpeed.isValid()) {
     ROS_WARN("Lost connection to /right/owd/GetSpeed; trying to resubscribe...");
     ros::NodeHandle n("~");
-    right_GetSpeed = n.serviceClient<pr_msgs::GetSpeed>("/right/owd/GetSpeed",true);
+    right_GetSpeed = n.serviceClient<owd_msgs::GetSpeed>("/right/owd/GetSpeed",true);
     // try again
     if (!right_GetSpeed.isValid()) {
       ROS_ERROR("Could not reconnect to /right/owd/GetSpeed service: is /right/owd running?");
@@ -80,7 +80,7 @@ bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   if (!left_GetSpeed.isValid()) {
     ROS_WARN("Lost connection to /left/owd/GetSpeed; trying to resubscribe...");
     ros::NodeHandle n("~");
-    left_GetSpeed = n.serviceClient<pr_msgs::GetSpeed>("/left/owd/GetSpeed",true);
+    left_GetSpeed = n.serviceClient<owd_msgs::GetSpeed>("/left/owd/GetSpeed",true);
     // try again
     if (!left_GetSpeed.isValid()) {
       ROS_ERROR("Could not reconnect to /left/owd/GetSpeed service: is /left/owd running?");
@@ -145,8 +145,8 @@ bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
     mjt.id = req.traj.id;
   }
 
-  pr_msgs::AddTimedTrajectory::Request at_req;
-  pr_msgs::AddTimedTrajectory::Response at_res;
+  owd_msgs::AddTimedTrajectory::Request at_req;
+  owd_msgs::AddTimedTrajectory::Response at_res;
   BinaryData bd;
   bd.PutInt(OWD::Trajectory::TRAJTYPE_MACJOINTTRAJ);
   bd.PutString(mjt.serialize(0,6));
@@ -156,12 +156,12 @@ bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   ROS_WARN("Traj will end at %s",mjt.end_position.sdump());
   ROS_WARN("Serialized synchronized right trajectory into a string of len %ld",
 	   at_req.SerializedTrajectory.size());
-  at_req.options = pr_msgs::JointTraj::opt_Synchronize;
+  at_req.options = owd_msgs::JointTraj::opt_Synchronize;
   at_req.id=mjt.id;
   if (!right_AddTimedTrajectory.isValid()) {
     ROS_WARN("Lost connection to /right/owd/AddTimedTrajectory; trying to resubscribe...");
     ros::NodeHandle n("~");
-    right_AddTimedTrajectory = n.serviceClient<pr_msgs::AddTimedTrajectory>("/right/owd/AddTimedTrajectory",true);
+    right_AddTimedTrajectory = n.serviceClient<owd_msgs::AddTimedTrajectory>("/right/owd/AddTimedTrajectory",true);
     // try again
     if (!right_AddTimedTrajectory.isValid()) {
       ROS_ERROR("Could not reconnect to /right/owd/AddTimedTrajectory service: is /right/owd running?");
@@ -195,7 +195,7 @@ bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
   if (!left_AddTimedTrajectory.isValid()) {
     ROS_WARN("Lost connection to /left/owd/AddTimedTrajectory; trying to resubscribe...");
     ros::NodeHandle n("~");
-    left_AddTimedTrajectory = n.serviceClient<pr_msgs::AddTimedTrajectory>("/left/owd/AddTimedTrajectory",true);
+    left_AddTimedTrajectory = n.serviceClient<owd_msgs::AddTimedTrajectory>("/left/owd/AddTimedTrajectory",true);
     // try again
     if (!left_AddTimedTrajectory.isValid()) {
       ROS_ERROR("Could not reconnect to /left/owd/AddTimedTrajectory service: is /left/owd running?");
@@ -226,7 +226,7 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, std::string("owd_sync"));
   ros::NodeHandle n("~");
-  left_AddTimedTrajectory = n.serviceClient<pr_msgs::AddTimedTrajectory>("/left/owd/AddTimedTrajectory",true);
+  left_AddTimedTrajectory = n.serviceClient<owd_msgs::AddTimedTrajectory>("/left/owd/AddTimedTrajectory",true);
   if (! left_AddTimedTrajectory.exists()) {
     ROS_WARN("Waiting for service /left/owd/AddTimedTrajectory.");
     if (!left_AddTimedTrajectory.waitForExistence()) {
@@ -235,7 +235,7 @@ int main(int argc, char** argv)
     }
     ROS_WARN("Connected to service /left/owd/AddTimedTrajectory.");
   }
-  right_AddTimedTrajectory = n.serviceClient<pr_msgs::AddTimedTrajectory>("/right/owd/AddTimedTrajectory",true);
+  right_AddTimedTrajectory = n.serviceClient<owd_msgs::AddTimedTrajectory>("/right/owd/AddTimedTrajectory",true);
   if (! right_AddTimedTrajectory.exists()) {
     ROS_WARN("Waiting for service /right/owd/AddTimedTrajectory.");
     if (!right_AddTimedTrajectory.waitForExistence()) {
@@ -244,7 +244,7 @@ int main(int argc, char** argv)
     }
     ROS_WARN("Connected to service /right/owd/AddTimedTrajectory.");
   }
-  left_GetSpeed = n.serviceClient<pr_msgs::GetSpeed>("/left/owd/GetSpeed",true);
+  left_GetSpeed = n.serviceClient<owd_msgs::GetSpeed>("/left/owd/GetSpeed",true);
   if (! left_GetSpeed.exists()) {
     ROS_WARN("Could not connect to service /left/owd/GetSpeed; perhaps the message types have changed?  Waiting for connection.");
     if (!left_GetSpeed.waitForExistence()) {
@@ -253,7 +253,7 @@ int main(int argc, char** argv)
     }
     ROS_WARN("Connected to service /left/owd/GetSpeed.");
   }
-  right_GetSpeed = n.serviceClient<pr_msgs::GetSpeed>("/right/owd/GetSpeed",true);
+  right_GetSpeed = n.serviceClient<owd_msgs::GetSpeed>("/right/owd/GetSpeed",true);
   if (! right_GetSpeed.exists()) {
     ROS_WARN("Could not connect to service /right/owd/GetSpeed; perhaps the message types have changed?  Waiting for connection.");
     if (!right_GetSpeed.waitForExistence()) {

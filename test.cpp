@@ -22,26 +22,26 @@
 
 #include <ros/ros.h>
 #include <ros/time.h>
-#include <pr_msgs/WAMState.h>
-#include <pr_msgs/SetStiffness.h>
-#include <pr_msgs/AddTrajectory.h>
-#include <pr_msgs/Reset.h>
-#include <pr_msgs/DeleteTrajectory.h>
-#include <pr_msgs/JointTraj.h>
-#include <pr_msgs/Joints.h>
-#include <pr_msgs/TrajInfo.h>
-#include <pr_msgs/MoveHand.h>
-#include <pr_msgs/ResetHand.h>
+#include <owd_msgs/WAMState.h>
+#include <owd_msgs/SetStiffness.h>
+#include <owd_msgs/AddTrajectory.h>
+#include <owd_msgs/Reset.h>
+#include <owd_msgs/DeleteTrajectory.h>
+#include <owd_msgs/JointTraj.h>
+#include <owd_msgs/Joints.h>
+#include <owd_msgs/TrajInfo.h>
+#include <owd_msgs/MoveHand.h>
+#include <owd_msgs/ResetHand.h>
 #include <iostream>
 #include <boost/thread/mutex.hpp>
 #include <pthread.h>
 
 class Test {
 public:
-  pr_msgs::WAMState wamstate, lastwamstate;
+  owd_msgs::WAMState wamstate, lastwamstate;
   ros::NodeHandle &node;
   ros::Subscriber sub_wamstate;
-  pr_msgs::Joints p1, p2;
+  owd_msgs::Joints p1, p2;
   std::vector<double> h1, h2, h3, h4;
   bool running;
   int point;
@@ -49,7 +49,7 @@ public:
 
   boost::mutex cb_mutex;
 
-  void wamstate_callback(const boost::shared_ptr<const pr_msgs::WAMState> &ws) {
+  void wamstate_callback(const boost::shared_ptr<const owd_msgs::WAMState> &ws) {
     wamstate = *ws;
     if (running) {
       if ((last_traj_id == "") // first time
@@ -167,8 +167,8 @@ public:
 
 
   void SetStiffness(float s) {
-    pr_msgs::SetStiffness::Request req;
-    pr_msgs::SetStiffness::Response res;
+    owd_msgs::SetStiffness::Request req;
+    owd_msgs::SetStiffness::Response res;
     
     req.stiffness = s;
 
@@ -180,8 +180,8 @@ public:
   }
 
   void DeleteTrajectory(std::string id) {
-    pr_msgs::DeleteTrajectory::Request delete_req;
-    pr_msgs::DeleteTrajectory::Response delete_res;
+    owd_msgs::DeleteTrajectory::Request delete_req;
+    owd_msgs::DeleteTrajectory::Response delete_res;
     delete_req.ids.push_back(id);
     ros::service::call("owd/DeleteTrajectory",delete_req,delete_res);
     return;
@@ -225,8 +225,8 @@ public:
   }
 
   int ResetHand() {
-    pr_msgs::ResetHand::Request r_req;
-    pr_msgs::ResetHand::Response r_res;
+    owd_msgs::ResetHand::Request r_req;
+    owd_msgs::ResetHand::Response r_res;
     if (!ros::service::call("bhd/ResetHandQuick",r_req, r_res)) {
       ROS_WARN("Could not call bhd/ResetHandQuick");
     }
@@ -234,11 +234,11 @@ public:
   }
     
 
-  std::string MoveTo(pr_msgs::Joints p, bool StopOnForce) {
+  std::string MoveTo(owd_msgs::Joints p, bool StopOnForce) {
     // build trajectory to move from current pos to preferred pos
-    pr_msgs::AddTrajectory::Request traj_req;
-    pr_msgs::AddTrajectory::Response traj_res;
-    pr_msgs::Joints pos;
+    owd_msgs::AddTrajectory::Request traj_req;
+    owd_msgs::AddTrajectory::Response traj_res;
+    owd_msgs::Joints pos;
     pos.j = wamstate.positions;
     traj_req.traj.positions.push_back(pos);
     traj_req.traj.blend_radius.push_back(0.0);
@@ -248,8 +248,8 @@ public:
     
     if (StopOnForce) {
       // tare the force sensor
-      pr_msgs::Reset::Request tare_req;
-      pr_msgs::Reset::Response tare_res;
+      owd_msgs::Reset::Request tare_req;
+      owd_msgs::Reset::Response tare_res;
       if (ros::service::call("owd/ft_tare",tare_req, tare_res)) {
 	if (tare_res.ok) {
 	  ROS_DEBUG("Tared force sensor");
@@ -277,8 +277,8 @@ public:
 
   int MoveHandTo(std::vector<double> p) {
     // build trajectory to move from current pos to preferred pos
-    pr_msgs::MoveHand::Request mh_req;
-    pr_msgs::MoveHand::Response mh_res;
+    owd_msgs::MoveHand::Request mh_req;
+    owd_msgs::MoveHand::Response mh_res;
     mh_req.movetype=1;
     mh_req.positions=p;
     if (ros::service::call("bhd/MoveHand",mh_req,mh_res)) {

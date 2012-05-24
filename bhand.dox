@@ -36,34 +36,34 @@ for the clients which communicate with them.
 
 \section services Services
 
- - \b /bhd/GetHandDOF: type: \e pr_msgs/GetDOF.  Get the number of
+ - \b /bhd/GetHandDOF: type: \e owd_msgs/GetDOF.  Get the number of
    degrees of freedom of the hand.
 
- - \b /bhd/MoveHand: type: \e pr_msgs/MoveHand.  Move the hand in
+ - \b /bhd/MoveHand: type: \e owd_msgs/MoveHand.  Move the hand in
    either position or velocity mode.
 
- - \b /bhd/RelaxHand: type: \e pr_msgs/RelaxHand.  Idle the hand
+ - \b /bhd/RelaxHand: type: \e owd_msgs/RelaxHand.  Idle the hand
    pucks.
 
- - \b /bhd/ResetHand: type: \e pr_msgs/ResetHand.  Send the HI (Hand
+ - \b /bhd/ResetHand: type: \e owd_msgs/ResetHand.  Send the HI (Hand
    Initialize) command to each hand puck, in the sequence 1, 2, 3, 1,
    2, 3, 1, 2, 3, 4 (allows the hand to fully unfold if fingers are
    blocking one-another in the worst-case configuration).  The HI command 
    is the only guaranteed way to clear the breakaway condition.
 
- - \b /bhd/ResetHandQuick: type: \e pr_msgs/ResetHand.  Send the HI (Hand
+ - \b /bhd/ResetHandQuick: type: \e owd_msgs/ResetHand.  Send the HI (Hand
    Initialize) command to each hand puck and the spread puck simultaneously.
    This command will work for most, but not every hand configuration. The 
    HI command is the only guaranteed way to clear the breakaway condition.
 
- - \b /bhd/ResetFinger: type: \e pr_msgs/ResetFinger.  Send the HI
+ - \b /bhd/ResetFinger: type: \e owd_msgs/ResetFinger.  Send the HI
    command to a single specified finger (1 through 4).
 
- - \b /bhd/GetProperty: type: \e pr_msgs/GetHandProperty.  Get a bhand
+ - \b /bhd/GetProperty: type: \e owd_msgs/GetHandProperty.  Get a bhand
    property.  See CANbus::initPropertyDefs for a list of property
    values.
 
- - \b /bhd/SetProperty: type: \e pr_msgs/SetHandProperty.  Set a bhand
+ - \b /bhd/SetProperty: type: \e owd_msgs/SetHandProperty.  Set a bhand
    property.  See CANbus::initPropertyDefs for a list of property
    values.
 
@@ -80,7 +80,7 @@ for the clients which communicate with them.
    command values (like HI or M) to the pucks CMD property.  But for
    the most part you treat them like arm pucks.
 
- - \b /bhd/SetSpeed: type: \e pr_msgs/SetSpeed.  Set the speed that
+ - \b /bhd/SetSpeed: type: \e owd_msgs/SetSpeed.  Set the speed that
    the hand will use for a /bhd/MoveHand position command.  The
    velocities vector should have four values in units of radians per
    second (three for the fingers, one for the spread).  The default
@@ -88,7 +88,7 @@ for the clients which communicate with them.
    spread.  The min_accel_time field in the service message is
    ignored.
 
- - \b /bhd/SetHandTorque: type: \e pr_msgs/SetHandTorque.  Set the
+ - \b /bhd/SetHandTorque: type: \e owd_msgs/SetHandTorque.  Set the
    torques that the hand will use for the position moves.  The \b initial
    value will be used for the start of each move, and if the finger
    gets stalled before it reaches its destination the torque will drop
@@ -98,7 +98,7 @@ for the clients which communicate with them.
 
 \section topics Topics
 
- - \b /bhd/handstate: type: \e pr_msgs/BHState.  Publishes the state
+ - \b /bhd/handstate: type: \e owd_msgs/BHState.  Publishes the state
    of the hand at the frequency set by the \b ~/hand_publish_frequency
    parameter.  Includes the following fields:
   - float64[] \b positions: The angle of each inner link, in radians,

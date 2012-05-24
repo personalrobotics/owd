@@ -22,7 +22,7 @@
 
 #include <ros/ros.h>
 #include <CANbus.hh>
-#include <pr_msgs/BHTactile.h>
+#include <owd_msgs/BHTactile.h>
 
 class Tactile {
 public:
@@ -39,7 +39,7 @@ public:
 private:
   void AdvertiseAndSubscribe(ros::NodeHandle &n);
   void Unadvertise();
-  pr_msgs::BHTactile tactile_msg;
+  owd_msgs::BHTactile tactile_msg;
 };
   
 

@@ -23,7 +23,7 @@
 #include <ros/ros.h>
 #include <CANbus.hh>
 #include <geometry_msgs/WrenchStamped.h>
-#include <pr_msgs/Reset.h>
+#include <owd_msgs/Reset.h>
 
 class FT {
 public:
@@ -39,8 +39,8 @@ public:
   ~FT();
   void Pump(const ros::TimerEvent& e);
   bool Publish();
-  bool Tare(pr_msgs::Reset::Request &req,
-	    pr_msgs::Reset::Response &res);
+  bool Tare(owd_msgs::Reset::Request &req,
+	    owd_msgs::Reset::Response &res);
   
 private:
   void AdvertiseAndSubscribe(ros::NodeHandle &n);

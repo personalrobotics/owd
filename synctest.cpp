@@ -22,23 +22,23 @@
 
 #include <ros/ros.h>
 #include <ros/time.h>
-#include <pr_msgs/WAMState.h>
-#include <pr_msgs/SetStiffness.h>
-#include <pr_msgs/AddTrajectory.h>
-#include <pr_msgs/Reset.h>
-#include <pr_msgs/JointTraj.h>
-#include <pr_msgs/Joints.h>
-#include <pr_msgs/TrajInfo.h>
+#include <owd_msgs/WAMState.h>
+#include <owd_msgs/SetStiffness.h>
+#include <owd_msgs/AddTrajectory.h>
+#include <owd_msgs/Reset.h>
+#include <owd_msgs/JointTraj.h>
+#include <owd_msgs/Joints.h>
+#include <owd_msgs/TrajInfo.h>
 #include <iostream>
 #include <boost/thread/mutex.hpp>
 #include <pthread.h>
 
 class Test {
 public:
-  pr_msgs::WAMState wamstate, lastwamstate;
+  owd_msgs::WAMState wamstate, lastwamstate;
   ros::NodeHandle &node;
   ros::Subscriber sub_wamstate_l, sub_wamstate_r;
-  pr_msgs::Joints p1, p2, p3;
+  owd_msgs::Joints p1, p2, p3;
   std::vector<double> h1, h2, h3, h4;
   bool running;
   int point;
@@ -47,7 +47,7 @@ public:
 
   boost::mutex cb_mutex;
 
-  void wamstate_callback_right(const boost::shared_ptr<const pr_msgs::WAMState> &ws) {
+  void wamstate_callback_right(const boost::shared_ptr<const owd_msgs::WAMState> &ws) {
     char pos_str[500];
     strcpy(pos_str,"");
     wamstate.positions.resize(14);
@@ -90,7 +90,7 @@ public:
     return;
   }
 
-  void wamstate_callback_left(const boost::shared_ptr<const pr_msgs::WAMState> &ws) {
+  void wamstate_callback_left(const boost::shared_ptr<const owd_msgs::WAMState> &ws) {
     char pos_str[500];
     strcpy(pos_str,"");
     wamstate.positions.resize(14);
@@ -168,8 +168,8 @@ public:
 
 
   void SetStiffness(float s) {
-    pr_msgs::SetStiffness::Request req;
-    pr_msgs::SetStiffness::Response res;
+    owd_msgs::SetStiffness::Request req;
+    owd_msgs::SetStiffness::Response res;
     
     req.stiffness = s;
 
@@ -223,11 +223,11 @@ public:
   }
 
 
-  std::string MoveTo(pr_msgs::Joints p, bool StopOnForce) {
+  std::string MoveTo(owd_msgs::Joints p, bool StopOnForce) {
     // build trajectory to move from current pos to preferred pos
-    pr_msgs::AddTrajectory::Request traj_req;
-    pr_msgs::AddTrajectory::Response traj_res;
-    pr_msgs::Joints pos;
+    owd_msgs::AddTrajectory::Request traj_req;
+    owd_msgs::AddTrajectory::Response traj_res;
+    owd_msgs::Joints pos;
     pos.j = wamstate.positions;
     traj_req.traj.positions.push_back(pos);
     traj_req.traj.blend_radius.push_back(0.0);
@@ -237,8 +237,8 @@ public:
     
     if (StopOnForce) {
       // tare the force sensor
-      pr_msgs::Reset::Request tare_req;
-      pr_msgs::Reset::Response tare_res;
+      owd_msgs::Reset::Request tare_req;
+      owd_msgs::Reset::Response tare_res;
       if (ros::service::call("owd/ft_tare",tare_req, tare_res)) {
 	if (tare_res.ok) {
 	  ROS_DEBUG("Tared force sensor");

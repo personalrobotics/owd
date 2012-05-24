@@ -23,16 +23,16 @@
 #include <ros/ros.h>
 #include <CANbus.hh>
 #include <tf/transform_broadcaster.h>
-#include <pr_msgs/BHState.h>
-#include <pr_msgs/MoveHand.h>
-#include <pr_msgs/ResetHand.h>
-#include <pr_msgs/ResetFinger.h>
-#include <pr_msgs/GetDOF.h>
-#include <pr_msgs/RelaxHand.h>
-#include <pr_msgs/SetHandProperty.h>
-#include <pr_msgs/GetHandProperty.h>
-#include <pr_msgs/SetSpeed.h>
-#include <pr_msgs/SetHandTorque.h>
+#include <owd_msgs/BHState.h>
+#include <owd_msgs/MoveHand.h>
+#include <owd_msgs/ResetHand.h>
+#include <owd_msgs/ResetFinger.h>
+#include <owd_msgs/GetDOF.h>
+#include <owd_msgs/RelaxHand.h>
+#include <owd_msgs/SetHandProperty.h>
+#include <owd_msgs/GetHandProperty.h>
+#include <owd_msgs/SetSpeed.h>
+#include <owd_msgs/SetHandTorque.h>
 
 class BHD_280 {
 public:
@@ -56,33 +56,33 @@ public:
   btTransform finger_link1_base[3];
   btTransform finger_link2_base, finger_link3_base;
 
-  pr_msgs::BHState bhstate;
+  owd_msgs::BHState bhstate;
   double max_velocity;
 
   BHD_280(CANbus *cb);
   ~BHD_280();
   void Pump(ros::TimerEvent const& e);
   bool Publish();
-  bool GetDOF(pr_msgs::GetDOF::Request &req,
-	      pr_msgs::GetDOF::Response &res);
-  bool RelaxHand(pr_msgs::RelaxHand::Request &req,
-		 pr_msgs::RelaxHand::Response &res);
-  bool ResetHand(pr_msgs::ResetHand::Request &req,
-		 pr_msgs::ResetHand::Response &res);
-  bool ResetHandQuick(pr_msgs::ResetHand::Request &req,
-		 pr_msgs::ResetHand::Response &res);
-  bool ResetFinger(pr_msgs::ResetFinger::Request &req,
-		   pr_msgs::ResetFinger::Response &res);
-  bool MoveHand(pr_msgs::MoveHand::Request &req,
-		pr_msgs::MoveHand::Response &res);
-  bool SetHandProperty(pr_msgs::SetHandProperty::Request &req,
-		pr_msgs::SetHandProperty::Response &res);
-  bool GetHandProperty(pr_msgs::GetHandProperty::Request &req,
-		pr_msgs::GetHandProperty::Response &res);
-  bool SetSpeed(pr_msgs::SetSpeed::Request &req,
-		pr_msgs::SetSpeed::Response &res); 
-  bool SetHandTorque(pr_msgs::SetHandTorque::Request &req,
-		     pr_msgs::SetHandTorque::Response &res); 
+  bool GetDOF(owd_msgs::GetDOF::Request &req,
+	      owd_msgs::GetDOF::Response &res);
+  bool RelaxHand(owd_msgs::RelaxHand::Request &req,
+		 owd_msgs::RelaxHand::Response &res);
+  bool ResetHand(owd_msgs::ResetHand::Request &req,
+		 owd_msgs::ResetHand::Response &res);
+  bool ResetHandQuick(owd_msgs::ResetHand::Request &req,
+		 owd_msgs::ResetHand::Response &res);
+  bool ResetFinger(owd_msgs::ResetFinger::Request &req,
+		   owd_msgs::ResetFinger::Response &res);
+  bool MoveHand(owd_msgs::MoveHand::Request &req,
+		owd_msgs::MoveHand::Response &res);
+  bool SetHandProperty(owd_msgs::SetHandProperty::Request &req,
+		owd_msgs::SetHandProperty::Response &res);
+  bool GetHandProperty(owd_msgs::GetHandProperty::Request &req,
+		owd_msgs::GetHandProperty::Response &res);
+  bool SetSpeed(owd_msgs::SetSpeed::Request &req,
+		owd_msgs::SetSpeed::Response &res); 
+  bool SetHandTorque(owd_msgs::SetHandTorque::Request &req,
+		     owd_msgs::SetHandTorque::Response &res); 
 private:
   void AdvertiseAndSubscribe(ros::NodeHandle &n);
   void GetParameters(ros::NodeHandle &n);

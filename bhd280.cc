@@ -34,7 +34,7 @@ BHD_280::BHD_280(CANbus *cb) : node("bhd"), bus(cb) {
   GetParameters(node);
   SetPuckValues();
   tf_broadcaster = new tf::TransformBroadcaster();
-  bhstate.state = pr_msgs::BHState::state_done;
+  bhstate.state = owd_msgs::BHState::state_done;
   bhstate.puck_temp_C.resize(4,0);
   bhstate.motor_temp_C.resize(4,0);
   bhstate.positions.resize(4, 0.0f);
@@ -72,7 +72,7 @@ BHD_280::~BHD_280() {
 }
 
 void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
-  pub_handstate = n.advertise<pr_msgs::BHState>("handstate", 1);
+  pub_handstate = n.advertise<owd_msgs::BHState>("handstate", 1);
   ss_gethanddof = n.advertiseService("GetHandDOF",
 					&BHD_280::GetDOF,this);
   ss_movehand = n.advertiseService("MoveHand",
@@ -184,13 +184,13 @@ bool BHD_280::Publish() {
   // state field once herbcontroller is updated
   for (unsigned int i=0; i<4; ++i) {
     if (state[i] == HANDSTATE_UNINIT) {
-      bhstate.internal_state[i] = pr_msgs::BHState::state_uninitialized;
+      bhstate.internal_state[i] = owd_msgs::BHState::state_uninitialized;
     } else if (state[i] == HANDSTATE_MOVING) {
-      bhstate.internal_state[i] = pr_msgs::BHState::state_moving;
+      bhstate.internal_state[i] = owd_msgs::BHState::state_moving;
     } else if (state[i] == HANDSTATE_STALLED) {
-      bhstate.internal_state[i] = pr_msgs::BHState::state_stalled;
+      bhstate.internal_state[i] = owd_msgs::BHState::state_stalled;
     } else if (state[i] == HANDSTATE_DONE) {
-      bhstate.internal_state[i] = pr_msgs::BHState::state_done;
+      bhstate.internal_state[i] = owd_msgs::BHState::state_done;
     } else {
       bhstate.internal_state[i] = 0;
     }
@@ -198,22 +198,22 @@ bool BHD_280::Publish() {
   }
 
   // set the default case
-  bhstate.state=pr_msgs::BHState::state_done;
+  bhstate.state=owd_msgs::BHState::state_done;
   for (unsigned int i=0; i<4; ++i) {
     if (state[i] == HANDSTATE_UNINIT) {
-      bhstate.state = pr_msgs::BHState::state_uninitialized;
+      bhstate.state = owd_msgs::BHState::state_uninitialized;
       break; // don't have to check any others
     } else if (state[i] == HANDSTATE_MOVING) {
       // moving always overrides state_stalled or state_done
-      bhstate.state = pr_msgs::BHState::state_moving;
+      bhstate.state = owd_msgs::BHState::state_moving;
       
       /* Until herbcontroller is updated to know about the stalled
 	 state, we will ignore stalled and treat it as state_done
 	 
 	 // } else if ((state[i] == CANbus::HANDSTATE_STALLED) && 
-	 // (bhstate.state != pr_msgs::BHState::state_moving)) {
+	 // (bhstate.state != owd_msgs::BHState::state_moving)) {
 	 //   // stalled cannot override moving
-	 // bhstate.state = pr_msgs::BHState::state_stalled;
+	 // bhstate.state = owd_msgs::BHState::state_stalled;
       */
     }
   }
@@ -284,16 +284,16 @@ void BHD_280::createT(double a, double alpha, double d, double theta, double res
 }
 
 // Handle requests for DOF information
-bool BHD_280::GetDOF(pr_msgs::GetDOF::Request &req,
-			 pr_msgs::GetDOF::Response &res) {
+bool BHD_280::GetDOF(owd_msgs::GetDOF::Request &req,
+			 owd_msgs::GetDOF::Response &res) {
   ROS_INFO_NAMED("service","Received GetDOF; returning 4");
   res.nDOF =4;
   return true;
 }
 
 // Relax command
-bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
-			pr_msgs::RelaxHand::Response &res) {
+bool BHD_280::RelaxHand(owd_msgs::RelaxHand::Request &req,
+			owd_msgs::RelaxHand::Response &res) {
   if (bus->hand_relax() == OW_SUCCESS) {
     res.ok=true;
   } else {
@@ -303,8 +303,8 @@ bool BHD_280::RelaxHand(pr_msgs::RelaxHand::Request &req,
   return true;
 }
 
-bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
-			pr_msgs::ResetHand::Response &res) {
+bool BHD_280::ResetHand(owd_msgs::ResetHand::Request &req,
+			owd_msgs::ResetHand::Response &res) {
   ROS_INFO_NAMED("service","Received ResetHand");
   res.ok=true;
   for (int cycles=0; cycles<3; ++cycles) {
@@ -347,8 +347,8 @@ bool BHD_280::ResetHand(pr_msgs::ResetHand::Request &req,
   return true;
 }
 
-bool BHD_280::ResetHandQuick(pr_msgs::ResetHand::Request &req,
-			     pr_msgs::ResetHand::Response &res) {
+bool BHD_280::ResetHandQuick(owd_msgs::ResetHand::Request &req,
+			     owd_msgs::ResetHand::Response &res) {
   ROS_INFO_NAMED("service","Received ResetHandQuick");
   res.ok=true;
   // send reset commands to all the fingers at once
@@ -393,8 +393,8 @@ bool BHD_280::ResetHandQuick(pr_msgs::ResetHand::Request &req,
   return true;
 }
 
-bool BHD_280::ResetFinger(pr_msgs::ResetFinger::Request &req,
-			  pr_msgs::ResetFinger::Response &res) {
+bool BHD_280::ResetFinger(owd_msgs::ResetFinger::Request &req,
+			  owd_msgs::ResetFinger::Response &res) {
   ROS_INFO_NAMED("service","Received ResetFinger");
   res.ok=true;
   if ((req.finger < 1) || (req.finger > 4)) {
@@ -424,9 +424,9 @@ bool BHD_280::ResetFinger(pr_msgs::ResetFinger::Request &req,
 }
 
 // Move command
-bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
-		       pr_msgs::MoveHand::Response &res) {
-  if (bhstate.state == pr_msgs::BHState::state_uninitialized) {
+bool BHD_280::MoveHand(owd_msgs::MoveHand::Request &req,
+		       owd_msgs::MoveHand::Response &res) {
+  if (bhstate.state == owd_msgs::BHState::state_uninitialized) {
     ROS_WARN_NAMED("bhd280","Rejected MoveHand: hand is uninitialized");
     res.ok=false;
     res.reason="Hand is uninitialized";
@@ -442,8 +442,8 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
     return true;
   }
   
-  if (req.movetype == pr_msgs::MoveHand::Request::movetype_position) {
-    bhstate.state = pr_msgs::BHState::state_moving;
+  if (req.movetype == owd_msgs::MoveHand::Request::movetype_position) {
+    bhstate.state = owd_msgs::BHState::state_moving;
     ROS_INFO_NAMED("bhd280", "Received MoveHand Position %2.2f %2.2f %2.2f %2.2f",
 		   req.positions[0],
 		   req.positions[1],
@@ -457,13 +457,13 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
       res.ok=true;
     }
     return true;
-  } else if (req.movetype == pr_msgs::MoveHand::Request::movetype_velocity) {
+  } else if (req.movetype == owd_msgs::MoveHand::Request::movetype_velocity) {
     ROS_INFO_NAMED("bhd280", "Received MoveHand Velocity %2.2f %2.2f %2.2f %2.2f",
 		   req.positions[0],
 		   req.positions[1],
 		   req.positions[2],
 		   req.positions[3]);
-    bhstate.state = pr_msgs::BHState::state_moving;
+    bhstate.state = owd_msgs::BHState::state_moving;
 
     /*  this was a temporary override to change velocity commands to
 	position moves just for the Personal Robotics project at Intel.
@@ -476,7 +476,7 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
 	req.positions[i] = 0;
       }
     }
-    req.movetype = pr_msgs::MoveHand::Request::movetype_position;
+    req.movetype = owd_msgs::MoveHand::Request::movetype_position;
     return MoveHand(req,res);
     */
     
@@ -503,7 +503,7 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
     }
     return true;
   } else if (req.movetype == 3) { // "hidden" torque mode
-    bhstate.state = pr_msgs::BHState::state_moving;
+    bhstate.state = owd_msgs::BHState::state_moving;
     pub_handstate.publish(bhstate);  // ensure at least 1 moving msg
     if (bus->hand_torque(req.positions) != OW_SUCCESS) {
       res.ok=false;
@@ -519,8 +519,8 @@ bool BHD_280::MoveHand(pr_msgs::MoveHand::Request &req,
   }
 }
 
-bool BHD_280::SetHandProperty(pr_msgs::SetHandProperty::Request &req,
-			  pr_msgs::SetHandProperty::Response &res) {
+bool BHD_280::SetHandProperty(owd_msgs::SetHandProperty::Request &req,
+			  owd_msgs::SetHandProperty::Response &res) {
   if (bus->hand_set_property(req.nodeid,req.property,req.value) != OW_SUCCESS) {
     ROS_WARN_NAMED("bhd280","Failed to set property %d = %d on puck %d",
 		   req.property,req.value,req.nodeid);
@@ -532,8 +532,8 @@ bool BHD_280::SetHandProperty(pr_msgs::SetHandProperty::Request &req,
   return true;
 }
 
-bool BHD_280::GetHandProperty(pr_msgs::GetHandProperty::Request &req,
-			  pr_msgs::GetHandProperty::Response &res) {
+bool BHD_280::GetHandProperty(owd_msgs::GetHandProperty::Request &req,
+			  owd_msgs::GetHandProperty::Response &res) {
   if (bus->hand_get_property(req.nodeid,req.property,&res.value) != OW_SUCCESS) {
     ROS_WARN_NAMED("bhd280","Failure getting property %d from puck %d",
 		   req.property,req.nodeid);
@@ -545,8 +545,8 @@ bool BHD_280::GetHandProperty(pr_msgs::GetHandProperty::Request &req,
   return true;
 }
 
-bool BHD_280::SetSpeed(pr_msgs::SetSpeed::Request &req,
-		       pr_msgs::SetSpeed::Response &res) {
+bool BHD_280::SetSpeed(owd_msgs::SetSpeed::Request &req,
+		       owd_msgs::SetSpeed::Response &res) {
   if (bus->hand_set_speed(req.velocities) != OW_SUCCESS) {
     ROS_WARN_NAMED("bhd280","BHD280 SetSpeed failed");
     res.ok=false;
@@ -557,8 +557,8 @@ bool BHD_280::SetSpeed(pr_msgs::SetSpeed::Request &req,
   return true;
 }
 
-bool BHD_280::SetHandTorque(pr_msgs::SetHandTorque::Request &req,
-			    pr_msgs::SetHandTorque::Response &res) {
+bool BHD_280::SetHandTorque(owd_msgs::SetHandTorque::Request &req,
+			    owd_msgs::SetHandTorque::Response &res) {
   if (req.initial > 5000) {
     ROS_ERROR("Initial torque exceeds safe limits");
     res.reason="Initial torque exceeds safe limits";

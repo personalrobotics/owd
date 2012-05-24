@@ -35,7 +35,7 @@ Tactile::~Tactile() {
 }
 
 void Tactile::AdvertiseAndSubscribe(ros::NodeHandle &n) {
-  pub_tactile = n.advertise<pr_msgs::BHTactile>("tactile", 40);
+  pub_tactile = n.advertise<owd_msgs::BHTactile>("tactile", 40);
 }
 
 void Tactile::Unadvertise() {

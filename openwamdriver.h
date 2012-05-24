@@ -28,37 +28,37 @@
 #include <algorithm>
 #include <ros/ros.h>
 #include <boost/thread/mutex.hpp>
-#include <pr_msgs/AddTrajectory.h>
-#include <pr_msgs/AddTimedTrajectory.h>
-#include <pr_msgs/DeleteTrajectory.h>
-#include <pr_msgs/CancelAllTrajectories.h>
-#include <pr_msgs/PauseTrajectory.h>
-#include <pr_msgs/ReplaceTrajectory.h>
-#include <pr_msgs/MassProperties.h>
-#include <pr_msgs/SetStiffness.h>
-#include <pr_msgs/SetJointStiffness.h>
-#include <pr_msgs/SetJointOffsets.h>
-#include <pr_msgs/SetSpeed.h>
-#include <pr_msgs/GetSpeed.h>
-#include <pr_msgs/SetExtraMass.h>
-#include <pr_msgs/SetStallSensitivity.h>
-#include <pr_msgs/WAMState.h>
-#include <pr_msgs/WAMInternals.h>
-#include <pr_msgs/GetDOF.h>
-#include <pr_msgs/Servo.h>
-#include <pr_msgs/Reset.h>
-#include <pr_msgs/SetForceInputThreshold.h>
-#include <pr_msgs/SetTactileInputThreshold.h>
-#include <pr_msgs/CalibrateJoints.h>
-#include <pr_msgs/StepJoint.h>
-#include <pr_msgs/SetGains.h>
+#include <owd_msgs/AddTrajectory.h>
+#include <owd_msgs/AddTimedTrajectory.h>
+#include <owd_msgs/DeleteTrajectory.h>
+#include <owd_msgs/CancelAllTrajectories.h>
+#include <owd_msgs/PauseTrajectory.h>
+#include <owd_msgs/ReplaceTrajectory.h>
+#include <owd_msgs/MassProperties.h>
+#include <owd_msgs/SetStiffness.h>
+#include <owd_msgs/SetJointStiffness.h>
+#include <owd_msgs/SetJointOffsets.h>
+#include <owd_msgs/SetSpeed.h>
+#include <owd_msgs/GetSpeed.h>
+#include <owd_msgs/SetExtraMass.h>
+#include <owd_msgs/SetStallSensitivity.h>
+#include <owd_msgs/WAMState.h>
+#include <owd_msgs/WAMInternals.h>
+#include <owd_msgs/GetDOF.h>
+#include <owd_msgs/Servo.h>
+#include <owd_msgs/Reset.h>
+#include <owd_msgs/SetForceInputThreshold.h>
+#include <owd_msgs/SetTactileInputThreshold.h>
+#include <owd_msgs/CalibrateJoints.h>
+#include <owd_msgs/StepJoint.h>
+#include <owd_msgs/SetGains.h>
 #include <tf/transform_broadcaster.h>
 
 #ifdef BUILD_FOR_SEA
-  #include <pr_msgs/WamRequestSeaCtrlTorqLimit.h>
-  #include <pr_msgs/WamRequestSeaCtrlKp.h>
-  #include <pr_msgs/WamRequestSeaCtrlKd.h>
-  #include <pr_msgs/WamRequestSeaCtrlKi.h>
+  #include <owd_msgs/WamRequestSeaCtrlTorqLimit.h>
+  #include <owd_msgs/WamRequestSeaCtrlKp.h>
+  #include <owd_msgs/WamRequestSeaCtrlKd.h>
+  #include <owd_msgs/WamRequestSeaCtrlKi.h>
 #endif
 
 #include "openwam/Joint.hh"
@@ -97,94 +97,94 @@ public:
 
     bool AddTrajectory(Trajectory *traj, std::string &failure_reason);
 
-    bool AddTrajectory(pr_msgs::AddTrajectory::Request &req,
-                       pr_msgs::AddTrajectory::Response &res);
-    bool AddTimedTrajectory(pr_msgs::AddTimedTrajectory::Request &req,
-                       pr_msgs::AddTimedTrajectory::Response &res);
-    bool DeleteTrajectory(pr_msgs::DeleteTrajectory::Request &req,
-                          pr_msgs::DeleteTrajectory::Response &res);
-    bool CancelAllTrajectories(pr_msgs::CancelAllTrajectories::Request &req,
-                          pr_msgs::CancelAllTrajectories::Response &res);
-    bool PauseTrajectory(pr_msgs::PauseTrajectory::Request &req,
-                         pr_msgs::PauseTrajectory::Response &res);
-    bool ReplaceTrajectory(pr_msgs::ReplaceTrajectory::Request &req,
-                           pr_msgs::ReplaceTrajectory::Response &res);
-    bool SetStiffness(pr_msgs::SetStiffness::Request &req,
-                      pr_msgs::SetStiffness::Response &res);
-    bool SetJointStiffness(pr_msgs::SetJointStiffness::Request &req,
-                      pr_msgs::SetJointStiffness::Response &res);
-    bool SetJointOffsets(pr_msgs::SetJointOffsets::Request &req,
-                      pr_msgs::SetJointOffsets::Response &res);
-    bool SetSpeed(pr_msgs::SetSpeed::Request &req,
-                  pr_msgs::SetSpeed::Response &res);
-    bool GetSpeed(pr_msgs::GetSpeed::Request &req,
-		  pr_msgs::GetSpeed::Response &res);
-    bool SetExtraMass(pr_msgs::SetExtraMass::Request &req,
-		      pr_msgs::SetExtraMass::Response &res);
-    bool SetStallSensitivity(pr_msgs::SetStallSensitivity::Request &req,
-			     pr_msgs::SetStallSensitivity::Response &res);
-    bool GetDOF(pr_msgs::GetDOF::Request &req,
-                pr_msgs::GetDOF::Response &res);
-    bool CalibrateJoints(pr_msgs::CalibrateJoints::Request &req,
-			 pr_msgs::CalibrateJoints::Response &res);
-    bool StepJoint(pr_msgs::StepJoint::Request &req,
-		   pr_msgs::StepJoint::Response &res);
-    bool SetGains(pr_msgs::SetGains::Request &req,
-		  pr_msgs::SetGains::Response &res);
-    bool ReloadPlugins(pr_msgs::Reset::Request &req,
-		       pr_msgs::Reset::Response &res);
-    bool SetForceInputThreshold(pr_msgs::SetForceInputThreshold::Request &req,
-				pr_msgs::SetForceInputThreshold::Response &res);
-    bool SetTactileInputThreshold(pr_msgs::SetTactileInputThreshold::Request &req,
-				pr_msgs::SetTactileInputThreshold::Response &res);
+    bool AddTrajectory(owd_msgs::AddTrajectory::Request &req,
+                       owd_msgs::AddTrajectory::Response &res);
+    bool AddTimedTrajectory(owd_msgs::AddTimedTrajectory::Request &req,
+                       owd_msgs::AddTimedTrajectory::Response &res);
+    bool DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
+                          owd_msgs::DeleteTrajectory::Response &res);
+    bool CancelAllTrajectories(owd_msgs::CancelAllTrajectories::Request &req,
+                          owd_msgs::CancelAllTrajectories::Response &res);
+    bool PauseTrajectory(owd_msgs::PauseTrajectory::Request &req,
+                         owd_msgs::PauseTrajectory::Response &res);
+    bool ReplaceTrajectory(owd_msgs::ReplaceTrajectory::Request &req,
+                           owd_msgs::ReplaceTrajectory::Response &res);
+    bool SetStiffness(owd_msgs::SetStiffness::Request &req,
+                      owd_msgs::SetStiffness::Response &res);
+    bool SetJointStiffness(owd_msgs::SetJointStiffness::Request &req,
+                      owd_msgs::SetJointStiffness::Response &res);
+    bool SetJointOffsets(owd_msgs::SetJointOffsets::Request &req,
+                      owd_msgs::SetJointOffsets::Response &res);
+    bool SetSpeed(owd_msgs::SetSpeed::Request &req,
+                  owd_msgs::SetSpeed::Response &res);
+    bool GetSpeed(owd_msgs::GetSpeed::Request &req,
+		  owd_msgs::GetSpeed::Response &res);
+    bool SetExtraMass(owd_msgs::SetExtraMass::Request &req,
+		      owd_msgs::SetExtraMass::Response &res);
+    bool SetStallSensitivity(owd_msgs::SetStallSensitivity::Request &req,
+			     owd_msgs::SetStallSensitivity::Response &res);
+    bool GetDOF(owd_msgs::GetDOF::Request &req,
+                owd_msgs::GetDOF::Response &res);
+    bool CalibrateJoints(owd_msgs::CalibrateJoints::Request &req,
+			 owd_msgs::CalibrateJoints::Response &res);
+    bool StepJoint(owd_msgs::StepJoint::Request &req,
+		   owd_msgs::StepJoint::Response &res);
+    bool SetGains(owd_msgs::SetGains::Request &req,
+		  owd_msgs::SetGains::Response &res);
+    bool ReloadPlugins(owd_msgs::Reset::Request &req,
+		       owd_msgs::Reset::Response &res);
+    bool SetForceInputThreshold(owd_msgs::SetForceInputThreshold::Request &req,
+				owd_msgs::SetForceInputThreshold::Response &res);
+    bool SetTactileInputThreshold(owd_msgs::SetTactileInputThreshold::Request &req,
+				owd_msgs::SetTactileInputThreshold::Response &res);
 
     void AdvertiseAndSubscribe(ros::NodeHandle &n);
 
 
-    pr_msgs::AddTrajectory::Response AddTrajectory(
-						   pr_msgs::AddTrajectory::Request *);
+    owd_msgs::AddTrajectory::Response AddTrajectory(
+						   owd_msgs::AddTrajectory::Request *);
 
     void update_xmission_ratio(const char *param_name, double &current_value, double nominal_value);
-    void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &message);
-    void MassProperties_callback(const boost::shared_ptr<const pr_msgs::MassProperties> &message);
+    void wamservo_callback(const boost::shared_ptr<const owd_msgs::Servo> &message);
+    void MassProperties_callback(const boost::shared_ptr<const owd_msgs::MassProperties> &message);
 
     inline void SetModifiedJ1(bool mj1) {modified_j1 = mj1;}
 
 #ifdef BUILD_FOR_SEA
-    void wamjointtargets_callback(const boost::shared_ptr<const pr_msgs::IndexedJointValues> &message);
+    void wamjointtargets_callback(const boost::shared_ptr<const owd_msgs::IndexedJointValues> &message);
 
     void resetSeaCtrl();
 
-    void wam_seactrl_settl_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &message);
+    void wam_seactrl_settl_callback(const boost::shared_ptr<const owd_msgs::WamSetupSeaCtrl> &message);
 
     void publishCurrentTorqLimits();
-    bool WamRequestSeaCtrlTorqLimit(pr_msgs::WamRequestSeaCtrlTorqLimit::Request &req,
-                                    pr_msgs::WamRequestSeaCtrlTorqLimit::Response &res);
+    bool WamRequestSeaCtrlTorqLimit(owd_msgs::WamRequestSeaCtrlTorqLimit::Request &req,
+                                    owd_msgs::WamRequestSeaCtrlTorqLimit::Response &res);
 
-    void wam_seactrl_setkp_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &message);
+    void wam_seactrl_setkp_callback(const boost::shared_ptr<const owd_msgs::WamSetupSeaCtrl> &message);
     void publishCurrentKp();
-    bool WamRequestSeaCtrlKp(pr_msgs::WamRequestSeaCtrlKp::Request &req,
-                             pr_msgs::WamRequestSeaCtrlKp::Response &res);
+    bool WamRequestSeaCtrlKp(owd_msgs::WamRequestSeaCtrlKp::Request &req,
+                             owd_msgs::WamRequestSeaCtrlKp::Response &res);
 
-    void wam_seactrl_setkd_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &message);
+    void wam_seactrl_setkd_callback(const boost::shared_ptr<const owd_msgs::WamSetupSeaCtrl> &message);
     void publishCurrentKd();
-    bool WamRequestSeaCtrlKd(pr_msgs::WamRequestSeaCtrlKd::Request &req,
-                             pr_msgs::WamRequestSeaCtrlKd::Response &res);
+    bool WamRequestSeaCtrlKd(owd_msgs::WamRequestSeaCtrlKd::Request &req,
+                             owd_msgs::WamRequestSeaCtrlKd::Response &res);
 
-    void wam_seactrl_setki_callback(const boost::shared_ptr<const pr_msgs::WamSetupSeaCtrl> &message);
+    void wam_seactrl_setki_callback(const boost::shared_ptr<const owd_msgs::WamSetupSeaCtrl> &message);
     void publishCurrentKi();
-    bool WamRequestSeaCtrlKi(pr_msgs::WamRequestSeaCtrlKi::Request &req,
-                             pr_msgs::WamRequestSeaCtrlKi::Response &res);
+    bool WamRequestSeaCtrlKi(owd_msgs::WamRequestSeaCtrlKi::Request &req,
+                             owd_msgs::WamRequestSeaCtrlKi::Response &res);
 
     void publishAllSeaSettings();
 #endif
 
 
 private:
-    Trajectory *BuildTrajectory(pr_msgs::JointTraj &jt);
-    pr_msgs::WAMState wamstate;
-    pr_msgs::WAMInternals waminternals;
-    pr_msgs::Servo servocmd;
+    Trajectory *BuildTrajectory(owd_msgs::JointTraj &jt);
+    owd_msgs::WAMState wamstate;
+    owd_msgs::WAMInternals waminternals;
+    owd_msgs::Servo servocmd;
     double gravity_comp_value;
     vector<double> max_joint_vel;
     double wamhome[8];
@@ -232,7 +232,7 @@ private:
     int get_joint_num();
     double get_nearest_joint_value(double jointval, double tolerance);
     void apply_joint_offsets(double *joint_offsets);
-    TrajType ros2owd_traj (pr_msgs::JointTraj &jt);
+    TrajType ros2owd_traj (owd_msgs::JointTraj &jt);
     void get_transmission_ratios();
     void set_transmission_ratios();
     void load_plugins(std::string plugin_list);
