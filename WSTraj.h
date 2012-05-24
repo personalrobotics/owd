@@ -14,7 +14,7 @@
 #include <openwam/Trajectory.hh>
 #include <openwam/ParabolicSegment.hh>
 #include <owd_plugins/AddWSTraj.h>
-#include <pr_msgs/Reset.h>
+#include <owd_msgs/Reset.h>
 
 
 class WSTraj : public OWD::Trajectory {
@@ -33,8 +33,8 @@ public:
   static bool AddWSTraj(owd_plugins::AddWSTraj::Request &req,
 			owd_plugins::AddWSTraj::Response &res);
 
-  static bool ForceFeedbackNextTrajSrv(pr_msgs::Reset::Request &req,
-				       pr_msgs::Reset::Response &res);
+  static bool ForceFeedbackNextTrajSrv(owd_msgs::Reset::Request &req,
+				       owd_msgs::Reset::Response &res);
 
   /// functions for starting up and shutting down the service
   static bool Register();

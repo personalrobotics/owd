@@ -10,7 +10,7 @@
 
 #include "GfePlugin.hh"
 #include <openwam/Trajectory.hh>
-#include <pr_msgs/Reset.h> // for debugging the Jacobian Pseudo-Inverse
+#include <owd_msgs/Reset.h> // for debugging the Jacobian Pseudo-Inverse
 
 class JacobianTestTraj : public OWD::Trajectory {
 public:
@@ -20,11 +20,11 @@ public:
 
   virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
 
-  static bool JacobianTest(pr_msgs::Reset::Request &req,
-			   pr_msgs::Reset::Response &res);
+  static bool JacobianTest(owd_msgs::Reset::Request &req,
+			   owd_msgs::Reset::Response &res);
 
-  bool StopTraj(pr_msgs::Reset::Request &req,
-		pr_msgs::Reset::Response &res);
+  bool StopTraj(owd_msgs::Reset::Request &req,
+		owd_msgs::Reset::Response &res);
 
   inline double random_joint_value(double low, double hi) {
     return random() / RAND_MAX * (hi-low) + low;

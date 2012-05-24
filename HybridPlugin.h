@@ -11,8 +11,8 @@
 #include <openwam/Plugin.hh>
 #include <openwam/DataRecorder.cc>
 #include <openwam/Butterworth.h>
-#include <pr_msgs/MoveHand.h>
-#include <pr_msgs/Reset.h>
+#include <owd_msgs/MoveHand.h>
+#include <owd_msgs/Reset.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <ros/ros.h>
 #include <pthread.h>
@@ -21,7 +21,7 @@
 // #define SIMULATION
 #ifdef SIMULATION
 #include <owd_plugins/ApplyForceDebug.h>
-#include <pr_msgs/Joints.h> // for debugging the Jacobian
+#include <owd_msgs/Joints.h> // for debugging the Jacobian
 #endif // SIMULATION
 
 
@@ -43,10 +43,10 @@ public:
   OWD::Trajectory *current_traj;
   void log_data(const std::vector<double> &data);
   bool write_recorder_data();
-  bool StopTraj(pr_msgs::Reset::Request &req,
-		pr_msgs::Reset::Response &res);
-  bool PowerGrasp(pr_msgs::MoveHand::Request &req,
-		  pr_msgs::MoveHand::Response &res);
+  bool StopTraj(owd_msgs::Reset::Request &req,
+		owd_msgs::Reset::Response &res);
+  bool PowerGrasp(owd_msgs::MoveHand::Request &req,
+		  owd_msgs::MoveHand::Response &res);
   R6 workspace_forcetorque();
   
   inline unsigned long long time_now_usec() {

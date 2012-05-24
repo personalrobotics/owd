@@ -13,7 +13,7 @@
 #include <openwam/Trajectory.hh>
 #include <owd_plugins/ApplyForce.h>
 #include <owd_plugins/StopForce.h>
-#include <pr_msgs/SetJointOffsets.h> // for changing force gains
+#include <owd_msgs/SetJointOffsets.h> // for changing force gains
 #include <queue>
 #include "Vibration.h"
 
@@ -34,8 +34,8 @@ public:
   bool StopForce(owd_plugins::StopForce::Request &req,
 		 owd_plugins::StopForce::Response &res);
 
-  static bool SetForceGains(pr_msgs::SetJointOffsets::Request &req,
-                            pr_msgs::SetJointOffsets::Response &res);
+  static bool SetForceGains(owd_msgs::SetJointOffsets::Request &req,
+                            owd_msgs::SetJointOffsets::Response &res);
 
   void SetVibration(double hand_x, double hand_y, double hand_z,
 		    double amplitude, double frequency);

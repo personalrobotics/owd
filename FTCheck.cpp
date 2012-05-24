@@ -10,8 +10,8 @@
 #include "openwam/CANdefs.hh"	// for HANDSTATE_* enumeration
 #include "openwamdriver.h"
 
-bool FTCheck::FTCheckSrv(pr_msgs::Reset::Request &req,
-			 pr_msgs::Reset::Response &res) {
+bool FTCheck::FTCheckSrv(owd_msgs::Reset::Request &req,
+			 owd_msgs::Reset::Response &res) {
   const int testtime(5);
   // compute a new trajectory
   try {

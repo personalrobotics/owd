@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import roslib; roslib.load_manifest('gfe_owd_plugin')
+import roslib; roslib.load_manifest('owd_plugins')
 
 import rospy
-from pr_msgs.msg import BHState
-from pr_msgs.srv import *
+from owd_msgs.msg import BHState
+from owd_msgs.srv import *
 import sys
 
 def handstate_cb(data):

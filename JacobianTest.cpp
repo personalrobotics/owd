@@ -8,8 +8,8 @@
 #include "JacobianTest.h"
 #include "openwam/Kinematics.hh"
 
-bool JacobianTestTraj::JacobianTest(pr_msgs::Reset::Request &req,
-				    pr_msgs::Reset::Response &res) {
+bool JacobianTestTraj::JacobianTest(owd_msgs::Reset::Request &req,
+				    owd_msgs::Reset::Response &res) {
   ROS_INFO("OWDPlugin: received JacobianTest service call");
 
   // compute a new trajectory
@@ -48,8 +48,8 @@ JacobianTestTraj::JacobianTestTraj(): OWD::Trajectory("Jacobian Test"),
 }
 
 // Stop the trajectory when asked by a client
-bool JacobianTestTraj::StopTraj(pr_msgs::Reset::Request &req,
-				pr_msgs::Reset::Response &res) {
+bool JacobianTestTraj::StopTraj(owd_msgs::Reset::Request &req,
+				owd_msgs::Reset::Response &res) {
   stoptraj=true;
   return true;
 }

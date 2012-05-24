@@ -128,8 +128,8 @@ void HybridPlugin::Publish() {
 
 
 // Stop the trajectory when asked by a client
-bool HybridPlugin::StopTraj(pr_msgs::Reset::Request &req,
-			 pr_msgs::Reset::Response &res) {
+bool HybridPlugin::StopTraj(owd_msgs::Reset::Request &req,
+			 owd_msgs::Reset::Response &res) {
   if (current_traj) {
     current_traj->runstate=OWD::Trajectory::DONE;
     res.reason="";
@@ -156,8 +156,8 @@ bool HybridPlugin::write_recorder_data() {
   return result;
 }
 
-bool HybridPlugin::PowerGrasp(pr_msgs::MoveHand::Request &req,
-			   pr_msgs::MoveHand::Response &res) {
+bool HybridPlugin::PowerGrasp(owd_msgs::MoveHand::Request &req,
+			   owd_msgs::MoveHand::Response &res) {
   int32_t state[4];
   OWD::WamDriver::bus->hand_get_state(state);
   for (unsigned int i=0; i<4; ++i) {
@@ -176,7 +176,7 @@ bool HybridPlugin::PowerGrasp(pr_msgs::MoveHand::Request &req,
     res.reason=s.str().c_str();
     return true;
   }
-  if (req.movetype != pr_msgs::MoveHand::Request::movetype_position) {
+  if (req.movetype != owd_msgs::MoveHand::Request::movetype_position) {
     ROS_ERROR("Only position moves (type=1) are supported for PowerGrasp");
     res.ok=false;
     res.reason="Only position moves (type=1) are supported for PowerGrasp";

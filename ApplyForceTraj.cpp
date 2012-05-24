@@ -377,8 +377,8 @@ bool ApplyForceTraj::StopForce(owd_plugins::StopForce::Request &req,
   return true;
 }
 
-bool ApplyForceTraj::SetForceGains(pr_msgs::SetJointOffsets::Request &req,
-                                   pr_msgs::SetJointOffsets::Response &res) {
+bool ApplyForceTraj::SetForceGains(owd_msgs::SetJointOffsets::Request &req,
+                                   owd_msgs::SetJointOffsets::Response &res) {
   if ((req.offset.size() != 6) && 
       (req.offset.size() != 7)) {
     res.reason = "Need 6 gains: force kP, kD, kI, torque kP, kD, kI, plus an optional velocity damping gain";

@@ -12,9 +12,9 @@ bool WSTraj::AddWSTraj(owd_plugins::AddWSTraj::Request &req,
   // compute a new workspace trajectory
   try {
     WSTraj *newtraj = new WSTraj(req);
-    newtraj->CancelOnStall=(req.options & pr_msgs::JointTraj::opt_CancelOnStall);
-    newtraj->CancelOnForceInput=(req.options & pr_msgs::JointTraj::opt_CancelOnForceInput);
-    newtraj->CancelOnTactileInput=(req.options & pr_msgs::JointTraj::opt_CancelOnTactileInput);
+    newtraj->CancelOnStall=(req.options & owd_msgs::JointTraj::opt_CancelOnStall);
+    newtraj->CancelOnForceInput=(req.options & owd_msgs::JointTraj::opt_CancelOnForceInput);
+    newtraj->CancelOnTactileInput=(req.options & owd_msgs::JointTraj::opt_CancelOnTactileInput);
 
     // send it to the arm
     res.id = OWD::Plugin::AddTrajectory(newtraj,res.reason);
@@ -39,8 +39,8 @@ bool WSTraj::AddWSTraj(owd_plugins::AddWSTraj::Request &req,
   return true;
 }
 
-bool WSTraj::ForceFeedbackNextTrajSrv(pr_msgs::Reset::Request &req,
-					     pr_msgs::Reset::Response &res) {
+bool WSTraj::ForceFeedbackNextTrajSrv(owd_msgs::Reset::Request &req,
+					     owd_msgs::Reset::Response &res) {
   ForceFeedbackNextTraj=true;
   res.ok=true;
   res.reason="";

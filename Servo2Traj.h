@@ -3,8 +3,8 @@
 #include <openwam/Trajectory.hh>
 #include <openwam/Butterworth.h>
 #include <ros/ros.h>
-#include <pr_msgs/Servo.h>
-#include <pr_msgs/SetGains.h>
+#include <owd_msgs/Servo.h>
+#include <owd_msgs/SetGains.h>
 
 
 class Servo2Traj : public OWD::Trajectory {
@@ -16,9 +16,9 @@ class Servo2Traj : public OWD::Trajectory {
 
   static bool Register();
   static bool Shutdown();
-  static void wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &servo);
-  static bool SetServoGains(pr_msgs::SetGains::Request &req,
-                            pr_msgs::SetGains::Response &res);
+  static void wamservo_callback(const boost::shared_ptr<const owd_msgs::Servo> &servo);
+  static bool SetServoGains(owd_msgs::SetGains::Request &req,
+                            owd_msgs::SetGains::Response &res);
 
   static Servo2Traj *current_traj;
   static std::vector<double> Kp, Kd;

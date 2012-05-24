@@ -41,7 +41,7 @@ bool Servo2Traj::Shutdown() {
   return true;
 }
 
-void Servo2Traj::wamservo_callback(const boost::shared_ptr<const pr_msgs::Servo> &servo) {
+void Servo2Traj::wamservo_callback(const boost::shared_ptr<const owd_msgs::Servo> &servo) {
   if (servo->joint.size() != servo->velocity.size()) {
     ROS_ERROR("Servo joint array is not the same size as servo velocity array");
     return;
@@ -171,8 +171,8 @@ void Servo2Traj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   end_position = tc.q; // keep tracking our current position
 }
 
-bool Servo2Traj::SetServoGains(pr_msgs::SetGains::Request &req,
-				      pr_msgs::SetGains::Response &res) {
+bool Servo2Traj::SetServoGains(owd_msgs::SetGains::Request &req,
+				      owd_msgs::SetGains::Response &res) {
   if ((req.joint < 1) || (req.joint > OWD::Plugin::arm_position.size())) {
     ROS_ERROR("SetServoGains ignored for joint %d (out of range)",
 	      req.joint);

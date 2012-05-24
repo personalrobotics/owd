@@ -10,7 +10,7 @@
 
 #include "HybridPlugin.h"
 #include <openwam/Trajectory.hh>
-#include <pr_msgs/Reset.h>
+#include <owd_msgs/Reset.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -22,8 +22,8 @@ public:
 
   virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
 
-  static bool FTCheckSrv(pr_msgs::Reset::Request &req,
-			 pr_msgs::Reset::Response &res);
+  static bool FTCheckSrv(owd_msgs::Reset::Request &req,
+			 owd_msgs::Reset::Response &res);
 
   /// functions for starting up and shutting down the service
   static bool Register();

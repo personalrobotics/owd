@@ -5,7 +5,7 @@
   <author>Mike Vande Weghe (vandeweg@cmu.edu)</author>
   <license>LGPL</license>
   <depend package="owd"/>
-  <depend package="pr_msgs"/>
+  <depend package="owd_msgs"/>
   <depend package="std_msgs"/>
   <depend package="bullet"/>
   <depend package="geometry_msgs"/>
