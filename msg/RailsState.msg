@@ -1,6 +1,0 @@
-string goal_station_name
-float64 goal_station_distance
-string prev_station_name
-float64 prev_station_distance
-string closest_station_name
-float64 closest_station_distance

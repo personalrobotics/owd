@@ -1,4 +1,4 @@
-pr_msgs/Joints[] positions
+owd_msgs/Joints[] positions
 float32[] blend_radius
 uint32 options
 string id

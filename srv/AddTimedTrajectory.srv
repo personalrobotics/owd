@@ -2,7 +2,7 @@
 #
 string SerializedTrajectory
 #
-# options come from the pr_msgs/JointTraj message
+# options come from the owd_msgs/JointTraj message
 uint32 options
 #
 # id string must be unique for each traj.  Will be truncated at 50 chars.

@@ -1,4 +1,4 @@
-pr_msgs/JointTraj traj
+owd_msgs/JointTraj traj
 ---
 bool ok
 string reason

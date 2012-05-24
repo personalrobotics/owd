@@ -1,4 +1,4 @@
-pr_msgs/MassProperties m
+owd_msgs/MassProperties m
 ---
 bool ok
 string reason
