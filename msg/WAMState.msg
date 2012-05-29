@@ -2,7 +2,7 @@ Header header
 
 float64[] positions
 float64[] jpositions
-# float64[] velocities  # not implemented yet
+float64[] velocities
 float64[] torques
 owd_msgs/TrajInfo[] trajectory_queue
 owd_msgs/TrajInfo prev_trajectory
