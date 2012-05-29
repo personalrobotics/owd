@@ -114,7 +114,9 @@ void HybridPlugin::log_data(const std::vector<double> &data) {
 void HybridPlugin::Publish() {
   // only if we are not shutting down
   if (pthread_mutex_trylock(&pub_mutex) == 0) {
-    pub_net_force.publish(net_force);
+    if (net_force.data.size() > 0) {
+      pub_net_force.publish(net_force);
+    }
   
     if (write_log_file &&
 	((recorder->count > 2500) || flush_recorder_data)) {

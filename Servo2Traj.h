@@ -24,14 +24,12 @@ class Servo2Traj : public OWD::Trajectory {
   static std::vector<double> Kp, Kd;
   static ros::Subscriber wamservo_sub;
   static ros::ServiceServer ss_SetServoGains;
-  static double lower_jlimit[], upper_jlimit[], jlimit_buffer;
 
   std::vector<double> target_velocity;
-  std::vector<double> last_jpos;
   std::vector<double> last_vel_error;
   std::vector<double> stoptime;
   std::vector<bool> active;
   std::vector<double> static_q;
-  std::vector<Butterworth<double> *> vel_filter;
-  double last_time, start_time;
+  double start_time;
+  size_t vel_address;
 };
