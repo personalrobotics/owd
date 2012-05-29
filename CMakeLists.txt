@@ -114,8 +114,4 @@ elseif (VENDOR_ID STREQUAL "CentaurHauls")
     add_definitions("-march=c3-2")
 endif  (DEFINED ENV{OWD_MARCH_FLAGS})
 
-
-
-
-
-
+add_custom_target(SUID ALL sudo chown root ../owd COMMAND sudo chmod u+s ../owd DEPENDS owd)

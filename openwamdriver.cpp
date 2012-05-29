@@ -121,6 +121,7 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
 #ifdef FAKE7
   wamstate.positions.resize(7,0.0f);
   wamstate.jpositions.resize(4,0.0f);
+  wamstate.velocities.resize(7,0.0f);
   wamstate.torques.resize(7,0.0f);
   waminternals.positions.resize(7,0.0f);
   waminternals.total_torque.resize(7,0.0f);
@@ -136,10 +137,12 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   Plugin::_pid_torque.resize(7);
   Plugin::_dynamic_torque.resize(7);
   Plugin::_trajectory_torque.resize(7);
+  Plugin::_arm_velocity.resize(7);
   
 #else
   wamstate.positions.resize(nJoints,0.0f);
   wamstate.jpositions.resize(4,0.0f);
+  wamstate.velocities.resize(nJoints,0.0f);
   wamstate.torques.resize(nJoints,0.0f);
   waminternals.positions.resize(nJoints,0.0f);
   waminternals.total_torque.resize(nJoints,0.0f);
@@ -155,6 +158,7 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   Plugin::_pid_torque.resize(nJoints);
   Plugin::_dynamic_torque.resize(nJoints);
   Plugin::_trajectory_torque.resize(nJoints);
+  Plugin::_arm_velocity.resize(nJoints);
 
 #endif // FAKE7
 
@@ -1749,6 +1753,7 @@ bool WamDriver::Publish() {
     if (i<4) {
       wamstate.jpositions[i]=abs_jointpos[i+1];
     }
+    wamstate.velocities[i] = owam->arm_velocity[i+1];
     wamstate.torques[i] = jointtorqs[i+1];
     waminternals.total_torque[i] 
       = waminternals.dynamic_torque[i]
@@ -2569,7 +2574,7 @@ void WamDriver::Update() {
       char timestring[100];
       time_t seconds = bus->jumptime[i] / 1e6;
       int useconds = bus->jumptime[i] - seconds * 1e6;
-      strftime(timestring,100,"%F %T",localtime(&seconds));
+      strftime(timestring,100,"%T",localtime(&seconds));
 	
       ROS_WARN("Motor %d jumped by more than 1000 encoder ticks at time [%s.%06d]",i,timestring,useconds);
       bus->jumptime[i]=0;
@@ -2699,7 +2704,7 @@ void WamDriver::update_xmission_ratio(const char *param_name, double &current_va
     // set the new transmission ratio
     current_value=new_value;
     // recalculate the joint positions using the new ratio
-    owam->mpos2jpos();
+    owam->mpos2jpos(false); // don't change velocity calc
     // recalculate the held position based on the new joint positions
     for (int i=1; i<=Joint::Jn; ++i) {
       owam->heldPositions[i] = owam->joints[i].q + heldPositionsDelta[i];

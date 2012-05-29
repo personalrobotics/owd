@@ -252,6 +252,11 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
     sim_links[i] = links[i];
   }
 
+  velocity_filter.resize(Joint::Jn);
+    for (unsigned int i=0; i<Joint::Jn; ++i) {
+      velocity_filter[i] = new Butterworth<double>(2,10);
+  }
+
   strncpy(last_traj_error,"(not supplied)",500);
 }
 
@@ -378,22 +383,83 @@ int WAM::send_mtrq(){
 }
 
 // convert motors positions to joints positions
-void WAM::mpos2jpos(){
+void WAM::mpos2jpos(bool recalc_velocity){
+  // Whenever we haven't received the most recent position for a puck (due
+  // do CANbus errors), we will estimate the joint value based on its last
+  // known velocity and the elapsed time since the last good reading.
+
+  // Velocity calculation is usually done in this function, too, but is suppressed
+  // when the function is called in conjunction with changing the transmission ratios
+  // so that we don't see a large spurious velocity value.
+
+  // MOTOR 1
   joints[1].q = -motors[1].q/mN1 
     + joints[1].offset;
+  if (bus->received_position_flags & (1 << 1)) {
+    update_velocity(1, recalc_velocity);
+  } else {
+    // update our estimate
+    double delta_time = (bus->next_encoder_clocktime[1] - bus->last_encoder_clocktime[1]) / 1.0e9;
+    joints[1].q += arm_velocity[1] * delta_time;
+  }
+    
+  // MOTORS 2 and 3
   joints[2].q =  motors[2].q*0.5/mN2     - motors[3].q*0.5/mN3
     + joints[2].offset;
   joints[3].q = -motors[2].q*0.5*mn3/mN2 - motors[3].q*0.5*mn3/mN3
     + joints[3].offset;
+  if ((bus->received_position_flags & (1 << 2)) && 
+      (bus->received_position_flags & (1 << 3))) {
+    update_velocity(2, recalc_velocity);
+    update_velocity(3, recalc_velocity);
+  } else {
+    // update our estimate
+    double delta_time = (bus->next_encoder_clocktime[2] - bus->last_encoder_clocktime[2]) / 1.0e9;
+    joints[2].q += arm_velocity[2] * delta_time;
+    delta_time = (bus->next_encoder_clocktime[3] - bus->last_encoder_clocktime[3]) / 1.0e9;
+    joints[3].q += arm_velocity[3] * delta_time;
+  }
+
+  // MOTOR 4
   joints[4].q = -motors[4].q/mN4
     + joints[4].offset;
+  if (bus->received_position_flags & (1 << 4)) {
+    update_velocity(4, recalc_velocity);
+  } else {
+    // update our estimate
+    double delta_time = (bus->next_encoder_clocktime[4] - bus->last_encoder_clocktime[4]) / 1.0e9;
+    joints[4].q += arm_velocity[4] * delta_time;
+  }
+
 #ifdef WRIST
+  // MOTORS 5 and 6
   joints[5].q =  motors[5].q*0.5/mN5     + motors[6].q*0.5/mN6
     + joints[5].offset;
   joints[6].q = -motors[5].q*0.5*mn6/mN5 + motors[6].q*0.5*mn6/mN6
     + joints[6].offset;
+  if ((bus->received_position_flags & (1 << 5)) && 
+      (bus->received_position_flags & (1 << 6))) {
+    update_velocity(5, recalc_velocity);
+    update_velocity(6, recalc_velocity);
+  } else {
+    // update our estimate
+    double delta_time = (bus->next_encoder_clocktime[5] - bus->last_encoder_clocktime[5]) / 1.0e9;
+    joints[5].q += arm_velocity[5] * delta_time;
+    delta_time = (bus->next_encoder_clocktime[6] - bus->last_encoder_clocktime[6]) / 1.0e9;
+        joints[6].q += arm_velocity[6] * delta_time;
+  }
+
+  // MOTOR 7
   joints[7].q = -motors[7].q/mN7
     + joints[7].offset;
+  if (bus->received_position_flags & (1 << 7)) {
+    update_velocity(7, recalc_velocity);
+  } else {
+    // update our estimate
+    double delta_time = (bus->next_encoder_clocktime[7] - bus->last_encoder_clocktime[7]) / 1.0e9;
+    joints[7].q += arm_velocity[7] * delta_time;
+  }
+
 #endif
 }
 
@@ -425,6 +491,27 @@ void WAM::jtrq2mtrq(){
   motors[6].t =  joints[5].t*0.5/mN5 + joints[6].t*0.5*mn6/mN6 ;
   motors[7].t = -joints[7].t/mN7 ;
 #endif
+}
+
+// update our internal tracking of velocity
+// we always update the previous joint value and time, but only recalculate
+// the velocity if asked.  that way this function can be called immediately
+// after making a large virtual change in joint values without affecting
+// the velocity calculation.
+// id represents both a joint and a motor, so this function has to be
+// called twice for differential motor/joint pairs (2&3, 5&6)
+void WAM::update_velocity(unsigned int id, bool recalc_velocity) {
+  if (bus->firstupdate[id]) {
+    // override if we're still starting up
+    recalc_velocity=false;
+  }
+  double sampletime = (bus->last_encoder_clocktime[id] - previous_encoder_clocktime[id]) / 1.0e9;
+  if (recalc_velocity) {
+    arm_velocity[id] = velocity_filter[id-1]->eval((joints[id].q - previous_joint_val[id]) / sampletime);
+						   
+    }
+    previous_joint_val[id] = joints[id].q;
+    previous_encoder_clocktime[id] = bus->last_encoder_clocktime[id];
 }
 
 /*
@@ -1058,6 +1145,7 @@ void WAM::newcontrol_rt(double dt){
     OWD::Plugin::_pid_torque[i]=pid_torq[i+1];
     OWD::Plugin::_dynamic_torque[i]=dyn_torq[i+1];
     OWD::Plugin::_trajectory_torque[i]=traj_torq[i+1];
+    OWD::Plugin::_arm_velocity[i]=arm_velocity[i+1];
   }
   if (bus->forcetorque_data) {
     for (unsigned int i=0; i<3; ++i) {
@@ -1721,6 +1809,10 @@ WAM::~WAM() {
     delete bus;
     bus=NULL;
   }
+  for (unsigned int i=0; i<velocity_filter.size(); ++i) {
+    delete velocity_filter[i];
+  }
+
 #endif // ! OWDSIM
 }
 

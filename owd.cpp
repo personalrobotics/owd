@@ -1,6 +1,6 @@
 /***********************************************************************
 
-  Copyright 2008-2011 Carnegie Mellon University and Intel Corporation
+  Copyright 2008-2012 Carnegie Mellon University and Intel Corporation
   Author: Mike Vande Weghe <vandeweg@cmu.edu>
 
   This file is part of owd.
@@ -30,6 +30,7 @@
 #include "ft.hh"
 #include "tactile.hh"
 #include <sys/mman.h>
+#include <sys/resource.h>
 
 int main(int argc, char** argv)
 {
@@ -40,7 +41,16 @@ int main(int argc, char** argv)
     ROS_FATAL("owd: mlockall failed: ");
     return NULL;
   }
-#endif
+#else // OWD_RT
+#ifndef OWDSIM
+  // increase the process priority so that it can still do effective control
+  // on a non-realtime system
+  if (setpriority(PRIO_PROCESS,0,-5)) {
+    ROS_WARN("Could not elevate process scheduling priority; will be more vulnerable to heartbeat faults on a heavily loaded system");
+    ROS_WARN("Please make sure the executable is set to suid root");
+  }
+#endif // OWDSIM
+#endif // OWD_RT
 
 
   // read parameters and set wam options

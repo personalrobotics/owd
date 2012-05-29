@@ -62,7 +62,9 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   force_tare_values_collected(0),
   torque_tare_values_collected(0),
   hand_initial_torque(2200),
-  hand_sustained_torque(1100)
+  hand_sustained_torque(1100),
+  next_encoder_clocktime(15),
+  last_encoder_clocktime(15)
 {
 
   // hand_queue_mutex is used to manage access to the hand command/response queues
@@ -957,6 +959,21 @@ int CANbus::request_positions_rt(int32_t id) {
     return OW_FAILURE;
   }
 
+  // now that the request has been sent on the CANbus, record the time that
+  // we expect the puck will take the position readings.  Barrett's estimate is
+  // 75 microseconds after the puck receives the request.
+  int low,high;
+  if (id == 0x404) {
+    low=1; high=7;
+  } else if (id == 0x405) {
+    low=11; high=14;
+  } else {
+    low = id; high=id;
+  }
+  for (int p=low; p<=high; ++p) {
+    next_encoder_clocktime[p] = time_now_ns() + 75000; // +75 microseconds
+  }
+
 #ifdef RT_STATS
   static double sendtime=0.0f;
   static int loopcount=0;
@@ -994,12 +1011,15 @@ int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
     // puck problem we've been seeing on the ARM-S right arm joint 1)
     int32_t oldvalue = pos[ pucks[nodeid].motor() ] / 2.0 / M_PI * pucks[nodeid].CPR();
     if ((fabs(value - oldvalue) > 1000) && (!firstupdate[pucks[nodeid].motor()])) {
-      jumptime[pucks[nodeid].motor()] = time_now_ns();
+      jumptime[pucks[nodeid].motor()] = time_now_ns() / 1e6;
     } else {
       // update the new value
       pos[ pucks[nodeid].motor() ] = 2.0*M_PI*( (double) value )/ 
 	( (double) pucks[nodeid].CPR() );
       firstupdate[pucks[nodeid].motor()] = false;
+      // record the time that this reading was taken
+      last_encoder_clocktime[pucks[nodeid].motor()] = 
+	next_encoder_clocktime[pucks[nodeid].motor()];
     }
 
     if (msglen==6) {
@@ -1615,9 +1635,6 @@ int CANbus::send_rt(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t use
   if (log_canbus_data) {
     std::vector<canio_data> crecord;
     canio_data cdata;
-    //  RTIME t1 = time_now_ns();
-    //  cdata.secs = t1 / 1e9;
-    //  cdata.usecs = (t1 - cdata.secs*1e9) / 1e3;
     struct timeval tv;
     gettimeofday(&tv,NULL);
     cdata.secs = tv.tv_sec;
@@ -2930,13 +2947,13 @@ void CANstats::rosprint() {
 #endif
 }
   
- RTIME CANbus::time_now_ns() {
+RTIME CANbus::time_now_ns() {
 #ifdef OWD_RT
    return rt_timer_ticks2ns(rt_timer_read());
 #else // ! OWD_RT
    struct timeval tv;
    gettimeofday(&tv,NULL);
-   return (tv.tv_sec * 1e6 + tv.tv_usec);
+   return (tv.tv_sec * 1e9 + tv.tv_usec * 1e3);
 #endif // ! OWD_RT
  }
 

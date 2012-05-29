@@ -47,9 +47,11 @@
 #include "Sigmoid.hh"
 #include "JointCtrlPID.hh"
 #include "MultiSync.hh"
+#include "DataRecorder.cc"
+#include "Butterworth.h"
+
 #include <owd_msgs/PIDgains.h>
 
-#include "DataRecorder.cc"
 
 class WAMstats{
 public:
@@ -174,9 +176,10 @@ public:
   int recv_mpos();
   int send_mtrq();
 
-  void mpos2jpos();
+  void mpos2jpos(bool recalc_velocity=true);
   void jpos2mpos();   
   void jtrq2mtrq();
+  void update_velocity(unsigned int joint, bool recalc_velocity);
 
   R6 WSControl(double dt);
   void newJSControl_rt(double q_target[], double q[], double dt, double pid_torq[]);
@@ -253,6 +256,11 @@ public:
   SE3 SE3_endpoint; // result of forward kinematics calculation
   double *last_control_position;
   bool slip_joints_on_high_torque;
+
+  double previous_joint_val[Joint::Jn+1];
+  unsigned long long previous_encoder_clocktime[Joint::Jn+1];
+  std::vector<Butterworth<double> *> velocity_filter;
+  double arm_velocity[Joint::Jn+1];
 };
 
 #endif

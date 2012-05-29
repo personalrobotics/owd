@@ -35,7 +35,11 @@ CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
   valid_forcetorque_data(NULL), valid_tactile_data(NULL),
   tactile_top10(false), pucks(NULL),n_arm_pucks(num_pucks),
   simulation(true), received_position_flags(0), received_state_flags(0),
-  hand_motion_state_sequence(0)
+  hand_motion_state_sequence(0),
+  jumptime(NULL),
+  firstupdate(NULL),
+  next_encoder_clocktime(15),
+  last_encoder_clocktime(15)
 {
   //  pthread_mutex_init(&trqmutex, NULL);
   //  pthread_mutex_init(&posmutex, NULL);
@@ -46,6 +50,8 @@ CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
   trq = new int32_t[n_arm_pucks+1];
   pos = new double[n_arm_pucks+1];
   jpos = new double[n_arm_pucks+1];
+  jumptime = new RTIME[n_arm_pucks+1];
+  firstupdate = new bool[n_arm_pucks+1];
   for(int p=1; p<=n_arm_pucks; p++){
     pos[p] = jpos[p] = 0.0;
     trq[p] = 0;
@@ -238,7 +244,21 @@ int32_t CANbus::spread_radians_to_encoder(double radians) {
   return(radians * 180.0/3.1416 / 180.0 * 35950.0);
 }
 
-int CANbus::request_positions_rt(int32_t groupid) {return OW_SUCCESS;}
+int CANbus::request_positions_rt(int32_t groupid) {
+  int low,high;
+  if (id == 0x404) {
+    low=1; high=7;
+  } else if (id == 0x405) {
+    low=11; high=14;
+  } else {
+    low = id; high=id;
+  }
+  for (int p=low; p<=high; ++p) {
+    next_encoder_clocktime[p] = time_now_ns() + 75000; // 75 microseconds
+  }
+  return OW_SUCCESS;
+}
+
 int CANbus::request_puck_state_rt(int32_t nodeid) {return OW_SUCCESS;}
 int CANbus::request_hand_state_rt() {return OW_SUCCESS;}
 int CANbus::request_tactile_rt() {return OW_SUCCESS;}
@@ -248,6 +268,9 @@ int CANbus::request_forcetorque_rt() {return OW_SUCCESS;}
 int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
   // make it look like we've already received all 7 joint values
   received_position_flags = 0xFE;
+  for (int i=1; i<=14; ++i) {
+    last_encoder_clocktime[i] = next_encoder_clocktime[i];
+  }
   return OW_SUCCESS; 
 }
 int CANbus::process_arm_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) { return OW_SUCCESS; }

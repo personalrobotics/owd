@@ -302,6 +302,8 @@ namespace OWD {
     /// \brief The upper limit of each joint (in radians)
     static const std::vector<double> &upper_jlimit;
 
+    /// \brief The filtered velocity of each arm joint (in radians/s)
+    static const std::vector<double> &arm_velocity;
 
   private:
     friend class ::WAM;
@@ -329,6 +331,7 @@ namespace OWD {
     static std::vector<float> _tactile_palm;
     static std::vector<double> _lower_jlimit;
     static std::vector<double> _upper_jlimit;
+    static std::vector<double> _arm_velocity;
     static SE3 _endpoint;
 
     static std::vector<Plugin *> children;

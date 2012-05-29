@@ -404,6 +404,7 @@ public:
   int32_t hand_initial_torque;
   int32_t hand_sustained_torque;
   
+  std::vector<unsigned long long> next_encoder_clocktime, last_encoder_clocktime;
 };
 
 #endif // __CANBUS_H__
