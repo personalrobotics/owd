@@ -2,7 +2,7 @@
 #include "Servo2Traj.h"
 
 Servo2Traj *Servo2Traj::current_traj = NULL;
-std::vector<double> Servo2Traj::Kp(7,32), Servo2Traj::Kd(7,32);
+std::vector<double> Servo2Traj::Kp(7,32), Servo2Traj::Kd(7,0), Servo2Traj::Ki(7,0);
 ros::Subscriber Servo2Traj::wamservo_sub;
 ros::ServiceServer Servo2Traj::ss_SetServoGains;
 
@@ -44,9 +44,15 @@ void Servo2Traj::wamservo_callback(const boost::shared_ptr<const owd_msgs::Servo
 	       servo->joint[i], current_traj->target_velocity.size());
       continue;
     }
+    if (servo->velocity[i] == 0) {
+      // better to keep holding position than to try to servo to zero vel
+      current_traj->stoptime[servo->joint[i]-1] = current_traj->time;
+      continue;
+    }
     current_traj->target_velocity[servo->joint[i]-1] = servo->velocity[i];
     if (!current_traj->active[servo->joint[i]-1]) {
       current_traj->last_vel_error[i]=0;
+      current_traj->total_vel_error[i]=0;
       current_traj->active[servo->joint[i]-1] = true;
     }
     current_traj->stoptime[servo->joint[i]-1] = current_traj->time + 0.5;
@@ -61,6 +67,7 @@ Servo2Traj::Servo2Traj(const std::vector<double> &start) :
   end_position=start;
   target_velocity.resize(start.size());
   last_vel_error.resize(start.size(),0);
+  total_vel_error.resize(start.size(),0);
   stoptime.resize(start.size());
   active.resize(start.size(), false);
   static_q = start;
@@ -123,7 +130,11 @@ void Servo2Traj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
 
       double vel_error = target_velocity[i] - hybridplug->arm_velocity[i];
       double vel_error_delta = vel_error - last_vel_error[i];
-      double correction = Kp[i] * vel_error + Kd[i] * vel_error_delta;
+      total_vel_error[i] += vel_error;
+      double correction = 
+	Kp[i] * vel_error +
+	Kd[i] * vel_error_delta +
+	Ki[i] * total_vel_error[i];
       tc.qd[i]=target_velocity[i];
       tc.qdd[i]=correction;
       last_vel_error[i] = vel_error;
@@ -149,6 +160,7 @@ bool Servo2Traj::SetServoGains(owd_msgs::SetGains::Request &req,
   }
   Kp[req.joint-1]=req.gains.kp;
   Kd[req.joint-1]=req.gains.kd;
+  Ki[req.joint-1]=req.gains.ki;
   return true;
 }
 

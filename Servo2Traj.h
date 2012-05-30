@@ -21,12 +21,13 @@ class Servo2Traj : public OWD::Trajectory {
                             owd_msgs::SetGains::Response &res);
 
   static Servo2Traj *current_traj;
-  static std::vector<double> Kp, Kd;
+  static std::vector<double> Kp, Kd, Ki;
   static ros::Subscriber wamservo_sub;
   static ros::ServiceServer ss_SetServoGains;
 
   std::vector<double> target_velocity;
   std::vector<double> last_vel_error;
+  std::vector<double> total_vel_error;
   std::vector<double> stoptime;
   std::vector<bool> active;
   std::vector<double> static_q;
