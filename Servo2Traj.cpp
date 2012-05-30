@@ -99,11 +99,11 @@ void Servo2Traj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
       // remember position and switch to inactive
       static_q[i] = tc.q[i];
       active[i]=false;
-      hybridplug->net_force.data[i*4+0]
-	= hybridplug->net_force.data[i*4+1]
-	= hybridplug->net_force.data[i*4+2]
-	= hybridplug->net_force.data[i*4+3]
-	= hybridplug->net_force.data[i*4+4]
+      hybridplug->net_force.data[i*5+0]
+	= hybridplug->net_force.data[i*5+1]
+	= hybridplug->net_force.data[i*5+2]
+	= hybridplug->net_force.data[i*5+3]
+	= hybridplug->net_force.data[i*5+4]
 	= 0;
       // if all joints have gone inactive, then end the trajectory
       bool anyactive = false;
@@ -138,11 +138,11 @@ void Servo2Traj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
       tc.qd[i]=target_velocity[i];
       tc.qdd[i]=correction;
       last_vel_error[i] = vel_error;
-      hybridplug->net_force.data[i*4+0] = target_velocity[i];
-      hybridplug->net_force.data[i*4+1] = OWD::Plugin::arm_velocity[i];
-      hybridplug->net_force.data[i*4+2] = vel_error;
-      hybridplug->net_force.data[i*4+3] = correction;
-      hybridplug->net_force.data[i*4+4] = tc.q[i];
+      hybridplug->net_force.data[i*5+0] = target_velocity[i];
+      hybridplug->net_force.data[i*5+1] = OWD::Plugin::arm_velocity[i];
+      hybridplug->net_force.data[i*5+2] = vel_error;
+      hybridplug->net_force.data[i*5+3] = correction;
+      hybridplug->net_force.data[i*5+4] = tc.q[i];
     } else {
       // hold our previous position
       tc.q[i]=static_q[i];
