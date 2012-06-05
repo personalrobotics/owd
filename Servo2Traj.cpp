@@ -45,11 +45,23 @@ void Servo2Traj::wamservo_callback(const boost::shared_ptr<const owd_msgs::Servo
       continue;
     }
     if (servo->velocity[i] == 0) {
-      // better to keep holding position than to try to servo to zero vel
+      // better to keep holding position than to try to servo to zero vel.
+      // setting the stop time to now will cause it to go back to
+      // inactive and hold position.
       current_traj->stoptime[servo->joint[i]-1] = current_traj->time;
       continue;
     }
-    current_traj->target_velocity[servo->joint[i]-1] = servo->velocity[i];
+    if (servo->velocity[i] > OWD::Plugin::joint_vel[servo->joint[i]-1]) {
+      // clamp to upper vel limit
+      current_traj->target_velocity[servo->joint[i]-1] 
+	= OWD::Plugin::joint_vel[servo->joint[i]-1];
+    } else if (servo->velocity[i] < -OWD::Plugin::joint_vel[servo->joint[i]-1]) {
+      // clamp to lower vel limit
+      current_traj->target_velocity[servo->joint[i]-1] 
+	= -OWD::Plugin::joint_vel[servo->joint[i]-1];
+    } else {
+      current_traj->target_velocity[servo->joint[i]-1] = servo->velocity[i];
+    }
     if (!current_traj->active[servo->joint[i]-1]) {
       current_traj->last_vel_error[i]=0;
       current_traj->total_vel_error[i]=0;
