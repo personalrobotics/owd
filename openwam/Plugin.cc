@@ -177,6 +177,10 @@ namespace OWD {
   std::vector<float> Plugin::_tactile_palm;
   std::vector<double> Plugin::_lower_jlimit;
   std::vector<double> Plugin::_upper_jlimit;
+  std::vector<double> Plugin::_max_joint_vel;
+  std::vector<double> Plugin::_joint_vel;
+  std::vector<double> Plugin::_joint_accel;
+  double Plugin::_max_jerk;
   std::vector<double> Plugin::_arm_velocity;
   SE3 Plugin::_endpoint;
   double Plugin::gravity;
@@ -205,6 +209,10 @@ namespace OWD {
   const std::vector<float> &Plugin::tactile_palm=Plugin::_tactile_palm;
   const std::vector<double> &Plugin::lower_jlimit=Plugin::_lower_jlimit;
   const std::vector<double> &Plugin::upper_jlimit=Plugin::_upper_jlimit;
+  const std::vector<double> &Plugin::max_joint_vel=Plugin::_max_joint_vel;
+  const std::vector<double> &Plugin::joint_vel=Plugin::_joint_vel;
+  const std::vector<double> &Plugin::joint_accel=Plugin::_joint_accel;
+  const double              &Plugin::max_jerk=Plugin::_max_jerk;
   const std::vector<double> &Plugin::arm_velocity=Plugin::_arm_velocity;
   const SE3 &Plugin::endpoint=Plugin::_endpoint;
 

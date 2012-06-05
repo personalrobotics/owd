@@ -104,19 +104,22 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   // motion limits
   gravity_comp_value=1.0;
   min_accel_time=0.75;
-  max_joint_vel.push_back(2.5); // J1
-  max_joint_vel.push_back(2.5); // J2
-  max_joint_vel.push_back(2.5); // J3
-  max_joint_vel.push_back(2.5); // J4
-  max_joint_vel.push_back(2.5); // J5
-  max_joint_vel.push_back(2.5); // J6
-  max_joint_vel.push_back(2.5); // J7
-  max_jerk = 10.0 * 3.141592654;
+  Plugin::_max_joint_vel.resize(7);
+  Plugin::_joint_vel.resize(7);
+  Plugin::_joint_accel.resize(7);
+  Plugin::_max_joint_vel[0]=2.5; // J1
+  Plugin::_max_joint_vel[1]=2.5; // J2
+  Plugin::_max_joint_vel[2]=2.5; // J3
+  Plugin::_max_joint_vel[3]=2.5; // J4
+  Plugin::_max_joint_vel[4]=2.5; // J5
+  Plugin::_max_joint_vel[5]=2.5; // J6
+  Plugin::_max_joint_vel[6]=2.5; // J7
+  Plugin::_max_jerk = 10.0 * 3.141592654;
   last_trajectory_error[0]=0;
   
   for (unsigned int j=0; j<nJoints; ++j) {
-    joint_vel.push_back(max_joint_vel[j]);
-    joint_accel.push_back(joint_vel[j]/min_accel_time);
+    Plugin::_joint_vel[j]=Plugin::_max_joint_vel[j];
+    Plugin::_joint_accel[j] = Plugin::_joint_vel[j]/min_accel_time;
   }
 #ifdef FAKE7
   wamstate.positions.resize(7,0.0f);
@@ -230,8 +233,8 @@ bool WamDriver::Init(const char *joint_cal_file)
   char speedstr[200], accelstr[200];
   strcpy(speedstr,""); strcpy(accelstr,"");
   for (unsigned int j = 0; j < nJoints; ++j) {
-    snprintf(speedstr+strlen(speedstr),199-strlen(speedstr),"%3.0f ",joint_vel[j] * 180.0/3.141592654);
-    snprintf(accelstr+strlen(accelstr),199-strlen(accelstr),"%3.0f ",joint_accel[j]*180.0/3.141592654);
+    snprintf(speedstr+strlen(speedstr),199-strlen(speedstr),"%3.0f ",Plugin::_joint_vel[j] * 180.0/3.141592654);
+    snprintf(accelstr+strlen(accelstr),199-strlen(accelstr),"%3.0f ",Plugin::_joint_accel[j]*180.0/3.141592654);
   }
   
   ROS_DEBUG("Max motion limits: joint speed (deg/s) = [ %s]",speedstr);
@@ -743,7 +746,7 @@ OWD::Trajectory *WamDriver::BuildTrajectory(owd_msgs::JointTraj &jt) {
     ROS_WARN_NAMED("BuildTrajectory","No blends found; using ParaJointTraj");
 
     try {
-      ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bCancelOnStall,bCancelOnForceInput,bCancelOnTactileInput);
+      ParaJointTraj *paratraj = new ParaJointTraj(traj,Plugin::_joint_vel,Plugin::_joint_accel,bWaitForStart,bCancelOnStall,bCancelOnForceInput,bCancelOnTactileInput);
       ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
       ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
       
@@ -764,8 +767,10 @@ OWD::Trajectory *WamDriver::BuildTrajectory(owd_msgs::JointTraj &jt) {
   } else {
     // use a MacJointTraj (blends at points)
     try {
-      MacJointTraj *mactraj = new MacJointTraj(traj,joint_vel, joint_accel,
-					       max_jerk,
+      MacJointTraj *mactraj = new MacJointTraj(traj,
+					       Plugin::_joint_vel,
+					       Plugin::_joint_accel,
+					       Plugin::max_jerk,
 					       bWaitForStart,
 					       bCancelOnStall,
 					       bCancelOnForceInput,
@@ -793,7 +798,7 @@ OWD::Trajectory *WamDriver::BuildTrajectory(owd_msgs::JointTraj &jt) {
       // can usually still succeed with a non-blended traj
       ROS_ERROR_NAMED("BuildTrajectory","Trying to use a ParaJointTraj instead");
       try {
-	ParaJointTraj *paratraj = new ParaJointTraj(traj,joint_vel,joint_accel,bWaitForStart,bCancelOnStall,bCancelOnForceInput,bCancelOnTactileInput);
+	ParaJointTraj *paratraj = new ParaJointTraj(traj,Plugin::_joint_vel,Plugin::_joint_accel,bWaitForStart,bCancelOnStall,bCancelOnForceInput,bCancelOnTactileInput);
 	ROS_DEBUG_NAMED("BuildTrajectory","parabolic trajectory built");
 	ROS_DEBUG_NAMED("BuildTrajectory","Segments=%zd, total time=%3.3f",paratraj->parsegs[0].size(),paratraj->parsegs[0].back().end_time);
 	if (jt.options & jt.opt_Synchronize) {
@@ -1259,7 +1264,7 @@ void WamDriver::calibrate_wam_mass_model() {
                         owam->unlock("OWD: calib mass model");
                 } else if (ScreenBuf::mode == ScreenBuf::FRICTION_CALIB) {
                         // run a velocity traj on the current joint
-                        joint_accel[active_link-1]=joint_vel[active_link-1]=ScreenBuf::friction_pulse_velocity;
+		    Plugin::_joint_accel[active_link-1]=Plugin::_joint_vel[active_link-1]=ScreenBuf::friction_pulse_velocity;
                         vtraj.clear();
                         // the first point in the trajectory will have most joint values the
                         // same as the current position, but the active joint set to the low
@@ -1271,9 +1276,9 @@ void WamDriver::calibrate_wam_mass_model() {
                         tp[active_link-1]=friction_pulse_highpos[active_link];
                         vtraj.push_back(TrajPoint(tp));
                         //                        ExecuteTrajectory(vtraj,false,false,false,false,0);
-                        // restore the joint velocities
-                        joint_vel[active_link-1]=max_joint_vel[active_link-1];
-                        joint_accel[active_link-1]=joint_vel[active_link-1]/min_accel_time;
+                        // restore the joint velocities to max
+			Plugin::_joint_vel[active_link-1]=Plugin::_max_joint_vel[active_link-1];
+			Plugin::_joint_accel[active_link-1]=Plugin::_joint_vel[active_link-1]/min_accel_time;
                     } else if (ScreenBuf::mode == ScreenBuf::TRAJ_RECORD) {
 #endif // PULSE
                         // add current position to point list
@@ -1533,12 +1538,12 @@ bool WamDriver::move_until_stop(int joint, double stop, double limit, double vel
     original_joint_pos=curpoint[joint-1];
     curpoint[joint-1]=limit;
     traj.push_back(curpoint);
-    std::vector<double> modified_joint_vel(joint_vel);
+    std::vector<double> modified_joint_vel(Plugin::_joint_vel);
     // override the default joint velocity to match what was specified
     modified_joint_vel[joint-1]=velocity;
-    std::vector<double> modified_joint_accel(joint_accel);
+    std::vector<double> modified_joint_accel(Plugin::_joint_accel);
     // rescale the acceleration to match the new velocity
-    modified_joint_accel[joint-1]=joint_accel[joint-1]*velocity/joint_vel[joint-1];
+    modified_joint_accel[joint-1]=Plugin::_joint_accel[joint-1]*velocity/Plugin::_joint_vel[joint-1];
     ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,true,false,false);
     ROS_DEBUG_NAMED("calibration",
 		    "Moving joint %d from %2.2f to %2.2f",
@@ -1596,12 +1601,12 @@ bool WamDriver::move_joint(int joint, double newpos, double velocity) {
     traj.push_back(curpoint);
     curpoint[joint-1]=newpos;
     traj.push_back(curpoint);
-    std::vector<double> modified_joint_vel(joint_vel);
+    std::vector<double> modified_joint_vel(Plugin::_joint_vel);
     // override the default joint velocity to match what was specified
     modified_joint_vel[joint-1]=velocity;
-    std::vector<double> modified_joint_accel(joint_accel);
+    std::vector<double> modified_joint_accel(Plugin::_joint_accel);
     // rescale the acceleration to match the new velocity
-    modified_joint_accel[joint-1]=joint_accel[joint-1]*velocity/joint_vel[joint-1];
+    modified_joint_accel[joint-1]=Plugin::_joint_accel[joint-1]*velocity/Plugin::_joint_vel[joint-1];
     ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,false,false,false);
     if (owam->run_trajectory(paratraj) == OW_FAILURE) {
       ROS_ERROR_NAMED("calibration",
@@ -2433,19 +2438,19 @@ bool WamDriver::SetSpeed(owd_msgs::SetSpeed::Request &req,
     return true;
   }
   for (unsigned int i=0; i<nJoints; ++i) {
-    if (req.velocities[i] > max_joint_vel[i]) {
+    if (req.velocities[i] > Plugin::_max_joint_vel[i]) {
       // limit to max
-      joint_vel[i] = max_joint_vel[i];
-      ROS_WARN("Limited joint %d velocity to max %2.2f radians/s",i,joint_vel[i]);
-    } else if (req.velocities[i] < 0.05 * max_joint_vel[i]) {
+      Plugin::_joint_vel[i] = Plugin::_max_joint_vel[i];
+      ROS_WARN("Limited joint %d velocity to max %2.2f radians/s",i,Plugin::_joint_vel[i]);
+    } else if (req.velocities[i] < 0.05 * Plugin::_max_joint_vel[i]) {
       // limit to no less than 5% of max
-      joint_vel[i] = 0.05 * max_joint_vel[i];
-      ROS_WARN("Limited joint %d velocity to min %2.2f radians/s",i,joint_vel[i]);
+      Plugin::_joint_vel[i] = 0.05 * Plugin::_max_joint_vel[i];
+      ROS_WARN("Limited joint %d velocity to min %2.2f radians/s",i,Plugin::_joint_vel[i]);
     } else {
-      joint_vel[i] = req.velocities[i];
-      ROS_INFO("Set joint %d velocity limit to %2.2f radians/s",i,joint_vel[i]);
+      Plugin::_joint_vel[i] = req.velocities[i];
+      ROS_INFO("Set joint %d velocity limit to %2.2f radians/s",i,Plugin::_joint_vel[i]);
     }
-    joint_accel[i] = joint_vel[i] / req.min_accel_time;
+    Plugin::_joint_accel[i] = Plugin::_joint_vel[i] / req.min_accel_time;
   }
   res.ok=true;
   return true;
@@ -2453,9 +2458,9 @@ bool WamDriver::SetSpeed(owd_msgs::SetSpeed::Request &req,
 
 bool WamDriver::GetSpeed(owd_msgs::GetSpeed::Request &req,
                          owd_msgs::GetSpeed::Response &res) {
-  res.max_velocity = joint_vel;
-  res.max_acceleration = joint_accel;
-  res.max_jerk = max_jerk;
+  res.max_velocity = Plugin::_joint_vel;
+  res.max_acceleration = Plugin::_joint_accel;
+  res.max_jerk = Plugin::_max_jerk;
   return true;
 }
     

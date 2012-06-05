@@ -302,6 +302,18 @@ namespace OWD {
     /// \brief The upper limit of each joint (in radians)
     static const std::vector<double> &upper_jlimit;
 
+    /// \brief The absolute max velocity for each joint (radians/s)
+    static const std::vector<double> &max_joint_vel;
+
+    /// \brief The current velocity limit for each joint (radians/s)
+    static const std::vector<double> &joint_vel;
+
+    /// \brief The current acceleration limit for each joint (radians/s/s)
+    static const std::vector<double> &joint_accel;
+
+    /// \brief The absolute max jerk (radians/s/s/s)
+    static const double &max_jerk;
+
     /// \brief The filtered velocity of each arm joint (in radians/s)
     static const std::vector<double> &arm_velocity;
 
@@ -331,6 +343,10 @@ namespace OWD {
     static std::vector<float> _tactile_palm;
     static std::vector<double> _lower_jlimit;
     static std::vector<double> _upper_jlimit;
+    static std::vector<double> _max_joint_vel;
+    static std::vector<double> _joint_vel;
+    static std::vector<double> _joint_accel;
+    static double _max_jerk;
     static std::vector<double> _arm_velocity;
     static SE3 _endpoint;
 
