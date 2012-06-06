@@ -90,7 +90,25 @@ public:
   inline void set_gains(double kp, double kd, double ki) {
     Kp=kp;
     Kd=kd;
-    Ki=ki;
+    if (ki != Ki) {
+      // we'll use a lot of care in changing the integral gain, since
+      // there may have been a build-up of the integrated error.
+      if (ki == 0) {
+	// no problem
+	Ki = 0;
+      } else {
+	// how much torque was being created by the integral term?
+	double oldtorque = Ki * se;
+	// if the new torque would be higher with the existing integrated
+	// error, then drop the integrator value to keep the same torque
+	if (ki * se > oldtorque) {
+	  se = oldtorque / ki;
+	} else if (ki * se < - oldtorque) {
+	  se = - oldtorque / ki;
+	}
+	Ki = ki;
+      }
+    }
   }
 
   inline void get_gains(double &kp, double &kd, double &ki) const {
