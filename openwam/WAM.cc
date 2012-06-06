@@ -1241,7 +1241,7 @@ void WAM::newcontrol_rt(double dt){
       // The trajectory wants us to end right where we are,
       // so hold the current position and delete the trajectory.
       for(int i = Joint::J1; i<=Joint::Jn; i++) {
-	tc.q[i-1] = heldPositions[i] = joints[i].q;
+	heldPositions[i] = tc.q[i-1];
       }
       holdpos = true;  // should have been true already, but just making sure
       if (ms && jointstraj->Synchronize) {
