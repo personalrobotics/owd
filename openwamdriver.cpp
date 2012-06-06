@@ -2562,7 +2562,7 @@ void WamDriver::Update() {
       static int dumpnum=0;
       char filename[200];
       snprintf(filename,200,"/tmp/wamstats%02d-%04d.csv",bus->id,dumpnum++);
-      ROS_INFO("Dumping data to %s",filename);
+      ROS_INFO_NAMED("controller","Dumping data to %s",filename);
       if (!owam->recorder.dump(filename)) {
 	ROS_INFO("FAILED!!!");
       }

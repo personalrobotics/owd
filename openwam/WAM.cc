@@ -1798,6 +1798,7 @@ WAM::~WAM() {
   if (recorder.count > 0) {
     char filename[200];
     snprintf(filename,200,"/tmp/wamstats%02d-final.csv",bus->id);
+    ROS_INFO_NAMED("controller","Dumping data to %s",filename);
     recorder.dump(filename);
   }
   if (jointstraj) {
