@@ -53,6 +53,7 @@ bool AddTrajectory(owd_msgs::AddTrajectory::Request &req,
 
   // retrieve the current joint speed limits from the right arm
   owd_msgs::GetSpeed speed;
+  ROS_DEBUG("Getting right arm speed");
   if (!right_GetSpeed.isValid()) {
     ROS_WARN("Lost connection to /right/owd/GetSpeed; trying to resubscribe...");
     ros::NodeHandle n("~");
@@ -77,6 +78,7 @@ bool AddTrajectory(owd_msgs::AddTrajectory::Request &req,
   double max_jerk = speed.response.max_jerk;
 
   // retrieve the current joint speed limits from the left arm
+  ROS_DEBUG("Getting left arm speed");
   if (!left_GetSpeed.isValid()) {
     ROS_WARN("Lost connection to /left/owd/GetSpeed; trying to resubscribe...");
     ros::NodeHandle n("~");
