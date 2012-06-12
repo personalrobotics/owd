@@ -636,6 +636,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("SetForceInputThreshold", &WamDriver::SetForceInputThreshold, this);
   ss_SetTactileInputThreshold =
     n.advertiseService("SetTactileInputThreshold", &WamDriver::SetTactileInputThreshold, this);
+  ss_SetTorqueLimits =
+    n.advertiseService("SetTorqueLimits", &WamDriver::SetTorqueLimits, this);
 
 #ifdef BUILD_FOR_SEA
   sub_wam_joint_targets = 
@@ -2826,6 +2828,24 @@ bool WamDriver::SetTactileInputThreshold(owd_msgs::SetTactileInputThreshold::Req
   return true;
 }
 
+bool WamDriver::SetTorqueLimits(owd_msgs::SetTorqueLimits::Request &req,
+				owd_msgs::SetTorqueLimits::Response &res) {
+  if (req.limit.size() > owam->bus->n_arm_pucks) {
+    ROS_WARN("Ignoring SetTorqueLimits attempt: too many arguments");
+    res.reason=std::string("Ignoring SetTorqueLimits attempt: too many arguments");
+    res.ok=false;
+    return true;
+  }
+  for (int p=0; p<req.limit.size(); ++p) {
+    if (req.limit[p] > Puck::MAX_TRQ[p+1]) {
+      Puck::soft_torque_limit[p+1] = Puck::MAX_TRQ[p+1];
+    } else {
+      Puck::soft_torque_limit[p+1] = req.limit[p];
+    }
+  }
+  res.reason=std::string("");
+  res.ok=true;
+}
 
 // storage for static members
 CANbus *WamDriver::bus = NULL;

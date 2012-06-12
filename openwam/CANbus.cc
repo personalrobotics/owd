@@ -768,9 +768,18 @@ int CANbus::send_torques_rt(){
               
               puck = groups[g].puck(p); 
               if(puck){ 
-                  torques[p] = clip(mytorqs[puck->motor()], 
-                                    Puck::MIN_TRQ[puck->id()], 
-                                    Puck::MAX_TRQ[puck->id()] );
+		if ((mytorqs[puck->motor()] > Puck::MAX_TRQ[puck->id()]) ||
+		    (mytorqs[puck->motor()] < Puck::MIN_TRQ[puck->id()])) {
+		  // Torques exceeded max software limits
+		  //		  emergency_shutdown();
+		  ROS_FATAL("Torque %d for puck %d exceeded limit; motors have been idled",
+			    mytorqs[puck->motor()],
+			    puck->id());
+		  return OW_FAILURE;
+		}
+		torques[p] = clip(mytorqs[puck->motor()], 
+				  -Puck::soft_torque_limit[puck->id()], 
+				  Puck::soft_torque_limit[puck->id()]);
               }
               else{
                   torques[p] = 0;	    
@@ -1288,6 +1297,16 @@ int CANbus::send_AP(int32_t* apval){
   return OW_SUCCESS;
 }
 
+int CANbus::emergency_shutdown() {
+  if ((set_property_rt(GROUPID(1), MODE, MODE_IDLE, false, 10000) == OW_FAILURE) ||
+      (set_property_rt(GROUPID(2), MODE, MODE_IDLE, false, 10000) == OW_FAILURE)) {
+    ROS_FATAL("Could not idle the pucks for emergency shutdown");
+    return OW_FAILURE;
+  }
+  return OW_SUCCESS;
+}
+
+
 int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
 		  int32_t* nodeid, int32_t* property, int32_t* value,
 		  int32_t *value2){
@@ -1733,8 +1752,16 @@ int CANbus::set_limits(){
   int32_t conversion;
    
   // Set max torque level on safety puck
-  if ((set_property_rt(SAFETY_MODULE,TL1,6000,false,15000) == OW_FAILURE) ||
-      (set_property_rt(SAFETY_MODULE,TL2,9000,false,15000) == OW_FAILURE)) {
+  // Set the fault level to the highest of the values set in Puck.cc.
+  // Set the warning level to 70% of the fault level
+  int max_torque(0); 
+  for (int p=1; p<=n_arm_pucks; ++p) {
+    if (Puck::MAX_TRQ[p] > max_torque) {
+      max_torque = Puck::MAX_TRQ[p];
+    }
+  }
+  if ((set_property_rt(SAFETY_MODULE,TL1,0.7*max_torque,false,15000) == OW_FAILURE) ||
+      (set_property_rt(SAFETY_MODULE,TL2,max_torque,false,15000) == OW_FAILURE)) {
     return OW_FAILURE;
   }
 
@@ -2095,7 +2122,6 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
   *value = msg.value;
   return OW_SUCCESS;
 }
-
 
 int CANbus::hand_activate(int32_t *nodes) {
   for (int32_t nodeid=11; nodeid<15; ++nodeid) {

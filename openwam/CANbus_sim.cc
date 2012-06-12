@@ -169,6 +169,10 @@ int CANbus::send_AP(int32_t* apval){
   return OW_SUCCESS;
 }
 
+int CANbus::emergency_shutdown() {
+  return OW_SUCCESS;
+}
+
 int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
 		  int32_t* nodeid, int32_t* property, 
 		  int32_t* value, int32_t* value2){

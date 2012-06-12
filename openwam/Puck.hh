@@ -47,7 +47,8 @@ class Puck{
 
   static const int MIN_TRQ[];
   static const int MAX_TRQ[];
-  
+  static int soft_torque_limit[];
+
   Puck(){ID=-1;}
   
   int id(){return ID;}

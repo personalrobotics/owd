@@ -290,6 +290,7 @@ DataRecorder<canio_data> candata;
   //  int read_torques(int32_t* mtrq);
   int send_positions(double* mpos);
   int send_AP(int32_t* apval);
+  int emergency_shutdown();
 
   // mutex functions that work when compiled with or without Realtime kernel
 #ifdef OWD_RT
