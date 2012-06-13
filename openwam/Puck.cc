@@ -23,6 +23,6 @@
 // a static const array.
 // Putting this in the header file will generate multiple definition errors
 // from the linker
-const int Puck::MIN_TRQ[]={0,-4860, -4860, -4860, -4320, -3900, -3900, -1370};
-const int Puck::MAX_TRQ[]={0, 4860,  4860,  4860,  4320,  3900,  3900,  1370};
-int Puck::soft_torque_limit[8]={0,4860,4860,4860,4320,3900,3900,1370};
+const int Puck::MIN_TRQ[]={0,-4860, -4860, -4860, -4320, -3900, -3900, -3200};
+const int Puck::MAX_TRQ[]={0, 4860,  4860,  4860,  4320,  3900,  3900,  3200};
+int Puck::soft_torque_limit[8]={0,4860,4860,4860,4320,3900,3900,3200};  

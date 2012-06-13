@@ -85,8 +85,8 @@ const int MODE_TRAPEZOID = 5;
 const int CMD_HI = 13;
 const int CMD_M  = 19;
 
-const double SAFETY_VELOCITY_LIMIT_WARN = 2.6; // rad/sec
-const double SAFETY_VELOCITY_LIMIT_FAULT = 3.0; // rad/sec
+const double SAFETY_VELOCITY_LIMIT_WARN = 0.4; // rad/sec
+const double SAFETY_VELOCITY_LIMIT_FAULT = 0.7; // rad/sec
 
 class CANstats{
 public:
