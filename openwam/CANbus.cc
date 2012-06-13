@@ -771,7 +771,7 @@ int CANbus::send_torques_rt(){
 		if ((mytorqs[puck->motor()] > Puck::MAX_TRQ[puck->id()]) ||
 		    (mytorqs[puck->motor()] < Puck::MIN_TRQ[puck->id()])) {
 		  // Torques exceeded max software limits
-		  //		  emergency_shutdown();
+		  emergency_shutdown();
 		  ROS_FATAL("Torque %d for puck %d exceeded limit; motors have been idled",
 			    mytorqs[puck->motor()],
 			    puck->id());
@@ -1887,7 +1887,7 @@ int CANbus::set_puck_group_id(int32_t nodeid) {
 
   // check/set each group value
   int32_t group;
-  if (get_property_rt(nodeid,GRPA,&group,20000) != OW_SUCCESS) {
+  if (get_property_rt(nodeid,GRPA,&group,30000) != OW_SUCCESS) {
     ROS_WARN("Could not get GRPA from puck %d",nodeid);
     return OW_FAILURE;
   }
