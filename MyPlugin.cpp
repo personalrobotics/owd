@@ -137,10 +137,8 @@ bool MyTraj::AddTrajectory(owd_plugin_example::AddMyTrajectory::Request &req,
 // a particular value.  If we had wanted to freeze the other joints,
 // we could have been setting each of them to their start_position
 // values.
-void MyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
-
-  time += dt;
-
+void MyTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
+  time = t;
   if (time < 1) {
     tc.t[joint-1] = torque; // apply torque for exactly 1 second
     ROS_DEBUG("MyTraj Time=%f secs",time);
@@ -151,6 +149,10 @@ void MyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
   end_position =tc.q;  // keep tracking the current position
 
   return;
+}
+
+void MyTraj::evaluate(OWD::Trajectory::TrajControl &tc, double dt) {
+  evaluate_abs(tc, time+dt);
 }
 
 // This helper function is called by our register_owd_plugin function

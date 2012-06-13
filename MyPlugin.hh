@@ -56,11 +56,12 @@ public:
   MyTraj(int joint, double torque);
 
   /// The only base class function we need to override is the
-  /// evaluate() function, which is what OWD will call at 500Hz while
+  /// evaluate_abs() function, which is what OWD will call at 500Hz while
   /// the trajectory is active.  This function is the "meat" of what
   /// makes this Trajectory different from the built-in ones.
-  virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
+  virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
 
+  virtual void evaluate(OWD::Trajectory::TrajControl &tc, double dt);
 
   /// The AddTrajectory() function is static so that it can be called
   /// by the ROS service callback before a particular trajectory instance
