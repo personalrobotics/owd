@@ -16,6 +16,11 @@
   <param name="owd/home_position" type="string"
          value="0, -1.629, 0, 0.164, 0, 0, 0" />
 
+  <!-- The max velocity that the elbow or hand can attain (in m/s) before
+       the safety puck shuts down the arm. -->
+  <param name="owd/max_cartesian_velocity" type="string"
+         value="0.7" />
+
   <!-- Numeric id of the canbus device, appended to "/dev/pcan" for Peak cards
        or "/dev/can" for ESD cards. -->
   <param name="owd/canbus_number" type="int" value="0" />
