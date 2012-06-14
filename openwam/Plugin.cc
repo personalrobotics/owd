@@ -181,6 +181,7 @@ namespace OWD {
   std::vector<double> Plugin::_joint_vel;
   std::vector<double> Plugin::_joint_accel;
   double Plugin::_max_jerk;
+  double Plugin::_max_cartesian_velocity;
   std::vector<double> Plugin::_arm_velocity;
   SE3 Plugin::_endpoint;
   double Plugin::gravity;
@@ -213,6 +214,7 @@ namespace OWD {
   const std::vector<double> &Plugin::joint_vel=Plugin::_joint_vel;
   const std::vector<double> &Plugin::joint_accel=Plugin::_joint_accel;
   const double              &Plugin::max_jerk=Plugin::_max_jerk;
+  const double              &Plugin::max_cartesian_velocity=Plugin::_max_cartesian_velocity;
   const std::vector<double> &Plugin::arm_velocity=Plugin::_arm_velocity;
   const SE3 &Plugin::endpoint=Plugin::_endpoint;
 

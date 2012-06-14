@@ -1766,16 +1766,21 @@ int CANbus::set_limits(){
   }
 
   // Set max velocity in safety puck
+  // Cartesian velocity is calculated at the elbow (550mm from the shoulder joint)
+  // and at the base of the hand (350mm beyond the elbow).
+  // VL1 is the level at which the pendant warning indicator will light.
+  // VL2 is the level at which the safety puck will IDLE the arm.
   if ((set_property_rt(SAFETY_MODULE,VL1,
-		       static_cast<int32_t>(SAFETY_VELOCITY_LIMIT_WARN * 0x1000), 
+		       static_cast<int32_t>(0.7 * max_cartesian_velocity * 0x1000), 
 		       false, 15000) == OW_FAILURE) ||
       (set_property_rt(SAFETY_MODULE,VL2,
-		       static_cast<int32_t>(SAFETY_VELOCITY_LIMIT_FAULT * 0x1000),
+		       static_cast<int32_t>(max_cartesian_velocity * 0x1000),
 		       false, 15000) == OW_FAILURE)) {
     return OW_FAILURE;
   }
-  ROS_INFO("Setting safety puck velocity limits to VL1 = %2.2f and VL2 = %2.2f", SAFETY_VELOCITY_LIMIT_WARN, SAFETY_VELOCITY_LIMIT_FAULT);
-
+  ROS_INFO("Setting velocity limits to %2.2f m/s (warn) and %2.2f m/s (fault)",
+	   0.7*max_cartesian_velocity,
+	   max_cartesian_velocity);
 
   int32_t voltlevel;
 #ifdef SET_VOLTAGE_LIMITS

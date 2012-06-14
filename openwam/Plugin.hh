@@ -314,6 +314,10 @@ namespace OWD {
     /// \brief The absolute max jerk (radians/s/s/s)
     static const double &max_jerk;
 
+    /// \brief The max speed in cartesian coordinates, measured at both the
+    ///       elbow and the hand (m/s)
+    static const double &max_cartesian_velocity;
+
     /// \brief The filtered velocity of each arm joint (in radians/s)
     static const std::vector<double> &arm_velocity;
 
@@ -347,6 +351,7 @@ namespace OWD {
     static std::vector<double> _joint_vel;
     static std::vector<double> _joint_accel;
     static double _max_jerk;
+    static double _max_cartesian_velocity;
     static std::vector<double> _arm_velocity;
     static SE3 _endpoint;
 

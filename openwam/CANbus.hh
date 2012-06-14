@@ -85,9 +85,6 @@ const int MODE_TRAPEZOID = 5;
 const int CMD_HI = 13;
 const int CMD_M  = 19;
 
-const double SAFETY_VELOCITY_LIMIT_WARN = 0.4; // rad/sec
-const double SAFETY_VELOCITY_LIMIT_FAULT = 0.7; // rad/sec
-
 class CANstats{
 public:
   double cansend_time;
@@ -404,6 +401,7 @@ public:
 
   int32_t hand_initial_torque;
   int32_t hand_sustained_torque;
+  double max_cartesian_velocity;
   
   std::vector<unsigned long long> next_encoder_clocktime, last_encoder_clocktime;
 };

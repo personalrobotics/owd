@@ -115,12 +115,23 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   Plugin::_max_joint_vel[5]=2.5; // J6
   Plugin::_max_joint_vel[6]=2.5; // J7
   Plugin::_max_jerk = 10.0 * 3.141592654;
-  last_trajectory_error[0]=0;
-  
+  n.param("max_cartesian_velocity",Plugin::_max_cartesian_velocity,0.7);
+  bus->max_cartesian_velocity = Plugin::_max_cartesian_velocity;
+
+  // working velocity limits
+  Plugin::_joint_vel[0]=0.75; // J1
+  Plugin::_joint_vel[1]=0.75; // J2
+  Plugin::_joint_vel[2]=2;    // J3
+  Plugin::_joint_vel[3]=2;    // J4
+  Plugin::_joint_vel[4]=2.5;  // J5
+  Plugin::_joint_vel[5]=2.5;  // J6
+  Plugin::_joint_vel[6]=2.5;  // J7
+
   for (unsigned int j=0; j<nJoints; ++j) {
-    Plugin::_joint_vel[j]=Plugin::_max_joint_vel[j];
     Plugin::_joint_accel[j] = Plugin::_joint_vel[j]/min_accel_time;
   }
+  last_trajectory_error[0]=0;
+
 #ifdef FAKE7
   wamstate.positions.resize(7,0.0f);
   wamstate.jpositions.resize(4,0.0f);
@@ -224,7 +235,7 @@ bool WamDriver::Init(const char *joint_cal_file)
   double uj[7]= { 2.60,  1.96,  2.73,  3.13,  1.30,  1.56,  2.99};
   memcpy(&Plugin::_upper_jlimit[0],uj,7*sizeof(double));
 
-  // The two arms on Herb have different limits for J1
+  // The arms on Herb and ARM-S Phase II have different limits for J1
   if ( modified_j1) {
     Plugin::_lower_jlimit[0]=0.52;
     Plugin::_upper_jlimit[0]=5.76;
@@ -2830,13 +2841,13 @@ bool WamDriver::SetTactileInputThreshold(owd_msgs::SetTactileInputThreshold::Req
 
 bool WamDriver::SetTorqueLimits(owd_msgs::SetTorqueLimits::Request &req,
 				owd_msgs::SetTorqueLimits::Response &res) {
-  if (req.limit.size() > owam->bus->n_arm_pucks) {
+  if (req.limit.size() > (unsigned int) owam->bus->n_arm_pucks) {
     ROS_WARN("Ignoring SetTorqueLimits attempt: too many arguments");
     res.reason=std::string("Ignoring SetTorqueLimits attempt: too many arguments");
     res.ok=false;
     return true;
   }
-  for (int p=0; p<req.limit.size(); ++p) {
+  for (unsigned int p=0; p<req.limit.size(); ++p) {
     if (req.limit[p] > Puck::MAX_TRQ[p+1]) {
       Puck::soft_torque_limit[p+1] = Puck::MAX_TRQ[p+1];
     } else {
@@ -2845,6 +2856,7 @@ bool WamDriver::SetTorqueLimits(owd_msgs::SetTorqueLimits::Request &req,
   }
   res.reason=std::string("");
   res.ok=true;
+  return true;
 }
 
 // storage for static members
