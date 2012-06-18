@@ -768,6 +768,7 @@ int CANbus::send_torques_rt(){
               
               puck = groups[g].puck(p); 
               if(puck){ 
+#ifdef OVERTORQUE_SHUTDOWN
 		if ((mytorqs[puck->motor()] > Puck::MAX_TRQ[puck->id()]) ||
 		    (mytorqs[puck->motor()] < Puck::MIN_TRQ[puck->id()])) {
 		  // Torques exceeded max software limits
@@ -777,6 +778,7 @@ int CANbus::send_torques_rt(){
 			    puck->id());
 		  return OW_FAILURE;
 		}
+#endif // OVERTORQUE_SHUTDOWN
 		torques[p] = clip(mytorqs[puck->motor()], 
 				  -Puck::soft_torque_limit[puck->id()], 
 				  Puck::soft_torque_limit[puck->id()]);
