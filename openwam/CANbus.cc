@@ -1773,7 +1773,7 @@ int CANbus::set_limits(){
   // VL1 is the level at which the pendant warning indicator will light.
   // VL2 is the level at which the safety puck will IDLE the arm.
   if ((set_property_rt(SAFETY_MODULE,VL1,
-		       static_cast<int32_t>(0.7 * max_cartesian_velocity * 0x1000), 
+		       static_cast<int32_t>(0.5 * max_cartesian_velocity * 0x1000), 
 		       false, 15000) == OW_FAILURE) ||
       (set_property_rt(SAFETY_MODULE,VL2,
 		       static_cast<int32_t>(max_cartesian_velocity * 0x1000),
