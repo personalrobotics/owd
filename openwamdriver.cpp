@@ -142,6 +142,7 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   waminternals.dynamic_torque.resize(7,0.0f);
   waminternals.trajectory_torque.resize(7,0.0f);
   waminternals.sim_torque.resize(7,0.0f);
+  waminternals.joint_offsets.resize(7,0.0f);
   owd_msgs::PIDgains empty_gains;
   waminternals.gains.resize(7);
 
@@ -163,6 +164,7 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   waminternals.dynamic_torque.resize(nJoints,0.0f);
   waminternals.trajectory_torque.resize(nJoints,0.0f);
   waminternals.sim_torque.resize(nJoints,0.0f);
+  waminternals.joint_offsets.resize(nJoints,0.0f);
   owd_msgs::PIDgains empty_gains;
   waminternals.gains.resize(nJoints,empty_gains);
 
@@ -1779,6 +1781,7 @@ bool WamDriver::Publish() {
     waminternals.dynamic_torque[i] -= jointtorqs[i+1] + trajtorqs[i+1];
     waminternals.trajectory_torque[i] = trajtorqs[i+1];
     waminternals.sim_torque[i] = simtorqs[i+1];
+    waminternals.joint_offsets[i] = owam->joints[i+1].offset;
     // publish as transforms, too
     char jref[50], jname[50];
     snprintf(jref,50,"wam%d",i);
