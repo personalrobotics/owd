@@ -30,7 +30,7 @@ namespace OWD {
 		     double *upper_joint_limits)
   : Trajectory("ServoTraj", id),
     nDOF(dof),
-    vlimit(0.5),
+    vlimit(2.5),
     accel(2.5),
     lasttime(time)
 {
