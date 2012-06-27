@@ -1590,7 +1590,7 @@ bool WamDriver::move_until_stop(int joint, double stop, double limit, double vel
     ROS_DEBUG_NAMED("calibration",
 		    "Joint stopped at angle %2.2f",jointpos[joint]);
     
-    float max_error = 0.12; //norm al error
+    float max_error = 0.12; //normal error
     
     if ((jointpos[joint] > stop-max_error) && (jointpos[joint] < stop+max_error) ) {
       // we stopped within .12 radians of the expected position: good!
@@ -1796,55 +1796,50 @@ bool WamDriver::Publish() {
   }
 
   owam->lock();
+  // Get the data we might need and then unlock as quickly as we can.
+  // Whatever you do, DO NOT call any ROS functions in this block, or
+  // you run the risk of slowing down the control loop enough to cause a
+  // heartbeat fault.
+  bool safety_hold = owam->safety_hold;
+  bool holdpos = owam->holdpos;
+  bool jointstraj(false);
+  std::string trajid;
   if (owam->jointstraj) {
+    jointstraj=true;
+    trajid = owam->jointstraj->id;
+  }
+  char jointstr[200];
+  strcpy(jointstr,"");
+  for(int i = Joint::J1; i<=Joint::Jn; i++) {
+    snprintf(jointstr+strlen(jointstr),199-strlen(jointstr)," %1.4f",owam->last_control_position[i]);
+  }
+  owam->unlock();
+
+  // Now that we've unlocked the controller again, we can figure out what's going
+  // on the with trajectory and log any messages as necessary.
+  if (jointstraj) {
     static bool stall_reported(false);
-    if (owam->jointstraj->state() == OWD::Trajectory::STOP) {
-      wamstate.state=owd_msgs::WAMState::state_traj_paused;
+    // trajectory is still running, but we still might be hitting something
+    if (safety_hold) {
+      wamstate.state=owd_msgs::WAMState::state_traj_stalled;
+      if (!stall_reported) {
+	ROS_INFO_NAMED("AddTrajectory","Trajectory %s has stalled at position[%s ]; trying to continue...",
+		       trajid.c_str(),jointstr);
+	stall_reported=true;
+      }
+    } else {
+      wamstate.state=owd_msgs::WAMState::state_traj_active;
       if (stall_reported) {
-	char endstr[200];
-	strcpy(endstr,"");
-	for(int i = Joint::J1; i<=Joint::Jn; i++) {
-	  snprintf(endstr+strlen(endstr),199-strlen(endstr)," %1.4f",owam->heldPositions[i]);
-	}
-	ROS_INFO_NAMED("AddTrajectory","Stalled trajectory %s has been paused at position[%s ]",
-		       owam->jointstraj->id.c_str(),endstr);
+	ROS_INFO_NAMED("AddTrajectory","Stalled trajectory %s has resumed at position[%s ]",
+		       trajid.c_str(),jointstr);
 	stall_reported=false;
       }
-	
-    } else {
-      // trajectory is still running, but we still might be hitting something
-      if (owam->safety_hold) {
-        wamstate.state=owd_msgs::WAMState::state_traj_stalled;
-	if (!stall_reported) {
-	  char endstr[200];
-	  strcpy(endstr,"");
-	  for(int i = Joint::J1; i<=Joint::Jn; i++) {
-	    snprintf(endstr+strlen(endstr),199-strlen(endstr)," %1.4f",owam->heldPositions[i]);
-	  }
-	  ROS_INFO_NAMED("AddTrajectory","Trajectory %s has stalled at position[%s ]; trying to continue...",
-			 owam->jointstraj->id.c_str(),endstr);
-	  stall_reported=true;
-	}
-      } else {
-	wamstate.state=owd_msgs::WAMState::state_traj_active;
-	if (stall_reported) {
-	  char endstr[200];
-	  strcpy(endstr,"");
-	  for(int i = Joint::J1; i<=Joint::Jn; i++) {
-	    snprintf(endstr+strlen(endstr),199-strlen(endstr)," %1.4f",owam->heldPositions[i]);
-	  }
-	  ROS_INFO_NAMED("AddTrajectory","Stalled trajectory %s has resumed at position[%s ]",
-			 owam->jointstraj->id.c_str(),endstr);
-	  stall_reported=false;
-	}
-      }
     }
-  } else if (owam->holdpos) {
+  } else if (holdpos) {
     wamstate.state = owd_msgs::WAMState::state_fixed;
   } else {
     wamstate.state = owd_msgs::WAMState::state_free;
   }
-  owam->unlock();
 
   wamstate.header.stamp = ros::Time::now();
 
@@ -2485,6 +2480,7 @@ bool WamDriver::SetExtraMass(owd_msgs::SetExtraMass::Request &req,
   owam->lock("SetExtraMass");
   if ((req.m.link < Link::L1) ||
       (req.m.link > Link::Ln)) {
+    owam->unlock();
     res.ok=false;
     res.reason="Specified link is out of range";
     return true; // always return true if we received the request
@@ -2725,11 +2721,15 @@ void WamDriver::update_xmission_ratio(const char *param_name, double &current_va
     // set the new transmission ratio
     current_value=new_value;
     // recalculate the joint positions using the new ratio
-    owam->mpos2jpos(false); // don't change velocity calc
-    // recalculate the held position based on the new joint positions
+    owam->mpos2jpos();
     for (int i=1; i<=Joint::Jn; ++i) {
+      // recalculate the held position based on the new joint positions
       owam->heldPositions[i] = owam->joints[i].q + heldPositionsDelta[i];
+      // modify the last position recorded by the velocity computation
+      // so that it doesn't think we moved
+      owam->previous_joint_val[i] = owam->joints[i].q;
     }
+
     // let the control loop resume
     owam->unlock();
     ROS_INFO("Using new value for %s = %2.3f",param_name, new_value);
@@ -2750,15 +2750,16 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const owd_msgs::Servo>
   if (owam->jointstraj) {
     ServoTraj *straj = dynamic_cast<ServoTraj *>(owam->jointstraj);
     if (straj) {
-      ROS_DEBUG_NAMED("servo","Updating servo trajectory %s",straj->id.c_str());
       for (unsigned int i=0; i<servo->joint.size(); ++i) {
         straj->SetVelocity(servo->joint[i],servo->velocity[i]);
       }
+      std::string trajid = straj->id;
       owam->unlock();
+      ROS_DEBUG_NAMED("servo","Updated servo trajectory %s",trajid.c_str());
       return;
     } else {
       owam->unlock();
-      ROS_WARN("Joint Trajectory already running; velocity command ignored");
+      ROS_WARN("A Joint Trajectory is still running; velocity command ignored");
       return;
     }
   } else {

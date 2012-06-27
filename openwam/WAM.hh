@@ -176,10 +176,11 @@ public:
   int recv_mpos();
   int send_mtrq();
 
-  void mpos2jpos(bool recalc_velocity=true);
+  void mpos2jpos();
   void jpos2mpos();   
   void jtrq2mtrq();
-  void update_velocity(unsigned int joint, bool recalc_velocity);
+  void update_velocities_or_estimate_positions();
+  void update_joint_velocity(unsigned int joint);
 
   R6 WSControl(double dt);
   void newJSControl_rt(double q_target[], double q[], double dt, double pid_torq[]);
