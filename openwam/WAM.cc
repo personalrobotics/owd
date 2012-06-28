@@ -193,6 +193,18 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 	    R3(  0.0000,   0.0000,  -76.0000)*0.001,
 	    Inertia(   2558.1007,   0.0000,      0.0000,
 		       2558.1007,   0.0000,   1242.1825, M2_MM2) );
+
+  L7_with_FT_and_Robotiq_hand // Robotiq hand is 2.4kg (1.25 more than 280 hand)
+    = Link( DH(  0.0000,   0.0000,   0.1800,   0.0000), 2.66,
+	    R3(  0.0000,   0.0000,  -50.0000)*0.001,
+	    Inertia(   4000,   0.0000,      0.0000,
+		       4000,   0.0000,   1800, M2_MM2) );
+
+  L7_with_Robotiq_hand // Robotiq hand is 2.4kg (1.25 more than 280 hand)
+    = Link( DH(  0.0000,   0.0000,   0.1800,   0.0000), 2.53,
+	    R3(  0.0000,   0.0000,  -58.0000)*0.001,
+	    Inertia(   4000,   0.0000,      0.0000,
+		       4000,   0.0000,   1800, M2_MM2) );
  
 
   L7_without_hand 
@@ -224,6 +236,12 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 	links[Link::L7] = L7_with_280FT_hand;
       } else {
 	links[Link::L7] = L7_with_280_hand;
+      }
+    } else if (BH_model == 998) {
+      if (forcetorque) {
+	links[Link::L7] = L7_with_FT_and_Robotiq_hand;
+      } else {
+	links[Link::L7] = L7_with_Robotiq_hand;
       }
     } else if (BH_model == 999) {
       links[Link::L7] = L7_with_ARMS_calibration_target;

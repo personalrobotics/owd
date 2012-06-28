@@ -114,8 +114,14 @@ int main(int argc, char** argv)
     }
   } else if (! hand_type.compare(0,3,"260")) {
     BH_model=260;
+  } else if (! hand_type.compare(0,7,"Robotiq")) {
+    BH_model=998;
   } else if (! hand_type.compare(0,29,"darpa_arms_calibration_target")) {
     BH_model=999;
+  } else if (hand_type.compare(0,4, "none")) { // note the absence of the !
+    ROS_FATAL("Unknown hand type \"%s\"; cannot continue with unknown mass properties",
+	      hand_type.c_str());
+    exit(1);
   }
 
   OWD::WamDriver *wamdriver = new OWD::WamDriver(canbus_number,BH_model,forcetorque,tactile);

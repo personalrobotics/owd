@@ -128,6 +128,8 @@ public:
   OWD::Link L7_with_260_hand,
     L7_with_280_hand,
     L7_with_280FT_hand,
+    L7_with_FT_and_Robotiq_hand,
+    L7_with_Robotiq_hand,
     L7_without_hand,
     L7_with_ARMS_calibration_target;
   OWD::Link L4_without_wrist_with_260_hand,
