@@ -103,14 +103,17 @@ void ServoTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
   bool active = false;
   for (unsigned int i = 0; i<(unsigned int)nDOF; ++i) {
     if (time < stoptime[i]) {
+        // June 28, 2012
+        // Moslem removed the joint limit check since it was problematic when we
+        // are close to joint limits.
       // check for approaching joint limits
-      if ((target_velocity[i] > 0) &&
-	  (current_position[i] + jlimit_buffer > upper_jlimit[i])) {
-	target_velocity[i] = 0.0; // come to a stop before hitting limit
-      } else if ((target_velocity[i] < 0) &&
-	  (current_position[i] - jlimit_buffer < lower_jlimit[i])) {
-	target_velocity[i] = 0.0; // come to a stop before hitting limit
-      }
+//      if ((target_velocity[i] > 0) &&
+//	  (current_position[i] + jlimit_buffer > upper_jlimit[i])) {
+//	target_velocity[i] = 0.0; // come to a stop before hitting limit
+//      } else if ((target_velocity[i] < 0) &&
+//	  (current_position[i] - jlimit_buffer < lower_jlimit[i])) {
+//	target_velocity[i] = 0.0; // come to a stop before hitting limit
+//      }
 
       // check for accel/decel
       if (target_velocity[i] > current_velocity[i]) {
