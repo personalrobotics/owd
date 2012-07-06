@@ -193,6 +193,8 @@ private:
     double min_accel_time;
 
     bool discard_movements;
+    
+    bool slip_joints_on_high_torque;
 
     // internal structures
     char *joint_calibration_file;

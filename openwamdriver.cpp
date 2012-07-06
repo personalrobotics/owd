@@ -309,6 +309,7 @@ bool WamDriver::Init(const char *joint_cal_file)
 #endif // BH280_ONLY
   
   owam = new WAM(bus, BH_model, ForceTorque, Tactile, log_controller_data);
+  n.param("slip_joints_on_high_torque",owam->slip_joints_on_high_torque,false);
 
   // Read the transmission ratios from ROS parameters
   get_transmission_ratios();
