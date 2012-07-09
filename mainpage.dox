@@ -89,6 +89,12 @@ roslaunch.  The following parameters are supported:
    it will start up with only gravity compensation leaving the arm free
    to move.
 
+ - \b ~/slip_joints_on_high_torque If set to \e true will allow the
+   joints to slip when high motor torques are applied. When a joint torque
+   exceeds the threshold, the joint setpoint is moved to reduce the
+   torque. This option is only valid when in gravity compensation and not
+   during any trajectory executions.
+ 
  - \b ~/modified_j1 If set to \e true %OWD expects that joint 1 has been
    remounted at 180 degrees from the original, as is done for Herb's
    configuration.  Defaults to \e false (factory configuration).
