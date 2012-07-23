@@ -134,32 +134,47 @@ bool AddTrajectory(owd_msgs::AddTrajectory::Request &req,
   ROS_INFO("max joint vel %s",joint_vel.sdump());
   ROS_INFO("max joint accel %s",joint_accel.sdump());
   ROS_INFO("max jerk %2.2f, options %d",max_jerk,req.traj.options);
-  
-  OWD::MacJointTraj mjt(traj,
-		   joint_vel, joint_accel, max_jerk,
-		   bWaitForStart,
-		   bCancelOnStall,
-		   bCancelOnForceInput,
-		   bCancelOnTactileInput);
+
+  OWD::MacJointTraj *mjt;
+  try {
+    mjt = new OWD::MacJointTraj(traj,
+				joint_vel, joint_accel, max_jerk,
+				bWaitForStart,
+				bCancelOnStall,
+				bCancelOnForceInput,
+				bCancelOnTactileInput);
+  } catch (const char *error) {
+    char trajectory_error[200];
+    snprintf(trajectory_error,200,"Error building blended traj: %s",error);
+    ROS_ERROR_NAMED("BuildTrajectory","%s",trajectory_error);
+    for (unsigned int tt=0; tt<traj.size(); ++tt) {
+      ROS_ERROR_NAMED("BuildTrajectory","  Traj point %d: %s",tt,
+		      traj[tt].sdump());
+    }
+    res.ok=false;
+    res.id=std::string("");
+    res.reason=std::string(trajectory_error);
+    return true;
+  } 
   if (req.traj.id == "") {
-    mjt.id = OWD::Trajectory::random_id();
+    mjt->id = OWD::Trajectory::random_id();
   } else {
-    mjt.id = req.traj.id;
+    mjt->id = req.traj.id;
   }
 
   owd_msgs::AddTimedTrajectory::Request at_req;
   owd_msgs::AddTimedTrajectory::Response at_res;
   BinaryData bd;
   bd.PutInt(OWD::Trajectory::TRAJTYPE_MACJOINTTRAJ);
-  bd.PutString(mjt.serialize(0,6));
+  bd.PutString(mjt->serialize(0,6));
   at_req.SerializedTrajectory = bd;
   ROS_WARN("Created timed trajectory for both arms");
-  ROS_WARN("Traj will start at %s",mjt.start_position.sdump());
-  ROS_WARN("Traj will end at %s",mjt.end_position.sdump());
+  ROS_WARN("Traj will start at %s",mjt->start_position.sdump());
+  ROS_WARN("Traj will end at %s",mjt->end_position.sdump());
   ROS_WARN("Serialized synchronized right trajectory into a string of len %ld",
 	   at_req.SerializedTrajectory.size());
   at_req.options = owd_msgs::JointTraj::opt_Synchronize;
-  at_req.id=mjt.id;
+  at_req.id=mjt->id;
   if (!right_AddTimedTrajectory.isValid()) {
     ROS_WARN("Lost connection to /right/owd/AddTimedTrajectory; trying to resubscribe...");
     ros::NodeHandle n("~");
@@ -190,7 +205,7 @@ bool AddTrajectory(owd_msgs::AddTrajectory::Request &req,
 
   BinaryData bd2;
   bd2.PutInt(OWD::Trajectory::TRAJTYPE_MACJOINTTRAJ);
-  bd2.PutString(mjt.serialize(7,13));
+  bd2.PutString(mjt->serialize(7,13));
   at_req.SerializedTrajectory = bd2;
   ROS_WARN("Serialized synchronized left trajectory into a string of len %ld",
 	   at_req.SerializedTrajectory.size());
