@@ -321,6 +321,13 @@ void ParaJointTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
       //	ROS_DEBUG_NAMED("trajectory","ParaJointTraj: incrementing segment for joint %d, time=%2.2f, et=%2.2f\n",j,time,current_segment[j]->end_time);
       ++current_segment[j];
     }
+    if (current_segment[j] == parsegs[j].end()) {
+      // we're done
+      tc.q[j] = parsegs[j].back().end_pos;
+      tc.qd[j]=tc.qdd[j]=0.0;
+      finished_joints++;
+      continue;
+    }
     // check to see if we need to go backwards
     while ((time < current_segment[j]->start_time) &&
 	   (current_segment[j] != parsegs[j].begin())) {
@@ -333,12 +340,7 @@ void ParaJointTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
       //	ROS_ERROR_NAMED("trajectory","time %2.2f, current segment start %2.2f, end %2.2f",time,current_segment[j]->start_time,current_segment[j]->end_time);
       throw "Could not locate matching segment";
     }
-    if (current_segment[j] == parsegs[j].end()) {
-      // we're done
-      tc.q[j] = parsegs[j].back().end_pos;
-      tc.qd[j]=tc.qdd[j]=0.0;
-      finished_joints++;
-    } else try {
+    try {
 	// now that we've found the right segments, ask each segment
 	// to evaluate itself.
 	if (restart) {
