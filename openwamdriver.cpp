@@ -1774,7 +1774,7 @@ bool WamDriver::Publish() {
   owam->get_gains(waminternals.gains);
 
   for (unsigned int i=0; i<nJoints; ++i) {
-    wamstate.positions[i] = owam->last_control_position[i+1];
+    wamstate.positions[i] = owam->last_control_position[i];
     waminternals.positions[i] = jointpos[i+1];
     if (i<4) {
       wamstate.jpositions[i]=abs_jointpos[i+1];
