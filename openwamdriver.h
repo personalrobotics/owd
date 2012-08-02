@@ -244,8 +244,7 @@ private:
     bool running;
 
  private:
-    boost::mutex queue_mutex;
-    boost::mutex wscb_mutex;
+    boost::mutex wamstate_mutex;
     boost::mutex plugin_mutex;
     bool modified_j1;
 

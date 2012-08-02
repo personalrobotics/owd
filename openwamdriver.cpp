@@ -1757,6 +1757,8 @@ bool WamDriver::Publish() {
   double trajtorqs[nJoints+1]; // torques output by the current traj
   double simtorqs[nJoints+1];  // Torques calculated from simulated links
                                // (used for experiental mass properties)
+  boost::mutex::scoped_lock lock(wamstate_mutex);
+
   if (! ros::ok()) {
     wamstate.state = owd_msgs::WAMState::state_inactive;
     wamstate.header.stamp = ros::Time::now();
@@ -1847,7 +1849,7 @@ bool WamDriver::Publish() {
   pub_wamstate.publish(wamstate);
   pub_waminternals.publish(waminternals);
   
-  boost::mutex::scoped_lock lock(plugin_mutex);
+  boost::mutex::scoped_lock plock(plugin_mutex);
   OWD::Plugin::PublishAll();
 
   return true;
@@ -2173,6 +2175,7 @@ bool WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_reason
 #endif
   ti.state = owd_msgs::TrajInfo::state_pending;
 
+  boost::mutex::scoped_lock lock(wamstate_mutex);
   // if there are already running / queued trajectories, just add ours.
   // note: the order of these conditional checks is important.  only want to
   // use the owam->jointtraj check if the queue is empty; otherwise you might
@@ -2217,7 +2220,7 @@ bool WamDriver::DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
   std::list<OWD::Trajectory *>::iterator tl_it;
   std::vector<owd_msgs::TrajInfo>::iterator ws_it;
   // lock against re-queuing by Update() function
-  boost::mutex::scoped_lock lock(queue_mutex);
+  boost::mutex::scoped_lock lock(wamstate_mutex);
   for (unsigned int x=0; x<req.ids.size(); ++x) {
     std::string delete_id = req.ids[x];
     owam->lock();
@@ -2431,6 +2434,7 @@ bool WamDriver::CancelAllTrajectories(
   if (owam->jointstraj) {
     owam->cancel_trajectory();
   }
+  boost::mutex::scoped_lock lock(wamstate_mutex);
   if (wamstate.trajectory_queue.size() > 0) {
     wamstate.prev_trajectory = wamstate.trajectory_queue.front();
     wamstate.prev_trajectory.state = owd_msgs::TrajInfo::state_aborted;
@@ -2604,6 +2608,7 @@ void WamDriver::Update() {
   }
   
   // look for a recently-completed trajectory
+  boost::mutex::scoped_lock lock(wamstate_mutex);
   if ((wamstate.trajectory_queue.size() > 0) &&
       (wamstate.trajectory_queue.front().state !=
        owd_msgs::TrajInfo::state_pending)) {
@@ -2637,7 +2642,6 @@ void WamDriver::Update() {
   }
 
   // now look for any new trajectories to start
-  boost::mutex::scoped_lock lock(queue_mutex);
   if (trajectory_list.size()==0) {
     // If there are no queued trajectories, then take advantage of this opportunity
     // to look for updated ROS parameters that can't be changed while running
