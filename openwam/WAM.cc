@@ -41,6 +41,8 @@ extern int MODE;  // puck parameter
  * Create a new WAM that uses the CAN bus cb;
  */
 
+JSController wimpy_jscontroller(std::string("wimpy"));
+
 WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 	 bool log_ctrl_data) :
   mN1(41.782),  //joint ratios
@@ -53,16 +55,25 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   mn3(1.68),
   mn6(1.00),
   check_safety_torques(true),stall_sensitivity(1.0),
-  tc(Joint::Jn), ms(NULL), rec(false),wsdyn(false),
+  pid_torq(Joint::Jn,0),
+  sim_torq(Joint::Jn,0),
+  dyn_torq(Joint::Jn,0),
+  traj_torq(Joint::Jn,0),
+  tc(Joint::Jn), ms(NULL), 
+  default_jscontroller(std::string("default")),
+  jscontroller(&default_jscontroller),
+  new_jscontroller(NULL),
+  jscontroller_blend_period(1.0),
+  rec(false),wsdyn(false),
   jsdyn(false), holdpos(false),exit_on_pendant_press(false),pid_sum(0.0f), 
   pid_count(0),safety_hold(false),
   log_controller_data(log_ctrl_data), 
   bus(cb),ctrl_loop(cb->id, &control_loop_rt, this),
   motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
+  last_control_position(Joint::Jn),
   slip_joints_on_high_torque(false)
 {
-
 #ifdef OWD_RT
   rt_mutex_create(&rt_mutex,"WAM_CC");
 #else // ! OWD_RT
@@ -75,9 +86,13 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   pulsetraj = NULL;
   for(int i = Joint::J1; i<=Joint::Jn; i++) {
     heldPositions[i] = 0;
-    suppress_controller[i]=false;
+    jscontroller->activate(i-1);
   }
-  last_control_position = (double *)malloc((Joint::Jn+1)*sizeof(double));
+  
+  std::vector<double> wimpy_gains(3,0);
+  for (int i=0; i<Joint::Jn; ++i) {
+    wimpy_jscontroller.set_gains(i, wimpy_gains);
+  }
   
   links[Link::L0]=Link( DH(  0.0000,   0.0000,   0.0000,   0.0000), 0.0000, 
                         R3(  0.0000,   0.0000,   0.0000), 
@@ -224,7 +239,6 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 
   for (int i=0; i<Joint::Jn; ++i) {
     safetytorquecount[i]=safetytorquesum[i]=0;
-    pid_torq[i+1]=dyn_torq[i+1]=sim_torq[i+1]=traj_torq[i+1]=0;
   }
     
   if (Link::Ln == Link::L7) {
@@ -271,7 +285,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   }
 
   velocity_filter.resize(Joint::Jn);
-    for (unsigned int i=0; i<Joint::Jn; ++i) {
+    for (int i=0; i<Joint::Jn; ++i) {
       velocity_filter[i] = new Butterworth<double>(2,10);
   }
 
@@ -299,17 +313,6 @@ int WAM::init(){
     motors[11].ID=11; motors[11].puckI_per_Nm = 500;
   }    
 
-  //                      Kp    Kd    Ki
-  jointsctrl[1].set_gains( 900, 10.0, 2.5);
-  jointsctrl[2].set_gains(2500, 20.0, 5.0);
-  jointsctrl[3].set_gains( 600, 10.0, 2.5);
-  jointsctrl[4].set_gains( 500,  2.5, 0.5);
-  if (Joint::Jn > 4) {
-  //                        Kp    Kd    Ki
-    jointsctrl[5].set_gains(  40,  0.5, 0.5);
-    jointsctrl[6].set_gains(  40,  0.5, 0.5);
-    jointsctrl[7].set_gains(  16,  0.16, 0.1);
-  }
   if (Joint::Jn > 7) {
     // set 280 Hand gains here
   }
@@ -320,21 +323,27 @@ int WAM::init(){
 
 bool WAM::set_gains(int joint,
 		    owd_msgs::PIDgains &gains) {
-  if ((joint < Joint::J1) || (joint >> Joint::Jn)) {
+  if ((joint < 0) || (joint >= Joint::Jn)) {
     return false;
   }
-  jointsctrl[joint].set_gains(gains.kp,gains.kd,gains.ki);
+  std::vector<double> vgains(3);
+  vgains[0]=gains.kp;
+  vgains[1]=gains.kd;
+  vgains[2]=gains.ki;
+  jscontroller->set_gains(joint, vgains);
   return true;
 }
 
 bool WAM::get_gains(std::vector<owd_msgs::PIDgains > &gains) {
   gains.resize(Joint::Jn);
-  for (int j=1; j<=Joint::Jn; ++j) {
-    jointsctrl[j].get_gains(gains[j-1].kp, gains[j-1].kd, gains[j-1].ki);
+  for (int j=0; j<Joint::Jn; ++j) {
+    std::vector<double> vgains = jscontroller->get_gains(j);
+    gains[j].kp = vgains[0];
+    gains[j].kd = vgains[1];
+    gains[j].ki = vgains[2];
   }
   return true;
 }
-
 
 
 /*
@@ -635,19 +644,19 @@ void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *sim
       // subtracts out static (gravity) and dynamic (acceleration) torques to
       // leave just what balances ext. forces
       for(int j=Joint::J1; j<=Joint::Jn; j++)
-        nettrq[ joints[j].id() ] = pid_torq[j];
+        nettrq[ joints[j].id() ] = pid_torq[j-1];
     }
 
     if (simtrq) {
       // torques computed by the simulated links (with experimental
       // mass properties)
       for(int j=Joint::J1; j<=Joint::Jn; j++)
-        simtrq[ joints[j].id() ] = sim_torq[j];
+        simtrq[ joints[j].id() ] = sim_torq[j-1];
     }
     if (trajtrq) {
       // torques output by the current trajectory
       for (int j=Joint::J1; j<=Joint::Jn; ++j) {
-	trajtrq[joints[j].id()] = traj_torq[j];
+	trajtrq[joints[j].id()] = traj_torq[j-1];
       }
     }
     this->unlock();
@@ -1140,6 +1149,7 @@ void WAM::newcontrol_rt(double dt){
   static double dyntime=0.0f;
   static double trajtime=0.0f;
   static int safety_torque_count=0;
+  static std::vector<double> q(Joint::Jn);
     
   double traj_timestep;
   static double timestep_factor = 1.0f;
@@ -1163,9 +1173,9 @@ void WAM::newcontrol_rt(double dt){
   update_velocities_or_estimate_positions();  // process the new joint pos
     
   for(int j=Joint::J1; j<=Joint::Jn; j++){
-    tc.q[j-1] = q[j] = joints[j].q; // set tc.q for traj->eval
-    links[j].theta(q[j]);
-    sim_links[j].theta(q[j]);
+    tc.q[j-1] = q[j-1] = joints[j].q; // set tc.q for traj->eval
+    links[j].theta(q[j-1]);
+    sim_links[j].theta(q[j-1]);
     tc.qd[j-1] = tc.qdd[j-1] = tc.t[j-1] = 0.0; // zero out
   }
 
@@ -1178,11 +1188,11 @@ void WAM::newcontrol_rt(double dt){
   // update the values in the Plugin base class
   OWD::Plugin::_endpoint = SE3_endpoint;
   for (int i=0; i<Joint::Jn; ++i) {
-    OWD::Plugin::_arm_position[i]=q[i+1];
-    OWD::Plugin::_target_arm_position[i]=last_control_position[i+1];
-    OWD::Plugin::_pid_torque[i]=pid_torq[i+1];
-    OWD::Plugin::_dynamic_torque[i]=dyn_torq[i+1];
-    OWD::Plugin::_trajectory_torque[i]=traj_torq[i+1];
+    OWD::Plugin::_arm_position[i]=q[i];
+    OWD::Plugin::_target_arm_position[i]=last_control_position[i];
+    OWD::Plugin::_pid_torque[i]=pid_torq[i];
+    OWD::Plugin::_dynamic_torque[i]=dyn_torq[i];
+    OWD::Plugin::_trajectory_torque[i]=traj_torq[i];
     OWD::Plugin::_arm_velocity[i]=arm_velocity[i+1];
   }
   if (bus->forcetorque_data) {
@@ -1244,7 +1254,7 @@ void WAM::newcontrol_rt(double dt){
     } 
     RTIME t4 = ControlLoop::get_time_ns_rt();
     for (int j=0; j<Joint::Jn; ++j) {
-      traj_torq[j+1] = tc.t[j];
+      traj_torq[j] = tc.t[j];
     }
     trajtime += (t4-t3) / 1e6;
     for(int j=0; j<Joint::Jn; j++){
@@ -1263,7 +1273,7 @@ void WAM::newcontrol_rt(double dt){
       // the next time around we'll start holding at the endpoint
       jointstraj->endPosition().cpy(&heldPositions[Joint::J1]);
       holdpos = true;  // should have been true already, but just making sure
-      for (int j=Joint::J1; j<Joint::Jn; ++j) {
+      for (int j=0; j<Joint::Jn; ++j) {
 	traj_torq[j]=0;  // make sure we don't leave these non-zero
       }
       if (ms && jointstraj->Synchronize) {
@@ -1292,14 +1302,37 @@ void WAM::newcontrol_rt(double dt){
 	}
       }
       OWD::Trajectory *t = jointstraj; jointstraj = NULL; delete t;
-      for (int j=Joint::J1; j<Joint::Jn; ++j) {
+      for (int j=0; j<Joint::Jn; ++j) {
 	traj_torq[j]=0;  // make sure we don't leave these non-zero
       }
     }
     
     // ask the controllers to compute the correction torques.
     RTIME t1 = ControlLoop::get_time_ns_rt();
-    newJSControl_rt((&tc.q[0])-1,q,dt,pid_torq);
+    if (new_jscontroller) {
+      // we are in the process of switching controllers
+      jscontroller_blend_time += dt;
+      if (jscontroller_blend_time > jscontroller_blend_period) {
+	// we've reached the end of the blend period, so switch completely
+	// over to the new controller
+	jscontroller = new_jscontroller;
+	new_jscontroller=NULL;
+	pid_torq = jscontroller->evaluate(tc.q, q, dt);
+      } else {
+	// do a proportional blend of the two controller outputs
+	std::vector<double> old_controller_torq(jscontroller->evaluate(tc.q, q, dt));
+	std::vector<double> new_controller_torq(new_jscontroller->evaluate(tc.q, q, dt));
+	double ratio(jscontroller_blend_time / jscontroller_blend_period);
+	for (unsigned int i=0; i<old_controller_torq.size(); ++i) {
+	  pid_torq[i] = ratio * new_controller_torq[i] +
+	    (1.0-ratio) * old_controller_torq[i];
+	}
+      }
+    } else {
+      pid_torq = jscontroller->evaluate(tc.q, q, dt);
+    }
+      
+    last_control_position=tc.q;
     RTIME t2 = ControlLoop::get_time_ns_rt();
     jscontroltime += (t2-t1) / 1e6;
     
@@ -1312,9 +1345,9 @@ void WAM::newcontrol_rt(double dt){
       } else {
 	data.push_back(0);
       }
-      for (int j=Joint::J1; j<=Joint::Jn; ++j) {
-	data.push_back(tc.q[j-1]);  // record target position
-	data.push_back(q[j]);         // record actual position
+      for (int j=0; j<Joint::Jn; ++j) {
+	data.push_back(tc.q[j]);  // record target position
+	data.push_back(q[j]);       // record actual position
 	data.push_back(pid_torq[j]);  // record the pid torques
       }
     }
@@ -1387,7 +1420,29 @@ void WAM::newcontrol_rt(double dt){
           
     // ask the controllers to compute the correction torques.
     RTIME t1 = ControlLoop::get_time_ns_rt();
-    newJSControl_rt((&tc.q[0])-1,q,dt,pid_torq);
+    if (new_jscontroller) {
+      // we are in the process of switching controllers
+      jscontroller_blend_time += dt;
+      if (jscontroller_blend_time > jscontroller_blend_period) {
+	// we've reached the end of the blend period, so switch completely
+	// over to the new controller
+	jscontroller = new_jscontroller;
+	new_jscontroller=NULL;
+	pid_torq = jscontroller->evaluate(tc.q, q, dt);
+      } else {
+	// do a proportional blend of the two controller outputs
+	std::vector<double> old_controller_torq(jscontroller->evaluate(tc.q, q, dt));
+	std::vector<double> new_controller_torq(new_jscontroller->evaluate(tc.q, q, dt));
+	double ratio(jscontroller_blend_time / jscontroller_blend_period);
+	for (unsigned int i=0; i<old_controller_torq.size(); ++i) {
+	  pid_torq[i] = ratio * new_controller_torq[i] +
+	    (1.0-ratio) * old_controller_torq[i];
+	}
+      }
+    } else {
+      pid_torq = jscontroller->evaluate(tc.q, q, dt);
+    }
+    last_control_position=tc.q;
     RTIME t2 = ControlLoop::get_time_ns_rt();
     jscontroltime += (t2-t1) / 1e6;
           
@@ -1396,9 +1451,9 @@ void WAM::newcontrol_rt(double dt){
       data.push_back(t1); // record the current time
       data.push_back(0);  // time factor (zero for no traj)
       data.push_back(0); // trajectory time (zero for no traj)
-      for (int j=Joint::J1; j<=Joint::Jn; ++j) {
+      for (int j=0; j<Joint::Jn; ++j) {
 	// values 4-24
-	data.push_back(tc.q[j-1]);  // record target position
+	data.push_back(tc.q[j]);  // record target position
 	data.push_back(q[j]);         // record actual position
 	data.push_back(pid_torq[j]);  // record the pid torques
       }
@@ -1415,9 +1470,9 @@ void WAM::newcontrol_rt(double dt){
     }
 
   } else {
-    for(int i = Joint::J1; i <= Joint::Jn; i++) {
+    for(int i = 0; i < Joint::Jn; i++) {
       pid_torq[i]=0.0f;  // zero out the torques otherwise
-      last_control_position[i] = joints[i].q;
+      last_control_position[i] = joints[i+1].q;
     }
   }
   if (++trajcount == 1000) {
@@ -1436,16 +1491,16 @@ void WAM::newcontrol_rt(double dt){
      
   // compute the torque required to meet the desired qd and qdd
   // always calculate simulated dynamics (we'll overwrite dyn_torq later)
-  JSdynamics(sim_torq, sim_links,(& tc.qd[0])-1, (&tc.qdd[0])-1); 
+  sim_torq = JSdynamics(sim_links,(& tc.qd[0])-1, (&tc.qdd[0])-1); 
   if (data_recorded) {
-    for (int j=Joint::J1; j<=Joint::Jn; ++j) {
+    for (int j=0; j<Joint::Jn; ++j) {
       // values 25-31
       data.push_back(sim_torq[j]); // torques from sim model
     }
   }
   if(jsdyn){
     RTIME t4 = ControlLoop::get_time_ns_rt();
-    JSdynamics(dyn_torq, links, (&tc.qd[0])-1, (&tc.qdd[0])-1); 
+    dyn_torq = JSdynamics(links, (&tc.qd[0])-1, (&tc.qdd[0])-1); 
     RTIME t5 = ControlLoop::get_time_ns_rt();
     dyntime += (t5-t4) / 1e6;
     if (++dyncount == 1000) {
@@ -1454,18 +1509,18 @@ void WAM::newcontrol_rt(double dt){
     }
 
   } else {
-    for (int j=Joint::J1; j<=Joint::Jn; j++) {
+    for (int j=0; j<Joint::Jn; j++) {
       dyn_torq[j]=0.0;  // zero out the torques otherwise
     }
   }
   if (data_recorded) {
-    for (int j=Joint::J1; j<=Joint::Jn; ++j) {
+    for (int j=0; j<Joint::Jn; ++j) {
       // values 32-38
       data.push_back(dyn_torq[j]); // dynamic torques
     }
-    for (int j=Joint::J1; j<=Joint::Jn; ++j) {
+    for (int j=0; j<Joint::Jn; ++j) {
       // values 39-45
-      data.push_back(tc.t[j-1]); // trajectory torques
+      data.push_back(tc.t[j]); // trajectory torques
     }
     for (int j=Joint::J1; j<=Joint::Jn; ++j) {
       // values 46-52
@@ -1476,9 +1531,9 @@ void WAM::newcontrol_rt(double dt){
 
         
   // finally, sum the control, dynamics, and trajectory torques
-  for(int j=Joint::J1; j<=Joint::Jn; j++){
+  for(int j=0; j<Joint::Jn; j++){
     // set the joint torques
-    joints[j].trq(stiffness*pid_torq[j] + dyn_torq[j] + tc.t[j-1]);
+    joints[j+1].trq(stiffness*pid_torq[j] + dyn_torq[j] + tc.t[j]);
   }
         
   jtrq2mtrq();         // results in motor::torque
@@ -1496,19 +1551,19 @@ void WAM::newcontrol_rt(double dt){
 
 }
 
-bool WAM::safety_torques_exceeded(double t[]) {
-  //    static double safety_torqs[8]={0.0,10.0,10.0,5.0,5.0,2,2,2};
-  static double safety_torqs[8]={0.0, 15.0, 30.0, 10.0, 15.0, 3.0, 3.0, 3.0};
-  //static double safety_torqs[8]={0.0,50.0,75.0,75.0,60.0,15.0,15.0,15.0};
+bool WAM::safety_torques_exceeded(std::vector<double> t) {
+  //    static double safety_torqs[7]={10.0,10.0,5.0,5.0,2,2,2};
+  static double safety_torqs[7]={15.0, 30.0, 10.0, 15.0, 3.0, 3.0, 3.0};
+  //static double safety_torqs[7]={50.0,75.0,75.0,60.0,15.0,15.0,15.0};
   bool bExceeded = false;
   if (!check_safety_torques) {
     return false;
   }
-  for (int i = 1; i <= Joint::Jn; i++) {
+  for (int i = 0; i < Joint::Jn; i++) {
     if (stiffness * stall_sensitivity * fabs(t[i])>safety_torqs[i]) {
       bExceeded = true;
-      safetytorquecount[i-1]++;
-      safetytorquesum[i-1] += fabs(t[i]);
+      safetytorquecount[i]++;
+      safetytorquesum[i] += fabs(t[i]);
     }
   }
   return bExceeded;
@@ -1533,18 +1588,6 @@ R6 WAM::WSControl(double dt){
   F = F + se3ctrl.evaluate(E0ns, E0n, dt); // + feedback forces/moments
 
   return F;
-}
-
-void WAM::newJSControl_rt(double q_target[],double q[],double dt,double pid_torq[]) {
-  for(int j=Joint::J1; j<=Joint::Jn; j++) {
-    if (suppress_controller[j]) {
-      pid_torq[j] = 0;
-    } else {
-      pid_torq[j]= jointsctrl[j].evaluate(q_target[j], q[j], dt );
-    }
-    last_control_position[j]=q_target[j];
-  }
-  
 }
 
 int WAM::run_trajectory(OWD::Trajectory *traj) {
@@ -1692,9 +1735,15 @@ int WAM::hold_position(double jval[],bool grab_lock)
     // (if we were already holding, then we won't change the target)
     for(int i = Joint::J1; i <= Joint::Jn; i++) {
       heldPositions[i] = joints[i].q;
-      jointsctrl[i].reset();
-      jointsctrl[i].run();
-      suppress_controller[i] = false;
+      jscontroller->reset(i-1);
+      jscontroller->run(i-1);
+      jscontroller->activate(i-1);
+      if (new_jscontroller) {
+	// do the same for the other controller we're still switching to
+	new_jscontroller->reset(i-1);
+	new_jscontroller->run(i-1);
+	new_jscontroller->activate(i-1);
+      }
     }
   }
   
@@ -1727,12 +1776,14 @@ void WAM::release_position(bool grab_lock)
       if (grab_lock) {
 	this->lock("release pos");
       }
-      for(int i = Joint::J1; i <= Joint::Jn; i++)
-        {
-	  jointsctrl[i].stop();
-        }
-      holdpos = false;
 
+      for (int j=0; j<Joint::Jn; ++j) {
+	jscontroller->stop(j);
+	if (new_jscontroller) {
+	  new_jscontroller->stop(j);
+	}
+      }
+      holdpos = false;
 
       if (grab_lock) {
 	this->unlock("release pos");

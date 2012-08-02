@@ -480,14 +480,13 @@ void Friction(double qd[Link::Ln+1], double F[Link::Ln+1]) {
 }
             
 
-void JSdynamics(double trq[Link::Ln+1], 
-		Link   links[Link::Ln+1], 
-		double qd[Link::Ln+1], 
-		double qdd[Link::Ln+1]){
+std::vector<double> JSdynamics(Link   links[Link::Ln+1], 
+			       double qd[Link::Ln+1], 
+			       double qdd[Link::Ln+1]){
 
   double ssq = 0.0;
+  std::vector<double> trq(Joint::Jn,0);
   for(int j=Joint::J1; j<=Joint::Jn; j++){
-    trq[j] = 0.0;
     ssq += qdd[j]*qdd[j];
   }
 
@@ -508,11 +507,12 @@ void JSdynamics(double trq[Link::Ln+1],
     dsymv_(&UPLO,           &N,  &ALPHA,   // symmetric matrix * vector
 	  &A[0][0],        &LDA,
 	  &qdd[Joint::J1], &INC, &BETA,
-	  &trq[Joint::J1], &INC);
+	  &trq[0], &INC);
   }
   double F[Link::Ln+1];  // array to hold friction torques
   Friction(qd,F);        // calculate friction torques based on velocities
   for(int j=Joint::J1; j<=Joint::Jn; j++) {
-    trq[j] += ccg[j] + F[j];   // add in the ccg and friction torques
+    trq[j-1] += ccg[j] + F[j];   // add in the ccg and friction torques
   }
+  return trq;
 }

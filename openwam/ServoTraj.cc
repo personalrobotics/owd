@@ -21,6 +21,7 @@
  ***********************************************************************/
 
 #include "ServoTraj.hh"
+#include "Plugin.hh"
 #include <string.h>
 
 namespace OWD {
@@ -30,44 +31,24 @@ namespace OWD {
 		     double *upper_joint_limits)
   : Trajectory("ServoTraj", id),
     nDOF(dof),
-    vlimit(2.5),
-    accel(2.5),
     lasttime(time)
 {
   stoptime.resize(nDOF,0.0);
   target_velocity.resize(nDOF,0.0);
   current_velocity.resize(nDOF,0.0);
+  jlimit_buffer.resize(nDOF,0.0);
   start_position.SetFromArray(nDOF,start_pos);
   current_position = start_position;
   end_position.resize(nDOF);
   duration=99999999999; // we might want to run a long time
 
-  if (lower_joint_limits) {
-    memcpy(lower_jlimit,lower_joint_limits,7*sizeof(double));
-  } else {
-    // WAM default
-    lower_jlimit[0]= -2.60;
-    lower_jlimit[1]= -1.96;
-    lower_jlimit[2]= -2.73;
-    lower_jlimit[3]= -0.86;
-    lower_jlimit[4]= -4.79;
-    lower_jlimit[5]= -1.56;
-    lower_jlimit[6]= -2.99;
-  }
-  if (upper_joint_limits) {
-    memcpy(upper_jlimit,upper_joint_limits,7*sizeof(double));
-  } else {
-    // WAM default
-    upper_jlimit[0]=  2.60;
-    upper_jlimit[1]=  1.96;
-    upper_jlimit[2]=  2.73;
-    upper_jlimit[3]=  3.13;
-    upper_jlimit[4]=  1.30;
-    upper_jlimit[5]=  1.56;
-    upper_jlimit[6]=  2.99;
-  }
  // space to leave near joint limits to allow for deceleration 
-  jlimit_buffer = 0.5*vlimit*vlimit/accel * 1.3;
+  for (int i=0; i<nDOF; ++i) {
+    // (1/2 * v^2 / a) is the distance to decelerate from v to 0
+    jlimit_buffer[i] = 0.5
+      * Plugin::joint_vel[i] * Plugin::joint_vel[i]
+      / Plugin::joint_accel[i];
+  }
 }
 
 ServoTraj::~ServoTraj() {
@@ -77,10 +58,10 @@ bool ServoTraj::SetVelocity(int j, float v, float duration) {
   if ((j > nDOF) || (j<1)) {
     return false;
   }
-  if (v > vlimit) {
-    v = vlimit;
-  } else if (v < -vlimit) {
-    v = -vlimit;
+  if (v > Plugin::joint_vel[j-1]) {
+    v = Plugin::joint_vel[j-1];
+  } else if (v < -Plugin::joint_vel[j-1]) {
+    v = -Plugin::joint_vel[j-1];
   }
   target_velocity[j-1] = v;
   stoptime[j-1] = time + duration;
@@ -103,30 +84,37 @@ void ServoTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
   bool active = false;
   for (unsigned int i = 0; i<(unsigned int)nDOF; ++i) {
     if (time < stoptime[i]) {
-        // June 28, 2012
-        // Moslem removed the joint limit check since it was problematic when we
-        // are close to joint limits.
       // check for approaching joint limits
-//      if ((target_velocity[i] > 0) &&
-//	  (current_position[i] + jlimit_buffer > upper_jlimit[i])) {
-//	target_velocity[i] = 0.0; // come to a stop before hitting limit
-//      } else if ((target_velocity[i] < 0) &&
-//	  (current_position[i] - jlimit_buffer < lower_jlimit[i])) {
-//	target_velocity[i] = 0.0; // come to a stop before hitting limit
-//      }
+      if ((target_velocity[i] > 0) &&
+	  (current_position[i] + jlimit_buffer[i] > Plugin::upper_jlimit[i])) {
+	double percent = (Plugin::upper_jlimit[i] - current_position[i])
+	  / jlimit_buffer[i];
+	double max_vel = Plugin::joint_vel[i] * percent;
+	if (target_velocity[i] > max_vel) {
+	  target_velocity[i] = max_vel;
+	}
+      } else if ((target_velocity[i] < 0) &&
+		 (current_position[i] - jlimit_buffer[i] < Plugin::lower_jlimit[i])) {
+	double percent = (Plugin::lower_jlimit[i] - current_position[i])
+	  / jlimit_buffer[i]; // negative
+	double min_vel = Plugin::joint_vel[i] * percent; // negative
+	if (target_velocity[i] < min_vel) {
+	  target_velocity[i] = min_vel;
+	}
+      }
 
       // check for accel/decel
       if (target_velocity[i] > current_velocity[i]) {
 	// still accelerating to target
-	current_velocity[i] += accel * dt;
-	tc.qdd[i]=accel;
+	current_velocity[i] += Plugin::joint_accel[i] * dt;
+	tc.qdd[i]=Plugin::joint_accel[i];
 	if (current_velocity[i] > target_velocity[i]) {
 	  current_velocity[i] = target_velocity[i];
 	}
       } else if (target_velocity[i] < current_velocity[i]) {
 	// still decelerating
-	current_velocity[i] -= accel * dt;
-	tc.qdd[i]=-accel;
+	current_velocity[i] -= Plugin::joint_accel[i] * dt;
+	tc.qdd[i]=-Plugin::joint_accel[i];
 	if (current_velocity[i] < target_velocity[i]) {
 	  current_velocity[i] = target_velocity[i];
 	}

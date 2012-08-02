@@ -36,11 +36,8 @@ private:
   std::vector<double> stoptime;
   std::vector<double> target_velocity;
   std::vector<double> current_velocity;
-  const float vlimit;
-  const float accel;
-  double jlimit_buffer;
+  std::vector<double> jlimit_buffer;
   JointPos current_position;
-  double lower_jlimit[7], upper_jlimit[7];
   double lasttime;
 
 public:

@@ -45,7 +45,8 @@
 #include "ParaJointTraj.hh"
 #include "MacJointTraj.hh"
 #include "Sigmoid.hh"
-#include "JointCtrlPID.hh"
+#include "JSController.hh"
+// #include "JointCtrlPID.hh"
 #include "MultiSync.hh"
 #include "DataRecorder.cc"
 #include "Butterworth.h"
@@ -135,14 +136,12 @@ public:
   OWD::Link L4_without_wrist_with_260_hand,
     L4_without_wrist_without_hand;
   double heldPositions[Joint::Jn+1];
-  bool suppress_controller[Joint::Jn+1];    // flag to disable PID control
   bool check_safety_torques;
   double stall_sensitivity;
-  double pid_torq[Joint::Jn+1];
-  double sim_torq[Joint::Jn+1];
-  double dyn_torq[Joint::Jn+1];
-  double traj_torq[Joint::Jn+1];
-  double q[Joint::Jn+1];
+  std::vector<double> pid_torq;
+  std::vector<double> sim_torq;
+  std::vector<double> dyn_torq;
+  std::vector<double> traj_torq;
   OWD::Trajectory::TrajControl tc;
  
   SE3 E0n;                                 // forward kinematics transformation
@@ -158,7 +157,12 @@ public:
 
   MultiSync *ms;
 
-  JointCtrlPID jointsctrl[Joint::Jn+1];    // joint controllers
+  JSController default_jscontroller;
+  JSController *jscontroller, *new_jscontroller;
+  double jscontroller_blend_time;
+  double jscontroller_blend_period;
+
+  //  JointCtrlPID jointsctrl[Joint::Jn+1];    // joint controllers
 
   bool rec;                                // Are we recording data
   bool wsdyn;                              // Is the WS dynamics turned on?
@@ -208,7 +212,7 @@ public:
   int start();                      // start the control loop
   void stop();                      // stop the control loop
   void newcontrol_rt(double dt);          // main control function
-  bool safety_torques_exceeded(double t[]); // check pid torqs against thresholds
+  bool safety_torques_exceeded(std::vector<double>); // check pid torqs against thresholds
 
   int  set_targ_jpos(double* pos);          // set the target joint positions online 
   int  set_jpos(double pos[]);   // set the joint positions offline
@@ -257,7 +261,7 @@ public:
   bool ForceTorque;
   bool Tactile;
   SE3 SE3_endpoint; // result of forward kinematics calculation
-  double *last_control_position;
+  std::vector<double> last_control_position;
   bool slip_joints_on_high_torque;
 
   double previous_joint_val[Joint::Jn+1];

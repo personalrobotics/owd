@@ -50,6 +50,7 @@
 #include <owd_msgs/SetForceInputThreshold.h>
 #include <owd_msgs/SetTactileInputThreshold.h>
 #include <owd_msgs/SetTorqueLimits.h>
+#include <owd_msgs/SetController.h>
 #include <owd_msgs/CalibrateJoints.h>
 #include <owd_msgs/StepJoint.h>
 #include <owd_msgs/SetGains.h>
@@ -140,6 +141,9 @@ public:
 				owd_msgs::SetTactileInputThreshold::Response &res);
     bool SetTorqueLimits(owd_msgs::SetTorqueLimits::Request &req,
 			 owd_msgs::SetTorqueLimits::Response &res);
+
+    bool SetController(owd_msgs::SetController::Request &req,
+		       owd_msgs::SetController::Response &res);
 
     void AdvertiseAndSubscribe(ros::NodeHandle &n);
 
@@ -278,7 +282,8 @@ private:
       ss_ReloadPlugins,
       ss_SetForceInputThreshold,
       ss_SetTactileInputThreshold,
-      ss_SetTorqueLimits;
+      ss_SetTorqueLimits,
+      ss_SetController;
 
     tf::TransformBroadcaster tf_broadcaster;
     btTransform wam_tf_base[7];

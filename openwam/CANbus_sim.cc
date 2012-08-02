@@ -68,6 +68,8 @@ CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
       pucks[p].group_order = p-7;
     }
     pucks[p].cpr = 4096;
+    jumptime[p]=0;
+    firstupdate[p]=true;
   }
 
   for(int p=1; p<=n_arm_pucks; p++){

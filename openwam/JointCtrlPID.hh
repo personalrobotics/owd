@@ -48,7 +48,12 @@ private:
 
 public:
 
-  JointCtrlPID(){reset();}
+  JointCtrlPID(double _kp, double _kd, double _ki){
+    Kp=_kp;
+    Kd=_kd;
+    Ki=_ki;
+    reset();
+  }
   
   double evaluate(double qs, double q, double dt){
     if(state() == Controller::RUN){
@@ -78,22 +83,16 @@ public:
     //    unlock();
   }
 
-  istream& get(istream& s){    s >> Kp >> Kd >> Ki;    return s;  }
-  
-  ostream& put(ostream& s){
-    s << "Kp: "  << setw(4) << Kp << "; "
-      << "Kd: "  << setw(4) << Kd << "; "
-      << "Ki: "  << setw(4) << Ki ;
-    return s;
-  }
-
-  inline void set_gains(double kp, double kd, double ki) {
-    Kp=kp;
-    Kd=kd;
-    if (ki != Ki) {
+  inline void set_gains(std::vector<double> gains) {
+    if (gains.size() != 3) {
+      throw "expected a vector of 3 gains (Kp, Kd, Ki)";
+    }
+    Kp=gains[0];
+    Kd=gains[1];
+    if (gains[2] != Ki) {
       // we'll use a lot of care in changing the integral gain, since
       // there may have been a build-up of the integrated error.
-      if (ki == 0) {
+      if (gains[2] == 0) {
 	// no problem
 	Ki = 0;
       } else {
@@ -101,20 +100,22 @@ public:
 	double oldtorque = Ki * se;
 	// if the new torque would be higher with the existing integrated
 	// error, then drop the integrator value to keep the same torque
-	if (ki * se > oldtorque) {
-	  se = oldtorque / ki;
-	} else if (ki * se < - oldtorque) {
-	  se = - oldtorque / ki;
+	if (gains[2] * se > oldtorque) {
+	  se = oldtorque / gains[2];
+	} else if (gains[2] * se < - oldtorque) {
+	  se = - oldtorque / gains[2];
 	}
-	Ki = ki;
+	Ki = gains[2];
       }
     }
   }
 
-  inline void get_gains(double &kp, double &kd, double &ki) const {
-    kp=Kp;
-    kd=Kd;
-    ki=Ki;
+  inline std::vector<double> get_gains() const {
+    std::vector<double> gains;
+    gains.push_back(Kp);
+    gains.push_back(Kd);
+    gains.push_back(Ki);
+    return gains;
   }
 
 };

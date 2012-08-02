@@ -23,6 +23,8 @@
       Carnegie Mellon University
 */
 
+#include <vector>
+
 #include "Joint.hh"
 
 #include "../openmath/SE3.hh"
@@ -52,6 +54,6 @@ void WSinertia(double A[6][6],               Link* links);
 void JSinertia(double A[Link::Ln][Link::Ln], Link* links);
 
 void WSdynamics(double* trq, Link* links, double* qd, R6& F);
-void JSdynamics(double* trq, Link* links, double* qd, double* qdd);
+std::vector<double> JSdynamics(Link* links, double* qd, double* qdd);
 
 #endif

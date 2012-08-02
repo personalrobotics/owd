@@ -292,7 +292,7 @@ void ParaJointTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
   // thread can get them out and print them.  For now they are all commented
   // out.
 
-  if (tc.q.size() < DOF) {
+  if (tc.q.size() < (unsigned int)DOF) {
     runstate=DONE;
     return;
   }
@@ -532,7 +532,7 @@ bool ParaJointTraj::log(const char *trajname) {
 
 void ParaJointTraj::reset(double t) {
   time=t;
-  for (unsigned int j=0; j<DOF; ++j) {
+  for (int j=0; j<DOF; ++j) {
     current_segment[j]=parsegs[j].begin();
   }
 }

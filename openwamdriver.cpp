@@ -310,6 +310,7 @@ bool WamDriver::Init(const char *joint_cal_file)
   
   owam = new WAM(bus, BH_model, ForceTorque, Tactile, log_controller_data);
   n.param("slip_joints_on_high_torque",owam->slip_joints_on_high_torque,false);
+  n.param("controller_blend_period",owam->jscontroller_blend_period,1.0);
 
   // Read the transmission ratios from ROS parameters
   get_transmission_ratios();
@@ -652,6 +653,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("SetTactileInputThreshold", &WamDriver::SetTactileInputThreshold, this);
   ss_SetTorqueLimits =
     n.advertiseService("SetTorqueLimits", &WamDriver::SetTorqueLimits, this);
+  ss_SetController =
+    n.advertiseService("SetController", &WamDriver::SetController, this);
 
 #ifdef BUILD_FOR_SEA
   sub_wam_joint_targets = 
@@ -1062,8 +1065,8 @@ void WamDriver::calibrate_joint_angles() {
   // put in hold mode, but suppress each of the controllers
   owam->check_safety_torques=false; // hold positions stiffly
   owam->hold_position();
-  for (unsigned int j=1; j<=nJoints; ++j) {
-    owam->suppress_controller[j]=true;
+  for (unsigned int j=0; j<nJoints; ++j) {
+    owam->jscontroller->suppress(j);
   }
 
   ROS_ERROR("Robot is in calibration mode.  For each joint,");
@@ -1131,13 +1134,13 @@ void WamDriver::calibrate_joint_angles() {
 	  // set it to parallel or square
 	  double holdval = get_nearest_joint_value(jointpos[jnum] - joint_offsets[jnum],2);
 	  owam->heldPositions[jnum] = holdval+joint_offsets[jnum];
-	  owam->jointsctrl[jnum].reset();
+	  owam->jscontroller->reset(jnum-1);
 #ifdef BUILD_FOR_SEA
 	  owam->heldPositions[jnum] = holdval+joint_offsets[jnum];
 	  owam->posSmoother.reset(owam->heldPositions, Joint::Jn+1);   
 #endif // BUILD_FOR_SEA
-	  owam->jointsctrl[jnum].run();
-	  owam->suppress_controller[jnum]=false;
+	  owam->jscontroller->run(jnum-1);
+	  owam->jscontroller->activate(jnum-1);
 	}
 	break;
       case 'u' :
@@ -1145,7 +1148,7 @@ void WamDriver::calibrate_joint_angles() {
 	ROS_ERROR("\nUnhold joint number 1-%d: holdpos: %d\n",nJoints, owam->holdpos);
 	jnum = get_joint_num();
 	if ((jnum > 0) && (jnum <= nJoints)) {
-	  owam->suppress_controller[jnum]=true;
+	  owam->jscontroller->suppress(jnum-1);
 	}
 	break;
       case 'q' :
@@ -1166,7 +1169,7 @@ void WamDriver::calibrate_joint_angles() {
   owam->release_position();
   owam->check_safety_torques = true;
   for (unsigned int j=1; j<=nJoints; ++j) {
-    owam->suppress_controller[j]=false;
+    owam->jscontroller->activate(j-1);
   }
 
   if (save) {
@@ -1816,6 +1819,13 @@ bool WamDriver::Publish() {
   for(int i = Joint::J1; i<=Joint::Jn; i++) {
     snprintf(jointstr+strlen(jointstr),199-strlen(jointstr)," %1.4f",owam->last_control_position[i]);
   }
+  wamstate.controller = owam->jscontroller->name;
+  if (owam->new_jscontroller) {
+    // we're in the process of switching controllers, so publish
+    // both controller names
+    wamstate.controller += std::string(" + ");
+    wamstate.controller += owam->new_jscontroller->name;
+  }
   owam->unlock();
 
   // Now that we've unlocked the controller again, we can figure out what's going
@@ -2303,11 +2313,11 @@ bool WamDriver::SetJointStiffness(owd_msgs::SetJointStiffness::Request &req,
   owam->hold_position(current_pos);
   for (unsigned int i=0; i<nJoints; ++i) {
     if (req.stiffness[i] != 0) {
-      owam->jointsctrl[i+1].reset();
-      owam->jointsctrl[i+1].run();
-      owam->suppress_controller[i+1]=false;
+      owam->jscontroller->reset(i);
+      owam->jscontroller->run(i);
+      owam->jscontroller->activate(i);
     } else {
-      owam->suppress_controller[i+1]=true;
+      owam->jscontroller->suppress(i);
     }
   }
   res.ok=true;
@@ -2867,6 +2877,61 @@ bool WamDriver::SetTorqueLimits(owd_msgs::SetTorqueLimits::Request &req,
   res.ok=true;
   return true;
 }
+
+bool WamDriver::SetController(owd_msgs::SetController::Request &req,
+			      owd_msgs::SetController::Response &res) {
+  JSController *controller = JSController::find_controller(req.name);
+  if (controller) {
+    if (controller->DOF() != Joint::Jn) {
+      res.reason=std::string("controller has wrong DOF");
+      res.ok=false;
+      return true;
+    }
+    if (owam->holdpos) {
+      // check to make sure that the existing controller is doing a good
+      // job at holding the joints close to the targets; if not we don't
+      // want to switch controllers and cause the new controller to have to
+      // suddenly fix a huge error.
+      for (int j=0; j<Joint::Jn; ++j) {
+	if (fabs(owam->last_control_position[j] - owam->joints[j+1].q)
+	    > 0.05) {
+	  res.reason=std::string("Existing controller is not holding position well; please SetStiffness 0 and try again");
+	  res.ok=false;
+	  return true;
+	}
+      }
+    }
+    for (int j=0; j<Joint::Jn; ++j) {
+      controller->reset(j);
+      controller->run(j);
+    }
+    owam->lock();
+    if (owam->new_jscontroller) {
+      res.reason=std::string("Still not finished switching to controller ");
+      res.reason += owam->new_jscontroller->name;
+      owam->unlock();
+      res.ok=false;
+      return true;
+    }
+    if (owam->holdpos) {
+      // controller is active, so set up for a gradual switch
+      owam->new_jscontroller = controller;
+      owam->jscontroller_blend_time=0;
+    } else {
+      // controller is inactive, so swith immediately
+      owam->jscontroller = controller;
+    }
+    owam->unlock();
+    res.reason=std::string("");
+    res.ok=true;
+    ROS_INFO("Switching to controller %s",controller->name.c_str());
+  } else {
+    res.reason=std::string("Requested controller has not been defined");
+    res.ok=false;
+  }
+  return true;
+}
+
 
 // storage for static members
 CANbus *WamDriver::bus = NULL;

@@ -46,7 +46,8 @@ rosbuild_add_library(openwam Joint.cc Motor.cc Puck.cc Group.cc
 			    TrajType.cc PulseTraj.cc Trajectory.cc ParabolicSegment.cc
                             ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc
                             ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc 
-			    butterworth_solver.c MultiSync.cc BinaryData.cc)
+			    butterworth_solver.c MultiSync.cc BinaryData.cc
+                            JSController.cc )
 endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
 rosbuild_add_library(openwamsim Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc
@@ -54,7 +55,8 @@ rosbuild_add_library(openwamsim Joint.cc CANbus_sim.cc Motor.cc Puck.cc Group.cc
                                TrajType.cc PulseTraj.cc Trajectory.cc ParabolicSegment.cc
                                ParaJointTraj.cc MacJointTraj.cc MacQuinticBlend.cc MacQuinticSegment.cc
                                ServoTraj.cc StepTraj.cc ConstrainedForceTrajectory.cc
-			       Plugin.cc butterworth_solver.c MultiSync.cc BinaryData.cc)
+			       Plugin.cc butterworth_solver.c MultiSync.cc
+                               BinaryData.cc JSController.cc )
 rosbuild_add_compile_flags(openwamsim "-DOWDSIM")
 
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
