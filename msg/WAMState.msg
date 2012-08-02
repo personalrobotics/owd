@@ -1,11 +1,13 @@
 Header header
 
 float64[] positions
+float64[] target_positions
 float64[] jpositions
 float64[] velocities
 float64[] torques
 owd_msgs/TrajInfo[] trajectory_queue
 owd_msgs/TrajInfo prev_trajectory
+string controller
 uint8 state
 
 uint8 state_free=0
