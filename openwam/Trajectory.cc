@@ -83,32 +83,20 @@ namespace OWD {
     forcetorque = R6(ft[0],ft[1],ft[2],
 		     ft[3],ft[4],ft[5]);
     valid_ft=true;
-    static int forcecount(0);
-    static int torquecount(0);
    
     // check force threshold
     if ((runstate==RUN) &&
 	CancelOnForceInput &&
 	((forcetorque.v * forcetorque_threshold_direction) 
 	 > forcetorque_threshold)) {
-      //      if (++forcecount == 8) {
-	// only stop if we have eight cycles in a row that exceed the threshold
-	runstate=ABORT;
-	//      }
-	//    } else {
-	//      forcecount=0;
+      runstate=ABORT;
     }
     // check torque threshold
     if ((runstate==RUN) &&
 	CancelOnForceInput &&
 	((forcetorque.w * forcetorque_torque_threshold_direction) 
 	 > forcetorque_torque_threshold)) {
-      //      if (++torquecount == 8) {
-	// only stop if we have eight cycles in a row that exceed the threshold
-      	runstate=ABORT;
-      //      }
-	//    } else {
-	//      torquecount=0;
+      runstate=ABORT;
     }
   }
 
@@ -205,10 +193,10 @@ namespace OWD {
     if (lastdof == -1) {
       lastdof = start_position.size()-1;
     }
-    if (firstdof > start_position.size()) {
+    if (firstdof > (int)start_position.size()) {
       throw "Invalid firstdof";
     }
-    if (lastdof >= start_position.size()) {
+    if (lastdof >= (int)start_position.size()) {
       throw "Invalid lastdof";
     }
     // create scaled-down versions of our start and end position

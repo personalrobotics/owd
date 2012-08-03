@@ -307,7 +307,6 @@ void MacQuinticSegment::BuildProfile() {
     start_vel = tmp_vel;
   }
 
-  MacAccelElement *ap;
   if (distance == 0) {
     throw "MacQuinticSegment::BuildProfile: distance was zero";
   }
@@ -317,8 +316,6 @@ void MacQuinticSegment::BuildProfile() {
   double cruise_start_vel = start_vel;
   duration=0;
 
-  double delta_v = end_vel - start_vel;
-  
   // ============================================================
   // Test #1: Max Velocity?
   //
@@ -747,7 +744,6 @@ MacAccelElement *MacQuinticSegment::check_for_cruise(double distance,
   double dist_remaining = distance - ae1->distance() - ae2->distance();
   if (dist_remaining > 0) {
     double cruise_vel = ae1->end_vel();
-    double cruise_time = dist_remaining / cruise_vel;
     double cruise_end_pos = ae1->end_pos() + dist_remaining;
     ae1 = new MacZeroAccel(ae1->end_pos(),
 			   cruise_vel,
@@ -798,11 +794,11 @@ bool MacQuinticSegment::search_for_decel_pulse(double distance,
   int iterations = 0;
   double amax = max_path_acceleration;
   double amax2 = pow(amax,2);
-  double amax3 = pow(amax,3);
+  // double amax3 = pow(amax,3);
   double jmax2 = pow(jmax,2);
   double P=amax/2.0;
   double Q=start_vel + 0.75*amax2*PI/jmax;
-  double R=start_vel * amax * PI/jmax + amax3 * PI2 * 0.25/jmax2;
+  // double R=start_vel * amax * PI/jmax + amax3 * PI2 * 0.25/jmax2;
   double S=end_vel * PI/jmax;
   double U=0.75*PI2/jmax2;
   double W=0.5*PI/jmax/amax;

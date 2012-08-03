@@ -87,9 +87,6 @@ void ConstrainedForceTrajectory::evaluate(OWD::Trajectory::TrajControl &tc, doub
 			    / initial_force_vector.length()
 			    / WSdiff.length());
 
-  // compare against velocity limits
-  double ws_velocity = distance_moved / dt;
-
   // check for ending condition
   if (((end_cond.type == EndCondition::ANGLE)
        && (total_angle > end_cond.value)) 

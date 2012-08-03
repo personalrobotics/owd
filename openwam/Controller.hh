@@ -49,7 +49,7 @@ public:
   void unlock(){pthread_mutex_unlock(&mutex);}
   int trylock(){ return pthread_mutex_trylock(&mutex); }
 
-  void run(){   lock();  s = Controller::RUN;   unlock();  }
+  bool run(){   lock();  s = Controller::RUN;   unlock(); return true; }
   void stop(){  lock();  s = Controller::STOP;  unlock();  }
 
   int state(){

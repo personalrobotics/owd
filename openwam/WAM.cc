@@ -41,7 +41,7 @@ extern int MODE;  // puck parameter
  * Create a new WAM that uses the CAN bus cb;
  */
 
-JSController wimpy_jscontroller(std::string("wimpy"));
+DefaultJSController wimpy_jscontroller(std::string("wimpy"));
 
 WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 	 bool log_ctrl_data) :
@@ -86,7 +86,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   pulsetraj = NULL;
   for(int i = Joint::J1; i<=Joint::Jn; i++) {
     heldPositions[i] = 0;
-    jscontroller->activate(i-1);
+    jscontroller->run(i-1);
   }
   
   std::vector<double> wimpy_gains(3,0);
@@ -727,11 +727,13 @@ void control_loop_rt(void* argv){
   double this_cycle_time(0.0f);
   unsigned int loopcount ( 0);
   unsigned int slowcount(0);
+#ifndef BH280_ONLY
   int missing_data_cycles(0);
   RTIME control_start_time, sendtorque_start_time, sendtorque_end_time;
 
   RTIME last_sendtorque_time = ControlLoop::get_time_ns_rt() - ControlLoop::PERIOD * 1e9;  // first-time initialization
   RTIME last_loopstart_time = last_sendtorque_time;
+#endif // BH280_ONLY
 
   ROS_DEBUG("Control loop started");
 
@@ -778,6 +780,7 @@ void control_loop_rt(void* argv){
 	}
 	state_cycles=0;
       }
+      bool torques_sent(false);
 #endif // ! BH280_ONLY
       if (wam->bus->BH280_installed) {
 	if (hand_counter==0) {
@@ -842,7 +845,6 @@ void control_loop_rt(void* argv){
       RTIME read_start_time = ControlLoop::get_time_ns_rt(); // record the time
       int32_t time_to_wait = ControlLoop::PERIOD * 1e6  // sec to usecs
 	- (read_start_time - loopstart_time) * 1e-3;  // nsecs to usecs
-      bool torques_sent(false);
       wam->lock("control loop");
       while (time_to_wait>0) {
 	uint8_t  msg[8];
@@ -1153,7 +1155,9 @@ void WAM::newcontrol_rt(double dt){
     
   double traj_timestep;
   static double timestep_factor = 1.0f;
+#ifndef OWDSIM
   static bool stall_recovery=false;
+#endif // OWDSIM
   traj_timestep = dt;
   /*    if (dt > .004) {
 	traj_timestep = .004; // bound the time in case the system got delayed; don't want to lurch
@@ -1230,7 +1234,6 @@ void WAM::newcontrol_rt(double dt){
 
   // is there a joint trajectory running?
   if(jointstraj != NULL){
-    bool abort(false);
     RTIME t3 = ControlLoop::get_time_ns_rt();        
     if (ms && jointstraj->Synchronize) {
       try {
@@ -1737,12 +1740,10 @@ int WAM::hold_position(double jval[],bool grab_lock)
       heldPositions[i] = joints[i].q;
       jscontroller->reset(i-1);
       jscontroller->run(i-1);
-      jscontroller->activate(i-1);
       if (new_jscontroller) {
 	// do the same for the other controller we're still switching to
 	new_jscontroller->reset(i-1);
 	new_jscontroller->run(i-1);
-	new_jscontroller->activate(i-1);
       }
     }
   }

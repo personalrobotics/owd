@@ -290,7 +290,7 @@ int CANbus::open(){
 
 int CANbus::check(){
   int32_t nodes[NUM_NODES+1];//, value;
-  int online_pucks, reset_pucks, running_pucks;
+  int online_pucks;
 
   //Get status of pucks on bus
   usleep(100000);
@@ -344,8 +344,8 @@ int CANbus::check(){
     return OW_FAILURE;
   }
 
-  reset_pucks = 0;
-  running_pucks = 0;
+  int reset_pucks = 0;
+  int running_pucks = 0;
   for(int p=1; p<=n_arm_pucks; p++){
     if(nodes[ pucks[p].id() ] == STATUS_RESET)
       reset_pucks++;
@@ -820,7 +820,6 @@ int CANbus::send_torques_rt(){
 }
 
 int CANbus::extra_bus_commands() {
-  static uint8_t msgbuf[20];
   CANmsg handmsg;
   bool message_received(false);
 #ifdef OWD_RT
@@ -1444,8 +1443,9 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
   } else {
     sleeptime=4000; // for longer delays, sleep for 4ms
   }
+#ifdef OWD_RT
   int retrycount = usecs / sleeptime + 0.5; // round to nearest int
-  
+#endif // OWD_RT
 
   std::vector<canio_data> crecord;
   canio_data cdata;
@@ -1454,11 +1454,9 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
 
 #ifdef PEAK_CAN
   TPCANRdMsg cmsg;
-  int pendread=0;
-  int pendwrite=0;
   
-  bool done=false;
 #ifdef OWD_RT
+  bool done=false;
   while (!done) {
     err=LINUX_CAN_Read_Timeout(handle,&cmsg,0);
     if (err == CAN_ERR_QRCVEMPTY) {
@@ -1641,7 +1639,6 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
 
 int CANbus::send_rt(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t usecs) {
 
-  int32_t len = 1;
   int i;
   int32_t err;
 
@@ -1677,8 +1674,6 @@ int CANbus::send_rt(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t use
   
 #ifdef PEAK_CAN
   TPCANMsg msg;
-  int pendread;
-  int pendwrite=1;
 
   msg.ID = msgid;
   msg.MSGTYPE = MSGTYPE_STANDARD;
@@ -1724,6 +1719,7 @@ int CANbus::send_rt(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t use
   for(i=0; i<msglen; i++)
     cmsg.data[i] = msgdata[i];
   
+  int32_t len = 1;
   while (((err=canSend(handle, &cmsg, &len)) != NTCAN_SUCCESS) && 
 	 (retrycount-- > 0)) {
 #ifdef OWD_RT
@@ -1751,7 +1747,6 @@ int CANbus::send_rt(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t use
 
 // Set warning/fault levels on safety puck
 int CANbus::set_limits(){
-  int32_t conversion;
    
   // Set max torque level on safety puck
   // Set the fault level to the highest of the values set in Puck.cc.
@@ -1784,8 +1779,8 @@ int CANbus::set_limits(){
 	   0.7*max_cartesian_velocity,
 	   max_cartesian_velocity);
 
-  int32_t voltlevel;
 #ifdef SET_VOLTAGE_LIMITS
+  int32_t voltlevel;
   // set appropriate high-voltage levels for battery operation
   if (get_property_rt(SAFETY_MODULE,VOLTH1,&voltlevel) == OW_FAILURE) {
     ROS_ERROR("CANbus::limits failed to get previous high voltage warning level.");
@@ -2420,6 +2415,7 @@ int CANbus::process_get_property_response_rt(int32_t msgid, uint8_t* msg, int32_
 #else // ! OWD_RT
   hand_response_queue.push(handmsg);
 #endif // ! OWD_RT
+  return OW_SUCCESS;
 }
 
 int CANbus::process_safety_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {

@@ -157,7 +157,7 @@ public:
 
   MultiSync *ms;
 
-  JSController default_jscontroller;
+  DefaultJSController default_jscontroller;
   JSController *jscontroller, *new_jscontroller;
   double jscontroller_blend_time;
   double jscontroller_blend_period;

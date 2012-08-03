@@ -359,6 +359,79 @@ namespace OWD {
 
   };
 
+  /// Base class for user-defined OWD controller plugins.  Define your own
+  /// class subclassed from the base class, making sure to override the pure
+  /// virtual members.  Then create an instance of your class in your plugin,
+  /// passing the name of your choice to the base class constructor.  The
+  /// instance will register its name with the base class, and thereafter
+  /// you can instruct OWD to start using it via the SetController service call.
+  /// OWD will also report the name of the current controller in the WAMState
+  /// messages.
+  class JSController {
+  public:
+    
+    /// Base class constructor requires an identifying name for each instance
+    JSController(std::string name);
+    ~JSController();
+    
+    /// \brief Compute control torques
+    ///
+    /// The main function.  Override this function in your class in order
+    /// to return your computed joint torques.
+    ///
+    /// \param q_target The vector of target joint positions (0-based)
+    /// \param q The vector of actual joint positions
+    /// \param dt The elapsed time (in seconds) since the previous call
+    /// \returns A vector of joint torques
+    virtual std::vector<double> evaluate(std::vector<double> q_target,
+					 std::vector<double> q,
+					 double dt) =0;
+
+    /// \brief Adjust the controller gains
+    ///
+    /// \param joint The index of the joint to change (0-based)
+    /// \param gains A vector of new gains (length depends on the controller)
+    /// \returns True on success, false otherwise (bad joint index or
+    ///          unreasonable gain values
+    virtual bool set_gains(unsigned int joint, std::vector<double> gains) =0;
+
+    /// \brief Get the current gains
+    ///
+    /// \param joint The index of the joint to get (0-based)
+    /// \returns A vector of the current gain values (controller dependent)
+    virtual std::vector<double> get_gains(unsigned int joint) =0;
+
+    /// \brief The number of joints being controlled
+    ///
+    /// \returns The number of joints
+    virtual int DOF() =0;
+
+    /// \brief Reset an individual joint controller to the initial state
+    virtual void reset(unsigned int j) =0;
+
+    /// \brief Prepare an individual controller to run
+    ///
+    /// \note If the controller is not able to run in the current state
+    ///       it can return false or throw a string describing the problem.
+    virtual bool run(unsigned int j) throw (const char *) =0;
+
+    /// \brief Stop a controller.
+    ///
+    /// When a controller has been stopped the evaluate function should
+    /// return zero torque for that joint
+    virtual void stop(unsigned int j) =0;
+
+    static JSController *find_controller(std::string name);
+    const std::string &name;
+
+  private:
+    std::string _name;
+    static std::vector<JSController *> children;
+
+  };
+
+
+
 };
 
 #endif // OWD_PLUGIN_HH

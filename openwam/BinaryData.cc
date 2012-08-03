@@ -179,7 +179,7 @@ void BinaryData::put_raw_data(const void *d, int s)
 
 void BinaryData::get_raw_data(void *d, int s) const 
 {
-  if (nextg+s > size()) {
+  if ((unsigned int)(nextg+s) > size()) {
     throw "Attempted read past end of data";
   }
   for (int i=0; i<s; ++i) {

@@ -3,12 +3,9 @@
 
 using namespace OWD;
 
-JSController::JSController(std::string controller_name) : 
-  name(_name),
-  _name(controller_name) {
-  // register this instance
-  children.push_back(this);
-
+DefaultJSController::DefaultJSController(std::string myname) : 
+  JSController(myname)
+{
   // create the individual joint controllers
   //                                  Kp,  Kd,   Ki
   jcontrollers.push_back(JointCtrlPID(900, 10.0, 2.5));  // J1
@@ -20,19 +17,12 @@ JSController::JSController(std::string controller_name) :
     jcontrollers.push_back(JointCtrlPID( 40,  0.5, 0.5));  // J6
     jcontrollers.push_back(JointCtrlPID( 16,  0.16, 0.1)); // J7
   }
-  active.resize(jcontrollers.size(),true);
 }
 
-JSController::~JSController() {
-  for (std::vector<JSController *>::iterator it=children.begin(); it!=children.end(); ++it) {
-    if (*it == this) {
-      children.erase(it);
-      return;
-    }
-  }
+DefaultJSController::~DefaultJSController() {
 }
 
-std::vector<double> JSController::evaluate(std::vector<double> q_target,
+std::vector<double> DefaultJSController::evaluate(std::vector<double> q_target,
 					   std::vector<double> q,
 					   double dt) {
   if (q_target.size() != jcontrollers.size()) {
@@ -41,52 +31,32 @@ std::vector<double> JSController::evaluate(std::vector<double> q_target,
   if (q.size() != jcontrollers.size()) {
     throw "q array size does not match number of controllers";
   }
-  std::vector<double> torques(jcontrollers.size(), 0);
+  std::vector<double> torques(jcontrollers.size());
   for (unsigned int i=0; i<jcontrollers.size(); ++i) {
-    if (active[i]) {
-      torques[i]=jcontrollers[i].evaluate(q_target[i], q[i], dt);
-    }
+    torques[i]=jcontrollers[i].evaluate(q_target[i], q[i], dt);
   }
   return torques;
 }
 
-void JSController::set_gains(unsigned int joint, std::vector<double> gains) {
+bool DefaultJSController::set_gains(unsigned int joint, std::vector<double> gains) {
   if (joint < jcontrollers.size()) {
     // might throw an error which will have to be caught by the
     // next level up.
     jcontrollers[joint].set_gains(gains);
-  } else {
-    throw "Index exceeds range";
+    return true;
   }
+  return false;
 }
 
-std::vector<double> JSController::get_gains(unsigned int joint) {
+std::vector<double> DefaultJSController::get_gains(unsigned int joint) {
   if (joint < jcontrollers.size()) {
-    // might throw an error which will have to be caught by the
-    // next level up.
     return jcontrollers[joint].get_gains();
   } else {
-    throw "Index exceeds range";
+    return std::vector<double>();
   }
 }
 
-void JSController::activate(unsigned int joint) {
-  if (joint < jcontrollers.size()) {
-    active[joint]=true;
-  } else {
-    throw "joint index exceeds number of controllers";
-  }
-}
-
-void JSController::suppress(unsigned int joint) {
-  if (joint < jcontrollers.size()) {
-    active[joint]=false;
-  } else {
-    throw "joint index exceeds number of controllers";
-  }
-}
-
-void JSController::reset(unsigned int j) {
+void DefaultJSController::reset(unsigned int j) {
   if (j<jcontrollers.size()) {
     jcontrollers[j].reset();
   } else {
@@ -94,15 +64,15 @@ void JSController::reset(unsigned int j) {
   }
 }
 
-void JSController::run(unsigned int j) {
+bool DefaultJSController::run(unsigned int j) throw (const char *) {
   if (j<jcontrollers.size()) {
-    jcontrollers[j].run();
+    return jcontrollers[j].run();
   } else {
     throw "Index out of range";
   }
 }
 
-void JSController::stop(unsigned int j) {
+void DefaultJSController::stop(unsigned int j) {
   if (j<jcontrollers.size()) {
     jcontrollers[j].stop();
   } else {
@@ -110,19 +80,7 @@ void JSController::stop(unsigned int j) {
   }
 }
 
-JSController *JSController::find_controller(std::string controller_name) {
-  for (std::vector<JSController *>::iterator it=children.begin(); it!=children.end(); ++it) {
-    if ((*it)->_name == controller_name) {
-      return *it;
-    }
-  }
-  return NULL;
-}
-
-int JSController::DOF() {
+int DefaultJSController::DOF() {
   return jcontrollers.size();
 }
-  
-std::vector<JSController *> JSController::children;
-
 

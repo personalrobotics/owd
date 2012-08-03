@@ -221,4 +221,39 @@ namespace OWD {
   WAM *Plugin::wam = NULL;
   WamDriver *Plugin::wamdriver = NULL;
 
+  JSController::JSController(std::string controller_name) : 
+    name(_name),
+    _name(controller_name) {
+    // make sure this name isn't already used
+    if (find_controller(controller_name)) {
+      char errmsg[200];
+      snprintf(errmsg,200,"Duplicate instance of controller %s",
+	       controller_name.c_str());
+      throw errmsg;
+    }
+
+    // register this instance
+    children.push_back(this);
+  }
+
+  JSController::~JSController() {
+    for (std::vector<JSController *>::iterator it=children.begin(); it!=children.end(); ++it) {
+      if (*it == this) {
+	children.erase(it);
+	return;
+      }
+    }
+  }
+
+  JSController *JSController::find_controller(std::string controller_name) {
+    for (std::vector<JSController *>::iterator it=children.begin(); it!=children.end(); ++it) {
+      if ((*it)->_name == controller_name) {
+	return *it;
+      }
+    }
+    return NULL;
+  }
+
+  std::vector<JSController *> JSController::children;
+
 }; // namespace OWD

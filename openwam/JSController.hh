@@ -25,35 +25,31 @@
 
 #include <vector>
 #include "JointCtrlPID.hh"
+#include "Plugin.hh"
 
 namespace OWD {
 
-  class JSController {
+  class DefaultJSController : public JSController {
   public:
     
-    JSController(std::string name);
-    ~JSController();
+    DefaultJSController(std::string myname);
+    ~DefaultJSController();
     
     virtual std::vector<double> evaluate(std::vector<double> q_target,
 					 std::vector<double> q,
 					 double dt);
-    virtual void set_gains(unsigned int joint, std::vector<double> gains);
+
+    virtual bool set_gains(unsigned int joint, std::vector<double> gains);
     virtual std::vector<double> get_gains(unsigned int joint);
-    virtual void activate(unsigned int joint);
-    virtual void suppress(unsigned int joint);
-    virtual void reset(unsigned int j);
-    virtual void run(unsigned int j);
-    virtual void stop(unsigned int j);
     virtual int DOF();
 
-    static JSController *find_controller(std::string name);
-    const std::string &name;
+    virtual void reset(unsigned int j);
+    virtual bool run(unsigned int j) throw (const char *);
+    virtual void stop(unsigned int j);
+
 
   private:
     std::vector<JointCtrlPID> jcontrollers;
-    std::vector<bool> active;
-    std::string _name;
-    static std::vector<JSController *> children;
 
   };
 

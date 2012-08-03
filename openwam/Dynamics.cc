@@ -386,6 +386,7 @@ void WSdynamics(double trq[Link::Ln+1],
 		Link links[Link::Ln+1], 
 		double qd[Link::Ln+1], R6& F){
 
+  /*
   char UPLO = 'L';
   char TRANST = 'T';
   int NJOINTS = Joint::Jn;
@@ -395,7 +396,8 @@ void WSdynamics(double trq[Link::Ln+1],
   double ALPHA =  1.0;
   double BETA  =  0.0;
   double GAMMA = -1.0;
-  
+  */
+
   for(int j=Joint::J1; j<=Joint::Jn; j++)
     trq[j] = 0.0;
 
@@ -407,12 +409,12 @@ void WSdynamics(double trq[Link::Ln+1],
   // note: the hack is the "if" statement
   // apply endpoint force
   if(0.0 < F.norm()){
+    /*
     double Ac[6][6];                 // Cartesian inertia matrix (lower half)
     int LDAc = 6;
     double J[Joint::Jn][6];          // Column major Jacobian
     int LDJ = 6;
 
-    /*
     WSinertia(Ac, links);
     JacobianNF(J, links);
 

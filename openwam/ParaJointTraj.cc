@@ -99,9 +99,9 @@ ParaJointTraj::ParaJointTraj(TrajType &vtraj,
     // now, go through all points, extending the PS when possible
     // and creating a new one otherwise
     for (int i = 2; i < numpoints; ++i) {        
-        bool inflect=false;
         bool bend=check_for_bend(parsegs,vtraj[i-1],vtraj[i]);
 #ifdef INFLECT_CHECK
+        bool inflect=false;
         // for each joint
         for (int j = 0; j<DOF; ++j) {
             if (parsegs[j].back().inflection(vtraj[i-1][j],vtraj[i][j])) {

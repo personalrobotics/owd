@@ -186,7 +186,6 @@ public:
       ROS_ERROR("Not receiving WAMState messages");
       return false;
     }
-    double rms_distance;
 #define SIMULATION
 #ifndef SIMULATION
     do {

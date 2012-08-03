@@ -1066,7 +1066,7 @@ void WamDriver::calibrate_joint_angles() {
   owam->check_safety_torques=false; // hold positions stiffly
   owam->hold_position();
   for (unsigned int j=0; j<nJoints; ++j) {
-    owam->jscontroller->suppress(j);
+    owam->jscontroller->stop(j);
   }
 
   ROS_ERROR("Robot is in calibration mode.  For each joint,");
@@ -1140,7 +1140,6 @@ void WamDriver::calibrate_joint_angles() {
 	  owam->posSmoother.reset(owam->heldPositions, Joint::Jn+1);   
 #endif // BUILD_FOR_SEA
 	  owam->jscontroller->run(jnum-1);
-	  owam->jscontroller->activate(jnum-1);
 	}
 	break;
       case 'u' :
@@ -1148,7 +1147,7 @@ void WamDriver::calibrate_joint_angles() {
 	ROS_ERROR("\nUnhold joint number 1-%d: holdpos: %d\n",nJoints, owam->holdpos);
 	jnum = get_joint_num();
 	if ((jnum > 0) && (jnum <= nJoints)) {
-	  owam->jscontroller->suppress(jnum-1);
+	  owam->jscontroller->stop(jnum-1);
 	}
 	break;
       case 'q' :
@@ -1169,7 +1168,7 @@ void WamDriver::calibrate_joint_angles() {
   owam->release_position();
   owam->check_safety_torques = true;
   for (unsigned int j=1; j<=nJoints; ++j) {
-    owam->jscontroller->activate(j-1);
+    owam->jscontroller->run(j-1);
   }
 
   if (save) {
@@ -2315,9 +2314,8 @@ bool WamDriver::SetJointStiffness(owd_msgs::SetJointStiffness::Request &req,
     if (req.stiffness[i] != 0) {
       owam->jscontroller->reset(i);
       owam->jscontroller->run(i);
-      owam->jscontroller->activate(i);
     } else {
-      owam->jscontroller->suppress(i);
+      owam->jscontroller->stop(i);
     }
   }
   res.ok=true;
@@ -2903,7 +2901,18 @@ bool WamDriver::SetController(owd_msgs::SetController::Request &req,
     }
     for (int j=0; j<Joint::Jn; ++j) {
       controller->reset(j);
-      controller->run(j);
+      try {
+	if (!controller->run(j)) {
+	  res.reason = std::string("Could not switch new controller into run state");
+	  res.ok=false;
+	  return true;
+	}
+      } catch (const char *err) {
+	res.reason = std::string("Could not switch new controller into run state: ");
+	res.reason += std::string(err);
+	res.ok=false;
+	return true;
+      }
     }
     owam->lock();
     if (owam->new_jscontroller) {
