@@ -744,7 +744,10 @@ int CANbus::send_torques(int32_t* torques){
   return OW_SUCCESS;
 }
 
-int CANbus::send_torques_rt(){
+int CANbus::send_torques_rt()
+{
+  int i;
+  
   uint8_t msg[8];
   int32_t torques[NUM_ORDERS+1];
   Puck* puck;
@@ -760,56 +763,70 @@ int CANbus::send_torques_rt(){
   RTIME bt1 = time_now_ns();
 #endif
 
-  for(int g=GROUP_ID_MIN; g<=GROUP_ID_MAX; g++){
-      
-      if(groups[g].id() != GROUP_INVALID){
-          
-          for(int p=PUCK_ORDER_MIN; p<=PUCK_ORDER_MAX; p++){
-              
-              puck = groups[g].puck(p); 
-              if(puck){ 
-#ifdef OVERTORQUE_SHUTDOWN
-		if ((mytorqs[puck->motor()] > Puck::MAX_TRQ[puck->id()]) ||
-		    (mytorqs[puck->motor()] < Puck::MIN_TRQ[puck->id()])) {
-		  // Torques exceeded max software limits
-		  emergency_shutdown();
-		  ROS_FATAL("Torque %d for puck %d exceeded limit; motors have been idled",
-			    mytorqs[puck->motor()],
-			    puck->id());
-		  return OW_FAILURE;
-		}
-#endif // OVERTORQUE_SHUTDOWN
-		torques[p] = clip(mytorqs[puck->motor()], 
-				  -Puck::soft_torque_limit[puck->id()], 
-				  Puck::soft_torque_limit[puck->id()]);
-              }
-              else{
-                  torques[p] = 0;	    
-              }
-          }
-
-          msg[0] = TORQ | 0x80; 
-          msg[1] = (uint8_t)(( torques[1]>>6)&0x00FF);
-          msg[2] = (uint8_t)(((torques[1]<<2)&0x00FC) | ((torques[2]>>12)&0x0003));
-          msg[3] = (uint8_t)(( torques[2]>>4)&0x00FF);
-          msg[4] = (uint8_t)(((torques[2]<<4)&0x00F0) | ((torques[3]>>10)&0x000F));
-          msg[5] = (uint8_t)(( torques[3]>>2)&0x00FF);
-          msg[6] = (uint8_t)(((torques[3]<<6)&0x00C0) | ((torques[4]>>8) &0x003F));
-          msg[7] = (uint8_t)(  torques[4]    &0x00FF);
-          
-          if(send_rt(GROUPID(groups[g].id()), msg, 8, 100) == OW_FAILURE) {
-	    ROS_ERROR("CANbus::set_torques: send failed: %s",last_error);
-	    return OW_FAILURE;
-          }
-	  
+  for (int g=GROUP_ID_MIN; g<=GROUP_ID_MAX; g++)
+  {
+    if (groups[g].id() != GROUP_INVALID)
+    {
+      for (int p=PUCK_ORDER_MIN; p<=PUCK_ORDER_MAX; p++)
+      {
+        puck = groups[g].puck(p);
+        if (!puck)
+        {
+          torques[p] = 0;
+          continue;
+        }
+        
+        torques[p] = mytorqs[puck->motor()];
+        
+        /* Check each puck's torque against its per-puck torque limits.
+         * This should never happen, because torques are checked per-joint before this. */
+        if (!(Puck::MIN_TRQ[puck->id()] <= torques[p] && torques[p] <= Puck::MAX_TRQ[puck->id()]))
+        {
+          emergency_shutdown();
+          ROS_FATAL("Torque %d for puck %d exceeded per-puck legal range %d - %d; motors have been idled",
+              torques[p], puck->id(), Puck::MIN_TRQ[puck->id()], Puck::MAX_TRQ[puck->id()]);
+          ROS_FATAL("This should never happen! Fix the bug in owd ...");
+          return OW_FAILURE;
+        }
       }
       
+      /* We have 14 bits (including sign bit) in the packed torque message per puck.
+       * If any of the torques are more extreme than this, abort!
+       * This should never happen, because torques are checked before this. */
+      for (i=1; i<5; i++)
+      {
+        if (!(-8192 <= torques[i] && torques[i] <= 8191))
+        {
+          emergency_shutdown();
+          ROS_FATAL("Torque %d for group %d index %d exceeded bit packing limit; motors have been idled",
+              torques[i], g, i-1);
+          ROS_FATAL("This should never happen! Fix the bug in owd ...");
+          return OW_FAILURE;
+        }
+      }
+
+      msg[0] = TORQ | 0x80;
+      msg[1] = (uint8_t)(( torques[1]>>6)&0x00FF);
+      msg[2] = (uint8_t)(((torques[1]<<2)&0x00FC) | ((torques[2]>>12)&0x0003));
+      msg[3] = (uint8_t)(( torques[2]>>4)&0x00FF);
+      msg[4] = (uint8_t)(((torques[2]<<4)&0x00F0) | ((torques[3]>>10)&0x000F));
+      msg[5] = (uint8_t)(( torques[3]>>2)&0x00FF);
+      msg[6] = (uint8_t)(((torques[3]<<6)&0x00C0) | ((torques[4]>>8) &0x003F));
+      msg[7] = (uint8_t)(  torques[4]    &0x00FF);
+          
+      if(send_rt(GROUPID(groups[g].id()), msg, 8, 100) == OW_FAILURE)
+      {
+        ROS_ERROR("CANbus::set_torques: send failed: %s",last_error);
+        return OW_FAILURE;
+      }
+    }
   }
 
 #ifdef RT_STATS
   RTIME bt2 = time_now_ns();
   sendtime += (bt2-bt1) * 1e-6; // ns to ms
-  if (++sendcount == 1000) {
+  if (++sendcount == 1000)
+  {
     stats.cansend_time = sendtime/1000.0;
     sendcount=0;
     sendtime=0.0f;
