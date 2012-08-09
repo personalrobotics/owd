@@ -71,7 +71,7 @@ private:
 
   void trq(double T){ 
     lock(); 
-    t = clip( T, Motor::MIN_TRQ[id()], Motor::MAX_TRQ[id()] ); 
+    t=T;
     unlock();
   }
   void pos(double Q){ lock();  q = Q;  unlock(); }

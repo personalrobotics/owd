@@ -171,7 +171,7 @@ int CANbus::send_AP(int32_t* apval){
   return OW_SUCCESS;
 }
 
-int CANbus::emergency_shutdown() {
+int CANbus::emergency_shutdown(int faulttype, int joint) {
   return OW_SUCCESS;
 }
 

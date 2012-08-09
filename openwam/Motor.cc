@@ -19,11 +19,3 @@
 
 #include "Motor.hh"
 
-// This is kind of lame but I don't know any other way of initializing
-// a static const array.
-// Putting this in the header file will generate multiple definition errors
-// from the linker
-const float Motor::MIN_TRQ[]={0,-30,-30,-30,-30,-20,-20,-20};
-const float Motor::MAX_TRQ[]={0, 30, 30, 30, 30, 20, 20, 20};
-
-

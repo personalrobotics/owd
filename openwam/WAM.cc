@@ -1529,14 +1529,20 @@ void WAM::newcontrol_rt(double dt){
       // values 46-52
       data.push_back(arm_velocity[j]);
     }
-    recorder.add(data);
+    try {
+      recorder.add(data);
+    } catch (const char *errmsg) {
+      // can't log an error message here (would take too long),
+      // so just ignore and give up recording this piece of data
+    }
   }
 
         
   // finally, sum the control, dynamics, and trajectory torques
   for(int j=0; j<Joint::Jn; j++){
     // set the joint torques
-    joints[j+1].trq(stiffness*pid_torq[j] + dyn_torq[j] + tc.t[j]);
+    double totaltorque = stiffness*pid_torq[j] + dyn_torq[j] + tc.t[j];
+    joints[j+1].trq(enforce_jointtorque_limits(totaltorque, j));
   }
         
   jtrq2mtrq();         // results in motor::torque
@@ -1552,6 +1558,25 @@ void WAM::newcontrol_rt(double dt){
     this->lock("control_loop");
   }
 
+}
+
+double WAM::enforce_jointtorque_limits(double t, int j) {
+  try {
+    if (IS_IN_RANGE(t,
+		    -Joint::MAX_CLIPPED_TORQ[j],
+		    Joint::MAX_CLIPPED_TORQ[j])) {
+      return CLIP(t, -Joint::MAX_SAFE_TORQ[j], Joint::MAX_SAFE_TORQ[j]);
+    } else {
+      bus->emergency_shutdown(2, j);
+      ROS_FATAL("Joint %d torque=%2.2f is outside the clipping range limits of %2.2f to %2.2f, so all pucks have been shut down for safety.  Please find and fix the controller bug.",
+		j+1, t, -Joint::MAX_CLIPPED_TORQ[j], Joint::MAX_CLIPPED_TORQ[j]);
+      return 0;
+    }
+  } catch (const char *errmsg) {
+    bus->emergency_shutdown();
+    ROS_FATAL("Invalid torque for joint %d: %s",j+1,errmsg);
+    return 0;
+  }
 }
 
 bool WAM::safety_torques_exceeded(std::vector<double> t) {

@@ -212,6 +212,7 @@ public:
   int start();                      // start the control loop
   void stop();                      // stop the control loop
   void newcontrol_rt(double dt);          // main control function
+  double enforce_jointtorque_limits(double t, int j);
   bool safety_torques_exceeded(std::vector<double>); // check pid torqs against thresholds
 
   int  set_targ_jpos(double* pos);          // set the target joint positions online 

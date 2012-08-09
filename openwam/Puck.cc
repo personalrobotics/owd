@@ -19,10 +19,5 @@
 
 #include "Puck.hh"
 
-// This is kind of lame but I don't know any other way of initializing
-// a static const array.
-// Putting this in the header file will generate multiple definition errors
-// from the linker
-const int Puck::MIN_TRQ[]={0,-4860, -4860, -4860, -4320, -3900, -3900, -3200};
 const int Puck::MAX_TRQ[]={0, 4860,  4860,  4860,  4320,  3900,  3900,  3200};
 int Puck::soft_torque_limit[8]={0,4860,4860,4860,4320,3900,3900,3200};  

@@ -45,7 +45,6 @@ class Puck{
    int j_cpr;           // Secondary ("joint") encoder CPR
 
 
-  static const int MIN_TRQ[];
   static const int MAX_TRQ[];
   static int soft_torque_limit[];
 

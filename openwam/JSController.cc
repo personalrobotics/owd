@@ -33,7 +33,15 @@ std::vector<double> DefaultJSController::evaluate(std::vector<double> q_target,
   }
   std::vector<double> torques(jcontrollers.size());
   for (unsigned int i=0; i<jcontrollers.size(); ++i) {
-    torques[i]=jcontrollers[i].evaluate(q_target[i], q[i], dt);
+    try {
+      torques[i]=CLIP(jcontrollers[i].evaluate(q_target[i], q[i], dt),
+		      -Joint::MAX_SAFE_TORQ[i],
+		      Joint::MAX_SAFE_TORQ[i]);
+    } catch (const char *err) {
+      static char errmsg[200];
+      snprintf(errmsg,200,"Problem computing torque for joint %d: %s",
+	       i+1, err);
+    }
   }
   return torques;
 }

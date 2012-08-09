@@ -780,11 +780,11 @@ int CANbus::send_torques_rt()
         
         /* Check each puck's torque against its per-puck torque limits.
          * This should never happen, because torques are checked per-joint before this. */
-        if (!(Puck::MIN_TRQ[puck->id()] <= torques[p] && torques[p] <= Puck::MAX_TRQ[puck->id()]))
+        if (!(-Puck::MAX_TRQ[puck->id()] <= torques[p] && torques[p] <= Puck::MAX_TRQ[puck->id()]))
         {
           emergency_shutdown();
           ROS_FATAL("Torque %d for puck %d exceeded per-puck legal range %d - %d; motors have been idled",
-              torques[p], puck->id(), Puck::MIN_TRQ[puck->id()], Puck::MAX_TRQ[puck->id()]);
+              torques[p], puck->id(), -Puck::MAX_TRQ[puck->id()], Puck::MAX_TRQ[puck->id()]);
           ROS_FATAL("This should never happen! Fix the bug in owd ...");
           return OW_FAILURE;
         }
@@ -1315,7 +1315,7 @@ int CANbus::send_AP(int32_t* apval){
   return OW_SUCCESS;
 }
 
-int CANbus::emergency_shutdown() {
+int CANbus::emergency_shutdown(int faulttype, int joint) {
   if ((set_property_rt(GROUPID(1), MODE, MODE_IDLE, false, 10000) == OW_FAILURE) ||
       (set_property_rt(GROUPID(2), MODE, MODE_IDLE, false, 10000) == OW_FAILURE)) {
     ROS_FATAL("Could not idle the pucks for emergency shutdown");
@@ -3244,6 +3244,18 @@ template<> inline bool DataRecorder<CANbus::canio_data>::dump(const char *fname)
 	    (cdata.msgdata[6] >> 6);
 	  int32_t tq4 = ((cdata.msgdata[6] & 0x3F) << 8) +
 	    cdata.msgdata[7];
+	  if (tq1 & 0x00002000) { // If negative 
+	      tq1 |= 0xFFFFC000; // Sign-extend
+	  }
+	  if (tq2 & 0x00002000) {
+	      tq2 |= 0xFFFFC000; 
+	  }
+	  if (tq3 & 0x00002000) {
+	      tq3 |= 0xFFFFC000; 
+	  }
+	  if (tq4 & 0x00002000) {
+	      tq4 |= 0xFFFFC000; 
+	  }
 	  fprintf(csv,"SET T=%d,%d,%d,%d", tq1,tq2,tq3,tq4);
 	} else if ((cdata.msgid & 0x41F) == 0x403) {
 	  // message set to GROUP 3 are 22-bit position updates

@@ -226,10 +226,10 @@ namespace OWD {
     _name(controller_name) {
     // make sure this name isn't already used
     if (find_controller(controller_name)) {
-      char errmsg[200];
+      static char errmsg[200];
       snprintf(errmsg,200,"Duplicate instance of controller %s",
 	       controller_name.c_str());
-      throw errmsg;
+      throw (const char *)errmsg;
     }
 
     // register this instance

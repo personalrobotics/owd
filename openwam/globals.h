@@ -18,14 +18,32 @@
 */
 
 #ifndef _GLOBALS_H_
-# define _GLOBALS_H_
+#define _GLOBALS_H_
 
 # define TWOPI 6.283185
 
 # define OW_SUCCESS 0
 # define OW_FAILURE -1
 
-#define clip(val, min, max) (val<min) ? min : ( (max<val) ? max : val )
+inline double dthrow(const char *message) {
+  throw message;
+  return 0;
+}
 
-#endif
+#define CLIP(val, min, max) \
+                (isnan(val) ? dthrow("NAN passed to CLIP") \
+              :  isinf(val) ? dthrow("INF passed to CLIP") \
+	      :  (val<min) ? min \
+	      :  (max<val) ? max \
+              : val )
+
+#define IS_IN_RANGE(val, min, max) \
+               (isnan(val) ? dthrow("NAN passed to IS_IN_RANGE") \
+	      : isinf(val) ? dthrow("INF passed to CLIP") \
+			   : (min < val) && (val < max))
+
+#endif // GLOBALS_H
+
+
+
 
