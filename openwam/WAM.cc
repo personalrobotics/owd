@@ -1562,10 +1562,10 @@ void WAM::newcontrol_rt(double dt){
 
 double WAM::enforce_jointtorque_limits(double t, int j) {
   try {
-    if (IS_IN_RANGE(t,
+    if (is_in_range(t,
 		    -Joint::MAX_CLIPPED_TORQ[j],
 		    Joint::MAX_CLIPPED_TORQ[j])) {
-      return CLIP(t, -Joint::MAX_SAFE_TORQ[j], Joint::MAX_SAFE_TORQ[j]);
+      return clip(t, -Joint::MAX_SAFE_TORQ[j], Joint::MAX_SAFE_TORQ[j]);
     } else {
       bus->emergency_shutdown(2, j);
       ROS_FATAL("Joint %d torque=%2.2f is outside the clipping range limits of %2.2f to %2.2f, so all pucks have been shut down for safety.  Please find and fix the controller bug.",

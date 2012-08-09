@@ -20,27 +20,34 @@
 #ifndef _GLOBALS_H_
 #define _GLOBALS_H_
 
+#include <math.h>
+
 # define TWOPI 6.283185
 
 # define OW_SUCCESS 0
 # define OW_FAILURE -1
 
-inline double dthrow(const char *message) {
-  throw message;
-  return 0;
-}
+namespace OWD {
 
-#define CLIP(val, min, max) \
-                (isnan(val) ? dthrow("NAN passed to CLIP") \
-              :  isinf(val) ? dthrow("INF passed to CLIP") \
-	      :  (val<min) ? min \
-	      :  (max<val) ? max \
-              : val )
+  inline double clip(double val, double min, double max) {
+    if (isnan(val)) {
+      throw "NAN passed to OWD::clip";
+    } else if (isinf(val)) {
+      throw "INF passed to OWD::clip";
+    } else return (val<min) ? min
+	     :    (max<val) ? max
+	     : val;
+  }
 
-#define IS_IN_RANGE(val, min, max) \
-               (isnan(val) ? dthrow("NAN passed to IS_IN_RANGE") \
-	      : isinf(val) ? dthrow("INF passed to CLIP") \
-			   : (min < val) && (val < max))
+  inline bool is_in_range(double val, double min, double max) {
+    if (isnan(val)) {
+      throw "NAN passed to OWD::is_in_range";
+    } else if (isinf(val)) {
+      throw "INF passed to OWD::is_in_range";
+    } else return (min < val) && (val < max);
+  }
+
+};
 
 #endif // GLOBALS_H
 
