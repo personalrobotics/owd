@@ -37,7 +37,7 @@ const double Joint::MAX_MECHANICAL_TORQ[]={
 };
 
 // The MAX_SAFE values are the most we ever want to use for each joint          
-const double Joint::MAX_SAFE_TORQ[]={                                           
+double Joint::MAX_SAFE_TORQ[]={                                           
   82.1, // J1
   109.5,// J2
   65.2, // J3
@@ -47,9 +47,9 @@ const double Joint::MAX_SAFE_TORQ[]={
   2.2   // J7
 };                                                                              
                                                                                 
-// Joint torques that exceed the SAFE values but are below the MAX_CLIPPED      
-// values will be clipped to the SAFE level.                                    
-const double Joint::MAX_CLIPPED_TORQ[]={                                        
+// Joint torques that exceed the SAFE values but are below the MAX_CLIPPABLE
+// values will be clipped to the SAFE level.
+const double Joint::MAX_CLIPPABLE_TORQ[]={                                        
   // double the SAFE values                                                     
   165, // J1
   220, // J2

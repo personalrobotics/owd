@@ -323,8 +323,12 @@ int WAM::init(){
 
 bool WAM::set_gains(int joint,
 		    owd_msgs::PIDgains &gains) {
-  if ((joint < 0) || (joint >= Joint::Jn)) {
-    return false;
+  try {
+    if (!is_in_range(joint,0,Joint::Jn-1)) {
+      return false;
+    }
+  } catch (const char *err) {
+    return false; // NAN or INF caught by is_in_range
   }
   std::vector<double> vgains(3);
   vgains[0]=gains.kp;
@@ -1563,13 +1567,13 @@ void WAM::newcontrol_rt(double dt){
 double WAM::enforce_jointtorque_limits(double t, int j) {
   try {
     if (is_in_range(t,
-		    -Joint::MAX_CLIPPED_TORQ[j],
-		    Joint::MAX_CLIPPED_TORQ[j])) {
+		    -Joint::MAX_CLIPPABLE_TORQ[j],
+		    Joint::MAX_CLIPPABLE_TORQ[j])) {
       return clip(t, -Joint::MAX_SAFE_TORQ[j], Joint::MAX_SAFE_TORQ[j]);
     } else {
       bus->emergency_shutdown(2, j);
       ROS_FATAL("Joint %d torque=%2.2f is outside the clipping range limits of %2.2f to %2.2f, so all pucks have been shut down for safety.  Please find and fix the controller bug.",
-		j+1, t, -Joint::MAX_CLIPPED_TORQ[j], Joint::MAX_CLIPPED_TORQ[j]);
+		j+1, t, -Joint::MAX_CLIPPABLE_TORQ[j], Joint::MAX_CLIPPABLE_TORQ[j]);
       return 0;
     }
   } catch (const char *errmsg) {

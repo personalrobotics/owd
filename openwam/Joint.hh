@@ -69,7 +69,7 @@ public:
   /// The maximum that we will ever send to each joint.  We generally keep
   /// these well below the MAX_MECHANICAL limits, but push it a little
   /// for J5, J6, and J7 so that we still have some strength.
-  static const double MAX_SAFE_TORQ[];
+  static double MAX_SAFE_TORQ[];
 
   /// The largest calculated joint torque that can be safely clipped to
   /// the MAX_SAFE_TORQ level.  If a joint torque exceeds this threshold
@@ -77,7 +77,7 @@ public:
   /// by the safety puck.
   /// This level should be greater than or equal to MAX_SAFE_TORQ, but
   /// not so high that controller bugs go undetected.
-  static const double MAX_CLIPPED_TORQ[];
+  static const double MAX_CLIPPABLE_TORQ[];
 
     //  static const double VEL[];
     //  static const double ACC[];

@@ -20,4 +20,3 @@
 #include "Puck.hh"
 
 const int Puck::MAX_TRQ[]={0, 4860,  4860,  4860,  4320,  3900,  3900,  3200};
-int Puck::soft_torque_limit[8]={0,4860,4860,4860,4320,3900,3900,3200};  

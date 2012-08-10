@@ -1924,6 +1924,36 @@ bool WamDriver::AddTrajectory(owd_msgs::AddTrajectory::Request &req,
   }
 #endif // FAKE7
 
+  // check all joint positions for bad values
+  for (unsigned int i=0; i<req.traj.positions.size(); ++i) {
+    if (req.traj.positions[i].j.size() != nJoints) {
+      ROS_ERROR("Wrong number of joint values at point %d in trajectory (expected %d but got %zd",
+		i, nJoints, req.traj.positions[i].j.size());
+      res.ok=false;
+      res.reason="Invalid trajectory: wrong number of joint values";
+      return true;
+    }
+    for (unsigned int j=0; j<req.traj.positions[i].j.size(); ++j) {
+      try {
+	if (!is_in_range(req.traj.positions[i].j[j],
+			 Plugin::lower_jlimit[j] - 0.2,
+			 Plugin::upper_jlimit[j] + 0.2)) {
+	  ROS_ERROR("At requested trajectory point %d: value %2.2f for joint %d is not in the range of %2.2f to %2.2f; trajectory rejected",
+		    i, req.traj.positions[i].j[j], j,
+		    Plugin::lower_jlimit[j] - 0.2,
+		    Plugin::upper_jlimit[j] + 0.2);
+	  res.ok=false;
+	  res.reason="One or more joint values were outside the allowable range (see OWD log for details)";
+	  return true;
+	}
+      } catch (const char *err) {
+	ROS_ERROR("One or more values in the AddTrajectory request were INF or NAN");
+	res.ok=false;
+	res.reason="One or more joint values were INF or NAN";
+      }
+    }
+  }
+
   // get trajectory start point
   JointPos firstpoint = JointPos(req.traj.positions[0].j);
 
@@ -2325,6 +2355,19 @@ bool WamDriver::SetJointStiffness(owd_msgs::SetJointStiffness::Request &req,
 bool WamDriver::SetStiffness(owd_msgs::SetStiffness::Request &req,
                              owd_msgs::SetStiffness::Response &res) {
   
+  try {
+    if (!is_in_range(req.stiffness,0,1)) {
+      ROS_ERROR("SetStiffness value of %2.2f ignored",req.stiffness);
+      res.ok=false;
+      res.reason="Stiffness value not in range of 0 to 1";
+      return true;
+    }
+  } catch (const char *err) {
+    ROS_ERROR("Invalid value passed to SetStiffness: %s", err);
+    res.ok=false;
+    res.reason="Stiffness value was INF or NAN";
+    return true;
+  }
   if (req.stiffness > 0.0) {
     if (!owam->jointstraj) {
       // if we're not running a trajectory, then hold the current position
@@ -2362,6 +2405,26 @@ bool WamDriver::SetJointOffsets(owd_msgs::SetJointOffsets::Request &req,
     res.reason=errmsg;
     res.ok=false;
     return true;
+  }
+  // Check to make sure the offset values are reasonable (and not NAN!)
+  for (unsigned int i=0; i<req.offset.size(); ++i) {
+    try {
+      if (!is_in_range(req.offset[i],-30/360*TWOPI,30/360*TWOPI)) {
+	char errmsg[200];
+	snprintf(errmsg,200,"Requested offset of %3.2f radians for joint %d was not in the range of +/- 30 degrees",
+		 req.offset[i],i+1);
+	res.ok=false;
+	res.reason=errmsg;
+	return true;
+      }
+    } catch (const char *err) {
+      char errmsg[200];
+      snprintf(errmsg,200,"Error while checking joint %d offset: %s",
+	       i+1, err);
+      res.ok=false;
+      res.reason=errmsg;
+      return true;
+    }
   }
   double *j_offsets = (double *)malloc((nJoints+1) * sizeof(double));
   if (j_offsets == NULL) {
@@ -2462,6 +2525,18 @@ bool WamDriver::SetSpeed(owd_msgs::SetSpeed::Request &req,
     return true;
   }
   for (unsigned int i=0; i<nJoints; ++i) {
+    if (isinf(req.velocities[i])) {
+      ROS_ERROR("Infinite velocity passed to SetSpeed service call; entire call rejected.");
+      res.ok=false;
+      res.reason="One or more joint speeds were infinite.";
+      return true;
+    }
+    if (isnan(req.velocities[i])) {
+      ROS_ERROR("NAN velocity passed to SetSpeed service call; entire call rejected.");
+      res.ok=false;
+      res.reason="One or more joint speeds were NAN.";
+      return true;
+    }
     if (req.velocities[i] > Plugin::_max_joint_vel[i]) {
       // limit to max
       Plugin::_joint_vel[i] = Plugin::_max_joint_vel[i];
@@ -2490,6 +2565,22 @@ bool WamDriver::GetSpeed(owd_msgs::GetSpeed::Request &req,
     
 bool WamDriver::SetExtraMass(owd_msgs::SetExtraMass::Request &req,
 			     owd_msgs::SetExtraMass::Response &res) {
+  
+  if (isinf(req.m.mass) || isnan(req.m.mass) ||
+      isinf(req.m.cog_x) || isnan(req.m.cog_x) ||
+      isinf(req.m.cog_y) || isnan(req.m.cog_y) ||
+      isinf(req.m.cog_z) || isnan(req.m.cog_z) ||
+      isinf(req.m.inertia_xx) || isnan(req.m.inertia_xx) ||
+      isinf(req.m.inertia_xy) || isnan(req.m.inertia_xy) ||
+      isinf(req.m.inertia_xz) || isnan(req.m.inertia_xz) ||
+      isinf(req.m.inertia_yy) || isnan(req.m.inertia_yy) ||
+      isinf(req.m.inertia_yz) || isnan(req.m.inertia_yz) ||
+      isinf(req.m.inertia_zz) || isnan(req.m.inertia_zz)) {
+    res.ok=false;
+    res.reason="One or more values are INF or NAN";
+    return true;
+  }
+     
   owam->lock("SetExtraMass");
   if ((req.m.link < Link::L1) ||
       (req.m.link > Link::Ln)) {
@@ -2535,6 +2626,11 @@ bool WamDriver::SetStallSensitivity(owd_msgs::SetStallSensitivity::Request &req,
 				    owd_msgs::SetStallSensitivity::Response &res) {
 
   res.ok = true;
+  if (isnan(req.level) || isinf(req.level)) {
+    res.ok=false;
+    res.reason="Requested value was INF or NAN";
+    return true;
+  }
   if (req.level > 1.0) {
     req.level = 1.0;
     res.reason = "Warning: sensitivity limited to 1.0";
@@ -2756,6 +2852,12 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const owd_msgs::Servo>
     return;
   }
   for (unsigned int j=0; j<servo->joint.size(); ++j) {
+    if (isinf(servo->velocity[j]) || isnan(servo->velocity[j])) {
+      ROS_ERROR("INF or NAN value published to wamservo topic; ignored");
+      return;
+    }
+  }
+  for (unsigned int j=0; j<servo->joint.size(); ++j) {
     ROS_DEBUG_NAMED("servo","  Servo joint %d velocity %2.2f",
               servo->joint[j], servo->velocity[j]);
   }
@@ -2811,6 +2913,12 @@ bool WamDriver::StepJoint(owd_msgs::StepJoint::Request &req,
 
 bool WamDriver::SetGains(owd_msgs::SetGains::Request &req,
 			 owd_msgs::SetGains::Response &res) {
+  if (isinf(req.gains.kp) || isnan(req.gains.kp) ||
+      isinf(req.gains.kd) || isnan(req.gains.kd) ||
+      isinf(req.gains.ki) || isnan(req.gains.ki)) {
+    ROS_ERROR("INF or NAN passed to SetGains; ignored");
+    return false;
+  }
   return owam->set_gains(req.joint,req.gains);
 }
 
@@ -2833,6 +2941,36 @@ bool WamDriver::ReloadPlugins(owd_msgs::Reset::Request &req,
 
 bool WamDriver::SetForceInputThreshold(owd_msgs::SetForceInputThreshold::Request &req,
 				       owd_msgs::SetForceInputThreshold::Response &res) {
+  try {
+    if (!is_in_range(req.direction.x,-1,1) ||
+	!is_in_range(req.direction.x,-1,1) ||
+	!is_in_range(req.direction.x,-1,1)) {
+      ROS_ERROR("Invalid direction vector passed to SetForceInputThreshold; ignored");
+      res.ok=false;
+      res.reason="Invalid direction vector (one or more values not in the range -1 to 1";
+      return true;
+    }
+    if (!is_in_range(req.force,-128,128)) {
+      ROS_ERROR("Force level passed to SetForceInputThreshold is outside the max force sensor range of -128 to 128");
+      res.ok=false;
+      res.reason="Invalid force level (not in the range -128 to 128)";
+      return true;
+    }
+    if (!is_in_range(req.torques.x,-128,128) ||
+	!is_in_range(req.torques.y,-128,128) ||
+	!is_in_range(req.torques.z,-128,128)) {
+      ROS_ERROR("Invalid torque vector passed to SetForceInputThreshold (one or more torques outside the sensor range of -128 to 128");
+      res.ok=false;
+      res.reason="Invalid torque vector (at least one value not in range -128 to 128)";
+      return true;
+    }
+  } catch (const char *err) {
+    ROS_ERROR("Rejected SetForceInputThreshold call: %s",err);
+    res.ok=false;
+    res.reason="One or more values were INF or NAN";
+    return true;
+  }
+
   R3 direction(req.direction.x, req.direction.y, req.direction.z);
   direction.normalize();
   Trajectory::forcetorque_threshold_direction = direction;
@@ -2865,11 +3003,23 @@ bool WamDriver::SetTorqueLimits(owd_msgs::SetTorqueLimits::Request &req,
     return true;
   }
   for (unsigned int p=0; p<req.limit.size(); ++p) {
-    if (req.limit[p] > Puck::MAX_TRQ[p+1]) {
-      Puck::soft_torque_limit[p+1] = Puck::MAX_TRQ[p+1];
-    } else {
-      Puck::soft_torque_limit[p+1] = req.limit[p];
+    try {
+      if (!is_in_range(req.limit[p],0,Joint::MAX_MECHANICAL_TORQ[p])) {
+	ROS_ERROR("Requested torque limit for joint %d exceeds max mechanical limit of %2.2fNm, so all requested torque limits have been rejected",
+		  p+1, Joint::MAX_MECHANICAL_TORQ[p]);
+	res.ok=false;
+	res.reason="One or more requested joint torques exceed max mechanical limits";
+	return true;
+      }
+    } catch (const char *err) {
+      ROS_ERROR("Invalid torque sent to SetTorqueLimits: %s",err);
+      res.ok=false;
+      res.reason="One or more torques were INF or NAN";
+      return true;
     }
+  }
+  for (unsigned int p=0; p<req.limit.size(); ++p) {
+    Joint::MAX_SAFE_TORQ[p] = req.limit[p];
   }
   res.reason=std::string("");
   res.ok=true;
