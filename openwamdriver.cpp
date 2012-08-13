@@ -2929,7 +2929,8 @@ bool WamDriver::ReloadPlugins(owd_msgs::Reset::Request &req,
     res.ok=false;
     return true;
   }
-  if (owam->jscontroller != &owam->default_jscontroller) {
+  if ((owam->jscontroller != &owam->default_jscontroller) ||
+      (owam->new_jscontroller)) {
     res.reason="Cannot reload plugins while using the non-default controller";
     res.ok=false;
     return true;

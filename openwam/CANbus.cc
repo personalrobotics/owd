@@ -54,6 +54,8 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   squeeze_after_stalling(false),
   jumptime(NULL),
   firstupdate(NULL),
+  max_safety_torque(0),
+  ok(true),
   log_canbus_data(log_cb_data),
   candata(0),
   unread_packets(0),
@@ -394,7 +396,7 @@ int CANbus::check(){
     ROS_DEBUG_NAMED("cancheck","Setting max torque...");
     int32_t max_torque;
     if (1 <= p && p <= 7) {
-      max_torque = Puck::MAX_TRQ[p];
+      max_torque = Puck::MAX_TRQ[p-1];
     } else {
       ROS_ERROR("CANbus::check: Unknown puck id of %d",p);
       throw -1;  // unknown puck id
@@ -775,18 +777,18 @@ int CANbus::send_torques_rt()
         /* Due to the way the differentials work, we may see motor torques above
          * the per-motor maximums (up to Puck::MAX_CLIPPABLE_TRQ).
          * Do a limited clip here to account for that. */
-        if (-Puck::MAX_CLIPPABLE_TRQ[puck->id()] <= torques[p] && torques[p] <= -Puck::MAX_TRQ[puck->id()])
-           torques[p] = -Puck::MAX_TRQ[puck->id()];
-        if (Puck::MAX_TRQ[puck->id()] <= torques[p] && torques[p] <= Puck::MAX_CLIPPABLE_TRQ[puck->id()])
-           torques[p] = Puck::MAX_TRQ[puck->id()];
+        if (-Puck::MAX_CLIPPABLE_TRQ[puck->id()-1] <= torques[p] && torques[p] <= -Puck::MAX_TRQ[puck->id()-1])
+           torques[p] = -Puck::MAX_TRQ[puck->id()-1];
+        if (Puck::MAX_TRQ[puck->id()-1] <= torques[p] && torques[p] <= Puck::MAX_CLIPPABLE_TRQ[puck->id()-1])
+           torques[p] = Puck::MAX_TRQ[puck->id()-1];
         
         /* Check each puck's torque against its per-puck torque limits.
          * This should never happen, because torques are checked per-joint before this. */
-        if (!(-Puck::MAX_TRQ[puck->id()] <= torques[p] && torques[p] <= Puck::MAX_TRQ[puck->id()]))
+        if (!(-Puck::MAX_TRQ[puck->id()-1] <= torques[p] && torques[p] <= Puck::MAX_TRQ[puck->id()-1]))
         {
-          emergency_shutdown();
+          emergency_shutdown(2,puck->id());
           ROS_FATAL("Torque %d for puck %d exceeded per-puck legal range %d to %d; motors have been idled",
-              torques[p], puck->id(), -Puck::MAX_TRQ[puck->id()], Puck::MAX_TRQ[puck->id()]);
+              torques[p], puck->id(), -Puck::MAX_TRQ[puck->id()-1], Puck::MAX_TRQ[puck->id()-1]);
           {
             int g2;
             int p2;
@@ -798,8 +800,8 @@ int CANbus::send_torques_rt()
                 ROS_FATAL("   puck %d torque %d min %d max %d\n",
                   groups[g2].puck(p2)->id(),
                   mytorqs[groups[g2].puck(p2)->motor()],
-                  -Puck::MAX_TRQ[groups[g2].puck(p2)->id()],
-                  Puck::MAX_TRQ[groups[g2].puck(p2)->id()]);
+                  -Puck::MAX_TRQ[groups[g2].puck(p2)->id()-1],
+                  Puck::MAX_TRQ[groups[g2].puck(p2)->id()-1]);
               }
             }
           }
@@ -815,7 +817,7 @@ int CANbus::send_torques_rt()
       {
         if (!(-8192 <= torques[i] && torques[i] <= 8191))
         {
-          emergency_shutdown();
+          emergency_shutdown(2,groups[g].puck(i)->id());
           ROS_FATAL("Torque %d for group %d index %d exceeded bit packing limit; motors have been idled",
               torques[i], g, i-1);
           ROS_FATAL("This should never happen! Fix the bug in owd ...");
@@ -1333,11 +1335,46 @@ int CANbus::send_AP(int32_t* apval){
   return OW_SUCCESS;
 }
 
-int CANbus::emergency_shutdown(int faulttype, int joint) {
+int CANbus::emergency_shutdown(int faulttype, int motor) {
+  ok=false; // let the top-level loop know
   if ((set_property_rt(GROUPID(1), MODE, MODE_IDLE, false, 10000) == OW_FAILURE) ||
       (set_property_rt(GROUPID(2), MODE, MODE_IDLE, false, 10000) == OW_FAILURE)) {
     ROS_FATAL("Could not idle the pucks for emergency shutdown");
     return OW_FAILURE;
+  }
+  if ((faulttype == 2) && (motor > 0) && (motor <= NUM_NODES)) {
+    // Torque fault, so send a high torque message to the appropriate
+    // puck so that the safety board will see it and do its own safety
+    // shutdown
+    uint8_t msg[8];
+    uint32_t torques[5];
+    torques[1]=torques[2]=torques[3]=torques[4]=0;
+    int groupid(1);
+    if ((1 <= motor) && (motor <= 4)) {
+      torques[motor]=max_safety_torque+1;
+    } else if ((5 <= motor) && (motor <= 7)) {
+      groupid=2;
+      torques[motor-4]=max_safety_torque+1;
+    } else {
+      ROS_ERROR("Cannot trigger safety torque fault for requested motor %d (out of range", motor);
+      return OW_FAILURE;
+    }
+
+    msg[0] = TORQ | 0x80;
+    msg[1] = (uint8_t)(( torques[1]>>6)&0x00FF);
+    msg[2] = (uint8_t)(((torques[1]<<2)&0x00FC) | ((torques[2]>>12)&0x0003));
+    msg[3] = (uint8_t)(( torques[2]>>4)&0x00FF);
+    msg[4] = (uint8_t)(((torques[2]<<4)&0x00F0) | ((torques[3]>>10)&0x000F));
+    msg[5] = (uint8_t)(( torques[3]>>2)&0x00FF);
+    msg[6] = (uint8_t)(((torques[3]<<6)&0x00C0) | ((torques[4]>>8) &0x003F));
+    msg[7] = (uint8_t)(  torques[4]    &0x00FF);
+    if (motor > 4) {
+      groupid=2;
+    }
+    if(send_rt(GROUPID(groupid), msg, 8, 100) == OW_FAILURE) {
+      ROS_ERROR("Could not trigger a torque fault by the safety system");
+      return OW_FAILURE;
+    }
   }
   return OW_SUCCESS;
 }
@@ -1786,14 +1823,14 @@ int CANbus::set_limits(){
   // Set max torque level on safety puck
   // Set the fault level to the highest of the values set in Puck.cc.
   // Set the warning level to 70% of the fault level
-  int max_torque(0); 
-  for (int p=1; p<=n_arm_pucks; ++p) {
-    if (Puck::MAX_TRQ[p] > max_torque) {
-      max_torque = Puck::MAX_TRQ[p];
+  max_safety_torque=0;
+  for (int p=0; p<n_arm_pucks; ++p) {
+    if (Puck::MAX_TRQ[p] > max_safety_torque) {
+      max_safety_torque = Puck::MAX_TRQ[p];
     }
   }
-  if ((set_property_rt(SAFETY_MODULE,TL1,0.7*max_torque,false,15000) == OW_FAILURE) ||
-      (set_property_rt(SAFETY_MODULE,TL2,max_torque,false,15000) == OW_FAILURE)) {
+  if ((set_property_rt(SAFETY_MODULE,TL1,0.7*max_safety_torque,false,15000) == OW_FAILURE) ||
+      (set_property_rt(SAFETY_MODULE,TL2,max_safety_torque,false,15000) == OW_FAILURE)) {
     return OW_FAILURE;
   }
 

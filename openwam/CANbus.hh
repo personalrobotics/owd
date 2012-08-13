@@ -150,6 +150,8 @@ public:
   bool squeeze_after_stalling;
   RTIME *jumptime;
   bool *firstupdate;
+  int max_safety_torque;
+  bool ok;
 
   static std::map<int,std::string> propname; // reverse number-to-name lookup
 
@@ -287,7 +289,7 @@ DataRecorder<canio_data> candata;
   //  int read_torques(int32_t* mtrq);
   int send_positions(double* mpos);
   int send_AP(int32_t* apval);
-  int emergency_shutdown(int faulttype=-1, int joint=-1);
+  int emergency_shutdown(int faulttype=-1, int motor=-1);
 
   // mutex functions that work when compiled with or without Realtime kernel
 #ifdef OWD_RT
