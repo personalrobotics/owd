@@ -44,7 +44,7 @@ namespace OWD {
       throw "NAN passed to OWD::is_in_range";
     } else if (isinf(val)) {
       throw "INF passed to OWD::is_in_range";
-    } else return (min < val) && (val < max);
+    } else return (min <= val) && (val <= max);
   }
 
 };

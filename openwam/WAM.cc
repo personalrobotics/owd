@@ -293,6 +293,8 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 }
 
 int WAM::init(){
+  std::ostringstream ss;
+
   for(int j=Joint::J1; j<=Joint::Jn; j++) {
     joints[j].ID = j;
   }
@@ -315,6 +317,86 @@ int WAM::init(){
 
   if (Joint::Jn > 7) {
     // set 280 Hand gains here
+  }
+
+  /* initialize Joint::MAX_MECHANICAL_TORQ (0-indexed) here,
+   * using the transmission ratios (read from ROS before init() is called),
+   * using the puckI_per_Nm above (assumed to be correct), and
+   * using the Puck::MAX_TRQ (1-index) (MT) values
+   * which were sent to the pucks when the bus was checked.
+   * Assumes WAM::jtrq2mtrq() is fixed as of 2012-08-12.
+   * Note that these joint torques in combination may not be within
+   * mechanical limits due to the way the differentials work;
+   * later, we will calculate Puck::MAX_CLIPPABLE_TRQ to account for that. */
+#define SIMPLE_MIN(a,b) ((a)<(b) ? (a) : (b))
+  double diff_motor_limit;
+  Joint::MAX_MECHANICAL_TORQ[0] = 1.0 * Puck::MAX_TRQ[1] / motors[1].puckI_per_Nm * mN1;
+  diff_motor_limit = SIMPLE_MIN(
+    1.0 * Puck::MAX_TRQ[2] / motors[2].puckI_per_Nm,
+    1.0 * Puck::MAX_TRQ[3] / motors[3].puckI_per_Nm);
+  Joint::MAX_MECHANICAL_TORQ[1] = diff_motor_limit * 2.0 * mN2;
+  Joint::MAX_MECHANICAL_TORQ[2] = diff_motor_limit * 2.0 * mN3 / mn3;
+  Joint::MAX_MECHANICAL_TORQ[3] = 1.0 * Puck::MAX_TRQ[4] / motors[4].puckI_per_Nm * mN4;
+  if (Motor::Mn > 4) {
+    diff_motor_limit = SIMPLE_MIN(
+      1.0 * Puck::MAX_TRQ[5] / motors[5].puckI_per_Nm,
+      1.0 * Puck::MAX_TRQ[6] / motors[6].puckI_per_Nm);
+    Joint::MAX_MECHANICAL_TORQ[4] = diff_motor_limit * 2.0 * mN5;
+    Joint::MAX_MECHANICAL_TORQ[5] = diff_motor_limit * 2.0 * mN6 / mn6;
+    Joint::MAX_MECHANICAL_TORQ[6] = 1.0 * Puck::MAX_TRQ[7] / motors[7].puckI_per_Nm * mN7;
+  }
+#undef SIMPLE_MIN
+  /* Print result */
+  ss.str("");
+  for(int j=Joint::J1; j<=Joint::Jn; j++)
+    ss << " " << Joint::MAX_MECHANICAL_TORQ[j-1];
+  ROS_INFO("Calculated Joint::MAX_MECHANICAL_TORQ[]:%s", ss.str().c_str());
+  /* Check result */
+  try {
+    for(int j=Joint::J1; j<=Joint::Jn; j++)
+    if (!is_in_range(1.0 * Joint::MAX_MECHANICAL_TORQ[j-1] / Joint::MAX_MECHANICAL_TORQ_EXPECTED[j-1], 0.7, 1.3))
+    {
+      ROS_FATAL("Joint::MAX_MECHANICAL_TORQ for joint %d is too different from Joint::MAX_MECHANICAL_TORQ_EXPECTED!", j);
+      return OW_FAILURE;
+    }
+  } catch (const char *err) {
+    ROS_FATAL("NAN or INF found in Puck::MAX_CLIPPABLE_TRQ or Puck::MAX_TRQ!");
+    return OW_FAILURE;
+  }
+
+  /* Start with Joint::MAX_SAFE_TORQ equal to the mechanical limit above */
+  for(int j=Joint::J1; j<=Joint::Jn; j++)
+    Joint::MAX_SAFE_TORQ[j-1] = Joint::MAX_MECHANICAL_TORQ[j-1];
+
+  Puck::MAX_CLIPPABLE_TRQ[1] = (Joint::MAX_MECHANICAL_TORQ[0] / mN1) * motors[1].puckI_per_Nm;
+  Puck::MAX_CLIPPABLE_TRQ[2] = (Joint::MAX_MECHANICAL_TORQ[1]*0.5/mN2
+                              + Joint::MAX_MECHANICAL_TORQ[2]*0.5*mn3/mN3) * motors[2].puckI_per_Nm;
+  Puck::MAX_CLIPPABLE_TRQ[3] = (Joint::MAX_MECHANICAL_TORQ[1]*0.5/mN2
+                              + Joint::MAX_MECHANICAL_TORQ[2]*0.5*mn3/mN3) * motors[3].puckI_per_Nm;
+  Puck::MAX_CLIPPABLE_TRQ[4] = (Joint::MAX_MECHANICAL_TORQ[3] / mN4) * motors[4].puckI_per_Nm;
+  if (Motor::Mn > 4) {
+    Puck::MAX_CLIPPABLE_TRQ[5] = (Joint::MAX_MECHANICAL_TORQ[4]*0.5/mN5
+                                + Joint::MAX_MECHANICAL_TORQ[5]*0.5*mn6/mN6) * motors[5].puckI_per_Nm;
+    Puck::MAX_CLIPPABLE_TRQ[6] = (Joint::MAX_MECHANICAL_TORQ[4]*0.5/mN5
+                                + Joint::MAX_MECHANICAL_TORQ[5]*0.5*mn6/mN6) * motors[6].puckI_per_Nm;
+    Puck::MAX_CLIPPABLE_TRQ[7] = (Joint::MAX_MECHANICAL_TORQ[6] / mN7) * motors[7].puckI_per_Nm;
+  }
+  /* Print result */
+  ss.str("");
+  for(int j=Joint::J1; j<=Joint::Jn; j++)
+    ss << " " << Puck::MAX_CLIPPABLE_TRQ[j];
+  ROS_INFO("Calculated Puck::MAX_CLIPPABLE_TRQ[]:%s", ss.str().c_str());
+  /* Check result */
+  try {
+    for(int j=Joint::J1; j<=Joint::Jn; j++)
+    if (!is_in_range(1.0 * Puck::MAX_CLIPPABLE_TRQ[j] / Puck::MAX_CLIPPABLE_TRQ_EXPECTED[j], 0.7, 1.3))
+    {
+      ROS_FATAL("Puck::MAX_CLIPPABLE_TRQ for puck %d is too different from Puck::MAX_CLIPPABLE_TRQ_EXPECTED!", j);
+      return OW_FAILURE;
+    }
+  } catch (const char *err) {
+    ROS_FATAL("NAN or INF found in Puck::MAX_CLIPPABLE_TRQ or Puck::MAX_TRQ!");
+    return OW_FAILURE;
   }
 
   return OW_SUCCESS;
@@ -1572,7 +1654,7 @@ double WAM::enforce_jointtorque_limits(double t, int j) {
       return clip(t, -Joint::MAX_SAFE_TORQ[j], Joint::MAX_SAFE_TORQ[j]);
     } else {
       bus->emergency_shutdown(2, j);
-      ROS_FATAL("Joint %d torque=%2.2f is outside the clipping range limits of %2.2f to %2.2f, so all pucks have been shut down for safety.  Please find and fix the controller bug.",
+      ROS_FATAL("Joint %d torque=%2.2f is outside the clipping range limits of %2.2f to %2.2f, so all pucks have been shut down for safety.",
 		j+1, t, -Joint::MAX_CLIPPABLE_TORQ[j], Joint::MAX_CLIPPABLE_TORQ[j]);
       return 0;
     }

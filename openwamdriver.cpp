@@ -2409,7 +2409,7 @@ bool WamDriver::SetJointOffsets(owd_msgs::SetJointOffsets::Request &req,
   // Check to make sure the offset values are reasonable (and not NAN!)
   for (unsigned int i=0; i<req.offset.size(); ++i) {
     try {
-      if (!is_in_range(req.offset[i],-30/360*TWOPI,30/360*TWOPI)) {
+      if (!is_in_range(req.offset[i],-30.0/360.0*TWOPI,30.0/360.0*TWOPI)) {
 	char errmsg[200];
 	snprintf(errmsg,200,"Requested offset of %3.2f radians for joint %d was not in the range of +/- 30 degrees",
 		 req.offset[i],i+1);
@@ -2926,6 +2926,11 @@ bool WamDriver::ReloadPlugins(owd_msgs::Reset::Request &req,
 			      owd_msgs::Reset::Response &res) {
   if (owam->jointstraj) {
     res.reason="Cannot reload plugins while a trajectory is active";
+    res.ok=false;
+    return true;
+  }
+  if (owam->jscontroller != &owam->default_jscontroller) {
+    res.reason="Cannot reload plugins while using the non-default controller";
     res.ok=false;
     return true;
   }

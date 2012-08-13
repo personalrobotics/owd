@@ -45,7 +45,9 @@ class Puck{
    int j_cpr;           // Secondary ("joint") encoder CPR
 
 
-  static const int MAX_TRQ[];
+  static const int MAX_TRQ[8];
+  static const int MAX_CLIPPABLE_TRQ_EXPECTED[8];
+  static int MAX_CLIPPABLE_TRQ[8];
 
   Puck(){ID=-1;}
   

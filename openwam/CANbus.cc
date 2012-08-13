@@ -393,14 +393,8 @@ int CANbus::check(){
     
     ROS_DEBUG_NAMED("cancheck","Setting max torque...");
     int32_t max_torque;
-    if (p<4) { // pucks 1-3 (shoulder)
-      max_torque = 4860;
-    } else if (p==4) {  // puck 4 (elbow)
-      max_torque = 4320;
-    } else if (p<7) {  // pucks 5 and 6 (wrist diff)
-      max_torque = 3900;
-    } else if (p==7) { // puck 7 (wrist final twist)
-      max_torque = 1370;
+    if (1 <= p && p <= 7) {
+      max_torque = Puck::MAX_TRQ[p];
     } else {
       ROS_ERROR("CANbus::check: Unknown puck id of %d",p);
       throw -1;  // unknown puck id
@@ -777,14 +771,38 @@ int CANbus::send_torques_rt()
         }
         
         torques[p] = mytorqs[puck->motor()];
+
+        /* Due to the way the differentials work, we may see motor torques above
+         * the per-motor maximums (up to Puck::MAX_CLIPPABLE_TRQ).
+         * Do a limited clip here to account for that. */
+        if (-Puck::MAX_CLIPPABLE_TRQ[puck->id()] <= torques[p] && torques[p] <= -Puck::MAX_TRQ[puck->id()])
+           torques[p] = -Puck::MAX_TRQ[puck->id()];
+        if (Puck::MAX_TRQ[puck->id()] <= torques[p] && torques[p] <= Puck::MAX_CLIPPABLE_TRQ[puck->id()])
+           torques[p] = Puck::MAX_TRQ[puck->id()];
         
         /* Check each puck's torque against its per-puck torque limits.
          * This should never happen, because torques are checked per-joint before this. */
         if (!(-Puck::MAX_TRQ[puck->id()] <= torques[p] && torques[p] <= Puck::MAX_TRQ[puck->id()]))
         {
           emergency_shutdown();
-          ROS_FATAL("Torque %d for puck %d exceeded per-puck legal range %d - %d; motors have been idled",
+          ROS_FATAL("Torque %d for puck %d exceeded per-puck legal range %d to %d; motors have been idled",
               torques[p], puck->id(), -Puck::MAX_TRQ[puck->id()], Puck::MAX_TRQ[puck->id()]);
+          {
+            int g2;
+            int p2;
+            ROS_FATAL("Other puck torques:");
+            for (g2=GROUP_ID_MIN; g2<=GROUP_ID_MAX; g2++) if (groups[g2].id() != GROUP_INVALID)
+            {
+              for (p2=PUCK_ORDER_MIN; p2<=PUCK_ORDER_MAX; p2++) if (groups[g2].puck(p2))
+              {
+                ROS_FATAL("   puck %d torque %d min %d max %d\n",
+                  groups[g2].puck(p2)->id(),
+                  mytorqs[groups[g2].puck(p2)->motor()],
+                  -Puck::MAX_TRQ[groups[g2].puck(p2)->id()],
+                  Puck::MAX_TRQ[groups[g2].puck(p2)->id()]);
+              }
+            }
+          }
           ROS_FATAL("This should never happen! Fix the bug in owd ...");
           return OW_FAILURE;
         }
