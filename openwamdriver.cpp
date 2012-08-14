@@ -508,72 +508,76 @@ void WamDriver::load_plugins(std::string plugin_list) {
   // try to load any specified plugins
   std::stringstream pp(plugin_list);
   std::string pname;
-  while (std::getline(pp,pname,',')) {
-    dlerror();  // clear any previous errors
+  while (std::getline(pp,pname,','))
+  {
+    // open the plugin from disk
     void *plib;
     try {
       plib = dlopen(pname.c_str(), RTLD_NOW);
     } catch (char const *error) {
       ROS_WARN("Plugin %s threw error message \"%s\"",
-               pname.c_str(),error);
+               pname.c_str(), error);
       continue;
     }
-    char *perr = dlerror();
-    if (perr != NULL) {
-      ROS_WARN("Could not load plugin %s: %s", pname.c_str(),perr);
-      if (plib != NULL) {
-	dlclose(plib);
-	continue;
-      }
-    } else {
-      bool (*pl_register)(), (*pl_unregister)();
-      // the recommendation of casting our function pointer
-      // to a void * comes from the dlsym man page
-      *(void **)(&pl_register) = dlsym(plib,"_Z19register_owd_pluginv");
-      perr=dlerror();
-      if (!pl_register) {
-	ROS_WARN("Could not find register_owd_plugin function in library %s: %s",
-		 pname.c_str(), perr);
-	dlclose(plib);
-	continue;
-      }
-      if (perr) {
-	ROS_WARN("Error while looking for register_owd_plugin function in library %s: %s",
-		 pname.c_str(), perr);
-	dlclose(plib);
-	continue;
-      }		 
-      *(void **)(&pl_unregister) = dlsym(plib,"_Z21unregister_owd_pluginv");
-      perr=dlerror();
-      if (!pl_unregister) {
-	ROS_WARN("Could not find unregister_owd_plugin function in library %s: %s",
-		 pname.c_str(), perr);
-	dlclose(plib);
-	continue;
-      }
-      if (perr) {
-	ROS_WARN("Error while looking for unregister_owd_plugin function in library %s: %s",
-		 pname.c_str(), perr);
-	dlclose(plib);
-	continue;
-      }
-      try {
-        if (! (*pl_register)()) {
-          ROS_WARN("Could not call register_owd_plugin function in plugin %s",
-                   pname.c_str());
-          dlclose(plib);
-          continue;
-        }
-      } catch (char const* error) {
-        ROS_ERROR("Plugin %s threw error string \"%s\"",
-                  pname.c_str(),error);
+    if (!plib)
+    {
+      ROS_WARN("Could not load plugin %s: %s",
+               pname.c_str(), dlerror());
+      continue;
+    }
+    // functions to find
+    bool (*pl_register)();
+    bool (*pl_register_path)(const char *);
+    bool (*pl_unregister)();
+    // the recommendation of casting our function pointer
+    // to a void * comes from the dlsym man page
+    *(void **)(&pl_register_path) = dlsym(plib,"_Z19register_owd_pluginPKc");
+    char * perr1 = pl_register_path ? 0 : dlerror();
+    *(void **)(&pl_register) = dlsym(plib,"_Z19register_owd_pluginv");
+    char * perr2 = pl_register ? 0 : dlerror();
+    if (pl_register_path && pl_register) {
+      ROS_WARN("Plugin %s provides both register_owd_plugin() and register_owd_plugin(path)!",
+               pname.c_str());
+      dlclose(plib);
+      continue;
+    }
+    if (!(pl_register_path || pl_register)) {
+      ROS_WARN("Could not find register_owd_plugin function in library %s: %s (no path) %s (with path)",
+               pname.c_str(), perr1, perr2);
+      dlclose(plib);
+      continue;
+    }
+    // find unregister function           
+    *(void **)(&pl_unregister) = dlsym(plib,"_Z21unregister_owd_pluginv");
+    if (!pl_unregister) {
+      ROS_WARN("Could not find unregister_owd_plugin function in library %s: %s",
+               pname.c_str(), dlerror());
+      dlclose(plib);
+      continue;
+    }
+    // call the correct register function
+    try {
+      bool success;
+      if (pl_register_path)
+        success = (*pl_register_path)(pname.c_str());
+      else
+        success = (*pl_register)();
+      if (!success)
+      {
+        ROS_WARN("Could not call register_owd_plugin function in plugin %s",
+                 pname.c_str());
         dlclose(plib);
         continue;
       }
-      ROS_INFO("Loaded and registered plugin %s", pname.c_str());
-      PluginPointers thisplugin(plib,pl_unregister);
-      loaded_plugins.push_back(thisplugin);
+    } catch (char const* error) {
+      ROS_ERROR("Plugin %s threw error string \"%s\"",
+                pname.c_str(),error);
+      dlclose(plib);
+      continue;
     }
+    ROS_INFO("Loaded and registered plugin %s", pname.c_str());
+    PluginPointers thisplugin(plib,pl_unregister);
+    loaded_plugins.push_back(thisplugin);
   }
 }
 
