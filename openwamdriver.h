@@ -42,6 +42,7 @@
 #include <owd_msgs/GetSpeed.h>
 #include <owd_msgs/SetExtraMass.h>
 #include <owd_msgs/SetStallSensitivity.h>
+#include <owd_msgs/GetStallSensitivity.h>
 #include <owd_msgs/WAMState.h>
 #include <owd_msgs/WAMInternals.h>
 #include <owd_msgs/GetDOF.h>
@@ -125,6 +126,8 @@ public:
 		      owd_msgs::SetExtraMass::Response &res);
     bool SetStallSensitivity(owd_msgs::SetStallSensitivity::Request &req,
 			     owd_msgs::SetStallSensitivity::Response &res);
+    bool GetStallSensitivity(owd_msgs::GetStallSensitivity::Request &req,
+			     owd_msgs::GetStallSensitivity::Response &res);
     bool GetDOF(owd_msgs::GetDOF::Request &req,
                 owd_msgs::GetDOF::Response &res);
     bool CalibrateJoints(owd_msgs::CalibrateJoints::Request &req,
@@ -275,6 +278,7 @@ private:
       ss_GetSpeed,
       ss_SetExtraMass,
       ss_SetStallSensitivity,
+      ss_GetStallSensitivity,
       ss_GetArmDOF,
       ss_CalibrateJoints,
       ss_StepJoint,

@@ -633,6 +633,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("SetExtraMass",&WamDriver::SetExtraMass,this);
   ss_SetStallSensitivity = 
     n.advertiseService("SetStallSensitivity",&WamDriver::SetStallSensitivity,this);
+  ss_GetStallSensitivity = 
+    n.advertiseService("GetStallSensitivity",&WamDriver::GetStallSensitivity,this);
   ss_GetArmDOF =
     n.advertiseService("GetArmDOF",&WamDriver::GetDOF,this);
   ss_CalibrateJoints =
@@ -2639,6 +2641,13 @@ bool WamDriver::SetStallSensitivity(owd_msgs::SetStallSensitivity::Request &req,
     res.reason = "Warning: sensitivity cannot be negative; changed to zero";
   }
   owam->stall_sensitivity = req.level;
+  return true;
+}
+
+bool WamDriver::GetStallSensitivity(owd_msgs::GetStallSensitivity::Request &req,
+				    owd_msgs::GetStallSensitivity::Response &res)
+{
+  res.level = owam->stall_sensitivity;
   return true;
 }
 
