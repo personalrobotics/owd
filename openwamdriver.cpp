@@ -532,21 +532,29 @@ void WamDriver::load_plugins(std::string plugin_list) {
     // the recommendation of casting our function pointer
     // to a void * comes from the dlsym man page
     *(void **)(&pl_register_path) = dlsym(plib,"_Z19register_owd_pluginPKc");
-    char * perr1 = pl_register_path ? 0 : dlerror();
+    char * perr1 = pl_register_path ? 0 : strdup(dlerror());
     *(void **)(&pl_register) = dlsym(plib,"_Z19register_owd_pluginv");
-    char * perr2 = pl_register ? 0 : dlerror();
+    char * perr2 = pl_register ? 0 : strdup(dlerror());
     if (pl_register_path && pl_register) {
       ROS_WARN("Plugin %s provides both register_owd_plugin() and register_owd_plugin(path)!",
                pname.c_str());
       dlclose(plib);
+      free(perr1);
+      free(perr2);
       continue;
     }
     if (!(pl_register_path || pl_register)) {
       ROS_WARN("Could not find register_owd_plugin function in library %s: %s (no path) %s (with path)",
-               pname.c_str(), perr1, perr2);
+               pname.c_str(),
+               perr1 ? perr1 : "(none)",
+               perr2 ? perr2 : "(none)");
       dlclose(plib);
+      free(perr1);
+      free(perr2);
       continue;
     }
+    free(perr1);
+    free(perr2);
     // find unregister function           
     *(void **)(&pl_unregister) = dlsym(plib,"_Z21unregister_owd_pluginv");
     if (!pl_unregister) {
