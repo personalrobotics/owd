@@ -1936,7 +1936,7 @@ int CANbus::process_arm_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen)
 
 int CANbus::set_puck_group_id(int32_t nodeid) {
   // CANBUS GROUP ID CODES:
-  //   0 = all pucks (except safety)
+  //   0 = all motor pucks (pucks 1-7 and 11-14)
   //   1 = 4-DOF pucks (pucks 1 through 4)
   //   2 = Wrist pucks (pucks 5 through 7)
   //   4 = Arm pucks (pucks 1 through 7)
