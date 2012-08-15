@@ -35,9 +35,9 @@ namespace OWD {
     DefaultJSController(std::string myname);
     ~DefaultJSController();
     
-    virtual std::vector<double> evaluate(std::vector<double> q_target,
-					 std::vector<double> q,
-					 double dt);
+    virtual std::vector<double> evaluate(const std::vector<double> q_target,
+					 const std::vector<double> q,
+					 const double dt);
 
     virtual bool set_gains(unsigned int joint, std::vector<double> gains);
     virtual std::vector<double> get_gains(unsigned int joint);

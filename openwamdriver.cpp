@@ -3070,6 +3070,43 @@ bool WamDriver::SetController(owd_msgs::SetController::Request &req,
       for (int j=0; j<Joint::Jn; ++j) {
 	if (fabs(owam->last_control_position[j] - owam->joints[j+1].q)
 	    > 0.05) {
+	  // Sometimes the existing controller is not holding position well
+	  // because of an external force, so in this case we can allow a
+	  // greater error as long as the new torques would be similar to
+	  // to the current torques
+	  if (fabs(owam->last_control_position[j] - owam->joints[j+1].q)
+	      < 0.2) {
+	    for (int k=0; k<Joint::Jn; ++k) {
+	      try {
+		controller->reset(k);
+		if (!controller->run(k)) {
+		  res.reason = std::string("Could not switch new controller into run state");
+		  res.ok=false;
+		  return true;
+		}
+	      } catch (const char *err) {
+		res.reason = std::string("Could not switch new controller into run state");
+		res.ok=false;
+		return true;
+	      }
+	    }
+	    std::vector<double> newtorques = controller->evaluate(Plugin::target_arm_position,
+								  Plugin::arm_position,
+								  0.002);
+	    if (fabs(newtorques[j] - Plugin::pid_torque[j]) < 
+		0.15*Joint::MAX_MECHANICAL_TORQ[j]) {
+	      continue;
+	    } else {
+	      char errmsg[300];
+	      snprintf(errmsg,300,"New controller torque for joint %d differs too much from existing controller, so rejecting switch due to safety concerns (existing torque=%2.2fNm, new=%2.2fNm)",
+		       j+1,
+		       Plugin::pid_torque[j],
+		       newtorques[j]);
+	      res.reason=std::string(errmsg);
+	      res.ok=false;
+	      return true;
+	    }
+	  }	    
 	  res.reason=std::string("Existing controller is not holding position well; please SetStiffness 0 and try again");
 	  res.ok=false;
 	  return true;

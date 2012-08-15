@@ -383,9 +383,9 @@ namespace OWD {
     /// \param q The vector of actual joint positions
     /// \param dt The elapsed time (in seconds) since the previous call
     /// \returns A vector of joint torques
-    virtual std::vector<double> evaluate(std::vector<double> q_target,
-					 std::vector<double> q,
-					 double dt) =0;
+    virtual std::vector<double> evaluate(const std::vector<double> q_target,
+					 const std::vector<double> q,
+					 const double dt) =0;
 
     /// \brief Adjust the controller gains
     ///

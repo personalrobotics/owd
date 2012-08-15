@@ -22,9 +22,9 @@ DefaultJSController::DefaultJSController(std::string myname) :
 DefaultJSController::~DefaultJSController() {
 }
 
-std::vector<double> DefaultJSController::evaluate(std::vector<double> q_target,
-					   std::vector<double> q,
-					   double dt) {
+std::vector<double> DefaultJSController::evaluate(const std::vector<double> q_target,
+					   const std::vector<double> q,
+					   const double dt) {
   if (q_target.size() != jcontrollers.size()) {
     throw "q_target array size does not match number of controllers";
   }

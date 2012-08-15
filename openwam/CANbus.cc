@@ -812,7 +812,8 @@ int CANbus::send_torques_rt()
       
       /* We have 14 bits (including sign bit) in the packed torque message per puck.
        * If any of the torques are more extreme than this, abort!
-       * This should never happen, because torques are checked before this. */
+       * This should never happen, because torques are checked before this,
+       * unless someone raised the MAX_TRQ limits too high. */
       for (i=1; i<5; i++)
       {
         if (!(-8192 <= torques[i] && torques[i] <= 8191))
