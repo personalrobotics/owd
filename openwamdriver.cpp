@@ -3103,7 +3103,7 @@ bool WamDriver::SetController(owd_msgs::SetController::Request &req,
 								  Plugin::arm_position,
 								  0.002);
 	    if (fabs(newtorques[j] - Plugin::pid_torque[j]) < 
-		0.15*Joint::MAX_MECHANICAL_TORQ[j]) {
+		0.30*Joint::MAX_MECHANICAL_TORQ[j]) { /* was 0.15 */
 	      continue;
 	    } else {
 	      char errmsg[300];
