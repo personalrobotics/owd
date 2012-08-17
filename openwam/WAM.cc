@@ -176,11 +176,6 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
        Lyx = 0.00000219        Lyy = 0.01891658      Lyz = 0.00000515 
        Lzx = ­0.00160868       Lzy = 0.00000515      Lzz = 0.00197517 
   */
-#ifdef BH8
-  links[Link::L4] = L4_without_wrist_with_260_hand;
-#else // !BH8
-  links[Link::L4] = L4_without_wrist_without_hand;
-#endif // !BH8
 
 #endif // !WRIST
 

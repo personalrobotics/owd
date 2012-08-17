@@ -38,7 +38,7 @@ elseif (VENDOR_ID STREQUAL "CentaurHauls")
     add_definitions("-march=c3-2")
 endif (DEFINED ENV{OWD_MARCH_FLAGS})
 
-add_definitions("-O0 -ggdb3 -DWRIST -DBH8 -DRT_STATS")
+add_definitions("-O0 -ggdb3 -DWRIST -DRT_STATS")
 
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 rosbuild_add_library(openwam Joint.cc Motor.cc Puck.cc Group.cc
