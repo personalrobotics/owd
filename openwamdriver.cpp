@@ -1774,6 +1774,8 @@ bool WamDriver::Publish() {
   double simtorqs[nJoints+1];  // Torques calculated from simulated links
                                // (used for experiental mass properties)
   boost::mutex::scoped_lock lock(wamstate_mutex);
+  
+  wamstate.time_oldest = ros::Time::now();
 
   if (! ros::ok()) {
     wamstate.state = owd_msgs::WAMState::state_inactive;
@@ -2085,6 +2087,9 @@ bool WamDriver::AddTrajectory(owd_msgs::AddTrajectory::Request &req,
   // Return success/failure and the traj id
   res.id = t->id;
   res.ok = AddTrajectory(t,res.reason);
+  
+  // This should be after it's been added, for synchronization
+  res.time_added = ros::Time::now();
 
   return true;
 }

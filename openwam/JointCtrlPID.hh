@@ -34,6 +34,7 @@ class JointCtrlPID : public JointCtrl{
 private:
   double Kp, Kd, Ki;
   double last_e;
+  int last_e_valid;
   double se;         // Sum of error
   static const double Isaturation = 5;
 
@@ -59,9 +60,10 @@ public:
     if(state() == Controller::RUN){
       //      lock();
       double e = qs - q;
-      double ed = (e - last_e)/dt;
+      double ed = last_e_valid ? (e - last_e)/dt : 0.0;
       se += e;
       last_e = e;
+      last_e_valid = 1;
 
       double Isign = _GetSign(se);
       if(Isign*se > Isaturation)
@@ -79,6 +81,7 @@ public:
     //    lock();
     s = Controller::STOP;
     last_e = 0;
+    last_e_valid = 0;
     se=0;
     //    unlock();
   }
