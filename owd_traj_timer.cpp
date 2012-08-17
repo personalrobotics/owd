@@ -236,6 +236,8 @@ bool AddTrajectory(owd_msgs::AddTrajectory::Request &req,
   } else {
     ROS_WARN("Synchronized trajectory %s sent to left arm", at_req.id.c_str());
   }
+
+  res.time_added = ros::Time::now();
   return true;
 }
 

@@ -2146,6 +2146,10 @@ bool WamDriver::AddTimedTrajectory(owd_msgs::AddTimedTrajectory::Request &req,
 
   res.id = t->id;
   res.ok = AddTrajectory(t,res.reason);
+
+  // This should be after it's been added, for synchronization
+  res.time_added = ros::Time::now();
+
   return true;
 }
 
