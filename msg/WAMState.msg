@@ -1,4 +1,5 @@
 Header header
+time time_oldest # time of the oldest data included
 
 float64[] positions
 float64[] target_positions

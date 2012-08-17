@@ -3,3 +3,4 @@ owd_msgs/JointTraj traj
 bool ok
 string reason
 string id
+time time_added
