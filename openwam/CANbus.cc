@@ -1217,9 +1217,9 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
 	=0;
     } else {
       // subtract the post-tare average
-      forcetorque_data[0] -= ft_tare_avg[0];
-      forcetorque_data[1] -= ft_tare_avg[1];
-      forcetorque_data[2] -= ft_tare_avg[2];
+      //forcetorque_data[0] -= ft_tare_avg[0];
+      //forcetorque_data[1] -= ft_tare_avg[1];
+      //forcetorque_data[2] -= ft_tare_avg[2];
     }
     // update the filtered force values
     R3 force(forcetorque_data[0],forcetorque_data[1],forcetorque_data[2]);
@@ -1264,9 +1264,9 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
 	=0;
     } else {
       // subtract the post-tare average
-      forcetorque_data[3] -= ft_tare_avg[3];
-      forcetorque_data[4] -= ft_tare_avg[4];
-      forcetorque_data[5] -= ft_tare_avg[5];
+      //      forcetorque_data[3] -= ft_tare_avg[3];
+      //      forcetorque_data[4] -= ft_tare_avg[4];
+      //      forcetorque_data[5] -= ft_tare_avg[5];
     }
     // update the filtered torque values
     R3 torque(forcetorque_data[3],forcetorque_data[4],forcetorque_data[5]);
@@ -3280,13 +3280,29 @@ template<> inline bool DataRecorder<CANbus::canio_data>::dump(const char *fname)
 	Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 256.0;
 	Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 256.0;
 	fprintf(csv,"SET FORCE X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
-      } else if ((cdata.msgid & 0x41F) == 0x40B) {
+        if (cdata.msglen > 6) {
+	  if (cdata.msgdata[6] & 128) {
+	    fprintf(csv," RE-TARE");
+	  }
+	  if (cdata.msgdata[6] & 64) {
+	    fprintf(csv," BAD");
+	  }
+	}
+     } else if ((cdata.msgid & 0x41F) == 0x40B) {
 	// group 11 messages are 3-axis Torque from the F/T sensor
 	double X,Y,Z;
 	X=CANbus::ft_combine(cdata.msgdata[0],cdata.msgdata[1]) / 4096.0;
 	Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 4096.0;
 	Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 4096.0;
 	fprintf(csv,"SET TORQUE X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
+        if (cdata.msglen > 6) {
+	  if (cdata.msgdata[6] & 128) {
+	    fprintf(csv," RE-TARE");
+	  }
+	  if (cdata.msgdata[6] & 64) {
+	    fprintf(csv," BAD");
+	  }
+	}
       } else if (cdata.msgdata[0] & 0x80) {  // SET
 	if (cdata.msgdata[0] == (42 | 0x80)) {
 	  // Packed Torque message
