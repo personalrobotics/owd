@@ -1775,11 +1775,11 @@ bool WamDriver::Publish() {
                                // (used for experiental mass properties)
   boost::mutex::scoped_lock lock(wamstate_mutex);
   
-  wamstate.time_oldest = ros::Time::now();
+  wamstate.header.stamp = ros::Time::now();
+  wamstate.time_oldest = wamstate.header.stamp;  // duplicate for now
 
   if (! ros::ok()) {
     wamstate.state = owd_msgs::WAMState::state_inactive;
-    wamstate.header.stamp = ros::Time::now();
     pub_wamstate.publish(wamstate);  // no need to fill in anything else
     return true;
   }
@@ -1868,8 +1868,6 @@ bool WamDriver::Publish() {
   } else {
     wamstate.state = owd_msgs::WAMState::state_free;
   }
-
-  wamstate.header.stamp = ros::Time::now();
 
   pub_wamstate.publish(wamstate);
   pub_waminternals.publish(waminternals);
