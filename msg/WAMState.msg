@@ -1,5 +1,8 @@
+# All of the data fields are at least as recent as the timestamp in
+# the in header, and possibly more recent.  If a trajectory that OWD added at
+# time T does not appear in the published queue at time t>=T, then that
+# trajectory has definitely finished.
 Header header
-time time_oldest # time of the oldest data included
 
 float64[] positions
 float64[] target_positions
