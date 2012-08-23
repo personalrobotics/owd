@@ -1776,7 +1776,6 @@ bool WamDriver::Publish() {
   boost::mutex::scoped_lock lock(wamstate_mutex);
   
   wamstate.header.stamp = ros::Time::now();
-  wamstate.time_oldest = wamstate.header.stamp;  // duplicate for now
 
   if (! ros::ok()) {
     wamstate.state = owd_msgs::WAMState::state_inactive;
