@@ -1165,6 +1165,26 @@ int CANbus::request_forcetorque_rt() {
   return OW_SUCCESS;
 }
 
+int CANbus::request_ecminmax_rt(int32_t id) {
+  uint8_t  msg[8];
+
+  // Compile the packet
+  msg[0] = (uint8_t)ECMIN;
+
+  if(send_rt(id, msg, 1, 100) == OW_FAILURE){
+    ROS_WARN("CANbus::request_ecminmax_rt: request for ECMIN failed: %s",last_error);
+    return OW_FAILURE;
+  }
+  // Compile the packet
+  msg[0] = (uint8_t)ECMAX;
+
+  if(send_rt(id, msg, 1, 100) == OW_FAILURE){
+    ROS_WARN("CANbus::request_ecminmax_rt: request for ECMAX failed: %s",last_error);
+    return OW_FAILURE;
+  }
+  return OW_SUCCESS;
+}
+
 int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
   int32_t nodeid = ADDR2NODE(msgid);
 

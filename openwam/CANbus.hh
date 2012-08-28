@@ -236,6 +236,7 @@ DataRecorder<canio_data> candata;
   int request_tactile_rt();
   int request_strain_rt();
   int request_forcetorque_rt();
+  int request_ecminmax_rt(int32_t id);
 
   int process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen);
   int process_arm_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen);

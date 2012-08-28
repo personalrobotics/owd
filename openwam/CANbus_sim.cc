@@ -270,6 +270,7 @@ int CANbus::request_hand_state_rt() {return OW_SUCCESS;}
 int CANbus::request_tactile_rt() {return OW_SUCCESS;}
 int CANbus::request_strain_rt() {return OW_SUCCESS;}
 int CANbus::request_forcetorque_rt() {return OW_SUCCESS;}
+int CANbus::request_ecminmax_rt(int32_t id) {return OW_SUCCESS;}
 
 int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
   // make it look like we've already received all 7 joint values
