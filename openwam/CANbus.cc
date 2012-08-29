@@ -3350,7 +3350,7 @@ template<> inline bool DataRecorder<CANbus::canio_data>::dump(const char *fname)
 	  }
 	  fprintf(csv,"SET T=%d,%d,%d,%d", tq1,tq2,tq3,tq4);
 	} else if ((cdata.msgid & 0x41F) == 0x403) {
-	  // message set to GROUP 3 are 22-bit position updates
+	  // messages sent to GROUP 3 are 22-bit position updates
 	  int32_t value = ((cdata.msgdata[0] & 0x3F) << 16) +
 	    (cdata.msgdata[1] << 8) +
 	    cdata.msgdata[2];
@@ -3367,6 +3367,25 @@ template<> inline bool DataRecorder<CANbus::canio_data>::dump(const char *fname)
 	      value |= 0xFFC00000; // Sign-extend
 	    }
 	    fprintf(csv," JP=%d",value);
+	  }
+	} else if ((cdata.msgid & 0x41F) == 0x407) {
+	  // messages sent to GROUP 7 are 22-bit joint positions
+	  int32_t value = ((cdata.msgdata[0] & 0x3F) << 16) +
+	    (cdata.msgdata[1] << 8) +
+	    cdata.msgdata[2];
+	  if (value & 0x00200000) { // If negative 
+	    value |= 0xFFC00000; // Sign-extend
+	  }
+	  fprintf(csv,"SET JP=%d",value);
+	  if (cdata.msglen == 6) {
+	    // this puck also sent a secondary value (JP2?)
+	    value = ((cdata.msgdata[3] & 0x3F) << 16) +
+	      (cdata.msgdata[4] << 8) +
+	      cdata.msgdata[5];
+	    if (value & 0x00200000) { // If negative 
+	      value |= 0xFFC00000; // Sign-extend
+	    }
+	    fprintf(csv," ??=%d",value);
 	  }
 	} else {
 	  // regular property
