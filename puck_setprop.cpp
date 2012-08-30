@@ -20,12 +20,13 @@
 
  ***********************************************************************/
 
-//int entryLine;
-//const int FALSE=0;
-//bool curses(FALSE);
-// #include "btinterface.h"
+int entryLine;
+const int FALSE=0;
+bool curses(FALSE);
+#include "btinterface.h"
 #include "openwam/CANbus.hh"
 #include "openwam/CANdefs.hh"
+#include "btutil_changeID.h"
 
 void usage(char *name) {
   printf("Usage: %s <bus> <puck> <property> <value>\n",name);
@@ -48,37 +49,52 @@ int main(int argc, char **argv ) {
     }
 
     CANbus *canbus = new CANbus(bus,0,true,false,false,true);
+    // set the global bus pointer for the btutil code
+    btinterface_bus = canbus;
 
-    if (canbus->open() == OW_FAILURE) {
-      fprintf(stderr,"Unable to open CANbus device\n");
-      return 1;
-    }
+    try {
+      
+      if (canbus->open() == OW_FAILURE) {
+	fprintf(stderr,"Unable to open CANbus device\n");
+	return 1;
+      }
+      
+      if (canbus->wake_puck(puck) != OW_SUCCESS) {
+	fprintf(stderr,"Unable to wake puck %d\n",puck);
+	return 1;
+      }
+      
+      // get the puck version
+      int32_t val;
+      if (canbus->get_property_rt(puck,VERS,&val,20000) != OW_SUCCESS) {
+	fprintf(stderr,"Unable to get VERS from puck %d\n",puck);
+	return 1;
+      }
+      printf("Puck firmware version %d\n",val);
+      canbus->initPropertyDefs(val);
+      
+      if ((property < 0) || (property >=PROP_END)) {
+	fprintf(stderr,"Error: property %d out of range (0 to %d)\n",
+		property, PROP_END);
+	usage(argv[0]);
+	exit(1);
+      }
+      
+      // set the value
+      if (property == 1) {
+	// use the btutil code for changing the ROLE
+	changeID(puck,puck,value); // no return value
+	printf("ROLE set to %d on puck %d\n",value,puck);
 
-    // wake the puck
-    if (canbus->wake_puck(puck) != OW_SUCCESS) {
-      fprintf(stderr,"Unable to wake puck %d\n",puck);
-      return 1;
-    }
-
-    // get the puck version
-    int32_t val;
-    if (canbus->get_property_rt(puck,VERS,&val,20000) != OW_SUCCESS) {
-      fprintf(stderr,"Unable to get VERS from puck %d\n",puck);
-      return 1;
-    }
-    canbus->initPropertyDefs(val);
-
-    if ((property < 0) || (property >=PROP_END)) {
-      fprintf(stderr,"Error: property %d out of range (0 to %d)\n",
-	     property, PROP_END);
-      usage(argv[0]);
-      exit(1);
-    }
-
-    // set the value
-    if (canbus->set_property_rt(puck,property, value, false, 10000) != OW_SUCCESS) {
-      fprintf(stderr,"Unable to set property %d=%d: %s\n",
-	      property, value, canbus->last_error);
+      } else if (canbus->set_property_rt(puck,property, value, false, 10000)
+		 != OW_SUCCESS) {
+	fprintf(stderr,"Unable to set property %d=%d: %s\n",
+		property, value, canbus->last_error);
+	exit(1);
+      }
+    } catch (const char *canerr) {
+      fprintf(stderr,"CANbus class threw an error: %s\n",canerr);
+      delete canbus;
       exit(1);
     }
     delete canbus;
