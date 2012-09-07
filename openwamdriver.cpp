@@ -2946,7 +2946,7 @@ bool WamDriver::SetGains(owd_msgs::SetGains::Request &req,
     ROS_ERROR("INF or NAN passed to SetGains; ignored");
     return false;
   }
-  return owam->set_gains(req.joint,req.gains);
+  return owam->set_gains(req.joint-1,req.gains);
 }
 
 bool WamDriver::ReloadPlugins(owd_msgs::Reset::Request &req,
