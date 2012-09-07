@@ -1450,35 +1450,12 @@ int CANbus::parse(int32_t msgid, uint8_t* msg, int32_t msglen,
 
   case 2:  // Data is normal, SET 
 
-    /***************************************
-     ***   UPDATED CODE FROM BARRETT     ***
-     *** Need to switch to this as       ***
-     *** soon as I have time for testing ***
-     *** Mike Vande Weghe 9/19/2009      ***
-     ***************************************
-
-     *property = messageData[0] & 0x7F;
-     *value = messageData[len-1] & 0x80 ? -1L : 0;
-      for (i = len-1; i >= 2; i--)
-      *value = *value << 8 | messageData[i];
+    // copied from Barrett's source code
+     *property = msg[0] & 0x7F;
+     *value = msg[msglen-1] & 0x80 ? -1L : 0;
+      for (i = msglen-1; i >= 2; i--)
+      *value = *value << 8 | msg[i];
       break;
-
-      ***  End updateded code (replaces entire case) ***/
-
-    *property = msg[0] & 0x7F;
-
-    //
-    // Store the value
-    // second byte of message is zero (for DSP word alignment) 
-    //
-    *value = 0;
-    for(i=0; i<msglen-2; i++)
-      *value |= ((unsigned int32_t)msg[i + 2] << (i * 8))
-	& (0x000000FF << (i * 8));
-      
-    if (*value & (1 << ((i*8) - 1)))
-      *value |= 0xFFFFFFFF << (i * 8); // Sign extend the value 
-    break;
 
   case 0:  // Assume firmware request (GET) 
       
