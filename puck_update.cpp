@@ -45,14 +45,20 @@ int main(int argc, char **argv ) {
     }
     printf("Downloading firmware %s to puck %d...",
 	   file, puck);
-    btinterface_bus = new CANbus(bus,0,true,false,false);
+    btinterface_bus = new CANbus(bus,0,true,false,false,true);
     btinterface_bus->initPropertyDefs(160);
     if (btinterface_bus->open() == OW_FAILURE) {
       printf("Unable to open CANbus device");
       return 1;
     }
-    return firmwareDL(puck,file);
+    if (firmwareDL(puck,file)) {
+      fprintf(stderr,"\nFirmware update failed.\n");
+      delete btinterface_bus;
+      exit(1);
+    }
     printf("\n");
+      delete btinterface_bus;
+      exit(0);
   } else {
     usage(argv[0]);
     exit(1);
