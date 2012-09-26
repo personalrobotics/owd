@@ -30,7 +30,8 @@
 CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
 	       bool ft, bool tactile,bool log_cb_data) : 
   puck_state(2),BH280_installed(bh280),id(bus_id),trq(NULL),
-  pos(NULL),jpos(NULL), forcetorque_data(NULL), filtered_forcetorque_data(NULL),
+  pos(NULL),jpos(NULL), forcetorque_data(NULL), accelerometer_data(NULL), 
+  filtered_forcetorque_data(NULL),
   ft_force_filter(2,10.0),ft_torque_filter(2,10.0), tactile_data(NULL),
   valid_forcetorque_data(NULL), valid_tactile_data(NULL),
   tactile_top10(false), pucks(NULL),n_arm_pucks(num_pucks),
@@ -271,6 +272,7 @@ int CANbus::request_hand_state_rt() {return OW_SUCCESS;}
 int CANbus::request_tactile_rt() {return OW_SUCCESS;}
 int CANbus::request_strain_rt() {return OW_SUCCESS;}
 int CANbus::request_forcetorque_rt() {return OW_SUCCESS;}
+int CANbus::request_accelerometer_rt() {return OW_SUCCESS;}
 int CANbus::request_ecminmax_rt(int32_t id) {return OW_SUCCESS;}
 
 int CANbus::process_positions_rt(int32_t msgid, uint8_t* msg, int32_t msglen) {
@@ -587,6 +589,7 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
     
     /* Force/Torque sensor */
     FT   = 54;
+    A    = 55;  // total guess
   }
 
 }
@@ -729,6 +732,7 @@ int VNOM=-10;
 
 /* Force/Torque properties */
 int FT=-10;
+int A=-10;
 
 // older properties (firmware < 40)
 int D=-10;

@@ -33,6 +33,7 @@ FT::~FT() {
 void FT::AdvertiseAndSubscribe(ros::NodeHandle &n) {
   pub_ft = n.advertise<geometry_msgs::WrenchStamped>("forcetorque", 1);
   pub_filtered_ft = n.advertise<geometry_msgs::WrenchStamped>("filtered_forcetorque", 1);
+  pub_accel = n.advertise<geometry_msgs::Vector3>("accelerometer", 1);
   ss_tare = n.advertiseService("ft_tare",&FT::Tare,this);
 }
 
@@ -72,6 +73,12 @@ bool FT::Publish() {
   ft_vals.wrench.torque.y=ft_filtered_values[4];
   ft_vals.wrench.torque.z=ft_filtered_values[5];
   pub_filtered_ft.publish(ft_vals);
+  if (bus->accelerometer_data) {
+    accel_vals.x = bus->accelerometer_data[0];
+    accel_vals.y = bus->accelerometer_data[1];
+    accel_vals.z = bus->accelerometer_data[2];
+    pub_accel.publish(accel_vals);
+  }
   return true;
 }
   

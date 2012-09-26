@@ -191,6 +191,7 @@ extern int VNOM;
 
 /* Force/Torque properties */
 extern int FT;
+extern int A;
 
 // older properties (firmware < 40)
 extern int D;

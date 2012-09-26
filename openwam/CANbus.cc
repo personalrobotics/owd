@@ -41,7 +41,7 @@
 
 CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, bool tactile, bool log_cb_data) : 
   puck_state(-1),BH280_installed(bh280),id(bus_id),fw_vers(0),trq(NULL),
-  pos(NULL), jpos(NULL), forcetorque_data(NULL), 
+  pos(NULL), jpos(NULL), forcetorque_data(NULL), accelerometer_data(NULL), 
   filtered_forcetorque_data(NULL),
   ft_force_filter(2,10.0), ft_torque_filter(2,10.0),
   tactile_data(NULL),
@@ -123,6 +123,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   if (ft) {
     forcetorque_data = new double[6];
     filtered_forcetorque_data = new double[6];
+    accelerometer_data = new double[6];
     for (int i=0; i<6; ++i) {
       ft_tare_avg[i]=0;
     }
@@ -1165,6 +1166,23 @@ int CANbus::request_forcetorque_rt() {
   return OW_SUCCESS;
 }
 
+int CANbus::request_accelerometer_rt() {
+  if (! accelerometer_data) {
+    return OW_FAILURE;
+  }
+  uint8_t  msg[8];
+
+  // Compile the packet
+  msg[0] = (uint8_t)A;
+
+
+  if(send_rt(8, msg, 1, 100) == OW_FAILURE){
+    ROS_WARN("CANbus::request_accelerometer_rt: send failed: %s",last_error);
+    return OW_FAILURE;
+  }
+  return OW_SUCCESS;
+}
+
 int CANbus::request_ecminmax_rt(int32_t id) {
   uint8_t  msg[8];
 
@@ -1296,6 +1314,13 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
     filtered_forcetorque_data[3] = torque[0];
     filtered_forcetorque_data[4] = torque[1];
     filtered_forcetorque_data[5] = torque[2];
+  } else if ((msgid & 0x41F) == 0x40C) {
+    // Group 12 is accelerometer data
+    if (accelerometer_data) {
+      accelerometer_data[0]=ft_combine(msg[0], msg[1]) / 1024.0;
+      accelerometer_data[1]=ft_combine(msg[2], msg[3]) / 1024.0;
+      accelerometer_data[2]=ft_combine(msg[4], msg[5]) / 1024.0;
+    }
   } else {
     //    ROS_ERROR("CANbus::process_forcetorque_response_rt: Unknown message type %X", msgid);
     return OW_FAILURE;
@@ -3211,6 +3236,7 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
 
     /* Force/Torque sensor */
     DEFPROP(FT   , 54);
+    DEFPROP(A    , 55);  //a total guess
   }
 }
 
@@ -3544,6 +3570,7 @@ int VNOM=-10;
 
 /* Force/Torque properties */
 int FT=-10;
+int A =-10;
 
 // older properties (firmware < 40)
 int D=-10;

@@ -863,6 +863,13 @@ void control_loop_rt(void* argv){
 	}
 	state_cycles=0;
       }
+      if (state_cycles==25) { // also once every 50 cycles (10hz)
+	if (wam->bus->accelerometer_data) {
+	  if (wam->bus->request_accelerometer_rt() != OW_SUCCESS) {
+	    ROS_WARN("control_loop: request_accelerometer_rt failed");
+	  }
+	}
+      }
       bool torques_sent(false);
 #endif // ! BH280_ONLY
       if (wam->bus->BH280_installed) {
