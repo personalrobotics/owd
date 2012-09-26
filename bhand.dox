@@ -149,4 +149,8 @@ for the clients which communicate with them.
   - uint8[] \b puck_mode: The MODE value for each of the pucks.
        Useful for debugging protocol problems.
 
+ - \b /owd/tactile: type: \e owd_msgs/BHTactile.  Data from the tactile
+   sensors on the model BH280 hand.  Each finger's values are given in
+   units of N/cm^2.  The numbering of each array matches the documentation
+   provided by Barrett.
 */
