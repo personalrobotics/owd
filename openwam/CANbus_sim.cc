@@ -38,6 +38,7 @@ CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
   hand_motion_state_sequence(0),
   jumptime(NULL),
   firstupdate(NULL),
+  ok(true),
   next_encoder_clocktime(15),
   last_encoder_clocktime(15)
 {
