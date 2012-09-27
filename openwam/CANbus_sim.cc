@@ -589,7 +589,7 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
     
     /* Force/Torque sensor */
     FT   = 54;
-    A    = 55;  // total guess
+    A    = 64;
   }
 
 }

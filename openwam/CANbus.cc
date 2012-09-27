@@ -2210,10 +2210,14 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
   if (msg.nodeid != id) {
     ROS_ERROR_NAMED("can_bh280","Expecting response from hand puck %d but got message from puck %d",
 	     id,msg.nodeid);
+    ROS_DEBUG_NAMED("can_bh280","Property was %d, value was %d",
+		    msg.property, msg.value);
     return OW_FAILURE;
   }
   if (msg.property != prop) {
     ROS_ERROR_NAMED("can_bh280","Asked hand puck %d for property %d but got property %d",id,prop,msg.property);
+    ROS_DEBUG_NAMED("can_bh280","Node ID was %d, value was %d",
+		    msg.nodeid, msg.value);
     return OW_FAILURE;
   }
   *value = msg.value;
@@ -2488,7 +2492,6 @@ int CANbus::process_get_property_response_rt(int32_t msgid, uint8_t* msg, int32_
   int32_t nodeid, property, value;
   // extract the payload
   if(parse(msgid, msg, msglen, &nodeid, &property, &value) != OW_SUCCESS){
-    //    ROS_WARN("CANbus::process_get_property_response_rt: parse failed: %s",last_error);
     return OW_FAILURE;
   }
   
@@ -3236,7 +3239,7 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
 
     /* Force/Torque sensor */
     DEFPROP(FT   , 54);
-    DEFPROP(A    , 55);  //a total guess
+    DEFPROP(A    , 64);
   }
 }
 
@@ -3326,8 +3329,16 @@ template<> inline bool DataRecorder<CANbus::canio_data>::dump(const char *fname)
 	    fprintf(csv," BAD");
 	  }
 	}
+      } else if ((cdata.msgid & 0x41F) == 0x40C) {
+	// group 12 messages are 3-axis accelerometer values from the F/T sensor
+	double X,Y,Z;
+	X=CANbus::ft_combine(cdata.msgdata[0],cdata.msgdata[1]) / 1024.0;
+	Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 1024.0;
+	Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 1024.0;
+	fprintf(csv,"SET ACCEL X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
       } else if (cdata.msgdata[0] & 0x80) {  // SET
-	if (cdata.msgdata[0] == (42 | 0x80)) {
+	if ((cdata.msgdata[0] == (42 | 0x80))
+	    && ((cdata.msgid & 0x41F) == 0x404)) {
 	  // Packed Torque message
 	  int32_t tq1 = (cdata.msgdata[1] << 6) +
 	    (cdata.msgdata[2] >> 2);
@@ -3393,9 +3404,21 @@ template<> inline bool DataRecorder<CANbus::canio_data>::dump(const char *fname)
 	} else {
 	  // regular property
 	  int32_t value = (cdata.msgdata[3] << 8) + cdata.msgdata[2];
-	  if (cdata.msglen == 6) {
+	  if (cdata.msglen == 5) {
+	    // 24-bit value
+	    value += (cdata.msgdata[4] << 16);
+	    if (value & 0x00800000) { // If negative 
+	      value |= 0xFF000000; // Sign-extend
+	    }
+	  } else if (cdata.msglen == 6) {
+	    // 32-bit value
 	    value += (cdata.msgdata[4] << 16) + (cdata.msgdata[5] << 24);
-	  }
+	  } else {
+	    // 16-bit value
+	    if (value & 0x00008000) { // If negative 
+	      value |=  0xFFFF0000; // Sign-extend
+	    }
+	  }	    
 	  if (CANbus::propname.find(cdata.msgdata[0] & 0x7F) != CANbus::propname.end()) {
 	    fprintf(csv,"SET %s=%d",CANbus::propname[cdata.msgdata[0] & 0x7F].c_str(), value);
 	  } else {
