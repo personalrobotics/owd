@@ -35,6 +35,7 @@
 #include <owd_msgs/PauseTrajectory.h>
 #include <owd_msgs/ReplaceTrajectory.h>
 #include <owd_msgs/MassProperties.h>
+#include <owd_msgs/GetStiffness.h>
 #include <owd_msgs/SetStiffness.h>
 #include <owd_msgs/SetJointStiffness.h>
 #include <owd_msgs/SetJointOffsets.h>
@@ -112,6 +113,8 @@ public:
                          owd_msgs::PauseTrajectory::Response &res);
     bool ReplaceTrajectory(owd_msgs::ReplaceTrajectory::Request &req,
                            owd_msgs::ReplaceTrajectory::Response &res);
+    bool GetStiffness(owd_msgs::GetStiffness::Request &req,
+                      owd_msgs::GetStiffness::Response &res);
     bool SetStiffness(owd_msgs::SetStiffness::Request &req,
                       owd_msgs::SetStiffness::Response &res);
     bool SetJointStiffness(owd_msgs::SetJointStiffness::Request &req,
@@ -267,6 +270,7 @@ private:
     ros::ServiceServer 
       ss_AddTrajectory,
       ss_AddTimedTrajectory,
+      ss_GetStiffness,
       ss_SetStiffness,
       ss_SetJointStiffness,
       ss_SetJointOffsets,

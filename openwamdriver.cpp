@@ -623,6 +623,8 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("AddTrajectory",&WamDriver::AddTrajectory,this);
   ss_AddTimedTrajectory = 
     n.advertiseService("AddTimedTrajectory",&WamDriver::AddTimedTrajectory,this);
+  ss_GetStiffness =
+    n.advertiseService("GetStiffness",&WamDriver::GetStiffness,this);
   ss_SetStiffness =
     n.advertiseService("SetStiffness",&WamDriver::SetStiffness,this);
   ss_SetJointStiffness =
@@ -1833,6 +1835,7 @@ bool WamDriver::Publish() {
   for(int i = Joint::J1; i<=Joint::Jn; i++) {
     snprintf(jointstr+strlen(jointstr),199-strlen(jointstr)," %1.4f",owam->last_control_position[i]);
   }
+  wamstate.stiffness = owam->stiffness;
   wamstate.controller = owam->jscontroller->name;
   if (owam->new_jscontroller) {
     // we're in the process of switching controllers, so publish
@@ -2368,6 +2371,13 @@ bool WamDriver::SetJointStiffness(owd_msgs::SetJointStiffness::Request &req,
       owam->jscontroller->stop(i);
     }
   }
+  res.ok=true;
+  return true;
+}
+
+bool WamDriver::GetStiffness(owd_msgs::GetStiffness::Request &req,
+                             owd_msgs::GetStiffness::Response &res) {
+  res.stiffness = owam->stiffness;
   res.ok=true;
   return true;
 }
