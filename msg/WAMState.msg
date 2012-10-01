@@ -9,6 +9,7 @@ float64[] target_positions
 float64[] jpositions
 float64[] velocities
 float64[] torques
+float64   stiffness
 owd_msgs/TrajInfo[] trajectory_queue
 owd_msgs/TrajInfo prev_trajectory
 string controller
