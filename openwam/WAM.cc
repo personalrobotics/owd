@@ -69,7 +69,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   pid_count(0),safety_hold(false),
   log_controller_data(log_ctrl_data), 
   bus(cb),ctrl_loop(cb->id, &control_loop_rt, this),
-  motor_state(MOTORS_OFF), stiffness(1.0), recorder(50000),
+  motor_state(MOTORS_OFF), stiffness(0), recorder(50000),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
   last_control_position(Joint::Jn),
   slip_joints_on_high_torque(false)
@@ -1851,6 +1851,10 @@ int WAM::hold_position(double jval[],bool grab_lock)
     // we weren't already holding, so set the held position 
     // to the current position
     // (if we were already holding, then we won't change the target)
+    if (stiffness == 0) {
+      stiffness =1; // if the stiffness was already non-zero then we
+                    // won't change it.
+    }
     for(int i = Joint::J1; i <= Joint::Jn; i++) {
       heldPositions[i] = joints[i].q;
       jscontroller->reset(i-1);
