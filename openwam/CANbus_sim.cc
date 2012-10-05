@@ -192,7 +192,7 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msg, int32_t* msglen, int32_t usecs
   *msgid = 1<<5;    // from node #1
   *msgid |= 0x403;  // to group #3
   msglen=0;
-  usleep(2400); // have to spend some time here so that owdsim doesn't busy-wait
+  usleep(200); // have to spend some time here so that owdsim doesn't busy-wait
   return OW_SUCCESS;
 }
 
