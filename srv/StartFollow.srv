@@ -1,7 +1,0 @@
-uint32 mode
-uint32 mode_none    = 0
-uint32 mode_joy     = 1
----
-bool ok
-string reason
-uint32 id

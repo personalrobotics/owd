@@ -10,4 +10,5 @@
   <depend package="bullet"/>
   <depend package="geometry_msgs"/>
   <depend package="joy"/>
+  <depend package="phantom_omni"/>
 </package>
