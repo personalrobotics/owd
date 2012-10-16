@@ -72,8 +72,6 @@ namespace OWD {
     /// \brief The total time the trajectory has been running, in seconds
     double time;
 
-    static OWD::WamDriver *wamdriver;
-
     static const int STOP = 0;
     static const int RUN  = 1;
     static const int DONE = 2;
