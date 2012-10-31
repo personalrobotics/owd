@@ -9,7 +9,7 @@
 
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/JointState.h>
-#include <phantom_omni/OmniState.h>
+// #include <phantom_omni/OmniState.h>
 #include <owd_msgs/StartTeleop.h>
 
 #include <openwam/Plugin.hh>
