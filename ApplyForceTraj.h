@@ -11,8 +11,8 @@
 #include "HybridPlugin.h"
 #include "ForceController.h"
 #include <openwam/Trajectory.hh>
-#include <owd_plugins/ApplyForce.h>
-#include <owd_plugins/StopForce.h>
+#include <owd_msgs/ApplyForce.h>
+#include <owd_msgs/StopForce.h>
 #include <owd_msgs/SetJointOffsets.h> // for changing force gains
 #include <queue>
 #include "Vibration.h"

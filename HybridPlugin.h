@@ -20,7 +20,7 @@
 
 // #define SIMULATION
 #ifdef SIMULATION
-#include <owd_plugins/ApplyForceDebug.h>
+#include <owd_msgs/ApplyForceDebug.h>
 #include <owd_msgs/Joints.h> // for debugging the Jacobian
 #endif // SIMULATION
 

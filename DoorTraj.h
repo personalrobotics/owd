@@ -10,7 +10,7 @@
 
 #include "HybridPlugin.h"
 #include <openwam/MacJointTraj.hh>
-#include <owd_plugins/OpenDoor.h>
+#include <owd_msgs/OpenDoor.h>
 #include <pthread.h>
 #include <openwam/DataRecorder.cc>
 #include <geometry_msgs/Pose.h>

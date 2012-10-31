@@ -1,5 +1,5 @@
 #include "ApplyForceTraj.h"
-#include <owd_plugins/InsertKey.h>
+#include <owd_msgs/InsertKey.h>
 
 class InsertKeyTraj : public OWD::Trajectory {
   public:

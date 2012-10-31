@@ -13,7 +13,7 @@
 #include "ApplyForceTraj.h"
 #include <openwam/Trajectory.hh>
 #include <openwam/ParabolicSegment.hh>
-#include <owd_plugins/AddWSTraj.h>
+#include <owd_msgs/AddWSTraj.h>
 #include <owd_msgs/Reset.h>
 
 
