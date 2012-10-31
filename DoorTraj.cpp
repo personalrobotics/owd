@@ -15,7 +15,7 @@
    conversion from geometry_msgs::Pose to SE3
 */
 
-DoorTraj::DoorTraj(OWD::TrajType &vtraj, owd_plugins::OpenDoor::Request::_ee_pose_type &eep, R3 _PullDirection)
+DoorTraj::DoorTraj(OWD::TrajType &vtraj, owd_msgs::OpenDoor::Request::_ee_pose_type &eep, R3 _PullDirection)
   : MacJointTraj(vtraj,
 		 max_j_vel, 
 		 max_j_accel,
@@ -287,8 +287,8 @@ SE3 DoorTraj::interpolate_ee_pose(const OWD::JointPos &current_pos) {
   return current_pose;
 }
 
-bool DoorTraj::OpenDoor(owd_plugins::OpenDoor::Request &req,
-			owd_plugins::OpenDoor::Response &res) {
+bool DoorTraj::OpenDoor(owd_msgs::OpenDoor::Request &req,
+			owd_msgs::OpenDoor::Response &res) {
 
   if (req.traj.positions.size() < 2) {
     ROS_ERROR_NAMED("OpenDoor","Minimum of 2 traj points required for door-opening trajectory");

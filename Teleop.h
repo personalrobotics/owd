@@ -37,13 +37,13 @@ public:
   void OmniCallback(phantom_omni::OmniState msg);
   
   static bool StartTeleopViaSpacenavCallback(
-        owd_plugins::StartTeleop::Request &req,
-        owd_plugins::StartTeleop::Response &res);
+        owd_msgs::StartTeleop::Request &req,
+        owd_msgs::StartTeleop::Response &res);
   static bool StartTeleopViaOmniCallback(
-        owd_plugins::StartTeleop::Request &req,
-        owd_plugins::StartTeleop::Response &res);
-  static bool AddTrajectory(owd_plugins::StartTeleop::Request &req,
-                            owd_plugins::StartTeleop::Response &res,
+        owd_msgs::StartTeleop::Request &req,
+        owd_msgs::StartTeleop::Response &res);
+  static bool AddTrajectory(owd_msgs::StartTeleop::Request &req,
+                            owd_msgs::StartTeleop::Response &res,
                             int mode_in);
   
   static ros::ServiceServer ss_spacenav;

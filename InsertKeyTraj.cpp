@@ -1,7 +1,7 @@
 #include "InsertKeyTraj.h"
 
-bool InsertKeyTraj::InsertKey(owd_plugins::InsertKey::Request &req,
-			      owd_plugins::InsertKey::Response &res) {
+bool InsertKeyTraj::InsertKey(owd_msgs::InsertKey::Request &req,
+			      owd_msgs::InsertKey::Response &res) {
 
   //  double max_distance=0;
   //  for (int xstep=-1; xstep<2; ++xstep) {

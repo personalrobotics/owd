@@ -57,19 +57,19 @@ void Teleop::PrintModeError(int mode_in) {
 }
 
 bool Teleop::StartTeleopViaSpacenavCallback(
-        owd_plugins::StartTeleop::Request &req,
-        owd_plugins::StartTeleop::Response &res) {
+        owd_msgs::StartTeleop::Request &req,
+        owd_msgs::StartTeleop::Response &res) {
     return Teleop::AddTrajectory(req, res, MODE_SPACENAV);
 }
 
 bool Teleop::StartTeleopViaOmniCallback(
-        owd_plugins::StartTeleop::Request &req,
-        owd_plugins::StartTeleop::Response &res) {
+        owd_msgs::StartTeleop::Request &req,
+        owd_msgs::StartTeleop::Response &res) {
     return Teleop::AddTrajectory(req, res, MODE_OMNI);
 }
 
-bool Teleop::AddTrajectory(owd_plugins::StartTeleop::Request &req,
-                           owd_plugins::StartTeleop::Response &res,
+bool Teleop::AddTrajectory(owd_msgs::StartTeleop::Request &req,
+                           owd_msgs::StartTeleop::Response &res,
                            int mode_in) {
   ROS_INFO("Teleop::AddTrajectory: received StartTeleop service call with mode=%d and topic=\"%s\"", mode_in, req.input_topic.c_str());
 

@@ -10,8 +10,8 @@
 #include <openwam/ControlLoop.hh>
 
 // Process our ApplyForce service calls from ROS
-bool ApplyForceTraj::ApplyForce(owd_plugins::ApplyForce::Request &req,
-				owd_plugins::ApplyForce::Response &res) {
+bool ApplyForceTraj::ApplyForce(owd_msgs::ApplyForce::Request &req,
+				owd_msgs::ApplyForce::Response &res) {
   // compute a new trajectory
   try {
     ApplyForceTraj *newtraj = new ApplyForceTraj(R3(req.x,req.y,req.z),req.f);
@@ -371,8 +371,8 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
 }
 
 // Stop the trajectory when asked by a client
-bool ApplyForceTraj::StopForce(owd_plugins::StopForce::Request &req,
-			       owd_plugins::StopForce::Response &res) {
+bool ApplyForceTraj::StopForce(owd_msgs::StopForce::Request &req,
+			       owd_msgs::StopForce::Response &res) {
   stopforce=true;
   return true;
 }

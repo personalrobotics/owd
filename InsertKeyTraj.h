@@ -6,8 +6,8 @@ class InsertKeyTraj : public OWD::Trajectory {
   InsertKeyTraj();
   ~InsertKeyTraj();
 
-  static bool InsertKey(owd_plugins::InsertKey::Request &req,
-			owd_plugins::InsertKey::Response &res);
+  static bool InsertKey(owd_msgs::InsertKey::Request &req,
+			owd_msgs::InsertKey::Response &res);
 
   virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
 

@@ -7,8 +7,8 @@
 #define PEAK_CAN
 #include <openwamdriver.h>
 
-bool WSTraj::AddWSTraj(owd_plugins::AddWSTraj::Request &req,
-		       owd_plugins::AddWSTraj::Response &res) {
+bool WSTraj::AddWSTraj(owd_msgs::AddWSTraj::Request &req,
+		       owd_msgs::AddWSTraj::Response &res) {
   // compute a new workspace trajectory
   try {
     WSTraj *newtraj = new WSTraj(req);
@@ -48,7 +48,7 @@ bool WSTraj::ForceFeedbackNextTrajSrv(owd_msgs::Reset::Request &req,
 }
 
 
-WSTraj::WSTraj(owd_plugins::AddWSTraj::Request &wst) 
+WSTraj::WSTraj(owd_msgs::AddWSTraj::Request &wst) 
   : OWD::Trajectory("WS Traj",OWD::Trajectory::random_id()),
     driving_force_direction(wst.wrench.force.x,
 			    wst.wrench.force.y,

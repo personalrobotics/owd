@@ -23,15 +23,15 @@ public:
   /// Holds the endpoint at the current position while applying
   /// force in the specified direction.  Endpoint is free to move
   /// in the direction of the force
-  WSTraj(owd_plugins::AddWSTraj::Request &wst);
+  WSTraj(owd_msgs::AddWSTraj::Request &wst);
   virtual ~WSTraj();
 
   virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
   virtual void force_feedback_evaluate(OWD::Trajectory::TrajControl &tc,
 				       double dt);
 
-  static bool AddWSTraj(owd_plugins::AddWSTraj::Request &req,
-			owd_plugins::AddWSTraj::Response &res);
+  static bool AddWSTraj(owd_msgs::AddWSTraj::Request &req,
+			owd_msgs::AddWSTraj::Response &res);
 
   static bool ForceFeedbackNextTrajSrv(owd_msgs::Reset::Request &req,
 				       owd_msgs::Reset::Response &res);

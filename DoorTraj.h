@@ -17,13 +17,13 @@
 
 class DoorTraj : public OWD::MacJointTraj {
 public:
-  DoorTraj(OWD::TrajType &vtraj, owd_plugins::OpenDoorRequest::_ee_pose_type &eep, R3 PullDirection);
+  DoorTraj(OWD::TrajType &vtraj, owd_msgs::OpenDoorRequest::_ee_pose_type &eep, R3 PullDirection);
   ~DoorTraj();
 
   virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
 
-  static bool OpenDoor(owd_plugins::OpenDoor::Request &req,
-		       owd_plugins::OpenDoor::Response &res);
+  static bool OpenDoor(owd_msgs::OpenDoor::Request &req,
+		       owd_msgs::OpenDoor::Response &res);
 
   /// functions for starting up and shutting down the service
   static bool Register();

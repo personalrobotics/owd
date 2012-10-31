@@ -28,11 +28,11 @@ public:
 
   virtual void evaluate_abs(OWD::Trajectory::TrajControl &tc, double t);
 
-  static bool ApplyForce(owd_plugins::ApplyForce::Request &req,
-			 owd_plugins::ApplyForce::Response &res);
+  static bool ApplyForce(owd_msgs::ApplyForce::Request &req,
+			 owd_msgs::ApplyForce::Response &res);
 
-  bool StopForce(owd_plugins::StopForce::Request &req,
-		 owd_plugins::StopForce::Response &res);
+  bool StopForce(owd_msgs::StopForce::Request &req,
+		 owd_msgs::StopForce::Response &res);
 
   static bool SetForceGains(owd_msgs::SetJointOffsets::Request &req,
                             owd_msgs::SetJointOffsets::Response &res);
