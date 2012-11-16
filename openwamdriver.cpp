@@ -212,8 +212,8 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   // from the WAM manual.
   static double PI=3.141592654;
   btQuaternion HALFPI_ROLL, NEG_HALFPI_ROLL;
-  HALFPI_ROLL.setRPY(PI/2.0,0,0);
-  NEG_HALFPI_ROLL.setRPY(-PI/2.0,0,0);
+  HALFPI_ROLL.setEulerZYX(0,0,PI/2.0);
+  NEG_HALFPI_ROLL.setEulerZYX(0,0,-PI/2.0);
   wam_tf_base[0] = btTransform::getIdentity();
   wam_tf_base[1] = btTransform(NEG_HALFPI_ROLL);
   wam_tf_base[2] = btTransform(HALFPI_ROLL);
@@ -1811,7 +1811,7 @@ bool WamDriver::Publish() {
     std::string jrefstring(jref);
     std::string jnamestring(jname);
     btQuaternion YAW;
-    YAW.setRPY(0,0,jointpos[i+1]);
+    YAW.setEulerZYX(jointpos[i+1],0,0);
     btTransform wam_tf = wam_tf_base[i] *  btTransform(YAW);
     tf::StampedTransform st(wam_tf,ros::Time::now(),jrefstring,jnamestring);
     tf_broadcaster.sendTransform(st);
