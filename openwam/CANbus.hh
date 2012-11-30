@@ -136,7 +136,7 @@ public:
   double* filtered_forcetorque_data;
   Butterworth<R3> ft_force_filter, ft_torque_filter;
   float* tactile_data;
-  bool valid_forcetorque_data;
+  bool valid_forcetorque_data, valid_filtered_forcetorque_data;
   bool valid_tactile_data;
   bool tactile_top10;
   Puck *pucks;

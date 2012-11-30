@@ -51,7 +51,7 @@ bool FT::Publish() {
   static double ft_values[6];
   static double ft_filtered_values[6];
   if (bus->ft_get_data(ft_values,ft_filtered_values) != OW_SUCCESS) {
-    ROS_WARN_NAMED("ft","Unable to get data from Force/Torque sensor");
+    ROS_DEBUG_NAMED("ft","Unable to get data from Force/Torque sensor");
     return false;
   }
 
@@ -90,7 +90,7 @@ bool FT::Tare(owd_msgs::Reset::Request &req,
     ROS_WARN_NAMED("ft","Unable to tare the sensor");
     res.ok=false;
     res.reason="Unable to tare the sensor";
-  }
-  return true; // the service call still succeeded, even though action did not
+  }    
+  return true;
 }
 

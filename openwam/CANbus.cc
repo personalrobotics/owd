@@ -45,7 +45,8 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   filtered_forcetorque_data(NULL),
   ft_force_filter(2,10.0), ft_torque_filter(2,10.0),
   tactile_data(NULL),
-  valid_forcetorque_data(false), valid_tactile_data(false),
+  valid_forcetorque_data(false), valid_filtered_forcetorque_data(false),
+  valid_tactile_data(false),
   tactile_top10(false), pucks(NULL),n_arm_pucks(number_of_arm_pucks),
   simulation(false), received_position_flags(0), received_state_flags(0),
   hand_motion_state_sequence(0),
@@ -1212,7 +1213,7 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
     return OW_FAILURE;
   }
 
-  if ((msgid & 0x41F) == 0x40A) {
+  if (((msgid & 0x41F) == 0x40A) && valid_forcetorque_data) {
 
     // Group 10 is Force
     forcetorque_data[0]=ft_combine(msg[0], msg[1]) / 256.0;
@@ -1229,7 +1230,7 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
       if (force_tare_values_collected != -2) {
 	if (++force_tare_values_collected > 0) {
 	  // the ft_tare_avg field will hold the sum until we
-	  // get enough values.  The valid_forcetorque_data field
+	  // get enough values.  The valid_filtered_forcetorque_data field
 	  // ensures that the avg values won't be used until
 	  // we sum enough values and then calc the average.
 	  ft_tare_avg[0] += forcetorque_data[0];
@@ -1243,7 +1244,7 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
 	  if (torque_tare_values_collected == ft_tare_values_to_average) {
 	    // if we also have enough torque values, then our data
 	    // is finally valid
-	    valid_forcetorque_data=true;
+	    valid_filtered_forcetorque_data=true;
 	  }
 	}
       }
@@ -1269,51 +1270,58 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
     filtered_forcetorque_data[2] = force[2];
 
   } else if ((msgid & 0x41F) == 0x40B) {
+    
+    if (msg[6] & 64) {
+      // BAD flag has been set
+      valid_forcetorque_data=false;
+    } else {
+      valid_forcetorque_data=true;
 
-    // Group 11 is Torque
-    forcetorque_data[3]=ft_combine(msg[0], msg[1]) / 4096.0;
-    forcetorque_data[4]=ft_combine(msg[2], msg[3]) / 4096.0;
-    forcetorque_data[5]=ft_combine(msg[4], msg[5]) / 4096.0;
-
-    if (torque_tare_values_collected < ft_tare_values_to_average) {
-      // same as above, but for torques
-      if (torque_tare_values_collected != -2) {
-	if (++torque_tare_values_collected > 0) {
-	  ft_tare_avg[3] += forcetorque_data[3];
-	  ft_tare_avg[4] += forcetorque_data[4];
-	  ft_tare_avg[5] += forcetorque_data[5];
-	}
-	if (torque_tare_values_collected == ft_tare_values_to_average) {
-	  ft_tare_avg[3] /= ft_tare_values_to_average;
-	  ft_tare_avg[4] /= ft_tare_values_to_average;
-	  ft_tare_avg[5] /= ft_tare_values_to_average;
-	  if (force_tare_values_collected == ft_tare_values_to_average) {
-	    // if we also have enough force values, then our data
-	    // is finally valid
-	    valid_forcetorque_data=true;
+      // Group 11 is Torque
+      forcetorque_data[3]=ft_combine(msg[0], msg[1]) / 4096.0;
+      forcetorque_data[4]=ft_combine(msg[2], msg[3]) / 4096.0;
+      forcetorque_data[5]=ft_combine(msg[4], msg[5]) / 4096.0;
+      
+      if (torque_tare_values_collected < ft_tare_values_to_average) {
+	// same as above, but for torques
+	if (torque_tare_values_collected != -2) {
+	  if (++torque_tare_values_collected > 0) {
+	    ft_tare_avg[3] += forcetorque_data[3];
+	    ft_tare_avg[4] += forcetorque_data[4];
+	    ft_tare_avg[5] += forcetorque_data[5];
+	  }
+	  if (torque_tare_values_collected == ft_tare_values_to_average) {
+	    ft_tare_avg[3] /= ft_tare_values_to_average;
+	    ft_tare_avg[4] /= ft_tare_values_to_average;
+	    ft_tare_avg[5] /= ft_tare_values_to_average;
+	    if (force_tare_values_collected == ft_tare_values_to_average) {
+	      // if we also have enough force values, then our data
+	      // is finally valid
+	      valid_filtered_forcetorque_data=true;
+	    }
 	  }
 	}
+	// since we're still collecting data, we'll make it look like the
+	// sensor is still perfectly tared
+	forcetorque_data[3]
+	  = forcetorque_data[4]
+	  = forcetorque_data[5]
+	  =0;
+      } else {
+	// subtract the post-tare average
+	//      forcetorque_data[3] -= ft_tare_avg[3];
+	//      forcetorque_data[4] -= ft_tare_avg[4];
+	//      forcetorque_data[5] -= ft_tare_avg[5];
       }
-      // since we're still collecting data, we'll make it look like the
-      // sensor is still perfectly tared
-      forcetorque_data[3]
-	= forcetorque_data[4]
-	= forcetorque_data[5]
-	=0;
-    } else {
-      // subtract the post-tare average
-      //      forcetorque_data[3] -= ft_tare_avg[3];
-      //      forcetorque_data[4] -= ft_tare_avg[4];
-      //      forcetorque_data[5] -= ft_tare_avg[5];
+      // update the filtered torque values
+      R3 torque(forcetorque_data[3],forcetorque_data[4],forcetorque_data[5]);
+      mutex_lock(&ft_mutex);
+      torque = ft_torque_filter.eval(torque);
+      mutex_unlock(&ft_mutex);
+      filtered_forcetorque_data[3] = torque[0];
+      filtered_forcetorque_data[4] = torque[1];
+      filtered_forcetorque_data[5] = torque[2];
     }
-    // update the filtered torque values
-    R3 torque(forcetorque_data[3],forcetorque_data[4],forcetorque_data[5]);
-    mutex_lock(&ft_mutex);
-    torque = ft_torque_filter.eval(torque);
-    mutex_unlock(&ft_mutex);
-    filtered_forcetorque_data[3] = torque[0];
-    filtered_forcetorque_data[4] = torque[1];
-    filtered_forcetorque_data[5] = torque[2];
   } else if ((msgid & 0x41F) == 0x40C) {
     // Group 12 is accelerometer data
     if (accelerometer_data) {
@@ -2027,37 +2035,31 @@ int CANbus::set_puck_group_id(int32_t nodeid) {
 }
 
 int CANbus::ft_get_data(double *values, double *filtered_values) {
-  if (forcetorque_data && (values || filtered_values)) {
-    int counter=0;
-    while (!valid_forcetorque_data 
-	   && (++counter < ft_tare_values_to_average)) {
-      // if a tare command was just issued, we might have to wait
-      // a number of CAN cycles before we get enough data for a 
-      // valid average.  We'll wait long enough for 2 cycles each
-      // time.
-      usleep(4000);
-    }
-    if (!valid_forcetorque_data) {
-          return OW_FAILURE;
-    }
-    for (int i=0; i<6; ++i) {
-      if (values) {
-	values[i] = forcetorque_data[i];
-      }
-      if (filtered_values) {
-	filtered_values[i] = filtered_forcetorque_data[i];
-      }
-    }
-    return OW_SUCCESS;
+  if (!forcetorque_data || !valid_forcetorque_data) {
+    return OW_FAILURE;
   }
-  return OW_FAILURE;
+
+  if (filtered_values && !valid_filtered_forcetorque_data) {
+    return OW_FAILURE;
+  }
+
+  for (int i=0; i<6; ++i) {
+    if (values) {
+      values[i] = forcetorque_data[i];
+    }
+    if (filtered_values) {
+      filtered_values[i] = filtered_forcetorque_data[i];
+    }
+  }
+  return OW_SUCCESS;
 }
 
 int CANbus::ft_tare() {
 
-  // Set the count to -1 initially.  Once we are sure the
-  // tare command has been executed, we'll set it to zero and
-  // collect subsequent readings until we reach ft_tare_values_to_average.
+  // Set the count to -2 initially.  Once the request is sent we'll set it
+  // to -1.  We'll still through out the first response received after the
+  // request (which will increment the counter to zero), and then start
+  // accumulating readings after that until we reach ft_tare_values_to_average.
   force_tare_values_collected
     = torque_tare_values_collected
     = -2;
@@ -2066,6 +2068,7 @@ int CANbus::ft_tare() {
     ft_tare_avg[i]=0;
   }
   valid_forcetorque_data=false;
+  valid_filtered_forcetorque_data=false;
 
   // reset the filters
   mutex_lock(&ft_mutex);
@@ -2073,7 +2076,23 @@ int CANbus::ft_tare() {
   ft_torque_filter.reset();
   mutex_unlock(&ft_mutex);
 
-  return hand_set_property(8,FT,0);
+  if (hand_set_property(8,FT,0) != OW_SUCCESS) {
+    return OW_FAILURE;
+  }
+  
+  struct timeval tv;
+  gettimeofday(&tv,NULL);
+  int waitsecs = tv.tv_sec + 10;
+  while (!valid_forcetorque_data && (tv.tv_sec < waitsecs)) {
+    usleep(100000); // might return sooner than 100ms...
+    gettimeofday(&tv,NULL); // so measure the actual time.
+  }
+  if (!valid_forcetorque_data) {
+    ROS_WARN("Taring of FT sensor failed after waiting for 10 seconds");
+    return OW_FAILURE;
+  }
+
+  return OW_SUCCESS;
 }
 
 int CANbus::tactile_get_data(float *f1, float *f2, float *f3, float *palm) {
