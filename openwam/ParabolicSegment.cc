@@ -79,7 +79,7 @@ namespace OWD {
     } else if (accel == 0.0f) {
       // if accel is zero, our times will be infinite.
       ROS_ERROR("ParabolicSegment: zero accel specified for non-const segment\n");
-      throw -1;
+      throw "zero accel specified for non-const segment";
     }
 
     
@@ -91,7 +91,7 @@ namespace OWD {
     if (v_end >= max_vel) {
       if (max_vel == 0.0f) {
 	ROS_ERROR("ParabolicSegment: need a linear segment but max vel is zero\n");
-	throw -1;
+	throw "need a linear segment but max vel is zero";
       }
       // Need to add a linear segment
       time_a = max_vel/accel;
@@ -121,7 +121,7 @@ namespace OWD {
     
     if (time_a <= 0.0f) {
       ROS_ERROR("ParabolicSegment: cannot refit with accel time <= 0\n");
-      throw -1;
+      throw "cannot refit with accel time <=0";
     }
     double total_time = end_time - start_time;
     if (time_a < total_time/2.0) {
@@ -137,11 +137,11 @@ namespace OWD {
     }
     if (accel > max_a*1.10) {
       ROS_ERROR("ParabolicSegment: Accel of %3.3g exceeds limit of %3.3g\n",accel,max_a);
-      throw -1;
+      throw "Accel exceeds limit";
     }
     if (accel * time_a > max_vel*1.10) {
       ROS_ERROR("ParabolicSegment: Velocity of %3.3g exceeds limit of %3.3g\n",accel*time_a,max_vel);
-      throw -1;
+      throw "Velocity exceeds limit";
     }
     return;
   }
@@ -150,7 +150,7 @@ namespace OWD {
     // return the joint value at time t
     if ((t < start_time) || (t > end_time)) {
       ROS_ERROR("ParabolicSegment: requested time of %3.3f exceeds segment end time of %3.3f\n",t,end_time);
-      throw -1;
+      throw "Requested time exceeds segment end time";
     }
     
     if (dir == CONST) {

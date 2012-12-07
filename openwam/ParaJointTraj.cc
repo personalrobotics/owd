@@ -270,8 +270,9 @@ int ParaJointTraj::rescale_to_slowest(int slowest_joint,double max_end_time,doub
                                               accel_time);
                 ROS_DEBUG_NAMED("trajectory","ParaJointTraj: second fitting J%d: ",k);
                 parsegs[k].back().dump();
-            } catch (int e) {
-	      ROS_ERROR("ParaJointTraj: error in joint %d.  Limiting joint %d, max time %3.3f accel time %3.3f\n",k+1,slowest_joint+1,max_end_time,accel_time);
+            } catch (const char *msg) {
+	      ROS_ERROR("ParaJointTraj: error in joint %d: %s",k+1,msg);
+	      ROS_ERROR("ParaJointTraj: Limiting joint %d, max time %3.3f accel time %3.3f\n",slowest_joint+1,max_end_time,accel_time);
 	      ROS_ERROR("ParaJointTraj: dump of all joints for this seg:\n");
                 for (int k2 = 0; k2 < DOF; k2++) {
 		  ROS_ERROR("ParaJointTraj: joint %d: ",k2+1);
@@ -341,18 +342,18 @@ void ParaJointTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
       throw "Could not locate matching segment";
     }
     try {
-	// now that we've found the right segments, ask each segment
-	// to evaluate itself.
-	if (restart) {
-	  // if we stopped during a previous restart, use the
-	  // restart segments
-	  restart_parsegs[j].evaluate(tc.q[j],tc.qd[j],tc.qdd[j],restart_time);
-	} else {
-	  // otherwise, use the standard segments
-	  current_segment[j]->evaluate(tc.q[j],tc.qd[j],tc.qdd[j],time);
-	}
-      } catch(int e) {
-	if (restart) {
+      // now that we've found the right segments, ask each segment
+      // to evaluate itself.
+      if (restart) {
+	// if we stopped during a previous restart, use the
+	// restart segments
+	restart_parsegs[j].evaluate(tc.q[j],tc.qd[j],tc.qdd[j],restart_time);
+      } else {
+	// otherwise, use the standard segments
+	current_segment[j]->evaluate(tc.q[j],tc.qd[j],tc.qdd[j],time);
+      }
+    } catch(const char *msg) {
+      if (restart) {
 	  //	  ROS_ERROR("ParaJointTraj: error occurred within joint %d, restart segment, time %3.3f of %3.3f\n",
 	  //		    j+1,restart_time,restart_parsegs[0].end_time);
 	  //	  ROS_ERROR("ParaJointTraj: Dump of all joints for that segment:\n");
@@ -360,7 +361,7 @@ void ParaJointTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
 	    //	    ROS_ERROR("ParaJointTraj: %d: ",k+1);
 	    restart_parsegs[k].dump();
 	  }
-	} else {
+      } else {
 	  //	  ROS_ERROR("ParaJointTraj: Error occurred within joint %d, time %3.3f of %3.3f\n",
 	  //		    j+1,time,duration);
 	  //	  ROS_ERROR("ParaJointTraj: Dump of all joints for that segment:\n");
@@ -368,11 +369,12 @@ void ParaJointTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
 	    //	    ROS_ERROR("ParaJointTraj: %d: ",k+1);
 	    current_segment[k]->dump();
 	  }
-	}
-	runstate = STOP;
-	throw "problem in ParaJointTraj evaluate()";
-	
       }
+      runstate = STOP;
+      ROS_ERROR("Error in ParaJointTraj evaluate(): %s",msg);
+      throw "problem in ParaJointTraj evaluate()";
+	
+    }
     if (runstate == STOP) {
       // if we're supposed to be stationary, keep the position values we
       // calculated, but zero out the vel and accel
@@ -468,14 +470,15 @@ void ParaJointTraj::run() {
                                                max_joint_accel[j],
                                                max_end_time,
                                                accel_time);
-            } catch (int e) {
-                ROS_ERROR("ParaJointTraj: ERROR in joint %d.  Limiting joint %d, max time %3.3f accel time %3.3f\n",j+1,slowest_joint+1,max_end_time,accel_time);
-                ROS_ERROR("ParaJointTraj: Dump of all joints for this seg:\n");
-                for (int k2 = 0; k2 < DOF; k2++) {
-                    ROS_ERROR("ParaJointTraj: joint %d: ",k2+1);
-                    restart_parsegs[k2].dump();
-                }
-                throw; // give up
+            } catch (const char *msg) {
+	      ROS_ERROR("ParaJointTraj: ERROR in joint %d: %s",j+1,msg);
+	      ROS_ERROR("ParaJointTraj: Limiting joint %d, max time %3.3f accel time %3.3f\n",slowest_joint+1,max_end_time,accel_time);
+	      ROS_ERROR("ParaJointTraj: Dump of all joints for this seg:\n");
+	      for (int k2 = 0; k2 < DOF; k2++) {
+		ROS_ERROR("ParaJointTraj: joint %d: ",k2+1);
+		restart_parsegs[k2].dump();
+	      }
+	      throw "Could not rescale joint speeds"; // give up
             }
         }
     }

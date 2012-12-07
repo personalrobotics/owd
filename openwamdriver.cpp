@@ -1578,15 +1578,21 @@ bool WamDriver::move_until_stop(int joint, double stop, double limit, double vel
     std::vector<double> modified_joint_accel(Plugin::_joint_accel);
     // rescale the acceleration to match the new velocity
     modified_joint_accel[joint-1]=Plugin::_joint_accel[joint-1]*velocity/Plugin::_joint_vel[joint-1];
-    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,true,false,false);
-    ROS_DEBUG_NAMED("calibration",
-		    "Moving joint %d from %2.2f to %2.2f",
-		    joint,original_joint_pos,limit);
-    if (owam->run_trajectory(paratraj) == OW_FAILURE) {
-      ROS_ERROR_NAMED("calibration",
-		      "Error starting joint %d trajectory",joint);
+    try {
+      ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,true,false,false);
+      ROS_DEBUG_NAMED("calibration",
+		      "Moving joint %d from %2.2f to %2.2f",
+		      joint,original_joint_pos,limit);
+      if (owam->run_trajectory(paratraj) == OW_FAILURE) {
+	ROS_ERROR_NAMED("calibration",
+			"Error starting joint %d trajectory",joint);
         return false;
+      }
+    } catch (const char *msg) {
+      ROS_ERROR_NAMED("calibration","Could not create trajectory to move joint: %s",msg);
+      return false;
     }
+
 
     // loop until the trajectory finishes or gets stuck
     owam->lock(); // lock before checking jointstraj
@@ -1641,11 +1647,16 @@ bool WamDriver::move_joint(int joint, double newpos, double velocity) {
     std::vector<double> modified_joint_accel(Plugin::_joint_accel);
     // rescale the acceleration to match the new velocity
     modified_joint_accel[joint-1]=Plugin::_joint_accel[joint-1]*velocity/Plugin::_joint_vel[joint-1];
-    ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,false,false,false);
-    if (owam->run_trajectory(paratraj) == OW_FAILURE) {
-      ROS_ERROR_NAMED("calibration",
-		      "Error starting joint %d trajectory",joint);
+    try {
+      ParaJointTraj *paratraj = new ParaJointTraj(traj,modified_joint_vel,modified_joint_accel,false,false,false,false);
+      if (owam->run_trajectory(paratraj) == OW_FAILURE) {
+	ROS_ERROR_NAMED("calibration",
+			"Error starting joint %d trajectory",joint);
         return false;
+      }
+    } catch (const char *msg) {
+      ROS_ERROR_NAMED("calibration","Could not create trajectory to move joint: %s",msg);
+      return false;
     }
 
     // loop until the trajectory finishes or gets stuck
@@ -2557,6 +2568,18 @@ bool WamDriver::SetSpeed(owd_msgs::SetSpeed::Request &req,
     ROS_ERROR("%s",res.reason.c_str());
     return true;
   }
+  if (isinf(req.min_accel_time)) {
+    ROS_ERROR("Infinite min_accel_time passed to SetSpeed service call; entire call rejected.");
+      res.ok=false;
+      res.reason="min_accel_time was infinite.";
+      return true;
+  }
+  if (isnan(req.min_accel_time)) {
+    ROS_ERROR("NAN min_accel_time passed to SetSpeed service call; entire call rejected.");
+    res.ok=false;
+    res.reason="min_accel_time was NAN.";
+    return true;
+  }
   for (unsigned int i=0; i<nJoints; ++i) {
     if (isinf(req.velocities[i])) {
       ROS_ERROR("Infinite velocity passed to SetSpeed service call; entire call rejected.");
@@ -2942,11 +2965,17 @@ bool WamDriver::StepJoint(owd_msgs::StepJoint::Request &req,
   owam->posSmoother.getSmoothedPVA(owam->heldPositions);
 #endif // BUILD_FOR_SEA
   std::string trajid = Trajectory::random_id();
-  StepTraj *straj = new StepTraj(trajid, nJoints, req.joint, owam->heldPositions+1, req.radians);
-  if (owam->run_trajectory(straj) != OW_SUCCESS) {
-    ROS_ERROR("Could not start Servo traj");
+  try {
+    StepTraj *straj = new StepTraj(trajid, nJoints, req.joint, owam->heldPositions+1, req.radians);
+    if (owam->run_trajectory(straj) != OW_SUCCESS) {
+      ROS_ERROR("Could not start Servo traj");
+      return false;
+    }
+  } catch (const char *msg) {
+    ROS_ERROR("Could not construct StepTraj: %s",msg);
     return false;
   }
+
   ROS_DEBUG_NAMED("servo","Starting servo trajectory %s",trajid.c_str());
   return true;
 }
