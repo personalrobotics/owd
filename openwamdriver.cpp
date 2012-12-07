@@ -2329,7 +2329,8 @@ bool WamDriver::DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
   }
   owam->unlock();
   for (unsigned int tl_check=tl_start,ws_check=ws_start; tl_check < trajectory_list.size(); ++tl_check,++ws_check) {
-    while ((tl_check < trajectory_list.size()) && (p != trajectory_list[tl_check]->end_position)) {
+    // make sure previous endpoint matches beginning of next traj
+    while ((tl_check < trajectory_list.size()) && (p != trajectory_list[tl_check]->start_position)) {
       // as long as the points don't match, delete the queued traj
       trajectory_list.erase(trajectory_list.begin()+tl_check);
       if (ws_check < wamstate.trajectory_queue.size()) {
