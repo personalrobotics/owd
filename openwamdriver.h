@@ -211,7 +211,7 @@ private:
     JointPos desiredJointPositions, vLastCommand;
     struct timeval trajstarttime;
     bool intraj;
-    std::list<Trajectory *> trajectory_list;
+    std::vector<Trajectory *> trajectory_list;
     char last_trajectory_error[200];
     int BH_model; /// model number of the hand, either 260, 280, or 0 (no hand)
     bool ForceTorque; /// whether the Force/Torque sensor is installed

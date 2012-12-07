@@ -2279,7 +2279,7 @@ bool WamDriver::DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
   return true;
 #endif
 
-  std::list<OWD::Trajectory *>::iterator tl_it;
+  std::vector<OWD::Trajectory *>::iterator tl_it;
   std::vector<owd_msgs::TrajInfo>::iterator ws_it;
   // lock against re-queuing by Update() function
   boost::mutex::scoped_lock lock(wamstate_mutex);
@@ -2297,7 +2297,7 @@ bool WamDriver::DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
     } else {
       owam->unlock();
       for (tl_it = trajectory_list.begin(),
-             ws_it=wamstate.trajectory_queue.begin();
+             ws_it=wamstate.trajectory_queue.begin()+1;
            tl_it != trajectory_list.end(); ++tl_it,++ws_it) {
 	if (tl_it != trajectory_list.end()) {
 	  if ((*tl_it)->id == delete_id) {
@@ -2305,6 +2305,7 @@ bool WamDriver::DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
 	    if (ws_it != wamstate.trajectory_queue.end()) {
 	      wamstate.trajectory_queue.erase(ws_it);
 	    }
+	    break;
 	  }
         }
       }
@@ -2313,13 +2314,13 @@ bool WamDriver::DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
   // now look for discontinuities in position
   owam->lock();
   JointPos p;
-  tl_it=trajectory_list.begin();
-  ws_it=wamstate.trajectory_queue.begin();
+  unsigned int tl_start(0), ws_start(1); // start checking first queued traj
   if (owam->jointstraj) {
     p=owam->jointstraj->end_position;
   } else if (trajectory_list.size() > 0) {
     p=(*tl_it)->end_position;
-    ++tl_it; ++ws_it;
+    tl_start=1; // start checking second queued traj
+    ws_start=2;
   } else {
     // no more trajectories
     owam->unlock();
@@ -2327,16 +2328,16 @@ bool WamDriver::DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
     return true;
   }
   owam->unlock();
-  while (tl_it != trajectory_list.end()) {
-    while (p != (*tl_it)->end_position) {
-      // mismatch, so delete
-      trajectory_list.erase(tl_it);
-      wamstate.trajectory_queue.erase(ws_it);
-      ++tl_it; ++ws_it;
+  for (unsigned int tl_check=tl_start,ws_check=ws_start; tl_check < trajectory_list.size(); ++tl_check,++ws_check) {
+    while ((tl_check < trajectory_list.size()) && (p != trajectory_list[tl_check]->end_position)) {
+      // as long as the points don't match, delete the queued traj
+      trajectory_list.erase(trajectory_list.begin()+tl_check);
+      if (ws_check < wamstate.trajectory_queue.size()) {
+	wamstate.trajectory_queue.erase(wamstate.trajectory_queue.begin()+ws_check);
+      }
     }
-    if (tl_it != trajectory_list.end()) {
-      p = (*tl_it)->end_position;
-      ++tl_it; ++ws_it;
+    if (tl_check < trajectory_list.size()) {
+      p=trajectory_list[tl_check]->end_position;
     }
   }
   ROS_INFO("DeleteTrajectory processed: new queue size %zd",
@@ -2528,9 +2529,10 @@ bool WamDriver::CancelAllTrajectories(
   while (trajectory_list.size() > 0) {
     // remove each one from the list first, then delete it.
     // that way we won't screw up other threads
-    std::list<OWD::Trajectory *>::iterator it=trajectory_list.begin();
-    trajectory_list.pop_front();
-    delete *it;
+    std::vector<OWD::Trajectory *>::iterator it=trajectory_list.begin();
+    OWD::Trajectory *deleteme = *it;  // get the pointer value
+    trajectory_list.erase(it); // remove from the vector
+    delete deleteme;  // delete the actual traj
   }
   if (owam->jointstraj) {
     owam->cancel_trajectory();
@@ -2806,7 +2808,7 @@ void WamDriver::Update() {
   // make sure already holding position
   if (!owam->holdpos || (owam->stiffness < 1.0)) {
     ROS_ERROR("WAM not holding position; cannot start trajectory");
-    for (std::list<OWD::Trajectory *>::iterator it=trajectory_list.begin();
+    for (std::vector<OWD::Trajectory *>::iterator it=trajectory_list.begin();
          it != trajectory_list.end(); ++it) {
       delete *it;
     }
@@ -2825,7 +2827,7 @@ void WamDriver::Update() {
   if (firstpoint != curpoint) {
     ROS_ERROR("Arm position doesn't match queued trajectory start");
     ROS_ERROR("Clearing trajectory queue");
-    for (std::list<OWD::Trajectory *>::iterator it=trajectory_list.begin();
+    for (std::vector<OWD::Trajectory *>::iterator it=trajectory_list.begin();
          it != trajectory_list.end(); ++it) {
       delete *it;
     }
@@ -2838,7 +2840,7 @@ void WamDriver::Update() {
   if (owam->run_trajectory(trajectory_list.front()) == OW_FAILURE) {
     ROS_ERROR("Could not start queued trajectory");
   }
-  trajectory_list.pop_front();
+  trajectory_list.erase(trajectory_list.begin());
   if (wamstate.trajectory_queue.size() > 0) {
     wamstate.trajectory_queue.front().state=owd_msgs::TrajInfo::state_active;
   }
