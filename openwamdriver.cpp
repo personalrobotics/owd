@@ -1982,6 +1982,16 @@ bool WamDriver::AddTrajectory(owd_msgs::AddTrajectory::Request &req,
     }
   }
 
+  if (req.traj.blend_radius.size() == 0) {
+    req.traj.blend_radius.resize(req.traj.positions.size(),0);
+  } else if (req.traj.blend_radius.size() != req.traj.positions.size()) {
+    res.reason="Size of blend radius array does not match size of position array";
+    ROS_ERROR_NAMED("AddTrajectory","%s",res.reason.c_str());
+    res.id = req.traj.id;
+    res.ok=false;
+    return true;
+  }
+
   // get trajectory start point
   JointPos firstpoint = JointPos(req.traj.positions[0].j);
 
