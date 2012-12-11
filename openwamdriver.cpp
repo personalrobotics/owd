@@ -1977,6 +1977,7 @@ bool WamDriver::AddTrajectory(owd_msgs::AddTrajectory::Request &req,
 	ROS_ERROR("One or more values in the AddTrajectory request were INF or NAN");
 	res.ok=false;
 	res.reason="One or more joint values were INF or NAN";
+	return true;
       }
     }
   }
