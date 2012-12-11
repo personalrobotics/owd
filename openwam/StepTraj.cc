@@ -34,7 +34,7 @@ namespace OWD {
     end_position = start_position;
     duration=3.0;  // always 3 seconds total
     if ((joint<1) || (joint>Joint::Jn)) {
-      char msg[200];
+      static char msg[200];
       snprintf(msg,200,"Joint must be between 1 and %d",Joint::Jn);
       throw((const char *)msg);
     }
