@@ -137,6 +137,17 @@ namespace OWD {
     /// that will yield the requested workspace forces/torques
     static const JointPos JacobianTranspose_times_vector(R6 &v);
 
+    /// \brief Multiply the supplied vector by the Jacobian Transpose in 
+    /// EE frame
+    ///
+    /// \param v an R6 vector of workspace positions and rotations
+    /// \returns a JointPos vector of length NJOINTS
+    ///
+    /// This function is typically used to compute the joint torques
+    /// that will yield the requested EE frame forces/torques
+    static const JointPos JacobianEETranspose_times_vector(R6 &v);
+
+
     /// \brief Multiply the supplied vector by the Jacobian Pseudo_Inverse
     ///
     static const JointPos JacobianPseudoInverse_times_vector(R6 &v);

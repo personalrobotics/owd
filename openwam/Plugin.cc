@@ -137,6 +137,14 @@ namespace OWD {
     return jp;
   }
 
+  const JointPos Plugin::JacobianEETranspose_times_vector(R6 &v) {
+    double result[OWD::Kinematics::NJOINTS];
+    OWD::Kinematics::JacobianEETranspose_times_vector(v,result);
+    JointPos jp;
+    jp.SetFromArray(OWD::Kinematics::NJOINTS,result);
+    return jp;
+  }
+
   const JointPos Plugin::Nullspace_projection(JointPos v) {
     double result[OWD::Kinematics::NJOINTS];
     OWD::Kinematics::Nullspace_projection(&v[0], result);

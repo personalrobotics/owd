@@ -111,6 +111,22 @@ namespace OWD {
 	      B, &INC,
 	      &BETA, out, &INC);
   }
+ 
+  // Computes the product of Jacobian (in EE frame) transpose with the
+  // input vector
+  void Kinematics::JacobianEETranspose_times_vector(R6 &v, double *out) {
+    if (!valid_Jacobian) {
+      throw "Current Jacobian matrix not available";
+    }
+    int M=NDIMS;
+    int N=NJOINTS;
+    double B[6];
+    B[0]=v.v[0]; B[1]=v.v[1]; B[2]=v.v[2]; B[3]=v.w[0]; B[4]=v.w[1]; B[5]=v.w[2];
+    dgemv_(&TRANST, &M,  &N, &ALPHA,
+	      &JacobianEE [0][0], &LD_Jacobian,
+	      B, &INC,
+	      &BETA, out, &INC);
+  }
     
   SE3 Kinematics::forward_kinematics(Link* link){
     SE3 H = (SE3)link[Link::L0];

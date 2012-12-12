@@ -70,6 +70,17 @@ namespace OWD {
     /// that will yield the requested workspace forces/torques
     static void Jacobian0Transpose_times_vector(R6 &v, double *out);
 
+    /// \brief Multiply the EE-frame Jacobian Transpose by the
+    /// supplied vector
+    ///
+    /// \param v an R6 vector
+    /// \param {out} out A pointer to a previously-allocated array of
+    ///              NJOINTS doubles to hold the result
+    ///
+    /// This function is typically used to compute the joint torques
+    /// that will yield the requested forces/torques in EE frame
+    static void JacobianEETranspose_times_vector(R6 &v, double *out);
+
     /// \brief Multiply the Pseudo-Inverse of the base-frame Jacobian
     /// by the supplied vector.
     ///
