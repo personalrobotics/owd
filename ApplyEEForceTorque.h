@@ -7,8 +7,8 @@
  which exits in the owd_plugins -Moslem Kazemi
  **********************************************************************/
 
-#ifndef APPLYFORCETRAJ_HH
-#define APPLYFORCETRAJ_HH
+#ifndef APPLY_EE_FORCE_TORQUE_HH
+#define APPLY_EE_FORCE_TORQUE_HH
 
 #include "HybridPlugin.h"
 #include "ForceController.h"
@@ -74,4 +74,4 @@ public:
 
 };
 
-#endif // APPLYFORCETRAJ_HH
+#endif //

@@ -12,6 +12,7 @@
 #include <iostream>
 #include "openwam/Kinematics.hh"
 #include "ApplyForceTraj.h"
+#include "ApplyEEForceTorque.h"
 #include "DoorTraj.h"
 #include "WSTraj.h"
 #include "Servo2Traj.h"
@@ -35,6 +36,9 @@ HybridPlugin::HybridPlugin()
   n.param("log_hybridplugin_data",write_log_file,false);
 
   // Let our Trajectory classes register themselves
+  if (!ApplyEEForceTorque::Register()) {
+    throw "ApplyEEForceTorque trajectory failed to register";
+  }
   if (!ApplyForceTraj::Register()) {
     throw "ApplyForceTraj trajectory failed to register";
   }
@@ -74,6 +78,7 @@ HybridPlugin::~HybridPlugin() {
 
   // Tell our Trajectory classes to clean up.
   ApplyForceTraj::Shutdown();
+  ApplyEEForceTorque::Shutdown();
   DoorTraj::Shutdown();
   WSTraj::Shutdown();
   FTCheck::Shutdown();

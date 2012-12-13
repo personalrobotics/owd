@@ -1,3 +1,6 @@
+#ifndef VIBRATION_HH
+#define VIBRATION_HH
+
 #include "openmath/SO3.hh"
 #include "openwam/Plugin.hh"
 #include "math.h"
@@ -15,3 +18,5 @@ class Vibration {
   static const double twopi = 2.0*3.141592654;
   
 };
+
+#endif // VIBRATION_HH
