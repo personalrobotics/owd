@@ -89,6 +89,8 @@ ApplyEEForceTorque::ApplyEEForceTorque(R3 force, R3 torque, double dist_limit) :
         }
         force_controller.reset();
 
+        double torque_magnitude = torque.norm();
+
         // Set the start position from the current position
         start_position = hybridplug->target_arm_position;
         end_position = start_position;
@@ -96,9 +98,21 @@ ApplyEEForceTorque::ApplyEEForceTorque(R3 force, R3 torque, double dist_limit) :
         // Save the current Workspace endpoint position
         current_endpoint_target = endpoint_target = hybridplug->endpoint;
 
-        // Calculate the force/torque to apply at endpoint
         force_direction = force;
         force_direction.normalize();
+        if(force.norm() == 0.0)
+        {
+            force_direction *= 0.0;
+        }
+
+        torque_direction = torque;
+        torque_direction.normalize();
+        if(torque.norm() == 0.0)
+        {
+            torque_direction *= 0.0;
+        }
+
+        // Calculate the force/torque to apply at endpoint
         forcetorque_vector = R6(force, torque);
 
         // values used for debugging during development
@@ -234,7 +248,7 @@ void ApplyEEForceTorque::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t
     // take the dot product of the WS force with our force direction, so
     // that we just correct the on-axis forces.
     // we'll throw out the torques and set them to zero.
-    R6 net_force_torque((current_force_torque.v * force_direction) * force_direction, R3());
+    R6 net_force_torque((current_force_torque.v * force_direction) * force_direction, (current_force_torque.w * torque_direction) * torque_direction);
 
     // overall force/torque error in WS coordinates
     R6 workspace_forcetorque_error = forcetorque_vector - net_force_torque;
@@ -312,15 +326,17 @@ void ApplyEEForceTorque::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t
     // Compute the rotation error by taking the net rotation from the
     // current orientation to the original orientation and converting
     // it to axis-angle format
-    SO3 rotation_correction_SO3 = current_endpoint_target * (!(SO3) hybridplug->endpoint);
-    so3 rotation_correction = (so3) rotation_correction_SO3;
+    SO3 rotation_err_SO3 = current_endpoint_target * (!(SO3) hybridplug->endpoint);
+    so3 rotation_err = (so3) rotation_err_SO3;
 
-    R3 rotation_correction_R3 = rotation_correction.t() * rotation_correction.w();
-    hybridplug->net_force.data[17] = rotation_correction_R3[0];
-    hybridplug->net_force.data[18] = rotation_correction_R3[1];
-    hybridplug->net_force.data[19] = rotation_correction_R3[2];
+    R3 rotation_err_R3 = rotation_err.t() * rotation_err.w();
+    hybridplug->net_force.data[17] = rotation_err_R3[0];
+    hybridplug->net_force.data[18] = rotation_err_R3[1];
+    hybridplug->net_force.data[19] = rotation_err_R3[2];
 
-    R6 endpos_correction(position_correction, rotation_correction_R3);
+    R3 rotation_correction = rotation_err_R3; // - (rotation_err_R3 * torque_direction) * torque_direction;  
+
+    R6 endpos_correction(position_correction, rotation_correction);
     R3 desired_endpoint = (R3) hybridplug->endpoint + endpos_correction.v;
     endpositions.push(desired_endpoint);
 

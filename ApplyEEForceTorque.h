@@ -48,6 +48,7 @@ public:
 
     SE3 endpoint_target;
     R3 force_direction;
+    R3 torque_direction;
     R6 forcetorque_vector;
     R3 last_endpoint_velocity, last_endpoint;
     static const double joint_vel_limit = 0.03927; // rad/s; .39 = 90deg/sec
