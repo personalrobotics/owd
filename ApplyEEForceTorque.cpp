@@ -89,8 +89,6 @@ ApplyEEForceTorque::ApplyEEForceTorque(R3 force, R3 torque, double dist_limit) :
         }
         force_controller.reset();
 
-        double torque_magnitude = torque.norm();
-
         // Set the start position from the current position
         start_position = hybridplug->target_arm_position;
         end_position = start_position;
@@ -257,6 +255,10 @@ void ApplyEEForceTorque::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t
     // Pass the F/T error to the force controller to get
     // the joint torques to apply
     OWD::JointPos correction_torques(tc.q.size());
+    force_controller.tkp = 0.05;
+    force_controller.tkd = 0.0;
+    force_controller.tki = 0.005;
+ 
     correction_torques = force_controller.control(workspace_forcetorque_error);
 
     // log the 1-dimensional values from force controller
@@ -343,7 +345,8 @@ void ApplyEEForceTorque::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t
     OWD::JointPos joint_correction(tc.q.size());
     try
     {
-        joint_correction = hybridplug->JacobianPseudoInverse_times_vector(endpos_correction);
+        // joint_correction = hybridplug->JacobianPseudoInverse_times_vector(endpos_correction);
+        joint_correction *= 0.0;
     } catch (const char *err)
     {
         // no valid Jacobian, for whatever reason, so give up.

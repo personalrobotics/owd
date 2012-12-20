@@ -449,7 +449,7 @@ ForceController ApplyForceTraj::force_controller;
 ros::ServiceServer ApplyForceTraj::ss_ApplyForce,
   ApplyForceTraj::ss_SetForceGains;
   
-double ApplyForceTraj::velocity_damping_gain(0.5);
+double ApplyForceTraj::velocity_damping_gain(0.2);
 
 ApplyForceTraj *ApplyForceTraj::current_traj(NULL);
 
