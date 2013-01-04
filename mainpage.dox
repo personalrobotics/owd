@@ -19,7 +19,7 @@ recommended for desktop systems running Xenomai, while the Peak
 IPEH-002093 performs well on laptops if Xenomai is not required.
 
 The Peak Linux driver can be obtained from
-  \b http://www.peak-system.com/fileadmin/media/linux/files/peak-linux-driver.6.20.tar.gz
+  \b http://www.peak-system.com/fileadmin/media/linux/files/peak-linux-driver-7.7.tar.gz
 
 Build it as follows:
 \verbatim
