@@ -13,8 +13,8 @@
   <depend package="owd_msgs"/>
   <depend package="geometry_msgs"/>
   <depend package="tf"/>
-  <rosdep name="blas"/>
-  <rosdep name="lapack"/>
+  <rosdep name="libblas-dev"/>
+  <rosdep name="liblapack-dev"/>
   <rosdep name="gfortran"/>
-  <rosdep name="xenomai"/>
+  <rosdep name="libxenomai-dev"/>
 </package>
