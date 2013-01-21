@@ -46,6 +46,7 @@ public:
 
   OWD::JointPos limit_excursion_and_velocity(double travel);
   double limit_force_correction_movement(double correction_distance);
+  bool clamp_torques(OWD::JointPos &torques);
 
   SE3 endpoint_target;
   R3 force_direction;

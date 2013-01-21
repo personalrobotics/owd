@@ -8,6 +8,7 @@
 #include "ApplyForceTraj.h"
 #include <openwam/Kinematics.hh>
 #include <openwam/ControlLoop.hh>
+#include <openwam/Puck.hh>
 
 // Process our ApplyForce service calls from ROS
 bool ApplyForceTraj::ApplyForce(owd_msgs::ApplyForce::Request &req,
@@ -435,6 +436,26 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
 	 correction_torque);
 
   return OWD::Plugin::JacobianTranspose_times_vector(correction_ft);
+}
+
+bool ApplyForceTraj::clamp_torques(OWD::JointPos &torques)
+{
+    // Only operate at 80% of the maximum torque.
+    double max_ratio = 1.2;
+
+    // Compute the normalization coefficient necessary to not exceed any 
+    // of the clipping torques.
+    for (size_t i = 0; i < torques.size(); ++i) {
+        double const max_torque = Puck::MAX_CLIPPABLE_TRQ[i];
+        double const ratio = torques[i] / max_torque;
+        max_ratio = std::max(ratio, max_ratio);
+    }
+
+    // Scale the torques to satisfy the bounds.
+    for (size_t i = 0; i < torques.size(); ++i) {
+        torques[i] /= max_ratio;
+    }
+    return max_ratio > 1;
 }
 
 void ApplyForceTraj::SetVibration(double hand_x, double hand_y, double hand_z,
