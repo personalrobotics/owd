@@ -8,7 +8,7 @@
 #include "ApplyForceTraj.h"
 #include <openwam/Kinematics.hh>
 #include <openwam/ControlLoop.hh>
-#include <openwam/Puck.hh>
+#include <openwam/Joint.hh>
 
 // Process our ApplyForce service calls from ROS
 bool ApplyForceTraj::ApplyForce(owd_msgs::ApplyForce::Request &req,
@@ -16,6 +16,7 @@ bool ApplyForceTraj::ApplyForce(owd_msgs::ApplyForce::Request &req,
   // compute a new trajectory
   try {
     ApplyForceTraj *newtraj = new ApplyForceTraj(R3(req.x,req.y,req.z),req.f);
+
     if (req.vibrate_amplitude_m > 0) {
       newtraj->SetVibration(req.vibrate_hand_x,
 			     req.vibrate_hand_y,
@@ -26,6 +27,7 @@ bool ApplyForceTraj::ApplyForce(owd_msgs::ApplyForce::Request &req,
     if (req.rotational_compliance) {
       newtraj->rotational_leeway = 10.0/180.0*3.14159; // 10 degrees
     }
+
     // send it to the arm
     if (OWD::Plugin::AddTrajectory(newtraj,res.reason)) {
       current_traj = newtraj;
@@ -265,6 +267,9 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
       ;
   }
 
+  // Clamp the torques to safe values that won't trigger a torque fault.
+  clamp_torques(tc.t);
+
   if (rotational_leeway > 0) {
     // we will servo the current_endpoint_target in response to torque
     // readings, up to a limit of rotational_leeway radians from 
@@ -440,14 +445,14 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
 
 bool ApplyForceTraj::clamp_torques(OWD::JointPos &torques)
 {
-    // Only operate at 80% of the maximum torque.
-    double max_ratio = 1.2;
+    static double const safety_torques[] = { 15.0, 30.0, 10.0, 15.0, 3.0, 3.0, 3.0 };
+    double max_ratio = 1.0;
 
     // Compute the normalization coefficient necessary to not exceed any 
     // of the clipping torques.
     for (size_t i = 0; i < torques.size(); ++i) {
-        double const max_torque = Puck::MAX_CLIPPABLE_TRQ[i];
-        double const ratio = torques[i] / max_torque;
+        double const max_torque = safety_torques[i];
+        double const ratio = std::fabs(torques[i]) / max_torque;
         max_ratio = std::max(ratio, max_ratio);
     }
 
@@ -479,7 +484,6 @@ bool ApplyForceTraj::Register() {
   ros::NodeHandle n("~");
   ss_ApplyForce = n.advertiseService("ApplyForce",&ApplyForceTraj::ApplyForce);
   ss_SetForceGains = n.advertiseService("SetForceGains",&ApplyForceTraj::SetForceGains);
-
   return true;
 }
 
