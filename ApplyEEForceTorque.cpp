@@ -10,6 +10,7 @@
 #include "ApplyEEForceTorque.h"
 #include <openwam/Kinematics.hh>
 #include <openwam/ControlLoop.hh>
+#include <openwam/Puck.hh>
 
 // Process our ApplyForce service calls from ROS
 bool ApplyEEForceTorque::ApplyForce(owd_msgs::ApplyEEForceTorque::Request &req, owd_msgs::ApplyEEForceTorque::Response &res)
@@ -284,6 +285,7 @@ void ApplyEEForceTorque::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t
     for (unsigned int i = 0; i < tc.t.size(); ++i)
     {
         tc.t[i] = correction_torques[i] + ideal_torques[i] + damping_torques[i];
+        clip_torques(tc.t);
     }
 
     if (rotational_leeway > 0)
@@ -471,6 +473,22 @@ OWD::JointPos ApplyEEForceTorque::limit_excursion_and_velocity(double travel)
     R6 correction_ft = R6((excursion_return_force + velocity_return_force) * force_direction, correction_torque);
 
     return OWD::Plugin::JacobianTranspose_times_vector(correction_ft);
+}
+
+bool ApplyEEForceTorque::clip_torques(OWD::JointPos &torques)
+{
+    bool clamped = false;
+    for (size_t i = 0; i < torques.size(); ++i) {
+        double const max_torque = Puck::MAX_CLIPPABLE_TRQ[i];
+        if (torques[i] < max_torque) {
+            torques[i] = -max_torque;
+            clamped = true;
+        } else if (torques[i] > max_torque) {
+            torques[i] =  max_torque;
+            clamped = true;
+        }
+    }
+    return clamped;
 }
 
 void ApplyEEForceTorque::SetVibration(double hand_x, double hand_y, double hand_z, double amplitude, double frequency)
