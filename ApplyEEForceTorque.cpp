@@ -285,7 +285,7 @@ void ApplyEEForceTorque::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t
     for (unsigned int i = 0; i < tc.t.size(); ++i)
     {
         tc.t[i] = correction_torques[i] + ideal_torques[i] + damping_torques[i];
-        clip_torques(tc.t);
+        clamp_torques(tc.t);
     }
 
     if (rotational_leeway > 0)
@@ -475,20 +475,23 @@ OWD::JointPos ApplyEEForceTorque::limit_excursion_and_velocity(double travel)
     return OWD::Plugin::JacobianTranspose_times_vector(correction_ft);
 }
 
-bool ApplyEEForceTorque::clip_torques(OWD::JointPos &torques)
+bool ApplyEEForceTorque::clamp_torques(OWD::JointPos &torques)
 {
-    bool clamped = false;
+    double max_ratio = 1.0;
+
+    // Compute the normalization coefficient necessary to not exceed any 
+    // of the clipping torques.
     for (size_t i = 0; i < torques.size(); ++i) {
         double const max_torque = Puck::MAX_CLIPPABLE_TRQ[i];
-        if (torques[i] < max_torque) {
-            torques[i] = -max_torque;
-            clamped = true;
-        } else if (torques[i] > max_torque) {
-            torques[i] =  max_torque;
-            clamped = true;
-        }
+        double const ratio = torques[i] / max_torque;
+        max_ratio = std::max(ratio, max_ratio);
     }
-    return clamped;
+
+    // Scale the torques to satisfy the bounds.
+    for (size_t i = 0; i < torques.size(); ++i) {
+        torques[i] /= max_ratio;
+    }
+    return max_ratio > 1;
 }
 
 void ApplyEEForceTorque::SetVibration(double hand_x, double hand_y, double hand_z, double amplitude, double frequency)
