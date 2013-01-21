@@ -247,7 +247,8 @@ void ApplyEEForceTorque::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t
     // take the dot product of the WS force with our force direction, so
     // that we just correct the on-axis forces.
     // we'll throw out the torques and set them to zero.
-    R6 net_force_torque((current_force_torque.v * force_direction) * force_direction, (current_force_torque.w * torque_direction) * torque_direction);
+    // R6 net_force_torque((current_force_torque.v * force_direction) * force_direction, (current_force_torque.w * torque_direction) * torque_direction);
+    R6 net_force_torque((current_force_torque.v * force_direction) * force_direction, R3());
 
     // overall force/torque error in WS coordinates
     R6 workspace_forcetorque_error = forcetorque_vector - net_force_torque;
@@ -347,8 +348,8 @@ void ApplyEEForceTorque::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t
     OWD::JointPos joint_correction(tc.q.size());
     try
     {
-        // joint_correction = hybridplug->JacobianPseudoInverse_times_vector(endpos_correction);
-        joint_correction *= 0.0;
+        joint_correction = hybridplug->JacobianPseudoInverse_times_vector(endpos_correction);
+        // joint_correction *= 0.0;
     } catch (const char *err)
     {
         // no valid Jacobian, for whatever reason, so give up.
