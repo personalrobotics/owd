@@ -445,7 +445,8 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
 
 bool ApplyForceTraj::clamp_torques(OWD::JointPos &torques)
 {
-    static double const safety_torques[] = { 15.0, 30.0, 10.0, 15.0, 3.0, 3.0, 3.0 };
+    //static double const safety_torques[] = { 15.0, 30.0, 10.0, 15.0, 3.0, 3.0, 3.0 };
+    static double const safety_torques[] = { 2 * 15.0, 2 * 30.0, 2 * 10.0, 2 * 15.0, 3.0, 3.0, 3.0 };
     double max_ratio = 1.0;
 
     // Compute the normalization coefficient necessary to not exceed any 
