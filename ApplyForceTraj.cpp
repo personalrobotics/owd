@@ -8,9 +8,7 @@
 #include "ApplyForceTraj.h"
 #include <openwam/Kinematics.hh>
 #include <openwam/ControlLoop.hh>
-#include <openwam/Joint.hh>
-
-// Process our ApplyForce service calls from ROS
+#include <openwam/Joint.hh> // Process our ApplyForce service calls from ROS
 bool ApplyForceTraj::ApplyForce(owd_msgs::ApplyForce::Request &req,
 				owd_msgs::ApplyForce::Response &res) {
   // compute a new trajectory
@@ -329,6 +327,7 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
     runstate=OWD::Trajectory::ABORT;
     return;
   }
+
   hybridplug->net_force.data[20]=joint_correction[0];
   hybridplug->net_force.data[21]=joint_correction[1];
   hybridplug->net_force.data[22]=joint_correction[2];
@@ -346,6 +345,17 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
     joint_correction += configuration_correction;
   } catch (const char *err) {
     // don't worry about it
+  }
+
+  // Constrain the maximum change in joint positions. This prevents a large PID
+  // gain from causing a torque fault.
+  double const max_correction = 0.02;
+  double ratio = 1.0;
+  for (size_t i = 0; i < joint_correction.size(); ++i) {
+      ratio = std::max(std::fabs(joint_correction[i] / max_correction), ratio);
+  }
+  for (size_t i = 0; i < joint_correction.size(); ++i) {
+      joint_correction[i] /= ratio;
   }
 
   // add the correction to the joint values
@@ -445,14 +455,12 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
 
 bool ApplyForceTraj::clamp_torques(OWD::JointPos &torques)
 {
-    //static double const safety_torques[] = { 15.0, 30.0, 10.0, 15.0, 3.0, 3.0, 3.0 };
-    static double const safety_torques[] = { 2 * 15.0, 2 * 30.0, 2 * 10.0, 2 * 15.0, 3.0, 3.0, 3.0 };
     double max_ratio = 1.0;
 
     // Compute the normalization coefficient necessary to not exceed any 
     // of the clipping torques.
     for (size_t i = 0; i < torques.size(); ++i) {
-        double const max_torque = safety_torques[i];
+        double const max_torque = Joint::MAX_SAFE_TORQ[i];
         double const ratio = std::fabs(torques[i]) / max_torque;
         max_ratio = std::max(ratio, max_ratio);
     }
@@ -476,7 +484,7 @@ ForceController ApplyForceTraj::force_controller;
 ros::ServiceServer ApplyForceTraj::ss_ApplyForce,
   ApplyForceTraj::ss_SetForceGains;
   
-double ApplyForceTraj::velocity_damping_gain(0.2);
+double ApplyForceTraj::velocity_damping_gain(0.5);
 
 ApplyForceTraj *ApplyForceTraj::current_traj(NULL);
 
