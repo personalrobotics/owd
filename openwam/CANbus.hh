@@ -137,6 +137,7 @@ public:
   Butterworth<R3> ft_force_filter, ft_torque_filter;
   float* tactile_data;
   bool valid_forcetorque_data, valid_filtered_forcetorque_data;
+  int valid_forcetorque_flag;
   bool valid_tactile_data;
   bool tactile_top10;
   Puck *pucks;
@@ -383,6 +384,7 @@ public:
   int wait_for_finger_reset(int32_t id);
 
   int ft_get_data(double *values, double *filtered_values=NULL);
+  int ft_get_state();
   int ft_tare();
 
   int tactile_get_data(float *f1, float *f2, float *f3, float *palm);

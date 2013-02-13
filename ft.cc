@@ -32,6 +32,7 @@ FT::~FT() {
 
 void FT::AdvertiseAndSubscribe(ros::NodeHandle &n) {
   pub_ft = n.advertise<geometry_msgs::WrenchStamped>("forcetorque", 1);
+  pub_ft_state = n.advertise<owd_msgs::ForceState>("forcestate", 1);
   pub_filtered_ft = n.advertise<geometry_msgs::WrenchStamped>("filtered_forcetorque", 1);
   pub_accel = n.advertise<geometry_msgs::Vector3>("accelerometer", 1);
   ss_tare = n.advertiseService("ft_tare",&FT::Tare,this);
@@ -50,10 +51,15 @@ void FT::Pump(const ros::TimerEvent& e) {
 bool FT::Publish() {
   static double ft_values[6];
   static double ft_filtered_values[6];
+  
   if (bus->ft_get_data(ft_values,ft_filtered_values) != OW_SUCCESS) {
     ROS_DEBUG_NAMED("ft","Unable to get data from Force/Torque sensor");
     return false;
   }
+
+  //force torque state
+  ft_state.saturated_axis = bus->ft_get_state();
+  pub_ft_state.publish(ft_state);
 
   // set the time
   ft_vals.header.stamp = ros::Time::now();

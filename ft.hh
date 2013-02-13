@@ -25,16 +25,19 @@
 #include <geometry_msgs/WrenchStamped.h>
 #include <geometry_msgs/Vector3.h>
 #include <owd_msgs/Reset.h>
+#include <owd_msgs/ForceState.h>
 
 class FT {
 public:
-  ros::Publisher pub_ft, pub_filtered_ft, pub_accel;
+  ros::Publisher pub_ft, pub_filtered_ft, pub_accel, pub_ft_state;
   ros::ServiceServer ss_tare;
   CANbus *bus;
 
   ros::NodeHandle node;
   geometry_msgs::WrenchStamped ft_vals;
   geometry_msgs::Vector3 accel_vals;
+  owd_msgs::ForceState ft_state;
+
   bool valid_data;
 
   FT(CANbus *cb);

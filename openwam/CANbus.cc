@@ -39,6 +39,7 @@
 #include <errno.h>
 
 
+
 CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, bool tactile, bool log_cb_data) : 
   puck_state(-1),BH280_installed(bh280),id(bus_id),fw_vers(0),trq(NULL),
   pos(NULL), jpos(NULL), forcetorque_data(NULL), accelerometer_data(NULL), 
@@ -46,6 +47,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   ft_force_filter(2,10.0), ft_torque_filter(2,10.0),
   tactile_data(NULL),
   valid_forcetorque_data(false), valid_filtered_forcetorque_data(false),
+  valid_forcetorque_flag(-1), 
   valid_tactile_data(false),
   tactile_top10(false), pucks(NULL),n_arm_pucks(number_of_arm_pucks),
   simulation(false), received_position_flags(0), received_state_flags(0),
@@ -1270,14 +1272,29 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
     filtered_forcetorque_data[2] = force[2];
 
   } else if ((msgid & 0x41F) == 0x40B) {
-    
-    if (msg[6] & 64) {
-      // BAD flag has been set
-      valid_forcetorque_data=false;
-    } else {
-      valid_forcetorque_data=true;
+    // Group 11 is Torque
 
-      // Group 11 is Torque
+    valid_forcetorque_data=true;
+    valid_forcetorque_flag = 0;
+
+    if (msg[6] & 128) {
+      // FT error byte has been sent and re-tare suggested flag has been set
+      // FT appears to saturate then return to slightly offset zero
+      // This flag is always set when the error byte exists
+     
+      if (msg[6] & 64) {
+	// Bad force torque data flag has been set
+	// Discard data
+	valid_forcetorque_data = false;
+	valid_forcetorque_flag = -1; 
+      }
+      else {
+	//these bits say which of the axis have saturated since latest re-tare
+	valid_forcetorque_flag = msg[6] & 63;
+      }
+    }
+  
+    if (valid_forcetorque_data) {
       forcetorque_data[3]=ft_combine(msg[0], msg[1]) / 4096.0;
       forcetorque_data[4]=ft_combine(msg[2], msg[3]) / 4096.0;
       forcetorque_data[5]=ft_combine(msg[4], msg[5]) / 4096.0;
@@ -1321,8 +1338,10 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
       filtered_forcetorque_data[3] = torque[0];
       filtered_forcetorque_data[4] = torque[1];
       filtered_forcetorque_data[5] = torque[2];
-    }
-  } else if ((msgid & 0x41F) == 0x40C) {
+    } 
+  } //end of torque block
+
+    else if ((msgid & 0x41F) == 0x40C) {
     // Group 12 is accelerometer data
     if (accelerometer_data) {
       accelerometer_data[0]=ft_combine(msg[0], msg[1]) / 1024.0;
@@ -2053,6 +2072,15 @@ int CANbus::ft_get_data(double *values, double *filtered_values) {
   }
   return OW_SUCCESS;
 }
+
+//return forcetorque state flag
+int CANbus::ft_get_state() {
+  int flag;
+  flag = valid_forcetorque_flag;
+  return flag;
+}
+
+
 
 int CANbus::ft_tare() {
 
