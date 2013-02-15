@@ -265,18 +265,21 @@ namespace OWD {
    */
   void Kinematics::Jacobians(double JN[][NDIMS], double J0[][NDIMS], Link *links){
     SE3 U;
+    double local_JN[NJOINTS][NDIMS];
+    if (!JN) {
+      JN=local_JN;  // use our temp storage so that we can successfully
+                    // compute J0 even if JN isn't defined
+    }
 
     for(int l=Link::Ln; l>=Link::L1; --l){
       U = ((SE3)links[l]) * U;
 
-      if (JN) {
-	JN[l-1][0] = U[SE3::TX]*U[SE3::NY] - U[SE3::TY]*U[SE3::NX];
-	JN[l-1][1] = U[SE3::TX]*U[SE3::OY] - U[SE3::TY]*U[SE3::OX];
-	JN[l-1][2] = U[SE3::TX]*U[SE3::AY] - U[SE3::TY]*U[SE3::AX];
-	JN[l-1][3] = U[SE3::NZ];
-	JN[l-1][4] = U[SE3::OZ];
-	JN[l-1][5] = U[SE3::AZ];
-      }
+      JN[l-1][0] = U[SE3::TX]*U[SE3::NY] - U[SE3::TY]*U[SE3::NX];
+      JN[l-1][1] = U[SE3::TX]*U[SE3::OY] - U[SE3::TY]*U[SE3::OX];
+      JN[l-1][2] = U[SE3::TX]*U[SE3::AY] - U[SE3::TY]*U[SE3::AX];
+      JN[l-1][3] = U[SE3::NZ];
+      JN[l-1][4] = U[SE3::OZ];
+      JN[l-1][5] = U[SE3::AZ];
     }
 
     // Rotate the end-effector Jacobian to the base frame
