@@ -87,6 +87,14 @@ void DefaultJSController::stop(unsigned int j) {
   }
 }
 
+bool DefaultJSController::active(unsigned int j) {
+  if (j<jcontrollers.size()) {
+    return jcontrollers[j].state() == Controller::RUN;
+  } else {
+    throw "Index out of range";
+  }
+}
+
 int DefaultJSController::DOF() {
   return jcontrollers.size();
 }

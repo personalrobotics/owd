@@ -431,6 +431,9 @@ namespace OWD {
     /// When a controller has been stopped the evaluate function should
     /// return zero torque for that joint
     virtual void stop(unsigned int j) =0;
+    
+    /// \brief Whether the controller is active or not
+    virtual bool active(unsigned int j) =0;
 
     static JSController *find_controller(std::string name);
     const std::string &name;

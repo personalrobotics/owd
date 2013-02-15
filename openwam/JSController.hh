@@ -46,7 +46,7 @@ namespace OWD {
     virtual void reset(unsigned int j);
     virtual bool run(unsigned int j) throw (const char *);
     virtual void stop(unsigned int j);
-
+    virtual bool active(unsigned int j);
 
   private:
     std::vector<JointCtrlPID> jcontrollers;

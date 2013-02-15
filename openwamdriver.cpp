@@ -2388,11 +2388,14 @@ bool WamDriver::SetJointStiffness(owd_msgs::SetJointStiffness::Request &req,
   double current_pos[8];
   owam->hold_position(current_pos);
   for (unsigned int i=0; i<nJoints; ++i) {
-    if (req.stiffness[i] != 0) {
+    if (req.stiffness[i] == 0) {
+      owam->jscontroller->stop(i);
+    } else if (!owam->jscontroller->active(i)) {
+      // since the joint was not previously active, move
+      // the setpoint to the current position
+      owam->heldPositions[i+1]=owam->joints[i+1].q;
       owam->jscontroller->reset(i);
       owam->jscontroller->run(i);
-    } else {
-      owam->jscontroller->stop(i);
     }
   }
   res.ok=true;
