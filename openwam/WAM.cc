@@ -75,6 +75,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   slip_joints_on_high_torque(false),
   elbow_vel(0,0,0),
   endpoint_vel(0,0,0),
+  barrett_endpoint_vel(0),
   vel_damping_gain(0)
 {
 #ifdef OWD_RT
@@ -1578,6 +1579,7 @@ void WAM::newcontrol_rt(double dt){
     // moving the arm
     elbow_vel = Kinematics::Elbow_Velocity(&q[0],arm_velocity+1);
     endpoint_vel = Kinematics::Endpoint_Velocity(&q[0],arm_velocity+1);
+    barrett_endpoint_vel = elbow_vel.norm() + fabs(arm_velocity[4])*0.350;
     // we'll just do the damping based on the max of the two velocities (the
     // other will get damped anyway as a side effect)
     double vel = endpoint_vel.norm();

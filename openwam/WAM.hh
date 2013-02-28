@@ -270,6 +270,7 @@ public:
   std::vector<Butterworth<double> *> velocity_filter;
   double arm_velocity[Joint::Jn+1];
   R3 elbow_vel, endpoint_vel;
+  double barrett_endpoint_vel;
   double vel_damping_gain;
 };
 

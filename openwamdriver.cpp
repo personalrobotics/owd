@@ -1817,6 +1817,7 @@ bool WamDriver::Publish() {
     waminternals.joint_offsets[i] = owam->joints[i+1].offset;
     waminternals.elbow_velocity = owam->elbow_vel.norm();
     waminternals.endpoint_velocity = owam->endpoint_vel.norm();
+    waminternals.barrett_endpoint_velocity = owam->barrett_endpoint_vel.norm();
     // publish as transforms, too
     char jref[50], jname[50];
     snprintf(jref,50,"wam%d",i);
