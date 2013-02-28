@@ -1815,6 +1815,8 @@ bool WamDriver::Publish() {
     waminternals.trajectory_torque[i] = trajtorqs[i+1];
     waminternals.sim_torque[i] = simtorqs[i+1];
     waminternals.joint_offsets[i] = owam->joints[i+1].offset;
+    waminternals.elbow_velocity = owam->elbow_vel.norm();
+    waminternals.endpoint_velocity = owam->endpoint_vel.norm();
     // publish as transforms, too
     char jref[50], jname[50];
     snprintf(jref,50,"wam%d",i);

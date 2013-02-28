@@ -298,6 +298,48 @@ namespace OWD {
     }
   }
 
+  R3 Kinematics::Elbow_Velocity(double q[], double qd[]) {
+    // calculate the Jacobian for the Elbow in this config
+    static double Jacobian[3][3];
+    SE3 U;
+    for (int l=Link::L3; l>=Link::L1; --l) {
+      vlinks[l].theta(q[l-1]);  // set the joint angle
+      U = ((SE3)vlinks[l])*U;   // update the transform
+      Jacobian[l-1][0] = U[SE3::TX]*U[SE3::NY] - U[SE3::TY]*U[SE3::NX];
+      Jacobian[l-1][1] = U[SE3::TX]*U[SE3::OY] - U[SE3::TY]*U[SE3::OX];
+      Jacobian[l-1][2] = U[SE3::TX]*U[SE3::AY] - U[SE3::TY]*U[SE3::AX];
+    }
+    // multiply the jacobian by the joint velocities
+    R3 xyz_vel;
+    int M(3), N(3), LD_J(3);
+    dgemv_(&TRANSN, &M, &N, &ALPHA,
+	   &Jacobian[0][0], &LD_J,
+	   qd, &INC,
+	   &BETA, xyz_vel.x, &INC);
+    return xyz_vel;
+  }
+
+  R3 Kinematics::Endpoint_Velocity(double q[], double qd[]) {
+    // calculate the Jacobian for the Endpoint (350mm past elbow)
+    static double Jacobian[4][3];
+    SE3 U;
+    for (int l=Link::L4; l>=Link::L1; --l) {
+      vlinks[l].theta(q[l-1]);  // set the joint angle
+      U = ((SE3)vlinks[l])*U;   // update the transform
+      Jacobian[l-1][0] = U[SE3::TX]*U[SE3::NY] - U[SE3::TY]*U[SE3::NX];
+      Jacobian[l-1][1] = U[SE3::TX]*U[SE3::OY] - U[SE3::TY]*U[SE3::OX];
+      Jacobian[l-1][2] = U[SE3::TX]*U[SE3::AY] - U[SE3::TY]*U[SE3::AX];
+    }
+    // multiply the jacobian by the joint velocities
+    R3 xyz_vel;
+    int M(3), N(4), LD_J(3);
+    dgemv_(&TRANSN, &M, &N, &ALPHA,
+	   &Jacobian[0][0], &LD_J,
+	   qd, &INC,
+	   &BETA, xyz_vel.x, &INC);
+    return xyz_vel;
+  }
+
   void Kinematics::Nullspace_Matrix(double Nullspace_matrix[][NJOINTS],
 				    double JPI[][NJOINTS],
 				    double J[][NDIMS]) {
@@ -382,10 +424,33 @@ namespace OWD {
     }
   }
 
+  void Kinematics::InitializeVelocityLinks() {
+    vlinks[Link::L0]=Link( DH(  0.0000,   0.0000, 0.0000,   0.0000), 0, 
+			   R3(  0.0000,   0.0000, 0.0000), 
+			   Inertia(0,0,0,0,0,0));
+
+    vlinks[Link::L1]=Link( DH( -M_PI_2,   0.0000, 0.0000,   0.0000), 0,
+			   R3(  0.0000,   0.0000, 0.0000), 
+			   Inertia(0,0,0,0,0,0));
+    
+    vlinks[Link::L2]=Link( DH(  M_PI_2,   0.0000, 0.0000,   0.0000), 0,
+			   R3(  0.0000,   0.0000, 0.0000), 
+			   Inertia(0,0,0,0,0,0));
+
+    vlinks[Link::L3]=Link( DH( -M_PI_2,   0.0450, 0.5500,   0.0000), 0,
+			   R3(  0.0000,   0.0000, 0.0000), 
+			   Inertia(0,0,0,0,0,0));
+
+    vlinks[Link::L4]=Link( DH(  M_PI_2,   0.3529, 0.0000,  -M_PI_2-0.1279), 0,
+			   R3(  0.0000,   0.0000, 0.0000), 
+			   Inertia(0,0,0,0,0,0));  // origin 350mm beyond elbow
+  }
+
   int Kinematics::thresholded_count=0;
   int Kinematics::zero_count=0;
   double Kinematics::max_condition=0;
   double Kinematics::thresholded_values[NJOINTS];
 
+  OWD::Link Kinematics::vlinks[5];
 
 }; // namespace OWD

@@ -136,6 +136,10 @@ namespace OWD {
     /// \brief body Jacobian for Fortran (column major)
     static void Jacobians(double JEE[][NDIMS], double J0[][NDIMS], Link *links);
 
+    static R3 Elbow_Velocity(double q[], double qd[]);
+
+    static R3 Endpoint_Velocity(double q[], double qd[]);
+
     /// \brief Jacobian Pseudo-Inverse from the Jacobian
     static void PseudoInverse(double JPI[][NJOINTS], double J0[][NDIMS]);
 
@@ -151,6 +155,10 @@ namespace OWD {
     /// \brief body Jacobian for C (row major) 
     static void JacobianN(double J[][NJOINTS], Link *links);
 
+    /// \brief Set up the internal links that are used just for the
+    ///        elbow and endpoint velocities
+    static void InitializeVelocityLinks();
+
     static char TRANST;
     static char TRANSN;
     static double ALPHA;
@@ -160,6 +168,7 @@ namespace OWD {
     static int LD_JacobianPseudoInverse;
     static int LD_Nullspace_matrix;
     static int INC;
+    static OWD::Link vlinks[5]; // for elbow and endpoint velocities
 
     static std::stringstream last_error;
   };

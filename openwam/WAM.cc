@@ -72,7 +72,10 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   motor_state(MOTORS_OFF), stiffness(0), recorder(50000),
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
   last_control_position(Joint::Jn),
-  slip_joints_on_high_torque(false)
+  slip_joints_on_high_torque(false),
+  elbow_vel(0,0,0),
+  endpoint_vel(0,0,0),
+  vel_damping_gain(0)
 {
 #ifdef OWD_RT
   rt_mutex_create(&rt_mutex,"WAM_CC");
@@ -285,6 +288,9 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   }
 
   strncpy(last_traj_error,"(not supplied)",500);
+
+  // set up the phantom links used for calculating endpoint velocity
+  Kinematics::InitializeVelocityLinks();
 }
 
 int WAM::init(){
@@ -1563,9 +1569,28 @@ void WAM::newcontrol_rt(double dt){
     }
 
   } else {
-    for(int i = 0; i < Joint::Jn; i++) {
+    for(int i = 0; i < Joint::Jn; ++i) {
       pid_torq[i]=0.0f;  // zero out the torques otherwise
       last_control_position[i] = joints[i+1].q;
+    }
+    // while in grav comp, apply damping torques as a function of elbow
+    // and endpoint velocities to prevent velocity faults while manually
+    // moving the arm
+    elbow_vel = Kinematics::Elbow_Velocity(&q[0],arm_velocity+1);
+    endpoint_vel = Kinematics::Endpoint_Velocity(&q[0],arm_velocity+1);
+    // we'll just do the damping based on the max of the two velocities (the
+    // other will get damped anyway as a side effect)
+    double vel = endpoint_vel.norm();
+    if (elbow_vel.norm() > vel) {
+      vel = elbow_vel.norm();
+    }
+    // now set a damping accel for each joint that will slow the velocity.
+    // this is scaled so that if vel == max_cartesian_velocity, the accel
+    // will slow each joint to zero in (1/vel_damping_gain) seconds.
+    for (int i=0; i<Joint::Jn; ++i) {
+      tc.qdd[i] -= vel_damping_gain 
+	* arm_velocity[i+1] 
+	* vel/bus->max_cartesian_velocity;
     }
   }
   if (++trajcount == 1000) {

@@ -23,20 +23,21 @@
 #define __DH_HH__
 
 class DH{
-  double alpha, a, d, theta;
+  double alpha, a, d, theta_naught, theta;
   double ca, sa;
   R3 pstar;
   SE3 H;
 public:
 
   DH(){}
-  DH(double alpha, double a, double d, double theta){
-
+  DH(double alpha, double a, double d, double _theta_naught)
+    : theta_naught(_theta_naught)
+  {
     this->alpha = alpha;    this->a = a;  this->d = d;
     ca = cos(alpha), sa = sin(alpha);
     pstar = R3(a, d*sa, d*ca);
-
-    t(theta);
+    
+    t(0);
   }
 
   operator SO3() const {return (SO3)H;}
@@ -45,8 +46,8 @@ public:
   R3 ps() const {return pstar;}
 
   void t(double t){
-    double ct = cos(t), st = sin(t);
     theta = t;
+    double ct = cos(theta_naught+theta), st = sin(theta_naught+theta);
     H = SE3( SO3( R3(ct, st, 0), R3(-st*ca, ct*ca, sa), R3(st*sa, -ct*sa, ca)),
 	      R3(a*ct, a*st, d) );
   }

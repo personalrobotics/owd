@@ -269,6 +269,8 @@ public:
   unsigned long long previous_encoder_clocktime[Joint::Jn+1];
   std::vector<Butterworth<double> *> velocity_filter;
   double arm_velocity[Joint::Jn+1];
+  R3 elbow_vel, endpoint_vel;
+  double vel_damping_gain;
 };
 
 #endif
