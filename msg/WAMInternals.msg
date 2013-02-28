@@ -5,3 +5,5 @@ float64[] trajectory_torque
 float64[] sim_torque
 float64[] joint_offsets
 PIDgains[] gains
+float64 elbow_velocity
+float64 endpoint_velocity
