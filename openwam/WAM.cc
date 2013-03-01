@@ -76,7 +76,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   elbow_vel(0,0,0),
   endpoint_vel(0,0,0),
   barrett_endpoint_vel(0),
-  vel_damping_gain(0)
+  vel_damping_gain(60)
 {
 #ifdef OWD_RT
   rt_mutex_create(&rt_mutex,"WAM_CC");
@@ -1582,17 +1582,19 @@ void WAM::newcontrol_rt(double dt){
     barrett_endpoint_vel = elbow_vel.norm() + fabs(arm_velocity[4])*0.350;
     // we'll just do the damping based on the max of the two velocities (the
     // other will get damped anyway as a side effect)
-    double vel = endpoint_vel.norm();
+    double vel = barrett_endpoint_vel;
     if (elbow_vel.norm() > vel) {
       vel = elbow_vel.norm();
     }
     // now set a damping accel for each joint that will slow the velocity.
     // this is scaled so that if vel == max_cartesian_velocity, the accel
-    // will slow each joint to zero in (1/vel_damping_gain) seconds.
+    // will slow each joint to zero in (1/vel_damping_gain) seconds.  The
+    // squared factor is so that it have as much of an effect at low
+    // velocities.
+    double damping_factor = vel_damping_gain 
+      * pow(vel/bus->max_cartesian_velocity,2);
     for (int i=0; i<Joint::Jn; ++i) {
-      tc.qdd[i] -= vel_damping_gain 
-	* arm_velocity[i+1] 
-	* vel/bus->max_cartesian_velocity;
+      tc.qdd[i] -= damping_factor * arm_velocity[i+1];
     }
   }
   if (++trajcount == 1000) {
