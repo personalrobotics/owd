@@ -9,6 +9,8 @@
 #include <openwam/Kinematics.hh>
 #include <openwam/ControlLoop.hh>
 #include <openwam/Joint.hh> // Process our ApplyForce service calls from ROS
+#include <numeric>
+
 bool ApplyForceTraj::ApplyForce(owd_msgs::ApplyForce::Request &req,
 				owd_msgs::ApplyForce::Response &res) {
   // compute a new trajectory
@@ -50,15 +52,14 @@ bool ApplyForceTraj::ApplyForce(owd_msgs::ApplyForce::Request &req,
   return true;
 }
 
-ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
-			       double dist_limit):
+ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude, double dist_limit):
   OWD::Trajectory("GFE Apply Force",OWD::Trajectory::random_id()),
   last_time(-1),
   last_force_error(0),
   stopforce(false),
   distance_limit(dist_limit),
   last_travel(0),
-  velocity_filter(2,50.0),
+  velocity_filter(2, 40.0),
   vibration(NULL),
   rotational_leeway(0)
 {
@@ -136,6 +137,7 @@ ApplyForceTraj::ApplyForceTraj(R3 _force_direction, double force_magnitude,
   hybridplug->recorder->reset();  // clear out any records from previous plugin
 }
 
+
 void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   time = t;
   double dt;
@@ -144,6 +146,7 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   } else {
     dt = time - last_time;
   }
+
   last_time = time;
   hybridplug->net_force.data[0 ]=dt/OWD::ControlLoop::PERIOD;
   
@@ -186,13 +189,8 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   // desired force and subtract it out
   double dot_prod = position_err * force_direction;
 
-  // limit the amount of distance we can travel from the
-  // starting position and the EE velocity by applying counter-torques
-  // as necessary.  we'll pass in the amount of travel in the force direction
-  // that's occurred, which is just the opposite of dot_prod.
-  OWD::JointPos damping_torques = limit_excursion_and_velocity(-dot_prod);
-
   R3 position_correction = position_err - dot_prod * force_direction;
+
   hybridplug->net_force.data[14]=position_correction[0];
   hybridplug->net_force.data[15]=position_correction[1];
   hybridplug->net_force.data[16]=position_correction[2];
@@ -223,15 +221,13 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
                       R3()); // zero
 
   // overall force/torque error in WS coordinates
-  R6 workspace_forcetorque_error =
-    forcetorque_vector - net_force_torque;
+  R6 workspace_forcetorque_error = forcetorque_vector - net_force_torque;
 
-  hybridplug->net_force.data[64]=workspace_forcetorque_error.norm();
+  hybridplug->net_force.data[64] = workspace_forcetorque_error.norm();
   // Pass the F/T error to the force controller to get
   // the joint torques to apply
   OWD::JointPos correction_torques(tc.q.size());
-  correction_torques = 
-    force_controller.control(workspace_forcetorque_error);
+  correction_torques = force_controller.control(workspace_forcetorque_error);
 
   // log the 1-dimensional values from force controller
   hybridplug->net_force.data[4] = force_controller.bounded_ft_error.v 
@@ -254,16 +250,29 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   // specify the feedforward torques that would ideally produce the
   // desired endpoint force.  this makes life easier for the force
   // controller.
-  OWD::JointPos ideal_torques = 
-    hybridplug->JacobianTranspose_times_vector(forcetorque_vector);
+  const double RAMP_DURATION = 1.0; // just for testing for now
+  double ramp_ratio = 1.0;
+  if(time < RAMP_DURATION)
+  {
+    ramp_ratio = time/RAMP_DURATION;
+  }
 
+  OWD::JointPos ideal_torques = ramp_ratio * hybridplug->JacobianTranspose_times_vector(forcetorque_vector);
+
+  // limit the amount of distance we can travel from the
+  // starting position and the EE velocity by applying counter-torques
+  // as necessary.  we'll pass in the amount of travel in the force direction
+  // that's occurred, which is just the opposite of dot_prod.
+  OWD::JointPos damping_torques = limit_excursion_and_velocity(-dot_prod, ideal_torques);
+
+  // std::cout << "torque: ";
   // sum the correction and feedforward torques
   for (unsigned int i=0; i<tc.t.size(); ++i) {
-    tc.t[i] = correction_torques[i]
-      + ideal_torques[i]
-      + damping_torques[i]
-      ;
+    // tc.t[i] = correction_torques[i] + ideal_torques[i] + damping_torques[i];
+    tc.t[i] = ideal_torques[i] + damping_torques[i];
+    // std::cout << tc.t[i] << ", ";
   }
+  // std::cout << std::endl;
 
   // Clamp the torques to safe values that won't trigger a torque fault.
   clamp_torques(tc.t);
@@ -309,7 +318,17 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   SO3 rotation_correction_SO3 = current_endpoint_target * (! (SO3)hybridplug->endpoint);
   so3 rotation_correction = (so3) rotation_correction_SO3;
 
-  R3 rotation_correction_R3 = rotation_correction.t() * rotation_correction.w();
+  const double TRANS_DEADBAND_WIDTH = 0.005;
+  double position_magnitude = position_correction.norm();
+  position_magnitude = deadband(position_magnitude, TRANS_DEADBAND_WIDTH);
+  position_correction.normalize();
+  position_correction *= position_magnitude;
+
+  double rotation_magnitude = rotation_correction.t();
+  const double ROT_DEADBAND_WIDTH = 0.005;
+  rotation_magnitude = deadband(rotation_magnitude, ROT_DEADBAND_WIDTH); 
+  R3 rotation_correction_R3 = rotation_magnitude * rotation_correction.w();
+
   hybridplug->net_force.data[17]=rotation_correction_R3[0];
   hybridplug->net_force.data[18]=rotation_correction_R3[1];
   hybridplug->net_force.data[19]=rotation_correction_R3[2];
@@ -318,10 +337,9 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   R3 desired_endpoint = (R3)hybridplug->endpoint + endpos_correction.v;
   endpositions.push(desired_endpoint);
 
-  OWD::JointPos joint_correction(tc.q.size());
+  static OWD::JointPos joint_correction(tc.q.size());
   try {
-    joint_correction = 
-      hybridplug->JacobianPseudoInverse_times_vector(endpos_correction);
+    joint_correction = hybridplug->JacobianPseudoInverse_times_vector(endpos_correction);
   } catch (const char *err) {
     // no valid Jacobian, for whatever reason, so give up.
     runstate=OWD::Trajectory::ABORT;
@@ -340,13 +358,20 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   // original configuration as possible
   OWD::JointPos configuration_error = start_position - tc.q;
   try {
-    OWD::JointPos configuration_correction
-      = hybridplug->Nullspace_projection(configuration_error);
-    joint_correction += configuration_correction;
+     OWD::JointPos configuration_correction = hybridplug->Nullspace_projection(configuration_error);
+     joint_correction += configuration_correction;
   } catch (const char *err) {
     // don't worry about it
   }
 
+  // std::cout << "correction: ";
+  // This is just to make sure the joint correction does not have NaN values
+  for (unsigned int i=0; i<joint_correction.size(); ++i) {
+    joint_correction[i] = isnan(joint_correction[i])? 0 : joint_correction[i];
+    // std::cout << joint_correction[i] << ", ";
+  }
+  // std::cout << std::endl;
+ 
   // Constrain the maximum change in joint positions. This prevents a large PID
   // gain from causing a torque fault.
   double const max_correction = 0.02;
@@ -361,6 +386,10 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   // add the correction to the joint values
   for (unsigned int i=0; i<tc.q.size(); ++i) {
     tc.q[i] += isnan(joint_correction[i])? 0 : joint_correction[i];
+    // Testing to see if removing the torques against the direction movement helps
+    // to reduce the shakiness
+    // if(joint_correction[i] * tc.t[i] < 0.0)
+    //    tc.t[i] = 0.0;
   }
   OWD::JointPos joint_change(tc.q.size());
   if (jointpositions.size() > 0) {
@@ -384,6 +413,13 @@ void ApplyForceTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
 
   end_position =tc.q;  // keep tracking the current position
   return;
+}
+
+double ApplyForceTraj::deadband(const double& error, const double& width)
+{
+    if(fabs(error) < width)
+        return 0.0;
+    return (error > 0.0) ? error-width : error+width;
 }
 
 // Stop the trajectory when asked by a client
@@ -414,7 +450,7 @@ bool ApplyForceTraj::SetForceGains(owd_msgs::SetJointOffsets::Request &req,
   return true;
 }
 
-OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
+OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel, const OWD::JointPos& ideal_torque) {
   // The travel argument is the distance we've moved in the force direction
   // from the original starting point.
 
@@ -425,32 +461,33 @@ OWD::JointPos ApplyForceTraj::limit_excursion_and_velocity(double travel) {
   double excursion_return_force = 0;
   static double excursion_gain = 10; // 10N of force if we reach the limit
   if (travel > 0.9 * distance_limit) {
-    excursion_return_force = -pow((travel - 0.9*distance_limit) / (0.1*distance_limit),3)
-      * excursion_gain;
+    excursion_return_force = -pow((travel - 0.9*distance_limit) / (0.1*distance_limit),3) * excursion_gain;
   } else if (travel < -0.9 * distance_limit) {
-    excursion_return_force = -pow((travel + 0.9*distance_limit) / (0.1*distance_limit),3)
-      * excursion_gain;
+    excursion_return_force = -pow((travel + 0.9*distance_limit) / (0.1*distance_limit),3) * excursion_gain;
   }
   hybridplug->net_force.data[55] = travel * 1000.0;
   hybridplug->net_force.data[56] = excursion_return_force;
-    
+   
   // We limit the velocity by creating a virtual dashpot that applies
   // a counter force proportional to the velocity.
   double travel_delta = travel - last_travel;
   last_travel = travel;
-  double velocity = velocity_filter.eval(travel_delta) / OWD::ControlLoop::PERIOD;
-  double velocity_return_force=0;
+
+  // Just running a moving average over the travelled distance
+  static double velocity = 0.0;
+  velocity = velocity_filter.eval(travel_delta) / OWD::ControlLoop::PERIOD;
+
+  double velocity_return_force = 0;
   velocity_return_force =  -velocity * velocity_damping_gain;
   hybridplug->net_force.data[57] = velocity * 1000.0;
   hybridplug->net_force.data[58] = velocity_return_force;
 
   // compute the corresponding joint torques
-  R3 correction_torque;
-  R6 correction_ft 
-    = R6((excursion_return_force+velocity_return_force)* force_direction,
-	 correction_torque);
+  R3 correction_torque(0.0, 0.0, 0.0);
+  R6 correction_ft = R6((excursion_return_force + velocity_return_force) * force_direction, correction_torque);
+  OWD::JointPos damping_torque = OWD::Plugin::JacobianTranspose_times_vector(correction_ft);
 
-  return OWD::Plugin::JacobianTranspose_times_vector(correction_ft);
+  return damping_torque;
 }
 
 bool ApplyForceTraj::clamp_torques(OWD::JointPos &torques)
@@ -484,7 +521,7 @@ ForceController ApplyForceTraj::force_controller;
 ros::ServiceServer ApplyForceTraj::ss_ApplyForce,
   ApplyForceTraj::ss_SetForceGains;
   
-double ApplyForceTraj::velocity_damping_gain(0.5);
+double ApplyForceTraj::velocity_damping_gain(0.1);
 
 ApplyForceTraj *ApplyForceTraj::current_traj(NULL);
 
