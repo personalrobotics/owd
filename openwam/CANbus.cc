@@ -1277,10 +1277,10 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
     valid_forcetorque_data=true;
     valid_forcetorque_flag = 0;
 
-    if (msg[6] & 128) {
+    if (msglen == 7) {
       // FT error byte has been sent and re-tare suggested flag has been set
       // FT appears to saturate then return to slightly offset zero
-      // This flag is always set when the error byte exists
+      
      
       if (msg[6] & 64) {
 	// Bad force torque data flag has been set

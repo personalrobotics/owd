@@ -52,14 +52,16 @@ bool FT::Publish() {
   static double ft_values[6];
   static double ft_filtered_values[6];
   
+    //force torque state
+  ft_state.saturated_axis = bus->ft_get_state();
+  pub_ft_state.publish(ft_state);
+
+
   if (bus->ft_get_data(ft_values,ft_filtered_values) != OW_SUCCESS) {
     ROS_DEBUG_NAMED("ft","Unable to get data from Force/Torque sensor");
     return false;
   }
 
-  //force torque state
-  ft_state.saturated_axis = bus->ft_get_state();
-  pub_ft_state.publish(ft_state);
 
   // set the time
   ft_vals.header.stamp = ros::Time::now();
