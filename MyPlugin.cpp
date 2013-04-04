@@ -62,7 +62,7 @@ MyPlugin *myplug = NULL;
 // Note that we have to explicitly call the OWD::Trajectory constructor
 // so that we can pass in the name of our trajectory for display in the
 // trajectory queue.
-MyTraj::MyTraj(int j, double t): OWD::Trajectory("MyTraj"), joint(j), torque(t) {
+MyTraj::MyTraj(int j, double t): OWD::Trajectory("MyTraj",""), joint(j), torque(t) {
   if ((j<1) || (j>7)) {
     // this throw will be caught by the AddTrajectory function so that
     // we can report the error back to the client
