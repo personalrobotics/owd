@@ -15,7 +15,7 @@ DefaultJSController::DefaultJSController(std::string myname) :
   if (Joint::Jn > 4) {
     jcontrollers.push_back(JointCtrlPID( 40,  0.5, 0.5));  // J5
     jcontrollers.push_back(JointCtrlPID( 40,  0.5, 0.5));  // J6
-    jcontrollers.push_back(JointCtrlPID( 16,  0.16, 0.1)); // J7
+    jcontrollers.push_back(JointCtrlPID( 12,  0.05, 0.1)); // J7
   }
 }
 
