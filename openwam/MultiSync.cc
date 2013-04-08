@@ -241,7 +241,13 @@ bool MultiSync::wait_for_traj_start(double timeout) {
     snprintf(last_error,200,"master aborted before beginning");
     return false;
   } else if (master_info->controller_info[0].status == DONE) {
-    master_info->controller_info[id].status = ABORTED;
+    if (master_info->traj_duration == 0) {
+      // this often happens for zero-length trajectories but it's not
+      // really a problem
+      master_info->controller_info[id].status = DONE;
+    } else {
+      master_info->controller_info[id].status = ABORTED;
+    }
     snprintf(last_error,200,"master finished before we began");
     return false;
   } else {

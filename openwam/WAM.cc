@@ -1772,13 +1772,16 @@ int WAM::run_trajectory(OWD::Trajectory *traj) {
     }
     // wait to initiate
     if (!ms->wait_for_traj_start()) {
-      ROS_ERROR("Trajectory %s aborted while waiting for synchronized start: %s",
-		traj->id.c_str(),
-		ms->last_error);
-      traj->abort();
-      snprintf(last_traj_error,500,"aborted while waiting for synchronized start: %s",
-		ms->last_error);
-      return OW_FAILURE;
+      // this is only an error if it's a non-zero length trajectory
+      if (traj->duration > 0) {
+	ROS_ERROR("Trajectory %s aborted while waiting for synchronized start: %s",
+		  traj->id.c_str(),
+		  ms->last_error);
+	traj->abort();
+	snprintf(last_traj_error,500,"aborted while waiting for synchronized start: %s",
+		 ms->last_error);
+	return OW_FAILURE;
+      }
     }
     ROS_INFO("Starting synchronized trajectory %s, duration is %2.2fs",
 	     traj->id.c_str(), traj->duration);
