@@ -1,4 +1,4 @@
 #Message to contain the state of the force torque data
 Header header
-
-uint8 saturated_axis
+geometry_msgs/Wrench wrench
+uint8 saturated_axes
