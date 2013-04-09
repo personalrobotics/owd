@@ -32,7 +32,7 @@ FT::~FT() {
 
 void FT::AdvertiseAndSubscribe(ros::NodeHandle &n) {
   pub_ft = n.advertise<geometry_msgs::WrenchStamped>("forcetorque", 1);
-  pub_ft_state = n.advertise<owd_msgs::ForceState>("forcestate", 1);
+  pub_ft_state = n.advertise<owd_msgs::ForceState>("forcetorque_state", 1);
   pub_filtered_ft = n.advertise<geometry_msgs::WrenchStamped>("filtered_forcetorque", 1);
   pub_accel = n.advertise<geometry_msgs::Vector3>("accelerometer", 1);
   ss_tare = n.advertiseService("ft_tare",&FT::Tare,this);
@@ -51,17 +51,27 @@ void FT::Pump(const ros::TimerEvent& e) {
 bool FT::Publish() {
   static double ft_values[6];
   static double ft_filtered_values[6];
-  
-    //force torque state
-  ft_state.saturated_axis = bus->ft_get_state();
+  int ft_get_status;
+  ft_get_status = bus->ft_get_data(ft_values,ft_filtered_values);
+ 
+  //forcetorque_state message always publishes
+  //when sensor is actively saturated, saturated_axes=255
+  //When sensor has no issues, saturated_axes=0
+  //When sensor has been saturated since latest re-tare:
+  //  saturated_axes = integer of bitmap of saturated cells, 000001-111111
+  ft_state.header.stamp = ros::Time::now();
+  ft_state.saturated_axes = bus->ft_get_state();
+  ft_state.wrench.force.x = ft_filtered_values[0];
+  ft_state.wrench.force.y = ft_filtered_values[1];
+  ft_state.wrench.force.z = ft_filtered_values[2];
+  ft_state.wrench.torque.x = ft_filtered_values[3];
+  ft_state.wrench.torque.y = ft_filtered_values[4];
+  ft_state.wrench.torque.z = ft_filtered_values[5];
   pub_ft_state.publish(ft_state);
-
-
-  if (bus->ft_get_data(ft_values,ft_filtered_values) != OW_SUCCESS) {
+  
+  if (ft_get_status != OW_SUCCESS) {
     ROS_DEBUG_NAMED("ft","Unable to get data from Force/Torque sensor");
-    return false;
-  }
-
+    return false; }
 
   // set the time
   ft_vals.header.stamp = ros::Time::now();

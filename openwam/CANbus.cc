@@ -1278,18 +1278,18 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
     valid_forcetorque_flag = 0;
 
     if (msglen == 7) {
-      // FT error byte has been sent and re-tare suggested flag has been set
-      // FT appears to saturate then return to slightly offset zero
-      
-     
+      // FT error byte has been sent
       if (msg[6] & 64) {
-	// Bad force torque data flag has been set
+	// Bad forcetorque data flag has been set
+	// This is the case when the sensor is actively saturated due to overload
 	// Discard data
 	valid_forcetorque_data = false;
 	valid_forcetorque_flag = -1; 
       }
       else {
-	//these bits say which of the axis have saturated since latest re-tare
+	//This is the case when the sensor is not actively saturated
+	//But a load cell has been saturated since the latest re-tare
+	//Report bits containing which of the axis have saturated since latest re-tare
 	valid_forcetorque_flag = msg[6] & 63;
       }
     }
