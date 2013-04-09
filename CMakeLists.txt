@@ -74,12 +74,12 @@ rosbuild_add_executable(puck_find_mofst puck_find_mofst.cpp)
 target_link_libraries(puck_find_mofst wamcan openwam ${CANBUS_LIBS})
 rosbuild_add_compile_flags(puck_find_mofst "${CANBUS_DEFS}")
 rosbuild_add_link_flags(puck_find_mofst "${CANBUS_LDFLAGS}")
-endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
 rosbuild_add_executable(puck_setprop puck_setprop.cpp)
 target_link_libraries(puck_setprop wamcan openwam ${CANBUS_LIBS})
 rosbuild_add_compile_flags(puck_setprop "${CANBUS_DEFS}")
 rosbuild_add_link_flags(puck_setprop "${CANBUS_LDFLAGS}")
+endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
 rosbuild_add_executable(owd_traj_timer owd_traj_timer.cpp)
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
