@@ -1773,9 +1773,10 @@ int WAM::run_trajectory(OWD::Trajectory *traj) {
     // wait to initiate
     if (!ms->wait_for_traj_start()) {
       // this is only an error if it's a non-zero length trajectory
-      if (traj->duration > 0) {
-	ROS_ERROR("Trajectory %s aborted while waiting for synchronized start: %s",
+      if (traj->duration > 0.5) {
+	ROS_ERROR("Trajectory %s of duration %fs aborted while waiting for synchronized start: %s",
 		  traj->id.c_str(),
+                  traj->duration,
 		  ms->last_error);
 	traj->abort();
 	snprintf(last_traj_error,500,"aborted while waiting for synchronized start: %s",
