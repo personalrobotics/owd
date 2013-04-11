@@ -1,6 +1,6 @@
 /***********************************************************************
 
-  Copyright 2011 Carnegie Mellon University and Intel Corporation
+  Copyright 2011-13 Carnegie Mellon University and Intel Corporation
   Author: Mike Vande Weghe <vandeweg@cmu.edu>
 
 **********************************************************************/
@@ -18,6 +18,7 @@
 #include "Servo2Traj.h"
 #include "FTCheck.h"
 #include "InsertKeyTraj.h"
+#include "CoggingCompTraj.h"
 #define PEAK_CAN
 #include "openwamdriver.h"
 #include "openwam/CANdefs.hh"	// for HANDSTATE_* enumeration
@@ -62,6 +63,9 @@ HybridPlugin::HybridPlugin()
   if (!Servo2Traj::Register()) {
     throw "Servo2Traj trajectory failed to register";
   }
+  if (!CoggingCompTraj::Register()) {
+    throw "CoggingCompTraj failed to register";
+  }
 
   pub_net_force = n.advertise<std_msgs::Float64MultiArray>("net_force",1);
 
@@ -84,6 +88,7 @@ HybridPlugin::~HybridPlugin() {
   FTCheck::Shutdown();
   InsertKeyTraj::Shutdown();
   Servo2Traj::Shutdown();
+  CoggingCompTraj::Shutdown();
 
   if (write_log_file && (recorder->count > 0)) {
     // do a final write of any lingering log data
