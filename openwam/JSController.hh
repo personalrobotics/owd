@@ -48,7 +48,7 @@ namespace OWD {
     virtual void stop(unsigned int j);
     virtual bool active(unsigned int j);
 
-  private:
+  protected:
     std::vector<JointCtrlPID> jcontrollers;
 
   };
