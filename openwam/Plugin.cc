@@ -192,6 +192,8 @@ namespace OWD {
   double Plugin::_max_cartesian_velocity;
   std::vector<double> Plugin::_arm_velocity;
   SE3 Plugin::_endpoint;
+  bool Plugin::_holdpos;
+  static OWD::Trajectory *_jointstraj;
   double Plugin::gravity;
 #ifdef OWDSIM
   const bool Plugin::simulation=true;
@@ -225,6 +227,7 @@ namespace OWD {
   const double              &Plugin::max_cartesian_velocity=Plugin::_max_cartesian_velocity;
   const std::vector<double> &Plugin::arm_velocity=Plugin::_arm_velocity;
   const SE3 &Plugin::endpoint=Plugin::_endpoint;
+  const bool &Plugin::holdpos = Plugin::_holdpos;
 
   WAM *Plugin::wam = NULL;
   WamDriver *Plugin::wamdriver = NULL;

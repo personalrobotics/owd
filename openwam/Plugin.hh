@@ -332,6 +332,8 @@ namespace OWD {
     /// \brief The filtered velocity of each arm joint (in radians/s)
     static const std::vector<double> &arm_velocity;
 
+    static const bool &holdpos;
+
   private:
     friend class ::WAM;
     friend class WamDriver;
@@ -365,7 +367,8 @@ namespace OWD {
     static double _max_cartesian_velocity;
     static std::vector<double> _arm_velocity;
     static SE3 _endpoint;
-
+    static bool _holdpos;
+    static OWD::Trajectory *_jointstraj;
     static std::vector<Plugin *> children;
 
   };

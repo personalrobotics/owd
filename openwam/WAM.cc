@@ -1288,6 +1288,7 @@ void WAM::newcontrol_rt(double dt){
 
   // update the values in the Plugin base class
   OWD::Plugin::_endpoint = SE3_endpoint;
+  OWD::Plugin::_holdpos = holdpos;
   for (int i=0; i<Joint::Jn; ++i) {
     OWD::Plugin::_arm_position[i]=q[i];
     OWD::Plugin::_target_arm_position[i]=last_control_position[i];
