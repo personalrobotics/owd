@@ -100,6 +100,7 @@ namespace OWD {
       // No linear segment
       time_a = v_end/accel;
       time_v = 0.0f;
+      max_vel = v_end;
     }
     
     end_time = start_time + 2.0*time_a + time_v;
@@ -143,6 +144,7 @@ namespace OWD {
       ROS_ERROR("ParabolicSegment: Velocity of %3.3g exceeds limit of %3.3g\n",accel*time_a,max_vel);
       throw "Velocity exceeds limit";
     }
+    max_vel = accel * time_a;
     return;
   }
 
