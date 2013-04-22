@@ -368,9 +368,7 @@ namespace OWD {
     static std::vector<double> _arm_velocity;
     static SE3 _endpoint;
     static bool _holdpos;
-    static OWD::Trajectory *_jointstraj;
     static std::vector<Plugin *> children;
-
   };
 
   /// Base class for user-defined OWD controller plugins.  Define your own

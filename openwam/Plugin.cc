@@ -229,6 +229,9 @@ namespace OWD {
   const SE3 &Plugin::endpoint=Plugin::_endpoint;
   const bool &Plugin::holdpos = Plugin::_holdpos;
 
+  
+  OWD::Link links[Link::Ln+1];
+
   WAM *Plugin::wam = NULL;
   WamDriver *Plugin::wamdriver = NULL;
 
