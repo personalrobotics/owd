@@ -292,6 +292,9 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
 
   // set up the phantom links used for calculating endpoint velocity
   Kinematics::InitializeVelocityLinks();
+
+  // Set the list of links in the Plugin
+  OWD::Plugin::set_links(links);
 }
 
 int WAM::init(){

@@ -334,6 +334,12 @@ namespace OWD {
 
     static const bool &holdpos;
 
+    // Set the links in the plugin, so to be accesible to the user
+    static bool set_links(OWD::Link* links);
+
+    // Computes the end-effector pose (forward kinematics) at the given joint configuration
+    static SE3 get_endeffector_pose(JointPos config);
+
   private:
     friend class ::WAM;
     friend class WamDriver;
@@ -369,6 +375,7 @@ namespace OWD {
     static SE3 _endpoint;
     static bool _holdpos;
     static std::vector<Plugin *> children;
+    static OWD::Link m_links[OWD::Link::Ln];
   };
 
   /// Base class for user-defined OWD controller plugins.  Define your own

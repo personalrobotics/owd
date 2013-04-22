@@ -167,6 +167,23 @@ namespace OWD {
     return traj;
   }
 
+  bool Plugin::set_links(OWD::Link* links)
+  {
+    for(int l=Link::L0; l<=Link::Ln; l++)
+      m_links[l] = links[l];
+    return true;
+  }
+
+  SE3 Plugin::get_endeffector_pose(JointPos config)
+  {
+      // Update the links jont values first
+      for(int j=Joint::J1; j<=Joint::Jn; j++)
+      {
+          m_links[j].theta(config[j-1]);
+      }
+      return OWD::Kinematics::forward_kinematics(m_links);
+  }
+
   std::vector<double> Plugin::_arm_position;
   std::vector<double> Plugin::_target_arm_position;
   std::vector<double> Plugin::_pid_torque;
@@ -201,6 +218,8 @@ namespace OWD {
   const bool Plugin::simulation=false;
 #endif // OWDSIM
   std::vector<Plugin *> Plugin::children;
+
+  OWD::Link OWD::Plugin::m_links[OWD::Link::Ln];
 
   const std::vector<double> &Plugin::arm_position=Plugin::_arm_position;
   const std::vector<double> &Plugin::target_arm_position=Plugin::_target_arm_position;
