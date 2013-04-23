@@ -1377,7 +1377,11 @@ void WAM::newcontrol_rt(double dt){
       // iteration (to help deccelerate if we're still moving), but
       // the next time around we'll start holding at the endpoint
       jointstraj->endPosition().cpy(&heldPositions[Joint::J1]);
-      holdpos = true;  // should have been true already, but just making sure
+      // TESTING THE COMPLIANT COntroller
+ 	  // for(int i = Joint::J1; i<=Joint::Jn; i++) {
+	  //   heldPositions[i] = joints[i].q;
+	  // }
+	  holdpos = true;  // should have been true already, but just making sure
       for (int j=0; j<Joint::Jn; ++j) {
 	traj_torq[j]=0;  // make sure we don't leave these non-zero
       }
