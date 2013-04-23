@@ -210,7 +210,8 @@ namespace OWD {
   std::vector<double> Plugin::_arm_velocity;
   SE3 Plugin::_endpoint;
   bool Plugin::_holdpos;
-  static OWD::Trajectory *_jointstraj;
+  OWD::Trajectory *Plugin::jointstraj;
+
   double Plugin::gravity;
 #ifdef OWDSIM
   const bool Plugin::simulation=true;

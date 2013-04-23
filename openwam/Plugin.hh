@@ -340,6 +340,8 @@ namespace OWD {
     // Computes the end-effector pose (forward kinematics) at the given joint configuration
     static SE3 get_endeffector_pose(JointPos config);
 
+    static OWD::Trajectory *jointstraj;
+
   private:
     friend class ::WAM;
     friend class WamDriver;
