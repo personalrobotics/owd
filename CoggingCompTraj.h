@@ -48,6 +48,7 @@ private:
   bool first;
   int sample_count;
   int last_position;
+  std::vector<double> fixed_pos;
   double sample_time;
   double done_time;
   static owd_plugins::CoggingComp::Response response;

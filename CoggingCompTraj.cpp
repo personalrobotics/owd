@@ -36,6 +36,7 @@ CoggingCompTraj::CoggingCompTraj(int _joint,
   }
   start_position=OWD::Plugin::target_arm_position;
   end_position = start_position;
+  response.data.clear();
   running=true;
 }
 
@@ -83,22 +84,29 @@ void CoggingCompTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   // else
   //     increase torque, reset time
   if (first) {
+    first=false;
     current_torque=0;
     sample_time=t+hold_duration;
-    first=false;
     sample_count=0;
+    fixed_pos = tc.q;
   }
+  // hold other joints at their starting position, but let the joint
+  // we are testing drift due to the test torque
+  fixed_pos[joint-1]=tc.q[joint-1];
+  tc.q = fixed_pos;
+  // check for sudden movement
   if (fabs(tc.q[joint-1] - last_position) > max_step) {
     ROS_INFO("Stopping due to max step condition");
     runstate=OWD::Trajectory::DONE;
     running=false;
     return;
   }
+  // check for start of sampling
   if (t>sample_time) {
     owd_plugins::CogSample sample;
     sample.position=tc.q[joint-1];
     sample.torque=current_torque;
-    response.push_back(sample);
+    response.data.push_back(sample);
     if (++sample_count == num_samples) {
       ROS_INFO("Collected data for t=%2.4f",current_torque);
       // increase the torque
@@ -118,9 +126,11 @@ void CoggingCompTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
       sample_time=t+hold_duration;
       sample_count=0;
     }
-  }        
+  }
+  // hold the current torque
   tc.t[joint-1] = current_torque;
-  end_position =tc.q;  // keep tracking the current position
+  // keep tracking the current position
+  end_position =tc.q;
 
   return;
 }
