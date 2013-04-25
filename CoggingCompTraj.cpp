@@ -89,6 +89,7 @@ void CoggingCompTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
     sample_time=t+hold_duration;
     sample_count=0;
     fixed_pos = tc.q;
+    last_position = tc.q[joint-1];
   }
   // hold other joints at their starting position, but let the joint
   // we are testing drift due to the test torque
@@ -96,7 +97,8 @@ void CoggingCompTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   tc.q = fixed_pos;
   // check for sudden movement
   if (fabs(tc.q[joint-1] - last_position) > max_step) {
-    ROS_INFO("Stopping due to max step condition");
+    ROS_INFO("Stopping due to max step condition (last=%f, current=%f",
+	     last_position,tc.q[joint-1]);
     runstate=OWD::Trajectory::DONE;
     running=false;
     return;
@@ -131,6 +133,7 @@ void CoggingCompTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   tc.t[joint-1] = current_torque;
   // keep tracking the current position
   end_position =tc.q;
+  last_position = tc.q[joint-1];
 
   return;
 }
