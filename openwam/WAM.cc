@@ -1376,12 +1376,14 @@ void WAM::newcontrol_rt(double dt){
             // the trajectory control values persist for the rest of this
             // iteration (to help deccelerate if we're still moving), but
             // the next time around we'll start holding at the endpoint
+            
             jointstraj->endPosition().cpy(&heldPositions[Joint::J1]);
+           
             // TESTING THE COMPLIANT Controller --- will remove this later
-            // std::cout << "===================== Trajectory DONE! ======================" << std::endl;
+            std::cout << "===================== Trajectory DONE! ======================" << std::endl;
             // for(int i = Joint::J1; i<=Joint::Jn; i++) {
             //    std::cout << joints[i].q << " ";
-            //   heldPositions[i] = joints[i].q;
+            //    heldPositions[i] = joints[i].q;
             // }
             // std::cout << std::endl;
             holdpos = true;  // should have been true already, but just making sure
