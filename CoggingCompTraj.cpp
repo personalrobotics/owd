@@ -13,6 +13,9 @@
 
 #include <ros/ros.h>
 #include <std_msgs/String.h>
+#define PEAK_CAN
+#include "openwam/CANdefs.hh"	// for HANDSTATE_* enumeration
+#include "openwamdriver.h"
 #include "CoggingCompTraj.h"
 
 CoggingCompTraj::CoggingCompTraj(int _joint,
@@ -106,11 +109,14 @@ void CoggingCompTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   // check for start of sampling
   if (t>sample_time) {
     owd_plugins::CogSample sample;
-    sample.position=tc.q[joint-1];
+    // motor position
+    sample.position=OWD::WamDriver::bus->pos[joint];
+    // old: joint position: sample.position=tc.q[joint-1];  
     sample.torque=current_torque;
     response.data.push_back(sample);
     if (++sample_count == num_samples) {
-      ROS_INFO("Collected data for t=%2.4f",current_torque);
+      ROS_INFO("At t=%2.4f mq=%2.4f, jq=%2.4f",current_torque,sample.position,
+	       tc.q[joint-1]);
       // increase the torque
       if (max_torque > 0) {
         current_torque += 0.005;
