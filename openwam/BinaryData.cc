@@ -162,10 +162,16 @@ void BinaryData::put_type(const BinaryDataType bt)
             
 void BinaryData::get_and_check_type(const BinaryDataType bt) const
 {
-  char s;
+  BinaryDataType s;
   get_raw_data(&s, sizeof(unsigned char));
+  printf("Looking for type %s\n",BDT_Type_String(bt).c_str());
   if(s != bt) {
-    throw "Mismatched data records";
+    char errmsg[200];
+    snprintf(errmsg,200,"Mismatched data records: expected type %s but found type %s",
+             BDT_Type_String(bt).c_str(),
+             BDT_Type_String(s).c_str());
+    printf("BinaryData error: %s\n",errmsg);
+    throw errmsg;
   }
 }        
 
@@ -187,3 +193,33 @@ void BinaryData::get_raw_data(void *d, int s) const
   }
 }
 
+std::string BinaryData::BDT_Type_String(BinaryDataType bt) const {
+  switch (bt) {
+  case BDT_Bool:
+    return std::string("Bool");
+  case BDT_Char:
+    return std::string("Char");
+  case BDT_Short:
+    return std::string("Short");
+  case BDT_Int:
+    return std::string("Int");
+  case BDT_Long:
+    return std::string("Long");
+  case BDT_Record:
+    return std::string("Record");
+  case BDT_NetworkID:
+    return std::string("NetworkID");
+  case BDT_BinaryData:
+    return std::string("BinaryData");
+  case BDT_UUID:
+    return std::string("UUID");
+  case BDT_String:
+    return std::string("String");
+  case BDT_Double:
+    return std::string("Double");
+  case BDT_DoubleVector:
+    return std::string("DoubleVector");
+  default:
+    return std::string("Undefined");
+  }
+}

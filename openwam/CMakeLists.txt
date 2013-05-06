@@ -80,3 +80,6 @@ endif (RT_BUILD)
 endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
 include_directories (../openmath)
+
+rosbuild_add_executable(MacTrajTest MacTrajTest.cc)
+target_link_libraries(MacTrajTest openwamsim)
