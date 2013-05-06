@@ -30,7 +30,7 @@
 CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
 	       bool ft, bool tactile,bool log_cb_data) : 
   puck_state(2),BH280_installed(bh280),id(bus_id),trq(NULL),
-  pos(NULL),jpos(NULL), forcetorque_data(NULL), accelerometer_data(NULL), 
+  pos(NULL),rawpos(NULL),jpos(NULL), forcetorque_data(NULL), accelerometer_data(NULL), 
   filtered_forcetorque_data(NULL),
   ft_force_filter(2,10.0),ft_torque_filter(2,10.0), tactile_data(NULL),
   valid_forcetorque_data(NULL), valid_tactile_data(NULL),
@@ -51,6 +51,7 @@ CANbus::CANbus(int32_t bus_id, int num_pucks, bool bh280,
   pucks = new Puck[n_arm_pucks+1];
   trq = new int32_t[n_arm_pucks+1];
   pos = new double[n_arm_pucks+1];
+  rawpos = new int[n_arm_pucks+1];
   jpos = new double[n_arm_pucks+1];
   jumptime = new RTIME[n_arm_pucks+1];
   firstupdate = new bool[n_arm_pucks+1];

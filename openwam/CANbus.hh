@@ -130,6 +130,7 @@ public:
   Group groups[NUM_GROUPS+1];
   int32_t* trq;
   double* pos;
+  int *rawpos;
   double* jpos;
   double* forcetorque_data;
   double* accelerometer_data;

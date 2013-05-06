@@ -472,10 +472,11 @@ int WAM::recv_mpos(){
         return OW_FAILURE;
     }
 
-    // copy the positions into the motors' structures
-    for(int m=Motor::M1; m<=Motor::Mn; m++)
-        motors[m].pos( mpos[ motors[m].id() ] );
-
+  // copy the positions into the motors' structures
+  for(int m=Motor::M1; m<=Motor::Mn; m++) {
+    motors[m].pos( mpos[ motors[m].id() ] );
+    motors[m].rawpos = bus->rawpos[motors[m].id()];
+  }
     return OW_SUCCESS;
 }
 

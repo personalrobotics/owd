@@ -35,6 +35,8 @@ public:
   double q;
   double t;
   double puckI_per_Nm;       // Newton Meters -> puck torque units
+  int offset;
+  int rawpos;
   
 private:
   void lock(){pthread_mutex_lock(&mutex);};
