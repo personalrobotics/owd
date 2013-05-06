@@ -1,2 +1,2 @@
-float64 position
+int32 position
 float64 torque

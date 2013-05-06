@@ -110,12 +110,12 @@ void CoggingCompTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
   if (t>sample_time) {
     owd_plugins::CogSample sample;
     // motor position
-    sample.position=OWD::WamDriver::bus->pos[joint];
+    sample.position=OWD::WamDriver::bus->rawpos[joint] - OWD::WamDriver::owam->motors[joint-1].offset;
     // old: joint position: sample.position=tc.q[joint-1];  
     sample.torque=current_torque;
     response.data.push_back(sample);
     if (++sample_count == num_samples) {
-      ROS_INFO("At t=%2.4f mq=%2.4f, jq=%2.4f",current_torque,sample.position,
+      ROS_INFO("At t=%2.4f mq=%d, jq=%2.4f",current_torque,sample.position,
 	       tc.q[joint-1]);
       // increase the torque
       if (max_torque > 0) {
