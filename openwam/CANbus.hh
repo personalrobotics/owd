@@ -404,7 +404,7 @@ public:
 
   static const int ft_tare_values_to_average = 20;
   int force_tare_values_collected, 
-    torque_tare_values_collected;
+      torque_tare_values_collected;
   double ft_tare_avg[6];
 
   int32_t hand_initial_torque;

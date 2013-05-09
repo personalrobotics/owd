@@ -193,6 +193,7 @@ namespace OWD {
   std::vector<double> Plugin::_ft_torque;
   std::vector<double> Plugin::_filtered_ft_force;
   std::vector<double> Plugin::_filtered_ft_torque;
+  int                 Plugin::_ft_saturation_state;
   std::vector<double> Plugin::_hand_position;
   std::vector<double> Plugin::_target_hand_position;
   std::vector<double> Plugin::_strain;
@@ -231,6 +232,7 @@ namespace OWD {
   const std::vector<double> &Plugin::ft_torque=Plugin::_ft_torque;
   const std::vector<double> &Plugin::filtered_ft_force=Plugin::_filtered_ft_force;
   const std::vector<double> &Plugin::filtered_ft_torque=Plugin::_filtered_ft_torque;
+  const int                 &Plugin::ft_saturation_state=Plugin::_ft_saturation_state;
   const std::vector<double> &Plugin::hand_position=Plugin::_hand_position;
   const std::vector<double> &Plugin::target_hand_position=Plugin::_target_hand_position;
   const std::vector<double> &Plugin::strain=Plugin::_strain;

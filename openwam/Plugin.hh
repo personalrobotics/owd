@@ -230,6 +230,12 @@ namespace OWD {
     ///
     static const std::vector<double> &filtered_ft_torque;
 
+    /// \brief Current F/T sensor saturation state bitmask
+    ///
+    /// A read-only reference to an integer bitmask
+    ///
+    static const int &ft_saturation_state;
+
     /// \brief Current position of the hand joints
     ///
     /// A read-only reference to the position of the four hand joints
@@ -359,6 +365,7 @@ namespace OWD {
     static std::vector<double> _ft_torque;
     static std::vector<double> _filtered_ft_force;
     static std::vector<double> _filtered_ft_torque;
+    static int                 _ft_saturation_state;
     static std::vector<double> _hand_position;
     static std::vector<double> _target_hand_position;
     static std::vector<double> _strain;

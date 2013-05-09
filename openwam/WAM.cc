@@ -1303,6 +1303,8 @@ void WAM::newcontrol_rt(double dt){
         OWD::Plugin::_arm_velocity[i]=arm_velocity[i+1];
     }
     if (bus->forcetorque_data) {
+
+        OWD::Plugin::_ft_saturation_state=bus->valid_forcetorque_flag;
         for (unsigned int i=0; i<3; ++i) {
             if (bus->valid_forcetorque_data) {
                 OWD::Plugin::_ft_force[i]=bus->forcetorque_data[i];
