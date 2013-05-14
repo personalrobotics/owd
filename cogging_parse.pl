@@ -6,7 +6,7 @@
 # trajectory records AP values, so to recover the true MECH value we will
 # subtract the offset.  If you have updated the CoggingComp trajectory
 # to report true MECH values then set OFFSET equal to zero.
-$offset = -985;
+$offset = 0;
 
 # set AVERAGE=0 to just dump out all the raw values in order to look for
 # drift.  set AVERAGE=1 to average together all the samples for a single
@@ -14,15 +14,15 @@ $offset = -985;
 $AVERAGE=1;
 
 
-
 $TWO_PI = 2.0 * 3.141592654;
-$offset_radians = $offset / 4096 * $TWO_PI;
+
 $lasttorque=0;
 $possum=0;
 $poscount=0;
 while (<>) {
     if (/position: (.*)/) {
-	$position=$1 - $offset_radians;
+	$position=$TWO_PI * ($1 - $offset) / 4096.0;
+
     }
     if (/torque: (.*)/) {
 	$torque = $1;

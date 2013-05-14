@@ -6,6 +6,7 @@
   <license>LGPL</license>
   <depend package="owd"/>
   <depend package="owd_msgs"/>
+  <depend package="pantilt"/>
   <depend package="std_msgs"/>
   <depend package="bullet"/>
   <depend package="geometry_msgs"/>
