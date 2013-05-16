@@ -33,6 +33,7 @@
 #include <owd_msgs/GetHandProperty.h>
 #include <owd_msgs/SetSpeed.h>
 #include <owd_msgs/SetHandTorque.h>
+#include <owd_msgs/SetFingerCompliant.h>
 
 class BHD_280 {
 public:
@@ -48,7 +49,8 @@ public:
     ss_gethandprop,
     ss_relaxhand,
     ss_setspeed,
-    ss_sethandtorque;
+    ss_sethandtorque,
+    ss_setfingercompliant;
 
   ros::NodeHandle node;
   CANbus *bus;
@@ -83,13 +85,15 @@ public:
 		owd_msgs::SetSpeed::Response &res); 
   bool SetHandTorque(owd_msgs::SetHandTorque::Request &req,
 		     owd_msgs::SetHandTorque::Response &res); 
+  bool SetFingerCompliant(owd_msgs::SetFingerCompliant::Request &req,
+		                  owd_msgs::SetFingerCompliant::Response &res); 
+
 private:
   void AdvertiseAndSubscribe(ros::NodeHandle &n);
   void GetParameters(ros::NodeHandle &n);
   void SetPuckValues();
   void Unadvertise();
   void createT(double a, double alpha, double d, double theta, double result[4][4]);
-
 };
   
 

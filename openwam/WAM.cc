@@ -1383,12 +1383,11 @@ void WAM::newcontrol_rt(double dt){
             jointstraj->endPosition().cpy(&heldPositions[Joint::J1]);
            
             // TESTING THE COMPLIANT Controller --- will remove this later
-            std::cout << "===================== Trajectory DONE! ======================" << std::endl;
-            // for(int i = Joint::J1; i<=Joint::Jn; i++) {
-            //    std::cout << joints[i].q << " ";
-            //    heldPositions[i] = joints[i].q;
-            // }
-            // std::cout << std::endl;
+            //std::cout << "===================== Trajectory DONE! ======================" << std::endl;
+            //for(int i = Joint::J1; i<=Joint::Jn; i++) {
+            //   heldPositions[i] = joints[i].q;
+            //}
+
             holdpos = true;  // should have been true already, but just making sure
             for (int j=0; j<Joint::Jn; ++j) {
                 traj_torq[j]=0;  // make sure we don't leave these non-zero
@@ -1673,7 +1672,6 @@ void WAM::newcontrol_rt(double dt){
             // so just ignore and give up recording this piece of data
         }
     }
-
 
     // finally, sum the control, dynamics, and trajectory torques
     for(int j=0; j<Joint::Jn; j++){

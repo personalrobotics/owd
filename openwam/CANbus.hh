@@ -381,6 +381,13 @@ public:
   int hand_get_strain(double &s1, double &s2, double &s3);
   int hand_get_state(int32_t *state);
   int hand_set_speed(const std::vector<double> &v);
+
+  /* Compliant finger */
+  int hand_finger_compliant(const bool enable, const int32_t& strain);
+  int hand_compliant_callback(const int& fingerId, const int32_t& strain);
+  bool m_compliantFinger;
+  int32_t m_compliantStrain;
+ 
   int send_finger_reset(int32_t id);
   int wait_for_finger_reset(int32_t id);
 

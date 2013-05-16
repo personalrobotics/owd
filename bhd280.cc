@@ -93,6 +93,9 @@ void BHD_280::AdvertiseAndSubscribe(ros::NodeHandle &n) {
 				   &BHD_280::SetSpeed,this);
   ss_sethandtorque = n.advertiseService("SetHandTorque",
 					&BHD_280::SetHandTorque,this);
+  ss_setfingercompliant = n.advertiseService("SetFingerCompliant",
+					&BHD_280::SetFingerCompliant,this);
+
 }
 
 void BHD_280::GetParameters(ros::NodeHandle &n) {
@@ -120,6 +123,7 @@ void BHD_280::Unadvertise() {
   ss_relaxhand.shutdown();
   ss_setspeed.shutdown();
   ss_sethandtorque.shutdown();
+  ss_setfingercompliant.shutdown();
 }
 
 void BHD_280::Pump(ros::TimerEvent const& e) {
@@ -583,3 +587,36 @@ bool BHD_280::SetHandTorque(owd_msgs::SetHandTorque::Request &req,
   res.ok=true;
   return true;
 }
+
+bool BHD_280::SetFingerCompliant(owd_msgs::SetFingerCompliant::Request &req,
+			                     owd_msgs::SetFingerCompliant::Response &res)
+{
+    if(!req.enable) {
+        ROS_WARN("Disabling finger compliance.");
+        bus->hand_finger_compliant(false, 0.0); 
+        res.reason="";
+        res.ok=true;
+        return true;
+    }
+
+    if (req.strain > 2500) {
+        ROS_ERROR("Strain torque exceeds safe limits");
+        res.reason="Strain exceeds safe limits";
+        res.ok=false;
+        return false;
+    }
+    if (req.strain < 100) {
+        ROS_ERROR("Strain below limits");
+        res.reason="Strain below limits";
+        res.ok=false;
+        return false;
+    }
+
+    bus->hand_finger_compliant(true, req.strain); 
+
+    res.reason="";
+    res.ok=true;
+    return true;
+}
+
+
