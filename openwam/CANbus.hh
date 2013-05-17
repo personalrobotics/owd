@@ -387,6 +387,8 @@ public:
   int hand_compliant_callback(const int& fingerId, const int32_t& strain);
   bool m_compliantFinger;
   int32_t m_compliantStrain;
+  int32_t m_compliantDeadband;
+  int32_t m_compliantReference;
  
   int send_finger_reset(int32_t id);
   int wait_for_finger_reset(int32_t id);

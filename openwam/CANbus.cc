@@ -71,7 +71,9 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   next_encoder_clocktime(15),
   last_encoder_clocktime(15),
   m_compliantFinger(false),
-  m_compliantStrain(0.0)
+  m_compliantStrain(0.0),
+  m_compliantDeadband(0.0),
+  m_compliantReference(0.0)
 {
 
   // hand_queue_mutex is used to manage access to the hand command/response queues
@@ -2219,7 +2221,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
     get_property_expecting_id = 0;
     return OW_FAILURE;
   }
-  if (bytes < sizeof(CANmsg)) {
+  if (size_t(bytes) < sizeof(CANmsg)) {
     ROS_ERROR_NAMED("can_bh280","Incomplete read of message from hand message pipe: expected %ld but got %d bytes",
 		    sizeof(CANmsg),bytes);
     get_property_expecting_id = 0;
@@ -2553,7 +2555,7 @@ int CANbus::process_get_property_response_rt(int32_t msgid, uint8_t* msg, int32_
   handmsg.value = value;
 #ifdef OWD_RT
   ssize_t bytecount = rt_pipe_write(&handpipe,&handmsg,sizeof(CANmsg),P_NORMAL);
-  if (bytecount < sizeof(CANmsg)) {
+  if (size_t(bytecount) < sizeof(CANmsg)) {
     if (bytecount < 0) {
       snprintf(last_error,200,"Error writing to hand message pipe: %zd",bytecount);
     } else {
@@ -3003,8 +3005,25 @@ int CANbus::hand_set_speed(const std::vector<double> &v) {
 
 int CANbus::hand_finger_compliant(const bool enable, const int32_t& strain)
 {
-    m_compliantFinger = enable;
-    m_compliantStrain = strain;
+    // JUST DO FINGER 1 FOR NOW
+
+    m_compliantFinger    = enable;
+    m_compliantStrain    = strain;
+    m_compliantDeadband  = 50;
+    m_compliantReference = hand_strain[1];
+
+    //Set the T-stop to zero
+	if (hand_set_property(11,TSTOP,0) != OW_SUCCESS) {
+   	  ROS_ERROR_NAMED("bhd280","could not set tstop");
+      return OW_FAILURE;
+    }
+
+    //Set the max torque to 1700
+	if (hand_set_property(11,MT,1700) != OW_SUCCESS) {
+   	  ROS_ERROR_NAMED("bhd280","could not set mt");
+      return OW_FAILURE;
+    }
+ 
     return OW_SUCCESS;
 }
  
@@ -3014,11 +3033,24 @@ int CANbus::hand_compliant_callback(const int& fingerId, const int32_t& strain)
         return OW_SUCCESS;
     }
 
-    int32_t strainError = strain - m_compliantStrain;
-    if(strainError > 0) {
-        ROS_INFO("OPEN");
-    } else{
-        ROS_INFO("CLOSE");
+    if(fingerId != 1) {
+        return OW_SUCCESS;
+    }
+
+    if  (strain > (m_compliantStrain+m_compliantDeadband)) {
+        ROS_INFO("OPEN %d, %d", fingerId,  strain);
+        if (hand_set_property(11,V,100) != OW_SUCCESS) {
+          ROS_INFO("OPEN FAILED");
+          return OW_FAILURE;
+        }
+    } else if(strain < (m_compliantStrain-m_compliantDeadband)) {
+        ROS_INFO("CLOSE %d, %d", fingerId,  strain);
+        if (hand_set_property(11,V,-100) != OW_SUCCESS) {
+          ROS_INFO("CLOSE FAILED");
+          return OW_FAILURE;
+        }
+    } else {
+        ROS_INFO("MAINTAIN %d, %d", fingerId,  strain);
     }
 
     return OW_SUCCESS;
