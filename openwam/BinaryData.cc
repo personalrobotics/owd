@@ -162,7 +162,8 @@ void BinaryData::put_type(const BinaryDataType bt)
             
 void BinaryData::get_and_check_type(const BinaryDataType bt) const
 {
-  BinaryDataType s;
+  BinaryDataType s(BDT_Bool);  // initialize to something so that upper bytes
+                               // are set to zero
   get_raw_data(&s, sizeof(unsigned char));
   printf("Looking for type %s\n",BDT_Type_String(bt).c_str());
   if(s != bt) {
