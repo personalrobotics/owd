@@ -167,9 +167,11 @@ void BinaryData::get_and_check_type(const BinaryDataType bt) const
   printf("Looking for type %s\n",BDT_Type_String(bt).c_str());
   if(s != bt) {
     char errmsg[200];
-    snprintf(errmsg,200,"Mismatched data records: expected type %s but found type %s",
+    snprintf(errmsg,200,"Mismatched data records: expected type %s (value %d) but found type %s (value %d)",
              BDT_Type_String(bt).c_str(),
-             BDT_Type_String(s).c_str());
+	     bt,
+             BDT_Type_String(s).c_str(),
+	     s);
     printf("BinaryData error: %s\n",errmsg);
     throw errmsg;
   }
