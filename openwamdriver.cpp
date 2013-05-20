@@ -2124,53 +2124,54 @@ bool WamDriver::AddTimedTrajectory(owd_msgs::AddTimedTrajectory::Request &req,
   
   ROS_WARN("About to deserialize a trajectory from a string of len %zd",
 	   req.SerializedTrajectory.size());
-  BinaryData bd(req.SerializedTrajectory);
-  int trajtype = bd.GetInt();
-  BinaryData bd2(bd.GetString());
-  OWD::Trajectory *t;
-  if (trajtype == Trajectory::TRAJTYPE_MACJOINTTRAJ) {
-    try {
+  try {
+    BinaryData bd(req.SerializedTrajectory);
+    int trajtype = bd.GetInt();
+    BinaryData bd2(bd.GetString());
+    OWD::Trajectory *t;
+    if (trajtype == Trajectory::TRAJTYPE_MACJOINTTRAJ) {
       t = new MacJointTraj(bd2);
-    } catch (const char *errmsg) {
-      ROS_ERROR("Could not deserialize trajectory: %s",errmsg);
+    } else {
+      ROS_ERROR("Could not deserialize trajectory: unknown type");
       res.ok=false;
-      res.reason = std::string("Could not deserialize trajectory: ");
-      res.reason += std::string(errmsg);
+      res.reason = std::string("Did not recognize serialized trajectory type: was it created by an OWD class?");
       res.id = std::string("");
-      return true;
+    return true;
     }
-  } else {
-    ROS_ERROR("Could not deserialize trajectory: unknown type");
+    if (req.options & owd_msgs::JointTraj::opt_WaitForStart) {
+      t->WaitForStart=true;
+    }
+    if (req.options & owd_msgs::JointTraj::opt_CancelOnStall) {
+      t->CancelOnStall=true;
+    }
+    if (req.options & owd_msgs::JointTraj::opt_CancelOnForceInput) {
+      t->CancelOnForceInput=true;
+    }
+    if (req.options & owd_msgs::JointTraj::opt_CancelOnTactileInput) {
+      t->CancelOnTactileInput=true;
+    }
+    if (req.options & owd_msgs::JointTraj::opt_Synchronize) {
+      t->Synchronize=true;
+    }
+    
+    if (req.id == "") {
+      t->id = Trajectory::random_id();
+    } else {
+      t->id = req.id;
+    }
+    
+    res.id = t->id;
+    res.ok = AddTrajectory(t,res.reason);
+
+  } catch (const char *errmsg) {
+    ROS_ERROR("Could not deserialize trajectory: %s",errmsg);
     res.ok=false;
-    res.reason = std::string("Did not recognize serialized trajectory type: was it created by an OWD class?");
+    res.reason = std::string("Could not deserialize trajectory: ");
+    res.reason += std::string(errmsg);
     res.id = std::string("");
     return true;
   }
     
-  if (req.options & owd_msgs::JointTraj::opt_WaitForStart) {
-    t->WaitForStart=true;
-  }
-  if (req.options & owd_msgs::JointTraj::opt_CancelOnStall) {
-    t->CancelOnStall=true;
-  }
-  if (req.options & owd_msgs::JointTraj::opt_CancelOnForceInput) {
-    t->CancelOnForceInput=true;
-  }
-  if (req.options & owd_msgs::JointTraj::opt_CancelOnTactileInput) {
-    t->CancelOnTactileInput=true;
-  }
-  if (req.options & owd_msgs::JointTraj::opt_Synchronize) {
-    t->Synchronize=true;
-  }
-
-  if (req.id == "") {
-    t->id = Trajectory::random_id();
-  } else {
-    t->id = req.id;
-  }
-
-  res.id = t->id;
-  res.ok = AddTrajectory(t,res.reason);
 
   // This should be after it's been added, for synchronization
   res.time_added = ros::Time::now();
