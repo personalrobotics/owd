@@ -115,6 +115,11 @@ PlayTraj::PlayTraj(std::vector<owd_plugins::TrajPoint> traj):
   playtraj(traj),
   i(0)
 {
+  if (traj.size() < 2) {
+    throw "Not enough trajectory points";
+  }
+  start_position=traj[0].angles;
+  end_position=traj.back().angles;
   // check dimensions of all fields
 }
 
