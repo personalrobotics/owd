@@ -307,8 +307,11 @@ bool WamDriver::Init(const char *joint_cal_file)
 #else 
   int32_t WamWasZeroed=1;
 #endif // BH280_ONLY
-  
-  owam = new WAM(bus, BH_model, ForceTorque, Tactile, log_controller_data);
+ 
+  bool FlippedHand;
+  n.param("flipped_hand", FlippedHand, false); 
+
+  owam = new WAM(bus, BH_model, ForceTorque, FlippedHand, Tactile, log_controller_data);
   n.param("slip_joints_on_high_torque",owam->slip_joints_on_high_torque,false);
   n.param("controller_blend_period",owam->jscontroller_blend_period,1.0);
 

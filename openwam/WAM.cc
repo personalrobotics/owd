@@ -43,7 +43,7 @@ extern int MODE;  // puck parameter
 
 DefaultJSController wimpy_jscontroller(std::string("wimpy"));
 
-WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
+WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool flipped_hand, bool tactile,
         bool log_ctrl_data) :
     mN1(41.782),  //joint ratios
     mN2(27.836),
@@ -70,7 +70,7 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
     log_controller_data(log_ctrl_data), 
     bus(cb),ctrl_loop(cb->id, &control_loop_rt, this),
     motor_state(MOTORS_OFF), stiffness(0), recorder(50000),
-    BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
+    BH_model(bh_model), ForceTorque(forcetorque), FlippedHand(flipped_hand), Tactile(tactile),
     last_control_position(Joint::Jn),
     slip_joints_on_high_torque(false),
     elbow_vel(0,0,0),
@@ -208,6 +208,12 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
                 Inertia(   2558.1007,   0.0000,      0.0000,
                     2558.1007,   0.0000,   1242.1825, M2_MM2) );
 
+    L7_with_280FT_Flipped_hand // Same as above, but the hand is 180 degrees rotated
+        = Link( DH(  0.000,   0.0000,   0.1800,   M_PI), 1.40548270,
+                R3(  0.0000,   0.0000,  -76.0000)*0.001,
+                Inertia(   2558.1007,   0.0000,      0.0000,
+                    2558.1007,   0.0000,   1242.1825, M2_MM2) );
+
     L7_with_FT_and_Robotiq_hand // Robotiq hand is 2.4kg (1.25 more than 280 hand)
         = Link( DH(  0.0000,   0.0000,   0.1800,   0.0000), 2.66,
                 R3(  0.0000,   0.0000,  -50.0000)*0.001,
@@ -246,7 +252,11 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
             links[Link::L7] = L7_with_260_hand;
         } else if (BH_model == 280) {
             if (forcetorque) {
-                links[Link::L7] = L7_with_280FT_hand;
+                if(flipped_hand){
+                    links[Link::L7] = L7_with_280FT_Flipped_hand;
+                }else{
+                    links[Link::L7] = L7_with_280FT_hand;
+                }
             } else {
                 links[Link::L7] = L7_with_280_hand;
             }

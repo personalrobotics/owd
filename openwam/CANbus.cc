@@ -3013,7 +3013,7 @@ int CANbus::hand_finger_compliant(const bool enable, const int32_t& strain)
     m_compliantReference = hand_strain[1];
 
     //Set the T-stop to zero
-	if (hand_set_property(11,TSTOP,0) != OW_SUCCESS) {
+	if (hand_set_property(11,TSTOP,100) != OW_SUCCESS) {
    	  ROS_ERROR_NAMED("bhd280","could not set tstop");
       return OW_FAILURE;
     }

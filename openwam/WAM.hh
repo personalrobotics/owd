@@ -129,6 +129,7 @@ public:
   OWD::Link L7_with_260_hand,
     L7_with_280_hand,
     L7_with_280FT_hand,
+    L7_with_280FT_Flipped_hand,
     L7_with_FT_and_Robotiq_hand,
     L7_with_Robotiq_hand,
     L7_without_hand,
@@ -199,7 +200,7 @@ public:
   CANbus* bus;                             // pointer to the CAN bus
   OWD::ControlLoop ctrl_loop;            // control loop object
 
-  WAM(CANbus* cb, int BH_model, bool forcetorque, bool tactile,
+  WAM(CANbus* cb, int BH_model, bool forcetorque, bool flipped_hand, bool tactile,
       bool log_ctrl_data=false);
   ~WAM();
  
@@ -260,6 +261,7 @@ public:
 
   int BH_model;
   bool ForceTorque;
+  bool FlippedHand;
   bool Tactile;
   SE3 SE3_endpoint; // result of forward kinematics calculation
   std::vector<double> last_control_position;
