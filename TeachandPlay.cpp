@@ -144,7 +144,7 @@ void PlayTraj::evaluate_abs(OWD::Trajectory::TrajControl &tc, double t) {
     return;
   }
   // linearly interpolate between i and i+1
-  double fraction=(t-playtraj[i].time) / (playtraj[i+1].time - playtraj[i].time);
+  double fraction=(playtraj[i+1].time - t) / (playtraj[i+1].time - playtraj[i].time);
   for (unsigned int j=0; j<tc.q.size(); ++j) {
     tc.q[j]=fraction*playtraj[i].angles[j] + (1-fraction)*playtraj[i+1].angles[j];
     tc.qd[j]=fraction*playtraj[i].velocities[j] + (1-fraction)*playtraj[i+1].velocities[j];
