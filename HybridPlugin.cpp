@@ -19,6 +19,7 @@
 #include "FTCheck.h"
 #include "InsertKeyTraj.h"
 #include "CoggingCompTraj.h"
+#include "TeachandPlay.h"
 #define PEAK_CAN
 #include "openwamdriver.h"
 #include "openwam/CANdefs.hh"	// for HANDSTATE_* enumeration
@@ -66,6 +67,12 @@ HybridPlugin::HybridPlugin()
   if (!CoggingCompTraj::Register()) {
     throw "CoggingCompTraj failed to register";
   }
+  if (!TeachTraj::Register()) {
+    throw "TeachTraj failed to register";
+  }
+  if (!PlayTraj::Register()) {
+    throw "PlayTraj failed to register";
+  }
 
   pub_net_force = n.advertise<std_msgs::Float64MultiArray>("net_force",1);
 
@@ -89,6 +96,8 @@ HybridPlugin::~HybridPlugin() {
   InsertKeyTraj::Shutdown();
   Servo2Traj::Shutdown();
   CoggingCompTraj::Shutdown();
+  TeachTraj::Shutdown();
+  PlayTraj::Shutdown();
 
   if (write_log_file && (recorder->count > 0)) {
     // do a final write of any lingering log data

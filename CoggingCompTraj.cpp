@@ -1,13 +1,7 @@
 /***********************************************************************
 
-  Copyright 2011-13 Carnegie Mellon University and Intel Corporation
+  Copyright 2013 Carnegie Mellon University
   Author: Mike Vande Weghe <vandeweg@cmu.edu>
-
-  This ROS package serves as a sample for how to make an OWD plugin.
-  For more information about OWD, please see the webpage
-  http://personalrobotics.intel-research.net/intel-pkg/owd/html/index.html
-
-  You are free to modify and reuse this code without restrictions.
 
 **********************************************************************/
 
