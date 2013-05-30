@@ -72,7 +72,6 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   hand_sustained_torque(1100),
   next_encoder_clocktime(15),
   last_encoder_clocktime(15),
-  m_compliantFinger(false),
   m_compliantStrain(0.0),
   m_compliantDeadband(0.0)
 {
@@ -108,6 +107,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   // is not necessary to initialize it.
   hand_strain[1]=hand_strain[2]=hand_strain[3]=0.0f;
   hand_breakaway[1]=hand_breakaway[2]=hand_breakaway[3]=false;
+  m_compliantFinger[0] = m_compliantFinger[1] = m_compliantFinger[2] = false;
 
 #ifdef OWD_RT
   int err = rt_pipe_create(&handpipe,"HANDPIPE",P_MINOR_AUTO,0);
@@ -2449,7 +2449,7 @@ int CANbus::process_hand_response_rt(int32_t msgid, uint8_t* msg, int32_t msglen
     }
     int32_t value = (msg[3]<<8) + msg[2] - 2048; // center on zero
     hand_strain[nodeid-10]=value;
-    hand_compliant_callback(nodeid-10, value);
+    hand_compliant_callback(nodeid, value);
     return OW_SUCCESS;
 
   } else if ((msgid & 0x41F) == 0x408) { // group 8
@@ -3007,7 +3007,7 @@ int CANbus::hand_set_speed(const std::vector<double> &v) {
 // fingerId: 11, 12, 13
 int CANbus::hand_finger_compliant(const int& fingerId, const bool enable, const int32_t& offset, const int32_t& deadband, const int32_t& max_torque)
 {
-    if(m_compliantFinger && !enable) {
+    if(m_compliantFinger[fingerId - 11] && !enable) {
         int32_t value;
         if (hand_get_property(fingerId, MODE, &value) != OW_SUCCESS) {
           ROS_INFO("Get property failed!");
@@ -3020,11 +3020,11 @@ int CANbus::hand_finger_compliant(const int& fingerId, const bool enable, const 
                 return OW_FAILURE;
             }
         }
-        m_compliantFinger = false;
+        m_compliantFinger[fingerId - 11] = false;
         return OW_SUCCESS;
     }
 
-    m_compliantFinger    = enable;
+    m_compliantFinger[fingerId - 11]    = enable;
     m_compliantStrain    = offset;
     m_compliantDeadband  = deadband;
 
@@ -3052,31 +3052,33 @@ int CANbus::hand_finger_compliant(const int& fingerId, const bool enable, const 
  
 int CANbus::hand_compliant_callback(const int& fingerId, const int32_t& strain)
 {
-    if(!m_compliantFinger)
+    if(!m_compliantFinger[fingerId - 11])
     {
         return OW_SUCCESS;
     }
 
-    double Kp = 0.1;
+    const double KP_OPEN = 0.2;
+    const double KP_CLOSE = 0.1;
+
     if  (strain > (m_compliantStrain+m_compliantDeadband)) {
-        int32_t velocity = int32_t(-Kp * (strain - m_compliantStrain + m_compliantDeadband));
-        ROS_INFO("OPEN %d, %d, %d", fingerId,  strain, velocity);
+        int32_t velocity = int32_t(-KP_OPEN * (strain - m_compliantStrain + m_compliantDeadband));
+        // ROS_INFO("OPEN %d, %d, %d", fingerId,  strain, velocity);
         if (hand_set_property(fingerId, V, velocity) != OW_SUCCESS) {
           ROS_INFO("OPEN FAILED");
           return OW_FAILURE;
         }
     } else if (strain < (m_compliantStrain-m_compliantDeadband)) {
-        int32_t velocity = int32_t(-Kp * (strain - m_compliantStrain - m_compliantDeadband));
-        ROS_INFO("CLOSE %d, %d, %d", fingerId,  strain, velocity);
+        int32_t velocity = int32_t(-KP_CLOSE * (strain - m_compliantStrain - m_compliantDeadband));
+        // ROS_INFO("CLOSE %d, %d, %d", fingerId,  strain, velocity);
         if (hand_set_property(fingerId, V, velocity) != OW_SUCCESS) {
           ROS_INFO("CLOSE FAILED");
           return OW_FAILURE;
         }
     } else {
-        ROS_INFO("MAINTAIN %d, %d, %d", fingerId,  strain, 0);
+        // ROS_INFO("MAINTAIN %d, %d, %d", fingerId,  strain, 0);
         if (hand_set_property(fingerId, V, 0) != OW_SUCCESS) {
-          ROS_INFO("CLOSE FAILED");
-          return OW_FAILURE;
+            ROS_INFO("CLOSE FAILED");
+            return OW_FAILURE;
         }
     }
 

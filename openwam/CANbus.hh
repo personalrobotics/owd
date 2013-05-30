@@ -385,7 +385,7 @@ public:
   /* Compliant finger */
   int hand_finger_compliant(const int& fingerId, const bool enable, const int32_t& offset, const int32_t& deadband, const int32_t& max_torque);
   int hand_compliant_callback(const int& fingerId, const int32_t& strain);
-  bool m_compliantFinger;
+  bool m_compliantFinger[3];
   int32_t m_compliantStrain;
   int32_t m_compliantDeadband;
  
