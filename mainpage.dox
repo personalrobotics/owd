@@ -8,8 +8,8 @@
 The %OWD ROS package, and its owd_msgs dependency, can be obtained via
 svn from
 \verbatim
-https://svn.personalrobotics.ri.cmu.edu/public/trunk/src/owd
-https://svn.personalrobotics.ri.cmu.edu/public/trunk/src/owd_msgs
+https://svn.personalrobotics.ri.cmu.edu/public/latest/owd
+https://svn.personalrobotics.ri.cmu.edu/public/latest/owd_msgs
 \endverbatim
 
 \section dependencies Dependencies
