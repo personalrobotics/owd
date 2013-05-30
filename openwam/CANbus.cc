@@ -40,6 +40,8 @@
 
 
 
+
+
 CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, bool tactile, bool log_cb_data) : 
   puck_state(-1),BH280_installed(bh280),id(bus_id),fw_vers(0),trq(NULL),
   pos(NULL), rawpos(NULL), jpos(NULL), forcetorque_data(NULL), accelerometer_data(NULL),
@@ -72,8 +74,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   last_encoder_clocktime(15),
   m_compliantFinger(false),
   m_compliantStrain(0.0),
-  m_compliantDeadband(0.0),
-  m_compliantReference(0.0)
+  m_compliantDeadband(0.0)
 {
 
   // hand_queue_mutex is used to manage access to the hand command/response queues
@@ -2160,7 +2161,7 @@ int CANbus::hand_set_property(int32_t id, int32_t prop, int32_t val) {
   mutex_lock(&hand_cmd_mutex);
   ssize_t bytes = ::write(handpipe_fd,&msg,sizeof(CANmsg));
   mutex_unlock(&hand_cmd_mutex);
-  if (bytes < sizeof(CANmsg)) {
+  if (size_t(bytes) < sizeof(CANmsg)) {
     if (bytes < 0) {
       ROS_ERROR_NAMED("can_bh280","Error writing to hand message pipe: %zd",bytes);
     } else {
@@ -2201,7 +2202,7 @@ int CANbus::hand_get_property(int32_t id, int32_t prop, int32_t *value) {
 #ifdef OWD_RT
 
   int bytes = ::write(handpipe_fd,&msg,sizeof(CANmsg));
-  if (bytes < sizeof(CANmsg)) {
+  if (size_t(bytes) < sizeof(CANmsg)) {
     if (bytes < 0) {
       ROS_ERROR_NAMED("can_bh280","Error writing to hand message pipe: %d", bytes);
     } else {
@@ -3003,54 +3004,80 @@ int CANbus::hand_set_speed(const std::vector<double> &v) {
   return OW_SUCCESS;
 }
 
-int CANbus::hand_finger_compliant(const bool enable, const int32_t& strain)
+// fingerId: 11, 12, 13
+int CANbus::hand_finger_compliant(const int& fingerId, const bool enable, const int32_t& offset, const int32_t& deadband, const int32_t& max_torque)
 {
-    // JUST DO FINGER 1 FOR NOW
+    if(m_compliantFinger && !enable) {
+        int32_t value;
+        if (hand_get_property(fingerId, MODE, &value) != OW_SUCCESS) {
+          ROS_INFO("Get property failed!");
+          return OW_FAILURE;
+        }
+        if(value == MODE_VELOCITY)
+        {
+            if (hand_set_property(fingerId, MODE, MODE_IDLE) != OW_SUCCESS) {
+                ROS_INFO("FAILURE to switch to idle mode!");
+                return OW_FAILURE;
+            }
+        }
+        m_compliantFinger = false;
+        return OW_SUCCESS;
+    }
 
     m_compliantFinger    = enable;
-    m_compliantStrain    = strain;
-    m_compliantDeadband  = 50;
-    m_compliantReference = hand_strain[1];
+    m_compliantStrain    = offset;
+    m_compliantDeadband  = deadband;
 
-    //Set the T-stop to zero
-	if (hand_set_property(11,TSTOP,100) != OW_SUCCESS) {
+    // Set the T-stop to zero, so it keeps going and not stop when hitting max torque
+	if (hand_set_property(fingerId, TSTOP, 0) != OW_SUCCESS) {
    	  ROS_ERROR_NAMED("bhd280","could not set tstop");
       return OW_FAILURE;
     }
-
-    //Set the max torque to 1700
-	if (hand_set_property(11,MT,1700) != OW_SUCCESS) {
+	if (hand_set_property(fingerId, MT, max_torque) != OW_SUCCESS) {
    	  ROS_ERROR_NAMED("bhd280","could not set mt");
       return OW_FAILURE;
     }
- 
+    // Setting the velocity to zero just to make sure
+    if (hand_set_property(fingerId, V, 0) != OW_SUCCESS) {
+          ROS_INFO("CLOSE FAILED");
+          return OW_FAILURE;
+    }
+    // Switch to velocity mode
+    if (hand_set_property(fingerId, MODE, MODE_VELOCITY) != OW_SUCCESS) {
+        ROS_INFO("FAILURE to switch to idle mode!");
+        return OW_FAILURE;
+    }
     return OW_SUCCESS;
 }
  
 int CANbus::hand_compliant_callback(const int& fingerId, const int32_t& strain)
 {
-    if(!m_compliantFinger) {
+    if(!m_compliantFinger)
+    {
         return OW_SUCCESS;
     }
 
-    if(fingerId != 1) {
-        return OW_SUCCESS;
-    }
-
+    double Kp = 0.1;
     if  (strain > (m_compliantStrain+m_compliantDeadband)) {
-        ROS_INFO("OPEN %d, %d", fingerId,  strain);
-        if (hand_set_property(11,V,100) != OW_SUCCESS) {
+        int32_t velocity = int32_t(-Kp * (strain - m_compliantStrain + m_compliantDeadband));
+        ROS_INFO("OPEN %d, %d, %d", fingerId,  strain, velocity);
+        if (hand_set_property(fingerId, V, velocity) != OW_SUCCESS) {
           ROS_INFO("OPEN FAILED");
           return OW_FAILURE;
         }
-    } else if(strain < (m_compliantStrain-m_compliantDeadband)) {
-        ROS_INFO("CLOSE %d, %d", fingerId,  strain);
-        if (hand_set_property(11,V,-100) != OW_SUCCESS) {
+    } else if (strain < (m_compliantStrain-m_compliantDeadband)) {
+        int32_t velocity = int32_t(-Kp * (strain - m_compliantStrain - m_compliantDeadband));
+        ROS_INFO("CLOSE %d, %d, %d", fingerId,  strain, velocity);
+        if (hand_set_property(fingerId, V, velocity) != OW_SUCCESS) {
           ROS_INFO("CLOSE FAILED");
           return OW_FAILURE;
         }
     } else {
-        ROS_INFO("MAINTAIN %d, %d", fingerId,  strain);
+        ROS_INFO("MAINTAIN %d, %d, %d", fingerId,  strain, 0);
+        if (hand_set_property(fingerId, V, 0) != OW_SUCCESS) {
+          ROS_INFO("CLOSE FAILED");
+          return OW_FAILURE;
+        }
     }
 
     return OW_SUCCESS;

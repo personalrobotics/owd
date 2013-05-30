@@ -30,12 +30,12 @@
 #define __JOINTCTRLPID_HH__
 
 class JointCtrlPID : public JointCtrl{
-
+public:
+  double se;         // Sum of error
 private:
   double Kp, Kd, Ki;
   double last_e;
   int last_e_valid;
-  double se;         // Sum of error
   static const double Isaturation = 5;
 
     double _GetSign(double in)

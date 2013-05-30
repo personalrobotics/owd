@@ -383,12 +383,11 @@ public:
   int hand_set_speed(const std::vector<double> &v);
 
   /* Compliant finger */
-  int hand_finger_compliant(const bool enable, const int32_t& strain);
+  int hand_finger_compliant(const int& fingerId, const bool enable, const int32_t& offset, const int32_t& deadband, const int32_t& max_torque);
   int hand_compliant_callback(const int& fingerId, const int32_t& strain);
   bool m_compliantFinger;
   int32_t m_compliantStrain;
   int32_t m_compliantDeadband;
-  int32_t m_compliantReference;
  
   int send_finger_reset(int32_t id);
   int wait_for_finger_reset(int32_t id);

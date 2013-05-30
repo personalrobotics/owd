@@ -591,29 +591,39 @@ bool BHD_280::SetHandTorque(owd_msgs::SetHandTorque::Request &req,
 bool BHD_280::SetFingerCompliant(owd_msgs::SetFingerCompliant::Request &req,
 			                     owd_msgs::SetFingerCompliant::Response &res)
 {
+    const double STRAIN_MIN_OFFSET = 0;
+    const double STRAIN_MAX_OFFSET = 1200;
+    const double MAX_TORQUE = 2500;
+
     if(!req.enable) {
         ROS_WARN("Disabling finger compliance.");
-        bus->hand_finger_compliant(false, 0.0); 
+        bus->hand_finger_compliant(req.id, false, 0.0, 0.0, 0.0); 
         res.reason="";
         res.ok=true;
         return true;
     }
 
-    if (req.strain > 2500) {
+    if (req.offset > STRAIN_MAX_OFFSET) {
         ROS_ERROR("Strain torque exceeds safe limits");
         res.reason="Strain exceeds safe limits";
         res.ok=false;
         return false;
     }
-    if (req.strain < 100) {
+    if (req.offset < STRAIN_MIN_OFFSET) {
         ROS_ERROR("Strain below limits");
         res.reason="Strain below limits";
         res.ok=false;
         return false;
     }
 
-    bus->hand_finger_compliant(true, req.strain); 
+    double max_torque = (req.max_torque > MAX_TORQUE) ? MAX_TORQUE : req.max_torque;
 
+    if(bus->hand_finger_compliant(req.id, true, req.offset, req.deadband, max_torque) != OW_SUCCESS)
+    {
+        res.reason = "Unable to switch to the compliant finger control!";
+        res.ok = false;
+        return false;
+    } 
     res.reason="";
     res.ok=true;
     return true;
