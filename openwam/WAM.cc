@@ -23,6 +23,8 @@
    Carnegie Mellon University
    */
 
+
+
 #include "WAM.hh"
 #include "Plugin.hh"
 #include "Kinematics.hh"
@@ -214,6 +216,12 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool flipped_hand, bool tac
                 Inertia(   2558.1007,   0.0000,      0.0000,
                     2558.1007,   0.0000,   1242.1825, M2_MM2) );
 
+    L7_with_irobot_Flipped_hand // Same as above, but the hand is 180 degrees rotated
+        = Link( DH(  0.000,   0.0000,   0.1800,   M_PI), 1.50548270,
+                R3(  0.0000,   0.0000,  -76.0000)*0.001,
+                Inertia(   2558.1007,   0.0000,      0.0000,
+                    2558.1007,   0.0000,   1242.1825, M2_MM2) );
+
     L7_with_FT_and_Robotiq_hand // Robotiq hand is 2.4kg (1.25 more than 280 hand)
         = Link( DH(  0.0000,   0.0000,   0.1800,   0.0000), 2.66,
                 R3(  0.0000,   0.0000,  -50.0000)*0.001,
@@ -259,6 +267,14 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool flipped_hand, bool tac
                 }
             } else {
                 links[Link::L7] = L7_with_280_hand;
+            }
+        } else if (BH_model == 978) {
+	  if ((forcetorque) && (flipped_hand)) {
+	      links[Link::L7] = L7_with_irobot_Flipped_hand;
+	      ROS_INFO("Using mass info for iRobot hand");
+            } else {
+	    ROS_WARN("Invalid hand requested; reverting to none-type hand");
+	    links[Link::L7] = L7_without_hand;
             }
         } else if (BH_model == 998) {
             if (forcetorque) {

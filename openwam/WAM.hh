@@ -130,6 +130,7 @@ public:
     L7_with_280_hand,
     L7_with_280FT_hand,
     L7_with_280FT_Flipped_hand,
+    L7_with_irobot_Flipped_hand,
     L7_with_FT_and_Robotiq_hand,
     L7_with_Robotiq_hand,
     L7_without_hand,

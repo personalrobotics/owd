@@ -116,6 +116,8 @@ int main(int argc, char** argv)
     BH_model=260;
   } else if (! hand_type.compare(0,7,"Robotiq")) {
     BH_model=998;
+  } else if (! hand_type.compare(0,6,"irobot")) {
+    BH_model=978;
   } else if (! hand_type.compare(0,29,"darpa_arms_calibration_target")) {
     BH_model=999;
   } else if (hand_type.compare(0,4, "none")) { // note the absence of the !
