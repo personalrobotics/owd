@@ -56,7 +56,7 @@ public:
   operator       double* ()        {return &H[0][0];}
   operator const double* () const  {return &H[0][0];}
 
-  double operator [] (int i) const {return (&H[0][0])[i];}
+  double operator [] (int i) const;
   
   operator so3() const;
   operator SO3() const 

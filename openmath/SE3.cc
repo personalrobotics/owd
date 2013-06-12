@@ -30,6 +30,10 @@ void SE3::setSO3(const SO3& R){
     H[2][0]=R[SO3::R31];   H[2][1]=R[SO3::R32];   H[2][2]=R[SO3::R33];
 }
 
+double SE3::operator [] (int i) const {
+  return (&H[0][0])[i];
+}
+
 SE3::operator so3() const{
   double theta = acos( (H[0][0]+H[1][1]+H[2][2] - 1.0)/2);
 

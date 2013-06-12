@@ -563,7 +563,7 @@ int CANbus::clear() {
   int32_t msgid, msglen;
   
   int count(0);
-  while (read_rt(&msgid, msg, &msglen, 50) == OW_SUCCESS) {
+  while (read_rt(&msgid, msg, &msglen, 50000) == OW_SUCCESS) {
     ++count;
   }
   return count;
@@ -1654,6 +1654,14 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
     return OW_FAILURE;
   }
 #endif // ! OWD_RT
+  if (cmsg.Msg.MSGTYPE == MSGTYPE_STATUS) {
+    if (cmsg.Msg.DATA[3] == CAN_ERR_BUSHEAVY) {
+      snprintf(last_error,200,"CAN BUSHEAVY ERROR");
+    } else if (cmsg.Msg.DATA[3] !=0) {
+      snprintf(last_error,200,"Linux CANbus error: 0x%x",cmsg.Msg.DATA[3]);
+    }
+    return OW_FAILURE;
+  }
 
   *msgid = cmsg.Msg.ID;
   *msglen = cmsg.Msg.LEN;
@@ -2103,6 +2111,7 @@ int CANbus::ft_tare() {
     ft_tare_avg[i]=0;
   }
   valid_forcetorque_data=false;
+  valid_forcetorque_flag=-2;
   valid_filtered_forcetorque_data=false;
 
   // reset the filters
