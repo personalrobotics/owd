@@ -142,7 +142,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
     tactile_data = (float *) calloc(96, sizeof(float));
   }
   if (log_canbus_data) {
-    candata.resize(100000);
+    candata.resize(300000);
   }
   for(int p=1; p<=n_arm_pucks; p++){
     pos[p] = 0.0;
