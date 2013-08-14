@@ -1921,8 +1921,8 @@ bool WamDriver::AddTrajectory(owd_msgs::AddTrajectory::Request &req,
   // this function takes a sequence of jointspace points and builds
   // a trajectory object.  the request will be rejected if:
   //  1) there are not at least 2 points
-  //  2) the first point is too far from the arm's current position (or
-  //     the ending position of the last queued trajectory)
+  //  2) the first point is too far from the arm's current reference 
+  //     position (or the ending position of the last queued trajectory)
   //  3) if there's a problem with the trajectory geometry and
   //     the timing cannot be computed
   // if the first point is a close match, it will be adjusted to an
