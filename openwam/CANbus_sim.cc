@@ -104,9 +104,6 @@ int CANbus::check(){
   return OW_SUCCESS;
 }
 
-void CANbus::dump(){
-}
-   
 int CANbus::allow_message(int32_t id, int32_t mask){
   return OW_SUCCESS;
 }

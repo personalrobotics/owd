@@ -180,6 +180,8 @@ MTLogger<canio_data> *candata;
   RT_INTR rt_can_intr;
 #endif // OWD_RT
 
+  std::string canio_to_string(const canio_data &cdata);
+
 #endif // ! OWDSIM
 
 #ifdef OWD_RT
@@ -287,7 +289,6 @@ MTLogger<canio_data> *candata;
   int start();
   int stop();
   int run();
-  std::string canio_to_string(const canio_data &cdata);
   void printpos();
   
   int send_torques(int32_t* mtrq);

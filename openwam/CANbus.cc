@@ -3587,13 +3587,17 @@ CANbus::~CANbus(){
       ROS_FATAL("Dumping CANbus log to %s",dumpname);
       canio_data cdata;
       while (candata->remove(&cdata)) {
-	fprintf(fp,"%s",canio_to_string(cdata).c_str());
+	fprintf(fp,"%s\n",canio_to_string(cdata).c_str());
       }
       fclose(fp);
+      ROS_FATAL("Done dumping CANbus log");
     } else {
       ROS_FATAL("Unable to dump CANbus log to %s: %s",
 		dumpname,strerror(errno));
     }
+  }
+  if (candata) {
+    delete candata;
   }
 }
  
