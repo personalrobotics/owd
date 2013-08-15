@@ -30,6 +30,7 @@
 #include <math.h>            // M_PI
 #include <iomanip>
 #include <map>
+#include "MTLogger.h"
 
 #ifndef OWDSIM
 
@@ -170,7 +171,7 @@ typedef struct {
   int32_t msglen;
   int32_t msgdata[8];
 } canio_data;
-DataRecorder<canio_data> candata;
+MTLogger<canio_data> *candata;
 
   int unread_packets;
   HANDLE handle;
@@ -286,7 +287,7 @@ DataRecorder<canio_data> candata;
   int start();
   int stop();
   int run();
-  void dump();
+  std::string canio_to_string(const canio_data &cdata);
   void printpos();
   
   int send_torques(int32_t* mtrq);

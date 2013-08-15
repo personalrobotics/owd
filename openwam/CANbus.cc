@@ -62,7 +62,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   max_safety_torque(0),
   ok(true),
   log_canbus_data(log_cb_data),
-  candata(0),
+  candata(NULL),
   unread_packets(0),
   get_property_expecting_id(0),
   get_property_expecting_prop(0),
@@ -142,7 +142,8 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
     tactile_data = (float *) calloc(96, sizeof(float));
   }
   if (log_canbus_data) {
-    candata.resize(300000);
+    // 5 minutes of data is 300s * 500 cycles/s * 20 msgs/cycle
+    candata = new MTLogger<canio_data>(3000000);
   }
   for(int p=1; p<=n_arm_pucks; p++){
     pos[p] = 0.0;
@@ -515,14 +516,6 @@ void CANbus::send_puck_reset(int32_t low, int32_t high) {
   }
 }
 
-void CANbus::dump(){
-  //  ROS_DEBUG("Printing bus information.");
-  for(int g=GROUP_ID_MIN; g<=GROUP_ID_MAX; g++){
-    //    if(groups[g].id() != GROUP_INVALID)
-      // ROS_DEBUG_STREAM(groups[g]);
-  }
-}
-   
 int CANbus::allow_message(int32_t id, int32_t mask){
   
 #ifdef PEAK_CAN
@@ -1576,7 +1569,6 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
   int retrycount = usecs / sleeptime + 0.5; // round to nearest int
 #endif // OWD_RT
 
-  std::vector<canio_data> crecord;
   canio_data cdata;
   struct timeval tv;
 
@@ -1611,9 +1603,7 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
 	  for (unsigned int i=1; i<8; ++i) {
 	    cdata.msgdata[i] = 0; // must pad the extra space with zeros
 	  }
-	  crecord.push_back(cdata);
-	  candata.add(crecord);
-	  crecord.clear();
+	  candata->append(cdata,true);
 	}
       } else {
 	snprintf(last_error,200,"timeout during read after %d microseconds",usecs);
@@ -1629,9 +1619,7 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
 	  for (unsigned int i=1; i<8; ++i) {
 	    cdata.msgdata[i] = 0; // must pad the extra space with zeros
 	  }
-	  crecord.push_back(cdata);
-	  candata.add(crecord);
-	  crecord.clear();
+	  candata->append(cdata,true);
 	}
 	return OW_FAILURE;
       }
@@ -1707,9 +1695,7 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
 	  for (unsigned int i=1; i<8; ++i) {
 	    cdata.msgdata[i] = 0; // must pad the extra space with zeros
 	  }
-	  crecord.push_back(cdata);
-	  candata.add(crecord);
-	  crecord.clear();
+	  candata->append(cdata,true);
 	}
 	len=1; // make sure we pass in the right len each time
       } else {
@@ -1725,9 +1711,7 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
 	  for (unsigned int i=1; i<8; ++i) {
 	    cdata.msgdata[i] = 0; // must pad the extra space with zeros
 	  }
-	  crecord.push_back(cdata);
-	  candata.add(crecord);
-	  crecord.clear();
+	  candata->append(cdata,true);
 	}
 	snprintf(last_error,200,"timeout during read after %d microseconds",usecs);
 	return OW_FAILURE;
@@ -1767,8 +1751,7 @@ int CANbus::read_rt(int32_t* msgid, uint8_t* msgdata, int32_t* msglen, int32_t u
 	cdata.msgdata[i] = 0; // must pad the extra space with zeros
       }
     }
-    crecord.push_back(cdata);
-    candata.add(crecord);
+    candata->append(cdata,true);
   }
 
   return OW_SUCCESS;
@@ -1788,7 +1771,6 @@ int CANbus::send_rt(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t use
   int retrycount = usecs / sleeptime + 0.5;
 
   if (log_canbus_data) {
-    std::vector<canio_data> crecord;
     canio_data cdata;
     struct timeval tv;
     gettimeofday(&tv,NULL);
@@ -1804,8 +1786,7 @@ int CANbus::send_rt(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t use
 	cdata.msgdata[i] = 0; // must pad the extra space with zeros
       }
     }
-    crecord.push_back(cdata);
-    candata.add(crecord);
+    candata->append(cdata,true);
   }
   
   
@@ -3406,220 +3387,215 @@ void CANbus::initPropertyDefs(int32_t firmwareVersion){
   }
 }
 
-template<> inline bool DataRecorder<CANbus::canio_data>::dump(const char *fname) {
-  FILE *csv = fopen(fname,"w");
-  if (csv) {
-    ROS_FATAL("Dumping CANbus log to %s",fname);
-    for (unsigned int i=0; i<count; ++i) {
-      CANbus::canio_data cdata = data[i];
-      char timestring[100];
-      time_t logtime = cdata.secs;
-	//	+ 4*3600; // shift by 4 hours to account for EDT - GMT shift
-      strftime(timestring,100,"%F %T",localtime(&logtime));
+std::string CANbus::canio_to_string(const canio_data &cdata) {
+  char buf[200];
+  char timestring[100];
+  time_t logtime = cdata.secs;
+  strftime(timestring,100,"%F %T",localtime(&logtime));
 	
-      fprintf(csv,"[%s,%06d] ",timestring,cdata.usecs);
-      if (cdata.msgid == -1) {
-	fprintf(csv,"SLEEP %d usecs\n",cdata.msgdata[0]);
-	continue;
-      }
-      if (cdata.msgid == -2) {
-	fprintf(csv,"TIMEOUT after %d usecs\n",cdata.msgdata[0]);
-	continue;
-      }
-      if (cdata.send) {
-	fprintf(csv,"SEND ");
-      } else {
-	fprintf(csv,"READ ");
-      }
-      int32_t recv_id = cdata.msgid & 0x1F; // bits 0-4
-      int32_t send_id = (cdata.msgid >> 5) & 0x1F;  // bits 5-9
-      fprintf(csv,"%02d ", send_id);
-      if (cdata.msgid & 0x400) {
-	fprintf(csv,"G%02d ",recv_id);
-      } else {
-	fprintf(csv," %02d ",recv_id);
-      }
-      if ((cdata.msgid & 0x41F) == 0x408) {
-	// group 8 messages are the Tactile Top-10 data
-	uint32_t top10_bitmap = cdata.msgdata[0] << 16 
-	  | cdata.msgdata[1] << 8 
-	  | cdata.msgdata[2];
-	bool first(true);
-	std::stringstream top10_string;
-	for (int i=0; i<24; ++i) {
-	  if (top10_bitmap & 0x800000) {
-	    if (first) {
-	      first=false;
-	    } else {
-	      top10_string << ",";
-	    }
-	    top10_string << i;
-	  }
-	  top10_bitmap <<= 1;  // left shift by 1 bit
-	}
-	fprintf(csv,"SET TACTILE TOP10=%s",top10_string.str().c_str());
-      } else if ((cdata.msgid & 0x41F) == 0x409) {
-	// group 9 messages are the Tactile Full data
-	int tactile_group=cdata.msgdata[0] >> 4;
-	fprintf(csv,"SET TACTILE FULL GROUP=%d",tactile_group);
-      } else if ((cdata.msgid & 0x41F) == 0x40A) {
-	// group 10 messages are 3-axis Force from the F/T sensor
-	double X,Y,Z;
-	X=CANbus::ft_combine(cdata.msgdata[0],cdata.msgdata[1]) / 256.0;
-	Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 256.0;
-	Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 256.0;
-	fprintf(csv,"SET FORCE X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
-        if (cdata.msglen > 6) {
-	  if (cdata.msgdata[6] & 128) {
-	    fprintf(csv," RE-TARE");
-	  }
-	  if (cdata.msgdata[6] & 64) {
-	    fprintf(csv," BAD");
-	  }
-	}
-     } else if ((cdata.msgid & 0x41F) == 0x40B) {
-	// group 11 messages are 3-axis Torque from the F/T sensor
-	double X,Y,Z;
-	X=CANbus::ft_combine(cdata.msgdata[0],cdata.msgdata[1]) / 4096.0;
-	Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 4096.0;
-	Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 4096.0;
-	fprintf(csv,"SET TORQUE X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
-        if (cdata.msglen > 6) {
-	  if (cdata.msgdata[6] & 128) {
-	    fprintf(csv," RE-TARE");
-	  }
-	  if (cdata.msgdata[6] & 64) {
-	    fprintf(csv," BAD");
-	  }
-	}
-      } else if ((cdata.msgid & 0x41F) == 0x40C) {
-	// group 12 messages are 3-axis accelerometer values from the F/T sensor
-	double X,Y,Z;
-	X=CANbus::ft_combine(cdata.msgdata[0],cdata.msgdata[1]) / 1024.0;
-	Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 1024.0;
-	Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 1024.0;
-	fprintf(csv,"SET ACCEL X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
-      } else if (cdata.msgdata[0] & 0x80) {  // SET
-	if ((cdata.msgdata[0] == (42 | 0x80))
-	    && ((cdata.msgid & 0x41F) == 0x404)) {
-	  // Packed Torque message
-	  int32_t tq1 = (cdata.msgdata[1] << 6) +
-	    (cdata.msgdata[2] >> 2);
-	  int32_t tq2 = ((cdata.msgdata[2] & 0x03) << 12) + 
-	    (cdata.msgdata[3] << 4) +
-	    (cdata.msgdata[4] >> 4);
-	  int32_t tq3 = ((cdata.msgdata[4] & 0x0F) << 10) +
-	    (cdata.msgdata[5] << 2) +
-	    (cdata.msgdata[6] >> 6);
-	  int32_t tq4 = ((cdata.msgdata[6] & 0x3F) << 8) +
-	    cdata.msgdata[7];
-	  if (tq1 & 0x00002000) { // If negative 
-	      tq1 |= 0xFFFFC000; // Sign-extend
-	  }
-	  if (tq2 & 0x00002000) {
-	      tq2 |= 0xFFFFC000; 
-	  }
-	  if (tq3 & 0x00002000) {
-	      tq3 |= 0xFFFFC000; 
-	  }
-	  if (tq4 & 0x00002000) {
-	      tq4 |= 0xFFFFC000; 
-	  }
-	  fprintf(csv,"SET T=%d,%d,%d,%d", tq1,tq2,tq3,tq4);
-	} else if ((cdata.msgid & 0x41F) == 0x403) {
-	  // messages sent to GROUP 3 are 22-bit position updates
-	  int32_t value = ((cdata.msgdata[0] & 0x3F) << 16) +
-	    (cdata.msgdata[1] << 8) +
-	    cdata.msgdata[2];
-	  if (value & 0x00200000) { // If negative 
-	    value |= 0xFFC00000; // Sign-extend
-	  }
-	  fprintf(csv,"SET P=%d",value);
-	  if (cdata.msglen == 6) {
-	    // this puck also sent a secondary value (JP)
-	    value = ((cdata.msgdata[3] & 0x3F) << 16) +
-	      (cdata.msgdata[4] << 8) +
-	      cdata.msgdata[5];
-	    if (value & 0x00200000) { // If negative 
-	      value |= 0xFFC00000; // Sign-extend
-	    }
-	    fprintf(csv," JP=%d",value);
-	  }
-	} else if ((cdata.msgid & 0x41F) == 0x407) {
-	  // messages sent to GROUP 7 are 22-bit joint positions
-	  int32_t value = ((cdata.msgdata[0] & 0x3F) << 16) +
-	    (cdata.msgdata[1] << 8) +
-	    cdata.msgdata[2];
-	  if (value & 0x00200000) { // If negative 
-	    value |= 0xFFC00000; // Sign-extend
-	  }
-	  fprintf(csv,"SET JP=%d",value);
-	  if (cdata.msglen == 6) {
-	    // this puck also sent a secondary value (JP2?)
-	    value = ((cdata.msgdata[3] & 0x3F) << 16) +
-	      (cdata.msgdata[4] << 8) +
-	      cdata.msgdata[5];
-	    if (value & 0x00200000) { // If negative 
-	      value |= 0xFFC00000; // Sign-extend
-	    }
-	    fprintf(csv," ??=%d",value);
-	  }
-	} else {
-	  // regular property
-	  int32_t value = (cdata.msgdata[3] << 8) + cdata.msgdata[2];
-	  if (cdata.msglen == 5) {
-	    // 24-bit value
-	    value += (cdata.msgdata[4] << 16);
-	    if (value & 0x00800000) { // If negative 
-	      value |= 0xFF000000; // Sign-extend
-	    }
-	  } else if (cdata.msglen == 6) {
-	    // 32-bit value
-	    value += (cdata.msgdata[4] << 16) + (cdata.msgdata[5] << 24);
-	  } else {
-	    // 16-bit value
-	    if (value & 0x00008000) { // If negative 
-	      value |=  0xFFFF0000; // Sign-extend
-	    }
-	  }	    
-	  if (CANbus::propname.find(cdata.msgdata[0] & 0x7F) != CANbus::propname.end()) {
-	    fprintf(csv,"SET %s=%d",CANbus::propname[cdata.msgdata[0] & 0x7F].c_str(), value);
-	  } else {
-	    fprintf(csv,"SET %03d=%d",cdata.msgdata[0] & 0x7F, value);
-	  }
-	}
-      } else {  // GET
-	if (CANbus::propname.find(cdata.msgdata[0]) != CANbus::propname.end()) {
-	  fprintf(csv,"GET %s",CANbus::propname[cdata.msgdata[0]].c_str());
-	} else {
-	  fprintf(csv,"GET %03d",cdata.msgdata[0]);
-	}
-      }
-      
-      fprintf(csv,"\n");
-    }
-    fclose(csv);
-    ROS_FATAL("  ...done dumping CANbus log");
-    return true;
-  } else {
-    ROS_FATAL("Unable to dump CANbus log to %s: %s",
-	      fname,strerror(errno));
-    return false;
+  snprintf(buf,200,"[%s,%06d] ",timestring,cdata.usecs);
+  if (cdata.msgid == -1) {
+    snprintf(buf+strlen(buf),200-strlen(buf),"SLEEP %d usecs\n",cdata.msgdata[0]);
+    return std::string(buf);
   }
+  if (cdata.msgid == -2) {
+    snprintf(buf+strlen(buf),200-strlen(buf),"TIMEOUT after %d usecs\n",cdata.msgdata[0]);
+    return std::string(buf);
+  }
+  if (cdata.send) {
+    snprintf(buf+strlen(buf),200-strlen(buf),"SEND ");
+  } else {
+    snprintf(buf+strlen(buf),200-strlen(buf),"READ ");
+  }
+  int32_t recv_id = cdata.msgid & 0x1F; // bits 0-4
+  int32_t send_id = (cdata.msgid >> 5) & 0x1F;  // bits 5-9
+  snprintf(buf+strlen(buf),200-strlen(buf),"%02d ", send_id);
+  if (cdata.msgid & 0x400) {
+    snprintf(buf+strlen(buf),200-strlen(buf),"G%02d ",recv_id);
+  } else {
+    snprintf(buf+strlen(buf),200-strlen(buf)," %02d ",recv_id);
+  }
+  if ((cdata.msgid & 0x41F) == 0x408) {
+    // group 8 messages are the Tactile Top-10 data
+    uint32_t top10_bitmap = cdata.msgdata[0] << 16 
+      | cdata.msgdata[1] << 8 
+      | cdata.msgdata[2];
+    bool first(true);
+    std::stringstream top10_string;
+    for (int i=0; i<24; ++i) {
+      if (top10_bitmap & 0x800000) {
+	if (first) {
+	  first=false;
+	} else {
+	  top10_string << ",";
+	}
+	top10_string << i;
+      }
+      top10_bitmap <<= 1;  // left shift by 1 bit
+    }
+    snprintf(buf+strlen(buf),200-strlen(buf),"SET TACTILE TOP10=%s",top10_string.str().c_str());
+  } else if ((cdata.msgid & 0x41F) == 0x409) {
+    // group 9 messages are the Tactile Full data
+    int tactile_group=cdata.msgdata[0] >> 4;
+    snprintf(buf+strlen(buf),200-strlen(buf),"SET TACTILE FULL GROUP=%d",tactile_group);
+  } else if ((cdata.msgid & 0x41F) == 0x40A) {
+    // group 10 messages are 3-axis Force from the F/T sensor
+    double X,Y,Z;
+    X=CANbus::ft_combine(cdata.msgdata[0],cdata.msgdata[1]) / 256.0;
+    Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 256.0;
+    Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 256.0;
+    snprintf(buf+strlen(buf),200-strlen(buf),"SET FORCE X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
+    if (cdata.msglen > 6) {
+      if (cdata.msgdata[6] & 128) {
+	snprintf(buf+strlen(buf),200-strlen(buf)," RE-TARE");
+      }
+      if (cdata.msgdata[6] & 64) {
+	snprintf(buf+strlen(buf),200-strlen(buf)," BAD");
+      }
+    }
+  } else if ((cdata.msgid & 0x41F) == 0x40B) {
+    // group 11 messages are 3-axis Torque from the F/T sensor
+    double X,Y,Z;
+    X=CANbus::ft_combine(cdata.msgdata[0],cdata.msgdata[1]) / 4096.0;
+    Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 4096.0;
+    Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 4096.0;
+    snprintf(buf+strlen(buf),200-strlen(buf),"SET TORQUE X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
+    if (cdata.msglen > 6) {
+      if (cdata.msgdata[6] & 128) {
+	snprintf(buf+strlen(buf),200-strlen(buf)," RE-TARE");
+      }
+      if (cdata.msgdata[6] & 64) {
+	snprintf(buf+strlen(buf),200-strlen(buf)," BAD");
+      }
+    }
+  } else if ((cdata.msgid & 0x41F) == 0x40C) {
+    // group 12 messages are 3-axis accelerometer values from the F/T sensor
+    double X,Y,Z;
+    X=CANbus::ft_combine(cdata.msgdata[0],cdata.msgdata[1]) / 1024.0;
+    Y=CANbus::ft_combine(cdata.msgdata[2],cdata.msgdata[3]) / 1024.0;
+    Z=CANbus::ft_combine(cdata.msgdata[4],cdata.msgdata[5]) / 1024.0;
+    snprintf(buf+strlen(buf),200-strlen(buf),"SET ACCEL X=%3.3f Y=%3.3f Z=%3.3f", X, Y, Z);
+  } else if (cdata.msgdata[0] & 0x80) {  // SET
+    if ((cdata.msgdata[0] == (42 | 0x80))
+	&& ((cdata.msgid & 0x41F) == 0x404)) {
+      // Packed Torque message
+      int32_t tq1 = (cdata.msgdata[1] << 6) +
+	(cdata.msgdata[2] >> 2);
+      int32_t tq2 = ((cdata.msgdata[2] & 0x03) << 12) + 
+	(cdata.msgdata[3] << 4) +
+	(cdata.msgdata[4] >> 4);
+      int32_t tq3 = ((cdata.msgdata[4] & 0x0F) << 10) +
+	(cdata.msgdata[5] << 2) +
+	(cdata.msgdata[6] >> 6);
+      int32_t tq4 = ((cdata.msgdata[6] & 0x3F) << 8) +
+	cdata.msgdata[7];
+      if (tq1 & 0x00002000) { // If negative 
+	tq1 |= 0xFFFFC000; // Sign-extend
+      }
+      if (tq2 & 0x00002000) {
+	tq2 |= 0xFFFFC000; 
+      }
+      if (tq3 & 0x00002000) {
+	tq3 |= 0xFFFFC000; 
+      }
+      if (tq4 & 0x00002000) {
+	tq4 |= 0xFFFFC000; 
+      }
+      snprintf(buf+strlen(buf),200-strlen(buf),"SET T=%d,%d,%d,%d", tq1,tq2,tq3,tq4);
+    } else if ((cdata.msgid & 0x41F) == 0x403) {
+      // messages sent to GROUP 3 are 22-bit position updates
+      int32_t value = ((cdata.msgdata[0] & 0x3F) << 16) +
+	(cdata.msgdata[1] << 8) +
+	cdata.msgdata[2];
+      if (value & 0x00200000) { // If negative 
+	value |= 0xFFC00000; // Sign-extend
+      }
+      snprintf(buf+strlen(buf),200-strlen(buf),"SET P=%d",value);
+      if (cdata.msglen == 6) {
+	// this puck also sent a secondary value (JP)
+	value = ((cdata.msgdata[3] & 0x3F) << 16) +
+	  (cdata.msgdata[4] << 8) +
+	  cdata.msgdata[5];
+	if (value & 0x00200000) { // If negative 
+	  value |= 0xFFC00000; // Sign-extend
+	}
+	snprintf(buf+strlen(buf),200-strlen(buf)," JP=%d",value);
+      }
+    } else if ((cdata.msgid & 0x41F) == 0x407) {
+      // messages sent to GROUP 7 are 22-bit joint positions
+      int32_t value = ((cdata.msgdata[0] & 0x3F) << 16) +
+	(cdata.msgdata[1] << 8) +
+	cdata.msgdata[2];
+      if (value & 0x00200000) { // If negative 
+	value |= 0xFFC00000; // Sign-extend
+      }
+      snprintf(buf+strlen(buf),200-strlen(buf),"SET JP=%d",value);
+      if (cdata.msglen == 6) {
+	// this puck also sent a secondary value (JP2?)
+	value = ((cdata.msgdata[3] & 0x3F) << 16) +
+	  (cdata.msgdata[4] << 8) +
+	  cdata.msgdata[5];
+	if (value & 0x00200000) { // If negative 
+	  value |= 0xFFC00000; // Sign-extend
+	}
+	snprintf(buf+strlen(buf),200-strlen(buf)," ??=%d",value);
+      }
+    } else {
+      // regular property
+      int32_t value = (cdata.msgdata[3] << 8) + cdata.msgdata[2];
+      if (cdata.msglen == 5) {
+	// 24-bit value
+	value += (cdata.msgdata[4] << 16);
+	if (value & 0x00800000) { // If negative 
+	  value |= 0xFF000000; // Sign-extend
+	}
+      } else if (cdata.msglen == 6) {
+	// 32-bit value
+	value += (cdata.msgdata[4] << 16) + (cdata.msgdata[5] << 24);
+      } else {
+	// 16-bit value
+	if (value & 0x00008000) { // If negative 
+	  value |=  0xFFFF0000; // Sign-extend
+	}
+      }	    
+      if (CANbus::propname.find(cdata.msgdata[0] & 0x7F) != CANbus::propname.end()) {
+	snprintf(buf+strlen(buf),200-strlen(buf),"SET %s=%d",CANbus::propname[cdata.msgdata[0] & 0x7F].c_str(), value);
+      } else {
+	snprintf(buf+strlen(buf),200-strlen(buf),"SET %03d=%d",cdata.msgdata[0] & 0x7F, value);
+      }
+    }
+  } else {  // GET
+    if (CANbus::propname.find(cdata.msgdata[0]) != CANbus::propname.end()) {
+      snprintf(buf+strlen(buf),200-strlen(buf),"GET %s",CANbus::propname[cdata.msgdata[0]].c_str());
+    } else {
+      snprintf(buf+strlen(buf),200-strlen(buf),"GET %03d",cdata.msgdata[0]);
+    }
+  }
+  return std::string(buf);
 }
 
- CANbus::~CANbus(){
-   ROS_FATAL("Destroying class CANbus");
-   //   rt_intr_delete(&rt_can_intr);   
-   if(pucks!=NULL) delete pucks; 
-   if(trq!=NULL) delete trq; 
-   if(pos!=NULL) delete pos;
-   if (log_canbus_data) {
-     char dumpname[200];
-     snprintf(dumpname,200,"candata%d.log",id);
-     candata.dump(dumpname);
-   }
- }
+CANbus::~CANbus(){
+  ROS_FATAL("Destroying class CANbus");
+  if(pucks!=NULL) delete pucks; 
+  if(trq!=NULL) delete trq; 
+  if(pos!=NULL) delete pos;
+  if (log_canbus_data && candata) {
+    char dumpname[200];
+    snprintf(dumpname,200,"candata%d.log",id);
+    FILE *fp = fopen(dumpname,"w");
+    if (fp) {
+      ROS_FATAL("Dumping CANbus log to %s",dumpname);
+      canio_data cdata;
+      while (candata->remove(&cdata)) {
+	fprintf(fp,"%s",canio_to_string(cdata).c_str());
+      }
+      fclose(fp);
+    } else {
+      ROS_FATAL("Unable to dump CANbus log to %s: %s",
+		dumpname,strerror(errno));
+    }
+  }
+}
  
 std::map <int, std::string> CANbus::propname;
 
