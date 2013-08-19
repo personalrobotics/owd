@@ -891,6 +891,11 @@ void control_loop_rt(void* argv){
         //      (2) no additional requests are made from the hand for several
         //          cycles after the tactile data is requested.
 #ifndef BH280_ONLY
+#ifdef WRIST
+            int all_pucks = 0xFE;
+#else // !WRIST
+            int all_pucks = 0x1E;
+#endif // WRIST
         static int state_cycles(0);
         if (++state_cycles==50) { // once every 50 cycles
             if (wam->bus->request_puck_state_rt(1) != OW_SUCCESS) {
@@ -900,7 +905,7 @@ void control_loop_rt(void* argv){
             }
             state_cycles=0;
         }
-        if (state_cycles==25) { // also once every 50 cycles (10hz)
+        if (state_cycles==25) { // once every 25 cycles (20hz)
             if (wam->bus->accelerometer_data) {
                 if (wam->bus->request_accelerometer_rt() != OW_SUCCESS) {
                     ROS_WARN("control_loop: request_accelerometer_rt failed");
@@ -976,15 +981,18 @@ void control_loop_rt(void* argv){
         while (time_to_wait>0) {
             uint8_t  msg[8];
             int32_t msgid, msglen;
+            uint32_t TO_GROUP;
+            uint32_t FROM_NODE;
+            uint32_t PROPERTY;
 
             if (wam->bus->read_rt(&msgid, msg, &msglen, time_to_wait) == OW_FAILURE){
-                break; // nothing more to read
+                goto NEXT;
             }
 
             // process the response
-            uint32_t TO_GROUP = msgid & 0x41F;
-            uint32_t FROM_NODE = (msgid & 0x3E0) >> 5;
-            uint32_t PROPERTY = msg[0] & 0x7F;
+            TO_GROUP = msgid & 0x41F;
+	    FROM_NODE = (msgid & 0x3E0) >> 5;
+	    PROPERTY = msg[0] & 0x7F;
             if ((FROM_NODE == wam->bus->get_property_expecting_id) &&
                     (PROPERTY == wam->bus->get_property_expecting_prop)) {
                 wam->bus->process_get_property_response_rt(msgid, msg, msglen);
@@ -1039,15 +1047,10 @@ void control_loop_rt(void* argv){
             } else {
                 // unknown
                 wam->bus->stats.canread_badpackets++;
-                continue;
+                goto NEXT;
             }
 
 #ifndef BH280_ONLY
-#ifdef WRIST
-            int all_pucks = 0xFE;
-#else // !WRIST
-            int all_pucks = 0x1E;
-#endif // WRIST
             if (!torques_sent && ((wam->bus->received_position_flags & 0xFE) == all_pucks)) {
                 // we've received all of the arm joint values, so compute and
                 // send out the torques
@@ -1099,7 +1102,7 @@ void control_loop_rt(void* argv){
                     //	    ROS_WARN("control_loop: extra_bus_commands failed.");
                 }
             }
-
+	NEXT:
             time_to_wait = ControlLoop::PERIOD * 1e6  // sec to usecs
                 - (ControlLoop::get_time_ns_rt() - loopstart_time) * 1e-3;  // nsecs to usecs
         } // END OF READ LOOP
