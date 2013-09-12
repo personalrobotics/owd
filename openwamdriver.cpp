@@ -1436,7 +1436,7 @@ void WamDriver::set_home_position() {
     }
     char *jvalstr = NULL;
     size_t jsize = 0;
-    size_t linelen = getline(&jvalstr,&jsize,moff_file); // getline will do the malloc
+    getline(&jvalstr,&jsize,moff_file); // getline will do the malloc
     if (strncmp(jvalstr,"WAM encoder offset values",strlen("WAM encoder offset values"))) {
       ROS_ERROR("Unrecognized format in joint calibration file \"%s\"",joint_calibration_file);
       goto NOCALIB;
