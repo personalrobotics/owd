@@ -30,7 +30,7 @@
 #include "ft.hh"
 #include "tactile.hh"
 #include <sys/mman.h>
-#include <sys/resource.h>
+#include <sched.h>
 
 int main(int argc, char** argv)
 {
@@ -43,11 +43,39 @@ int main(int argc, char** argv)
   }
 #else // OWD_RT
 #ifndef OWDSIM
-  // increase the process priority so that it can still do effective control
-  // on a non-realtime system
-  if (setpriority(PRIO_PROCESS,0,-5)) {
-    ROS_WARN("Could not elevate process scheduling priority; will be more vulnerable to heartbeat faults on a heavily loaded system");
-    ROS_WARN("Please make sure the executable is set to suid root");
+  // Set our RT scheduler profile so that we can get the read timeouts
+  // we ask for from the Peak CANbus driver
+  sched_param sp;
+  sp.sched_priority=10;
+  int priority_limit = sched_get_priority_min(SCHED_RR);
+  if (priority_limit < 0) {
+    ROS_FATAL("Could not retrieve minimum SCHED_RR priority level: %s",
+	      strerror(errno));
+    return 1;
+  }
+  if (sp.sched_priority < priority_limit) {
+    ROS_FATAL("Unable to set desired RT scheduler priority: desired value of %d is below the minimum of %d",sp.sched_priority,priority_limit);
+    return 1;
+  }
+  priority_limit = sched_get_priority_max(SCHED_RR);
+  if (priority_limit < 0) {
+    ROS_FATAL("Could not retrieve maximum SCHED_RR priority level: %s",
+	      strerror(errno));
+    return 1;
+  }
+  if (sp.sched_priority > priority_limit) {
+    ROS_FATAL("Unable to set desired RT scheduler priority: desired value of %d is above the maximum of %d",sp.sched_priority,priority_limit);
+    return 1;
+  }
+  int32_t err=sched_setscheduler(0,SCHED_RR, &sp);
+  if (err) {
+    if (errno == EPERM) {
+      ROS_FATAL("Not permitted to set the RT scheduler priority for this process.  Please make sure the file /etc/security/limits.conf contains the line '* - rtprio unlimited' or run as root.");
+      return 1;
+    }
+    ROS_FATAL("Could not set scheduler policy: %s",
+	      strerror(errno));
+    return 1;
   }
 #endif // OWDSIM
 #endif // OWD_RT

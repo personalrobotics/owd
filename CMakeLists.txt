@@ -118,5 +118,3 @@ elseif (VENDOR_ID STREQUAL "CentaurHauls")
     message(STATUS "Building for VIA - Original Barrett WAM PC")
     add_definitions("-march=c3-2")
 endif  (DEFINED ENV{OWD_MARCH_FLAGS})
-
-add_custom_target(SUID ALL sudo chown root ../owd COMMAND sudo chmod u+s ../owd DEPENDS owd)
