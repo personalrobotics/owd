@@ -217,6 +217,7 @@ private:
     bool ForceTorque; /// whether the Force/Torque sensor is installed
     bool Tactile;  /// whether the Tactile sensors are installed (280 hand only)
     bool log_controller_data;
+    bool auto_start;
     typedef pair<void *,bool (*)()> PluginPointers;
     std::vector<PluginPointers> loaded_plugins;
 

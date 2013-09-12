@@ -215,6 +215,17 @@ int CANbus::init(){
   //  }
 #endif // OWD_RT
 
+  // Unlock the safety puck so that we can change modes later
+  if ((set_property_rt(10, _LOCK, 18384, true, 10000) == OW_FAILURE) ||
+      (set_property_rt(10, _LOCK,    23, true, 10000) == OW_FAILURE) ||
+      (set_property_rt(10, _LOCK,  3145, true, 10000) == OW_FAILURE) ||
+      (set_property_rt(10, _LOCK,  1024, true, 10000) == OW_FAILURE) ||
+      (set_property_rt(10, _LOCK,     1, true, 10000) == OW_FAILURE))
+    {
+      ROS_ERROR("Unable to unlock safety puck");
+      return OW_FAILURE;
+    }
+
   return OW_SUCCESS;
 }
 

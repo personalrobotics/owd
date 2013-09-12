@@ -92,6 +92,7 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   ros::NodeHandle n("~");
   bool log_canbus_data;
   n.param("log_canbus_data",log_canbus_data,false);
+  n.param("auto_start",auto_start,false);
 
 #ifndef BH280_ONLY
   bus=new CANbus(canbus_number, Joint::Jn, bh_model==280, forcetorque, tactile, log_canbus_data);
@@ -258,18 +259,24 @@ bool WamDriver::Init(const char *joint_cal_file)
     return false;
   }
   
-  bool powerup = false;
-  if (bus->check() == OW_FAILURE) {
-    // Get the WAM into Idle mode
-    ROS_FATAL("  Unable to communicate with the WAM.  Please do the following:");
-    ROS_FATAL("    1. Turn on the WAM");
-    ROS_FATAL("    2. Move it to its home position");
-    ROS_FATAL("    3. Release all e-stops and press Shift-Idle on the pendant");
+  bool powerup(false);
+  while ((bus->check() == OW_FAILURE) && ros::ok()) {
     powerup=true;
-    do {
-      usleep(100000); // wait for the user, and try again
+    if (auto_start) {
+      // Try telling the safety puck to shift-idle the arm
+      if (bus->set_property_rt(SAFETY_MODULE,MODE,SAFETY_MODE_IDLE,true,10000)
+	  == OW_FAILURE) {
+	ROS_FATAL(" Unable to idle the WAM; does it have power?  Is the E-Stop released?");
+      } else {
+	// Get the WAM into Idle mode
+	ROS_FATAL("  Unable to communicate with the WAM.  Please do the following:");
+	ROS_FATAL("    1. Turn on the WAM");
+	ROS_FATAL("    2. Move it to its home position");
+	ROS_FATAL("    3. Release all e-stops and press Shift-Idle on the pendant");
+      }
+      usleep(1000000); // wait and try again
       bus->clear();
-    } while ((bus->check() == OW_FAILURE) && (ros::ok()));
+    }
   }
 
   if (!ros::ok()) {
@@ -428,7 +435,7 @@ bool WamDriver::Init(const char *joint_cal_file)
     owam->jsdynamics() = true; // turn on feed-forward dynamics
     
   } else {
-    if (!powerup) {
+    if (!powerup && !auto_start) {
       // still need to tell the user what to do
       ROS_FATAL("\007WAM did not retain its encoder values\007.");
       ROS_FATAL("Please move the WAM to its home position.");
@@ -1408,94 +1415,96 @@ void WamDriver::write_pulse_data() {
 
 
 void WamDriver::set_home_position() {
-
-  ROS_ERROR("\007When ready, type HOME<return>\007");
-  char *line=NULL;
-  size_t linelen = 0;
-  linelen = getline(&line,&linelen,stdin);
-  while ((linelen < 4) || strncmp(line,"HOME",4)) {
-    ROS_ERROR("\007\nYou must type the word HOME and press <return>\007");
+  if (auto_start) {
+    ROS_INFO("Auto-starting and assuming current position is home position");
+  } else {
+    ROS_ERROR("\007When ready, type HOME<return>\007");
+    char *line=NULL;
+    size_t linelen = 0;
     linelen = getline(&line,&linelen,stdin);
-  }
-  free(line);
-    
-    if (FILE *moff_file = fopen(joint_calibration_file,"r")) {
-      ROS_INFO("Applying encoder offsets from file %s",joint_calibration_file);
-        int32_t initial_mech[nJoints+1];
-        for (unsigned int m =1; m <= nJoints; ++m) {
-            puck_offsets[m] = initial_mech[m]=0;
-        }
-        char *jvalstr = NULL;
-        size_t jsize = 0;
-        linelen = getline(&jvalstr,&jsize,moff_file); // getline will do the malloc
-        if (strncmp(jvalstr,"WAM encoder offset values",strlen("WAM encoder offset values"))) {
-            ROS_ERROR("Unrecognized format in joint calibration file \"%s\"",joint_calibration_file);
-            goto NOCALIB;
-        } else {
-            int puck_id;
-            int32_t offset, initial;
-            unsigned int puckcount=0;
-            while (fscanf(moff_file,"%d = %d %d\n",
-                          &puck_id,&offset,&initial) ==3 ) {
-                puck_offsets[puck_id] = offset;
-                initial_mech[puck_id] = initial;
-                puckcount++;
-            }
-            if (puckcount != nJoints) {
-                ROS_ERROR("Unrecognized format in joint calibration file \"%s\"",joint_calibration_file);
-                goto NOCALIB;
-            }
-            int32_t apvals[bus->n_arm_pucks+1];
-            for (puck_id = 1; puck_id<=bus->n_arm_pucks; ++puck_id) {
-	      int32_t mech;
-	      int32_t old_AP;
-                
-                get_puck_offset(bus->pucks[puck_id].id(),&mech,&old_AP);
-
-                // Check to make sure we're mapping the offset to
-                // the nearest half-rev of the motor.  If it looks like
-                // we're more than half a rev away for when we saved
-                // the offset, add or subtract a full revolution.
-                int32_t puckdiff = mech - initial_mech[puck_id];
-                if (puckdiff < -2048) {
-                    apvals[puck_id] = mech + puck_offsets[puck_id] + 4096;
-                } else if (puckdiff > 2048) {
-                    apvals[puck_id] = mech + puck_offsets[puck_id] - 4096;
-                } else {
-                    apvals[puck_id] = mech + puck_offsets[puck_id];
-                }
-                
-                ROS_DEBUG("Changing puck %d from AP=%d to %d",puck_id,old_AP,apvals[puck_id]);
-            }
-            ROS_DEBUG("Setting new positions");
-            if (bus->send_AP(apvals) == OW_FAILURE) {
-                ROS_FATAL("Unable to update pucks with calibrated home position");
-                throw -1;
-            }
-            ROS_DEBUG("Positions set");
-            for (puck_id = 1; puck_id<=bus->n_arm_pucks; ++puck_id) {
-                int32_t mech;
-                int32_t old_AP;
-                get_puck_offset(bus->pucks[puck_id].id(),&mech,&old_AP);
-        }
-        }
-        free(jvalstr);
-        fclose(moff_file);
-    } else {
-    NOCALIB:
-        ROS_ERROR("Could not read WAM calibration file \"%s\";",joint_calibration_file);
-        ROS_ERROR("using home position values instead.");
-        
-        if (owam->set_jpos(wamhome) == OW_FAILURE) {
-            ROS_FATAL("Unable to define WAM home position");
-            throw -1;
-        }
-        
-        // record the offsets in case we go into calibration later
-        for (unsigned int i=1; i<=nJoints; ++i) {
-            puck_offsets[i]=get_puck_offset(i);
-        }
+    while ((linelen < 4) || strncmp(line,"HOME",4)) {
+      ROS_ERROR("\007\nYou must type the word HOME and press <return>\007");
+      linelen = getline(&line,&linelen,stdin);
     }
+    free(line);
+  }
+  if (FILE *moff_file = fopen(joint_calibration_file,"r")) {
+    ROS_INFO("Applying encoder offsets from file %s",joint_calibration_file);
+    int32_t initial_mech[nJoints+1];
+    for (unsigned int m =1; m <= nJoints; ++m) {
+      puck_offsets[m] = initial_mech[m]=0;
+    }
+    char *jvalstr = NULL;
+    size_t jsize = 0;
+    size_t linelen = getline(&jvalstr,&jsize,moff_file); // getline will do the malloc
+    if (strncmp(jvalstr,"WAM encoder offset values",strlen("WAM encoder offset values"))) {
+      ROS_ERROR("Unrecognized format in joint calibration file \"%s\"",joint_calibration_file);
+      goto NOCALIB;
+    } else {
+      int puck_id;
+      int32_t offset, initial;
+      unsigned int puckcount=0;
+      while (fscanf(moff_file,"%d = %d %d\n",
+		    &puck_id,&offset,&initial) ==3 ) {
+	puck_offsets[puck_id] = offset;
+	initial_mech[puck_id] = initial;
+	puckcount++;
+      }
+      if (puckcount != nJoints) {
+	ROS_ERROR("Unrecognized format in joint calibration file \"%s\"",joint_calibration_file);
+	goto NOCALIB;
+      }
+      int32_t apvals[bus->n_arm_pucks+1];
+      for (puck_id = 1; puck_id<=bus->n_arm_pucks; ++puck_id) {
+	int32_t mech;
+	int32_t old_AP;
+        
+	get_puck_offset(bus->pucks[puck_id].id(),&mech,&old_AP);
+	
+	// Check to make sure we're mapping the offset to
+	// the nearest half-rev of the motor.  If it looks like
+	// we're more than half a rev away for when we saved
+	// the offset, add or subtract a full revolution.
+	int32_t puckdiff = mech - initial_mech[puck_id];
+	if (puckdiff < -2048) {
+	  apvals[puck_id] = mech + puck_offsets[puck_id] + 4096;
+	} else if (puckdiff > 2048) {
+	  apvals[puck_id] = mech + puck_offsets[puck_id] - 4096;
+	} else {
+	  apvals[puck_id] = mech + puck_offsets[puck_id];
+	}
+        
+	ROS_DEBUG("Changing puck %d from AP=%d to %d",puck_id,old_AP,apvals[puck_id]);
+      }
+      ROS_DEBUG("Setting new positions");
+      if (bus->send_AP(apvals) == OW_FAILURE) {
+	ROS_FATAL("Unable to update pucks with calibrated home position");
+	throw -1;
+      }
+      ROS_DEBUG("Positions set");
+      for (puck_id = 1; puck_id<=bus->n_arm_pucks; ++puck_id) {
+	int32_t mech;
+	int32_t old_AP;
+	get_puck_offset(bus->pucks[puck_id].id(),&mech,&old_AP);
+      }
+    }
+    free(jvalstr);
+    fclose(moff_file);
+  } else {
+  NOCALIB:
+    ROS_ERROR("Could not read WAM calibration file \"%s\";",joint_calibration_file);
+    ROS_ERROR("using home position values instead.");
+    
+    if (owam->set_jpos(wamhome) == OW_FAILURE) {
+      ROS_FATAL("Unable to define WAM home position");
+      throw -1;
+    }
+    
+    // record the offsets in case we go into calibration later
+    for (unsigned int i=1; i<=nJoints; ++i) {
+      puck_offsets[i]=get_puck_offset(i);
+    }
+  }
 }
 
 void WamDriver::start_control_loop() {
@@ -1528,32 +1537,29 @@ void WamDriver::start_control_loop() {
     ROS_ERROR("  1. WAM has %d joints (%s)",nJoints,nJoints==4?"wrist NOT INSTALLED":nJoints==7?"wrist INSTALLED":"WARNING: UNFAMILIAR CONFIG");
     ROS_ERROR("  2. Tool mass is %fkg (%s)",owam->links[nJoints].mass,owam->links[nJoints].mass==1.3?"Barrett Hand with cameras":owam->links[nJoints].mass==0.0?"no tool":"custom tool");
     
-    ROS_ERROR("Press Shift-Activate to activate motors and start system.");
-
-#ifdef AUTO_ACTIVATE
-    if (bus->set_property_rt(10,MODE,2,false) == OW_FAILURE) {
-        ROS_FATAL("Error changing mode of puck 10");
-        throw -1;
-    }
-    for (int p=1; p<8; p++) {
-        if (bus->set_property_rt(p,MODE,2,false) == OW_FAILURE) {
-            ROS_FATAL("Error changing mode of puck %d",p);
-            throw -1;
-        }
-    }
-#endif // AUTO_ACTIVATE
-    
-    // check the mode of puck 1 to detect when activate is pressed
-    while ((bus->get_puck_state() != 2) && (ros::ok())) {
-      usleep(50000);
-      static int statcount=0;
-      if (++statcount == 20) {
-	owam->rosprint_stats();
-	statcount=0;
+    if (auto_start) {
+      if (bus->set_property_rt(SAFETY_MODULE,MODE,SAFETY_MODE_ACTIVE,true,10000)
+	  == OW_FAILURE) {
+	ROS_ERROR("Could not auto-activate the WAM");
+	throw -1;
+      } else {
+	ROS_INFO("WAM arm has been activated");
       }
-    }
-    if (!ros::ok()) {
-      throw -1;
+    } else {
+      ROS_ERROR("Press Shift-Activate to activate motors and start system.");
+
+      // check the mode of puck 1 to detect when activate is pressed
+      while ((bus->get_puck_state() != 2) && (ros::ok())) {
+	usleep(50000);
+	static int statcount=0;
+	if (++statcount == 20) {
+	  owam->rosprint_stats();
+	  statcount=0;
+	}
+      }
+      if (!ros::ok()) {
+	throw -1;
+      }
     }
 #endif // not BH280_ONLY    
 }

@@ -83,6 +83,10 @@ const int MODE_PID       = 3;
 const int MODE_VELOCITY  = 4;
 const int MODE_TRAPEZOID = 5;
 
+const int SAFETY_MODE_ESTOP  = 0;
+const int SAFETY_MODE_IDLE   = 1;
+const int SAFETY_MODE_ACTIVE = 2;
+
 const int CMD_HI = 13;
 const int CMD_M  = 19;
 
