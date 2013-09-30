@@ -375,7 +375,7 @@ public:
   int hand_set_property(int32_t id, int32_t prop, int32_t val);
   int hand_set_state_rt();
   int hand_activate(int32_t *nodes);
-  int hand_reset();
+  int hand_reset(bool confirm=true);
   int hand_move(std::vector<double> p);
   int hand_velocity(const std::vector<double> &v);
   int hand_torque(const std::vector<double> &t);

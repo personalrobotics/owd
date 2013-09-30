@@ -215,16 +215,6 @@ int CANbus::init(){
   //  }
 #endif // OWD_RT
 
-  // Unlock the safety puck so that we can change modes later
-  if ((set_property_rt(10, _LOCK, 18384, true, 10000) == OW_FAILURE) ||
-      (set_property_rt(10, _LOCK,    23, true, 10000) == OW_FAILURE) ||
-      (set_property_rt(10, _LOCK,  3145, true, 10000) == OW_FAILURE) ||
-      (set_property_rt(10, _LOCK,  1024, true, 10000) == OW_FAILURE) ||
-      (set_property_rt(10, _LOCK,     1, true, 10000) == OW_FAILURE))
-    {
-      ROS_ERROR("Unable to unlock safety puck");
-      return OW_FAILURE;
-    }
 
   return OW_SUCCESS;
 }
@@ -344,7 +334,7 @@ int CANbus::check(){
       online_pucks++;
     }
   }
-  
+
   if (online_pucks==0){
     ROS_INFO_NAMED("cancheck","The wam appears to be turned off");
     return OW_FAILURE;
@@ -2660,7 +2650,7 @@ int CANbus::wait_for_finger_reset(int32_t nodeid) {
   return OW_SUCCESS;
 }
 
-int CANbus::hand_reset() {
+int CANbus::hand_reset(bool confirm) {
   // Reset Strategy (from Barrett):
   //    Repeat 3 times{
   //       Open F1
@@ -2698,11 +2688,13 @@ int CANbus::hand_reset() {
     return OW_SUCCESS;
   }
   
-  ROS_FATAL("Please move the hand to a safe position and hit <RETURN> to reset the hand");
-  char *line=NULL;
-  size_t linelen = 0;
-  linelen = getline(&line,&linelen,stdin);
-  free(line);
+  if (confirm) {
+    ROS_FATAL("Please move the hand to a safe position and hit <RETURN> to reset the hand");
+    char *line=NULL;
+    size_t linelen = 0;
+    linelen = getline(&line,&linelen,stdin);
+    free(line);
+  }
   
   for (unsigned int attempts =0; attempts < 3; ++attempts) {
     // F1-F3
@@ -3587,9 +3579,9 @@ std::string CANbus::canio_to_string(const canio_data &cdata) {
 
 CANbus::~CANbus(){
   ROS_FATAL("Destroying class CANbus");
-  if(pucks!=NULL) delete pucks; 
-  if(trq!=NULL) delete trq; 
-  if(pos!=NULL) delete pos;
+  //  if(pucks!=NULL) delete [] pucks; 
+  //  if(trq!=NULL) delete [] trq; 
+  //  if(pos!=NULL) delete [] pos;
   if (log_canbus_data && candata) {
     char dumpname[200];
     snprintf(dumpname,200,"candata%d.log",id);

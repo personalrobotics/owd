@@ -63,7 +63,7 @@
 #define SAFETY_MODULE 10
 
 extern int MECH,AP,ZERO,IFAULT;
-extern int ADDR, VALUE, MODE;
+extern int ADDR, VALUE, MODE, _LOCK;
 extern int dyn_active_link;
 
 extern double fv[8];  // viscous friction from Dynamics.cc
@@ -263,8 +263,20 @@ bool WamDriver::Init(const char *joint_cal_file)
   while ((bus->check() == OW_FAILURE) && ros::ok()) {
     powerup=true;
     if (auto_start) {
+      ROS_INFO("----------> PROCEEDING WITH AUTO_START <----------");
+      // Unlock the safety puck so that we can change modes later
+      if ((bus->set_property_rt(SAFETY_MODULE, _LOCK, 18384, false, 10000) == OW_FAILURE) ||
+	  (bus->set_property_rt(SAFETY_MODULE, _LOCK,    23, false, 10000) == OW_FAILURE) ||
+	  (bus->set_property_rt(SAFETY_MODULE, _LOCK,  3145, false, 10000) == OW_FAILURE) ||
+	  (bus->set_property_rt(SAFETY_MODULE, _LOCK,  1024, false, 10000) == OW_FAILURE) ||
+	  (bus->set_property_rt(SAFETY_MODULE, _LOCK,     1, false, 10000) == OW_FAILURE))
+	{
+	  ROS_ERROR("Unable to unlock safety puck");
+	  return OW_FAILURE;
+	}
+
       // Try telling the safety puck to shift-idle the arm
-      if (bus->set_property_rt(SAFETY_MODULE,MODE,SAFETY_MODE_IDLE,true,10000)
+      if (bus->set_property_rt(SAFETY_MODULE,MODE,SAFETY_MODE_IDLE,false,10000)
 	  == OW_FAILURE) {
 	ROS_FATAL(" Unable to idle the WAM; does it have power?  Is the E-Stop released?");
       } else {
@@ -299,7 +311,7 @@ bool WamDriver::Init(const char *joint_cal_file)
 
 #ifndef OWDSIM
   if (BH_model == 280) {
-    if (bus->hand_reset() != OW_SUCCESS) {
+    if (bus->hand_reset(!auto_start) != OW_SUCCESS) {
       return false;
     }
   }
@@ -1538,28 +1550,27 @@ void WamDriver::start_control_loop() {
     ROS_ERROR("  2. Tool mass is %fkg (%s)",owam->links[nJoints].mass,owam->links[nJoints].mass==1.3?"Barrett Hand with cameras":owam->links[nJoints].mass==0.0?"no tool":"custom tool");
     
     if (auto_start) {
-      if (bus->set_property_rt(SAFETY_MODULE,MODE,SAFETY_MODE_ACTIVE,true,10000)
+      sleep(1); // wait for control loop to get going
+      if (bus->set_property_rt(SAFETY_MODULE,MODE,SAFETY_MODE_ACTIVE,false,10000)
 	  == OW_FAILURE) {
 	ROS_ERROR("Could not auto-activate the WAM");
 	throw -1;
-      } else {
-	ROS_INFO("WAM arm has been activated");
       }
     } else {
       ROS_ERROR("Press Shift-Activate to activate motors and start system.");
-
-      // check the mode of puck 1 to detect when activate is pressed
-      while ((bus->get_puck_state() != 2) && (ros::ok())) {
-	usleep(50000);
-	static int statcount=0;
-	if (++statcount == 20) {
-	  owam->rosprint_stats();
-	  statcount=0;
-	}
+    }
+    // check the mode of puck 1 to detect when activate is pressed
+    while ((bus->get_puck_state() != 2) && (ros::ok())) {
+      usleep(50000);
+      static int statcount=0;
+      if (++statcount == 20) {
+	owam->rosprint_stats();
+	statcount=0;
       }
-      if (!ros::ok()) {
-	throw -1;
-      }
+    }
+    ROS_INFO("WAM arm has been activated");
+    if (!ros::ok()) {
+      throw -1;
     }
 #endif // not BH280_ONLY    
 }
