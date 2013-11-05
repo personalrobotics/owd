@@ -548,7 +548,7 @@ int CANbus::wake_puck(int32_t puck_id){
       ROS_WARN("CANbus::wake_puck: set_property failed for puck %d.",puck_id);
         return OW_FAILURE;
     }
-    usleep(750000); // Wait 750ms for puck to initialize    
+    usleep(1200000); // Wait 1200ms for puck to initialize    
     return OW_SUCCESS;
 }
 
@@ -592,7 +592,7 @@ int CANbus::status(int32_t* nodes){
     }
     ROS_DEBUG_NAMED("canstatus","Sent probe message to puck %d id %d",n,NODE2ADDR(n));
 
-    if(read_rt(&msgid, msg, &msglen, 40000) == OW_FAILURE){
+    if(read_rt(&msgid, msg, &msglen, 100000) == OW_FAILURE){
       ROS_DEBUG_NAMED("canstatus","node %d didn't answer: %s",NODE2ADDR(n), last_error);
     }
     else{

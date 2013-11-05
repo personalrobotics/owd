@@ -259,36 +259,51 @@ bool WamDriver::Init(const char *joint_cal_file)
     return false;
   }
   
-  bool powerup(false);
+  bool powerup(false), unlocked(false);
   while ((bus->check() == OW_FAILURE) && ros::ok()) {
     powerup=true;
     if (auto_start) {
       ROS_INFO("----------> PROCEEDING WITH AUTO_START <----------");
       // Unlock the safety puck so that we can change modes later
-      if ((bus->set_property_rt(SAFETY_MODULE, _LOCK, 18384, false, 10000) == OW_FAILURE) ||
-	  (bus->set_property_rt(SAFETY_MODULE, _LOCK,    23, false, 10000) == OW_FAILURE) ||
-	  (bus->set_property_rt(SAFETY_MODULE, _LOCK,  3145, false, 10000) == OW_FAILURE) ||
-	  (bus->set_property_rt(SAFETY_MODULE, _LOCK,  1024, false, 10000) == OW_FAILURE) ||
-	  (bus->set_property_rt(SAFETY_MODULE, _LOCK,     1, false, 10000) == OW_FAILURE))
-	{
+      if (!unlocked) {
+	// reset the safety puck in case it was already unlocked
+	// STAT=0
+	if (bus->set_property_rt(SAFETY_MODULE, 5, 0, false, 10000) == OW_FAILURE) {
+	  ROS_ERROR("Unable to reset the safety puck");
+	}
+	sleep(1);
+	// set STAT back to 2
+	if (bus->set_property_rt(SAFETY_MODULE, 5, 2, false, 10000) == OW_FAILURE) {
+	  ROS_ERROR("Unable to re-activate the safety puck");
+	}
+	sleep(5);  // wait for activation
+	if ((bus->set_property_rt(SAFETY_MODULE, _LOCK, 18384, false, 10000) == OW_FAILURE) ||
+	    (bus->set_property_rt(SAFETY_MODULE, _LOCK,    23, false, 10000) == OW_FAILURE) ||
+	    (bus->set_property_rt(SAFETY_MODULE, _LOCK,  3145, false, 10000) == OW_FAILURE) ||
+	    (bus->set_property_rt(SAFETY_MODULE, _LOCK,  1024, false, 10000) == OW_FAILURE) ||
+	    (bus->set_property_rt(SAFETY_MODULE, _LOCK,     1, false, 10000) == OW_FAILURE)) {
 	  ROS_ERROR("Unable to unlock safety puck");
 	  return OW_FAILURE;
 	}
-
+	unlocked = true;
+      }
       // Try telling the safety puck to shift-idle the arm
       if (bus->set_property_rt(SAFETY_MODULE,MODE,SAFETY_MODE_IDLE,false,10000)
 	  == OW_FAILURE) {
 	ROS_FATAL(" Unable to idle the WAM; does it have power?  Is the E-Stop released?");
-      } else {
-	// Get the WAM into Idle mode
-	ROS_FATAL("  Unable to communicate with the WAM.  Please do the following:");
-	ROS_FATAL("    1. Turn on the WAM");
-	ROS_FATAL("    2. Move it to its home position");
-	ROS_FATAL("    3. Release all e-stops and press Shift-Idle on the pendant");
       }
-      usleep(1000000); // wait and try again
-      bus->clear();
+      sleep(4); // give the arm pucks time to power up
+      bus->clear(); // clear out the startup packets triggered by the
+                    // safety puck power-on
+    } else {
+      // Get the WAM into Idle mode
+      ROS_FATAL("  Unable to communicate with the WAM.  Please do the following:");
+      ROS_FATAL("    1. Turn on the WAM");
+      ROS_FATAL("    2. Move it to its home position");
+      ROS_FATAL("    3. Release all e-stops and press Shift-Idle on the pendant");
     }
+    usleep(1000000); // wait and try again
+    bus->clear();
   }
 
   if (!ros::ok()) {
