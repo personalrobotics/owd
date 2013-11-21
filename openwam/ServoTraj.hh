@@ -42,9 +42,13 @@ private:
 
 public:
 
-  ServoTraj(int DOF, std::string id, double *start_pos,
+  ServoTraj(int dof, std::string id, double *start_pos,
 	    double *lower_joint_limits = NULL,
-	    double *upper_joint_limits = NULL);
+	    double *upper_joint_limits = NULL,
+	    bool bWaitForStart = false,
+	    bool bCancelOnStall = false,
+	    bool bCancelOnForceInput = false,
+	    bool bCancelOnTactileInput = false);
   virtual ~ServoTraj();
 
   virtual bool SetVelocity(int j, float v, float duration = 0.5);

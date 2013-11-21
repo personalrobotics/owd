@@ -27,12 +27,21 @@
 namespace OWD {
 
   ServoTraj::ServoTraj(int dof, std::string id, double *start_pos,
-		     double *lower_joint_limits,
-		     double *upper_joint_limits)
+	    double *lower_joint_limits,
+	    double *upper_joint_limits,
+	    bool bWaitForStart,
+	    bool bCancelOnStall,
+	    bool bCancelOnForceInput,
+	    bool bCancelOnTactileInput)
   : Trajectory("ServoTraj", id),
     nDOF(dof),
     lasttime(time)
 {
+  WaitForStart=bWaitForStart;
+  CancelOnStall=bCancelOnStall;
+  CancelOnForceInput=bCancelOnForceInput;
+  CancelOnTactileInput=bCancelOnTactileInput;
+ 
   stoptime.resize(nDOF,0.0);
   target_velocity.resize(nDOF,0.0);
   current_velocity.resize(nDOF,0.0);
@@ -50,6 +59,7 @@ namespace OWD {
       / Plugin::joint_accel[i];
   }
 }
+
 
 ServoTraj::~ServoTraj() {
 }

@@ -48,6 +48,7 @@
 #include <owd_msgs/WAMInternals.h>
 #include <owd_msgs/GetDOF.h>
 #include <owd_msgs/Servo.h>
+#include <owd_msgs/ServoOpt.h>
 #include <owd_msgs/Reset.h>
 #include <owd_msgs/SetForceInputThreshold.h>
 #include <owd_msgs/SetTactileInputThreshold.h>
@@ -159,6 +160,7 @@ public:
 
     void update_xmission_ratio(const char *param_name, double &current_value, double nominal_value);
     void wamservo_callback(const boost::shared_ptr<const owd_msgs::Servo> &message);
+    void wamservoopt_callback(const boost::shared_ptr<const owd_msgs::ServoOpt> &message);
     void MassProperties_callback(const boost::shared_ptr<const owd_msgs::MassProperties> &message);
 
     inline void SetModifiedJ1(bool mj1) {modified_j1 = mj1;}
@@ -265,6 +267,7 @@ private:
 
     ros::Subscriber
       sub_wamservo,
+      sub_wamservoopt,
       sub_wam_joint_targets,
       sub_MassProperties;
 

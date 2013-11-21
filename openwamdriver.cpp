@@ -692,6 +692,9 @@ void WamDriver::AdvertiseAndSubscribe(ros::NodeHandle &n) {
     n.advertiseService("CalibrateJoints", &WamDriver::CalibrateJoints, this);
   sub_wamservo =
     n.subscribe("wamservo", 1, &WamDriver::wamservo_callback,this);
+  sub_wamservoopt =
+    n.subscribe("wamservoopt", 1, &WamDriver::wamservoopt_callback,this);
+
   sub_MassProperties =
     n.subscribe("wam_mass", 1, &WamDriver::MassProperties_callback,this);
   ss_StepJoint =
@@ -808,10 +811,12 @@ OWD::Trajectory *WamDriver::BuildTrajectory(owd_msgs::JointTraj &jt) {
     ROS_ERROR_NAMED("BuildTrajectory","%s",last_trajectory_error);
     return NULL;
   }
+
+  // Parse options
   bool bWaitForStart=(jt.options & jt.opt_WaitForStart);
   bool bCancelOnStall=(jt.options & jt.opt_CancelOnStall);
   bool bCancelOnForceInput=(jt.options & jt.opt_CancelOnForceInput);
-  bool bCancelOnTactileInput(jt.options & jt.opt_CancelOnTactileInput);
+  bool bCancelOnTactileInput=(jt.options & jt.opt_CancelOnTactileInput);
   ROS_DEBUG_NAMED("BuildTrajectory","Building trajectory with options WaitForStart=%d CancelOnStall=%d CancelOnForceInput=%d CancelOnTactileInput=%d",int(bWaitForStart), int(bCancelOnStall), int(bCancelOnForceInput), int(bCancelOnTactileInput));
 
   if (!blended_traj) {
@@ -3012,6 +3017,76 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const owd_msgs::Servo>
   }
 } 
 
+void WamDriver::wamservoopt_callback(const boost::shared_ptr<const owd_msgs::ServoOpt> &servoopt) {
+
+  ROS_DEBUG_NAMED("servoopt","Received servo command:");
+
+  // Error checking
+  if (servoopt->joint.size() != servoopt->velocity.size()) {
+    ROS_ERROR("Mismatched arrays received in ServoOpt message; ignored");
+    return;
+  }
+  for (unsigned int j=0; j<servoopt->joint.size(); ++j) {
+    if (isinf(servoopt->velocity[j]) || isnan(servoopt->velocity[j])) {
+      ROS_ERROR("INF or NAN value published to wamservoopt topic; ignored");
+      return;
+    }
+  }
+  for (unsigned int j=0; j<servoopt->joint.size(); ++j) {
+    ROS_DEBUG_NAMED("servoopt","  Servo joint %d velocity %2.2f",
+              servoopt->joint[j], servoopt->velocity[j]);
+  }
+
+  bool bWaitForStart=(servoopt->options & servoopt->opt_WaitForStart);
+  bool bCancelOnStall=(servoopt->options & servoopt->opt_CancelOnStall);
+  bool bCancelOnForceInput=(servoopt->options & servoopt->opt_CancelOnForceInput);
+  bool bCancelOnTactileInput=(servoopt->options & servoopt->opt_CancelOnTactileInput);
+ 
+  // Transfer data into ServoTraj
+  owam->lock();
+  if (owam->jointstraj) {
+    ServoTraj *straj = dynamic_cast<ServoTraj *>(owam->jointstraj);
+    if (straj) {
+      for (unsigned int i=0; i<servoopt->joint.size(); ++i) {
+        straj->SetVelocity(servoopt->joint[i],servoopt->velocity[i]);
+      }
+      std::string trajid = straj->id;
+      owam->unlock();
+      ROS_DEBUG_NAMED("servoopt","Updated servoopt trajectory %s",trajid.c_str());
+      return;
+    } else {
+      owam->unlock();
+      ROS_WARN("A Joint Trajectory is still running; velocity command ignored");
+      return;
+    }
+  } else {
+
+    owam->unlock();
+#ifdef BUILD_FOR_SEA
+    owam->posSmoother.getSmoothedPVA(owam->heldPositions);
+#endif // BUILD_FOR_SEA
+    std::string trajid = Trajectory::random_id();
+    ServoTraj *straj = new ServoTraj(nJoints, trajid, owam->heldPositions+1,
+                                     &Plugin::_lower_jlimit[0],
+                                     &Plugin::_upper_jlimit[0],
+                                     bWaitForStart,
+                                     bCancelOnStall,
+                                     bCancelOnForceInput,
+                                     bCancelOnTactileInput);
+    for (unsigned int i=0; i<servoopt->joint.size(); ++i) {
+      straj->SetVelocity(servoopt->joint[i],servoopt->velocity[i]);
+    }
+
+    if (owam->run_trajectory(straj) != OW_SUCCESS) {
+      ROS_ERROR_NAMED("servoopt","Servo trajectory failed to start");
+      return;
+    }
+
+    ROS_DEBUG_NAMED("servoopt","Starting servoopt trajectory %s",trajid.c_str());
+    return;
+  }
+} 
+
 bool WamDriver::StepJoint(owd_msgs::StepJoint::Request &req,
 			  owd_msgs::StepJoint::Response &res) {
 #ifdef BUILD_FOR_SEA
@@ -3107,6 +3182,7 @@ bool WamDriver::SetForceInputThreshold(owd_msgs::SetForceInputThreshold::Request
   R3 torques(req.torques.x, req.torques.y, req.torques.z);
   Trajectory::forcetorque_torque_threshold = torques.normalize();
   Trajectory::forcetorque_torque_threshold_direction = torques;
+
   res.reason=std::string("");
   res.ok=true;
   return true;
