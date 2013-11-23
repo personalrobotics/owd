@@ -46,7 +46,7 @@ CANbus::CANbus(int32_t bus_id, int number_of_arm_pucks, bool bh280, bool ft, boo
   puck_state(-1),BH280_installed(bh280),id(bus_id),fw_vers(0),trq(NULL),
   pos(NULL), rawpos(NULL), jpos(NULL), forcetorque_data(NULL), accelerometer_data(NULL),
   filtered_forcetorque_data(NULL),
-  ft_force_filter(2,10.0), ft_torque_filter(2,10.0),
+  ft_force_filter(2,20.0), ft_torque_filter(2,20.0),
   tactile_data(NULL),
   valid_forcetorque_data(false), valid_filtered_forcetorque_data(false),
   valid_forcetorque_flag(-1), 

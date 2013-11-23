@@ -1004,8 +1004,8 @@ void control_loop_rt(void* argv){
                 wam->bus->process_forcetorque_response_rt(msgid,msg,msglen);
                 if (wam->jointstraj) {
                     // pass the new values to the running trajectory
-                    //wam->jointstraj->ForceFeedback(wam->bus->filtered_forcetorque_data);
-                    wam->jointstraj->ForceFeedback(wam->bus->forcetorque_data);
+                    wam->jointstraj->ForceFeedback(wam->bus->filtered_forcetorque_data);
+                    //wam->jointstraj->ForceFeedback(wam->bus->forcetorque_data);
                 }
             } else if (FROM_NODE == 10) {
                 // safety puck
