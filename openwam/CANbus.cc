@@ -1340,9 +1340,7 @@ int CANbus::process_forcetorque_response_rt(int32_t msgid, uint8_t* msg, int32_t
       filtered_forcetorque_data[4] = torque[1];
       filtered_forcetorque_data[5] = torque[2];
     } 
-  } //end of torque block
-
-    else if ((msgid & 0x41F) == 0x40C) {
+  } else if ((msgid & 0x41F) == 0x40C) {
     // Group 12 is accelerometer data
     if (accelerometer_data) {
       accelerometer_data[0]=ft_combine(msg[0], msg[1]) / 1024.0;

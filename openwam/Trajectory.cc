@@ -80,6 +80,7 @@ namespace OWD {
   }
 
   void Trajectory::ForceFeedback(double ft[]) {
+    
     forcetorque = R6(ft[0],ft[1],ft[2],
 		     ft[3],ft[4],ft[5]);
     valid_ft=true;
@@ -89,15 +90,19 @@ namespace OWD {
 	CancelOnForceInput &&
 	((forcetorque.v * forcetorque_threshold_direction) 
 	 > forcetorque_threshold)) {
+      forcetorque_limit_reached = true;
       runstate=ABORT;
     }
+
     // check torque threshold
     if ((runstate==RUN) &&
 	CancelOnForceInput &&
 	((forcetorque.w * forcetorque_torque_threshold_direction) 
 	 > forcetorque_torque_threshold)) {
+      forcetorque_limit_reached = true;
       runstate=ABORT;
     }
+    ForceInputVerified = true;
   }
 
   void Trajectory::TactileFeedback(float tactile[], int repetitions) {
@@ -229,6 +234,7 @@ namespace OWD {
       CancelOnStall(false),WaitForStart(false),
       Synchronize(false),
       CancelOnForceInput(false),
+      ForceInputVerified(false),
       CancelOnTactileInput(false),
       valid_ft(false),
       tactile_filter(3,5)
@@ -261,6 +267,7 @@ namespace OWD {
 
   R3 Trajectory::forcetorque_threshold_direction(0,0,-1);  // negative Z (towards palm)
   double Trajectory::forcetorque_threshold(6.0);    // 6 newtons
+  bool   Trajectory::forcetorque_limit_reached(false);
   R3 Trajectory::forcetorque_torque_threshold_direction(1,0,0);
   double Trajectory::forcetorque_torque_threshold(999); // disabled at start
 

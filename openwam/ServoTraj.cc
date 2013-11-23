@@ -51,7 +51,7 @@ namespace OWD {
   end_position.resize(nDOF);
   duration=99999999999; // we might want to run a long time
 
- // space to leave near joint limits to allow for deceleration 
+  // space to leave near joint limits to allow for deceleration 
   for (int i=0; i<nDOF; ++i) {
     // (1/2 * v^2 / a) is the distance to decelerate from v to 0
     jlimit_buffer[i] = 0.5
@@ -68,6 +68,7 @@ bool ServoTraj::SetVelocity(int j, float v, float duration) {
   if ((j > nDOF) || (j<1)) {
     return false;
   }
+
   if (v > Plugin::joint_vel[j-1]) {
     v = Plugin::joint_vel[j-1];
   } else if (v < -Plugin::joint_vel[j-1]) {
@@ -88,25 +89,28 @@ void ServoTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
     runstate=DONE;
     return;
   }
+
   time = t;
   double dt = time - lasttime;  // need delta time for accel
   lasttime=time;
   bool active = false;
   for (unsigned int i = 0; i<(unsigned int)nDOF; ++i) {
     if (time < stoptime[i]) {
-      // check for approaching joint limits
-      if ((target_velocity[i] > 0) &&
+      if( (CancelOnForceInput && forcetorque_limit_reached) ||
+          (CancelOnForceInput && !ForceInputVerified) ) {
+         target_velocity[i]  = 0.0;
+         current_velocity[i] = 0.0;
+      } else if ((target_velocity[i] > 0) &&
 	  (current_position[i] + jlimit_buffer[i] > Plugin::upper_jlimit[i])) {
-	double percent = (Plugin::upper_jlimit[i] - current_position[i])
-	  / jlimit_buffer[i];
+        // check for approaching joint limits
+	double percent = (Plugin::upper_jlimit[i] - current_position[i]) / jlimit_buffer[i];
 	double max_vel = Plugin::joint_vel[i] * percent;
 	if (target_velocity[i] > max_vel) {
 	  target_velocity[i] = max_vel;
 	}
       } else if ((target_velocity[i] < 0) &&
 		 (current_position[i] - jlimit_buffer[i] < Plugin::lower_jlimit[i])) {
-	double percent = (Plugin::lower_jlimit[i] - current_position[i])
-	  / jlimit_buffer[i]; // negative
+	double percent = (Plugin::lower_jlimit[i] - current_position[i]) / jlimit_buffer[i]; // negative
 	double min_vel = Plugin::joint_vel[i] * percent; // negative
 	if (target_velocity[i] < min_vel) {
 	  target_velocity[i] = min_vel;
@@ -136,12 +140,20 @@ void ServoTraj::evaluate_abs(Trajectory::TrajControl &tc, double t) {
       current_position[i] += current_velocity[i] * dt;
       tc.qd[i] = current_velocity[i];
       active = true;
+      
     } else {
       tc.qd[i]=0.0;
       tc.qdd[i]=0.0;
     }
     tc.q[i] = current_position[i];
   }
+  /*
+  printf("ST: %d, VEL: %f, POS: %f\n",
+    runstate,
+    current_velocity[3],
+    current_position[3]);
+  */
+
   if (!active) {
     end_position = current_position;
     runstate = DONE;

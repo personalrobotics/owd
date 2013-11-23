@@ -127,7 +127,8 @@ namespace OWD {
     /// to set the threshold (default is 6 Newtons towards the palm).
     /// This option defaults to false, in which case values from the 
     /// force/torque sensor are ignored.
-    bool  CancelOnForceInput;
+    bool CancelOnForceInput;
+    bool ForceInputVerified;
 
     /// \brief Automatically cancel a trajectory based on sensed contact
     ///
@@ -136,7 +137,7 @@ namespace OWD {
     /// by the SetTactileInputThreshold service call.
     /// This option defaults to false, in which case values from the 
     /// force/torque sensor are ignored.
-    bool  CancelOnTactileInput;
+    bool CancelOnTactileInput;
 
     /// \brief The pad number (0-3) used for CancelOnTactileInput
     ///
@@ -161,6 +162,8 @@ namespace OWD {
     static R3 forcetorque_torque_threshold_direction;
     static double forcetorque_torque_threshold;
 
+    static bool forcetorque_limit_reached;
+
     /// \brief The contructor requires a trajectory name
     ///
     /// \param name Unique identifier of the trajectory type (usually
@@ -174,11 +177,12 @@ namespace OWD {
       CancelOnStall(false),WaitForStart(false),
       Synchronize(false),
       CancelOnForceInput(false),
+      ForceInputVerified(false),
       CancelOnTactileInput(false),
       valid_ft(false),
       tactile_filter(3,5) // 3rd-order, 5hz
     {
-      pthread_mutex_init(&mutex, NULL);
+        pthread_mutex_init(&mutex, NULL);
     }
 
     // serialization and deserialization routines
@@ -307,7 +311,6 @@ namespace OWD {
     } TRAJTYPES;
 
   };
-
 }; // namespace OWD
 
 #endif // TRAJECTORY_HH
