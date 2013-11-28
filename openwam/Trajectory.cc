@@ -97,7 +97,7 @@ namespace OWD {
     // check torque threshold
     if ((runstate==RUN) &&
 	CancelOnForceInput &&
-	((forcetorque.w * forcetorque_torque_threshold_direction) 
+	( fabs(forcetorque.w * forcetorque_torque_threshold_direction) 
 	 > forcetorque_torque_threshold)) {
       forcetorque_limit_reached = true;
       runstate=ABORT;

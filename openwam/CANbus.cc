@@ -445,25 +445,26 @@ int CANbus::check(){
       ROS_WARN_NAMED("can_ft","CANbus::check: wake_puck failed.");
       return OW_FAILURE;
     }
-    ROS_INFO_NAMED("can_ft","done.");
-
     if (set_puck_group_id(8) != OW_SUCCESS) {
       ROS_WARN("CANbus::check: set_puck_group_id(8) failed");
       return OW_FAILURE;
     }
+    ROS_INFO_NAMED("can_ft","done.");
   }
 
 #ifndef BH280_ONLY
+  ROS_INFO_NAMED("cancheck","   Listing properties of all pucks...");
   for (int nodeid=1; nodeid <=14; ++nodeid) {
     if ((nodeid > n_arm_pucks) && (nodeid < 8)) {
       // if 4 dof arm, skip to puck 8 after when done enumerating the 4 arm pucks
       nodeid = 8;
     }
     if ((nodeid ==8) && !forcetorque_data) {
-      nodeid=11; // skip to the hand
+      nodeid=10; // skip to the safety puck
     }
     if (nodeid ==9) {
-      nodeid = 11; // skip over non-existent pucks 9 and 10
+      ROS_INFO_NAMED("cancheck","Puck %d: not used", nodeid);
+      nodeid = 10; // skip over non-existent pucks 9, and do safety puck
     }
     if ((nodeid >=11) && (nodeid <=14) && (! BH280_installed)) {
       continue;
@@ -484,9 +485,11 @@ int CANbus::check(){
     if (get_property_rt(nodeid,VERS,&v,20000) != OW_SUCCESS) {
       ROS_WARN("CANbus::check: Failed to get puck %d VERS during final check",nodeid);
     }
+
     ROS_INFO_NAMED("cancheck","Puck %d: GRPA=%d, GRPB=%d, GRPC=%d, VERS=%d",
 		   nodeid,a,b,c,v);
   }
+  ROS_INFO_NAMED("cancheck","done.");
 
   if (set_limits() != OW_SUCCESS) {
     ROS_WARN("Canbus::check: Failed to set safety puck limits");

@@ -3180,8 +3180,8 @@ bool WamDriver::SetForceInputThreshold(owd_msgs::SetForceInputThreshold::Request
   Trajectory::forcetorque_threshold = req.force;
 
   R3 torques(req.torques.x, req.torques.y, req.torques.z);
-  Trajectory::forcetorque_torque_threshold = torques.normalize();
-  Trajectory::forcetorque_torque_threshold_direction = torques;
+  Trajectory::forcetorque_torque_threshold = torques.normalize(); // returns norm()
+  Trajectory::forcetorque_torque_threshold_direction = torques;   // unit vector
 
   Trajectory::forcetorque_limit_reached = false;
 
