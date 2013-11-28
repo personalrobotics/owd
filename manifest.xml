@@ -5,6 +5,7 @@
   </description>
   <author>herb-dev@lists.andrew.cmu.edu</author>
   <license>LGPL</license>
+  <review status="released" notes="approved on 3/13"/>
   <depend package="std_msgs"/>
   <depend package="geometry_msgs"/>
 </package>
