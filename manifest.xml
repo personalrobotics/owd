@@ -5,6 +5,7 @@
   <author>Mike Vande Weghe (vandeweg@cmu.edu)</author>
   <url>http://personalrobotics.ri.cmu.edu/intel-pkg/owd/html/index.html</url>
   <license>LGPL</license>
+  <review status="released" notes="approved on 3/13"/>
   <export>
     <cpp cflags="-I${prefix}"/>
   </export>
