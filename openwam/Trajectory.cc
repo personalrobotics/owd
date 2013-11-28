@@ -25,6 +25,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <ros/ros.h>
+
 namespace OWD {
 
 
@@ -84,24 +86,27 @@ namespace OWD {
     forcetorque = R6(ft[0],ft[1],ft[2],
 		     ft[3],ft[4],ft[5]);
     valid_ft=true;
-   
+
+    if(forcetorque_limit_reached || !CancelOnForceInput || (runstate!=RUN) ) {
+      return; 
+    }
+ 
     // check force threshold
-    if ((runstate==RUN) &&
-	CancelOnForceInput &&
-	((forcetorque.v * forcetorque_threshold_direction) 
-	 > forcetorque_threshold)) {
+    double forceValue = forcetorque.v * forcetorque_threshold_direction; // dot product
+    if (forceValue > forcetorque_threshold) {
       forcetorque_limit_reached = true;
       runstate=ABORT;
+      ROS_INFO("Force limit reached (%f > %f)", forceValue, forcetorque_threshold);
     }
 
     // check torque threshold
-    if ((runstate==RUN) &&
-	CancelOnForceInput &&
-	( fabs(forcetorque.w * forcetorque_torque_threshold_direction) 
-	 > forcetorque_torque_threshold)) {
+    double torqueValue = fabs(forcetorque.w * forcetorque_torque_threshold_direction);
+    if (torqueValue > forcetorque_torque_threshold) {
       forcetorque_limit_reached = true;
       runstate=ABORT;
+      ROS_INFO("Torque limit reached (%f > %f)", torqueValue, forcetorque_torque_threshold);
     }
+
     ForceInputVerified = true;
   }
 

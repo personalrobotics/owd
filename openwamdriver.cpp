@@ -2332,8 +2332,8 @@ bool WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_reason
   for (unsigned int j=0; j<nJoints; ++j) {
     snprintf(endstr+strlen(endstr),199-strlen(endstr)," %1.4f",ti.end_position[j]);
   }
-  ROS_INFO_NAMED("AddTrajectory","Trajectory %s will stop at [%s ]",
-		 ti.id.c_str(),endstr);
+  //ROS_INFO_NAMED("AddTrajectory","Trajectory %s will stop at [%s ]",
+  //		 ti.id.c_str(),endstr);
   return true;
 }
 
