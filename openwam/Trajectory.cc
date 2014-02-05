@@ -25,8 +25,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include <ros/ros.h>
-
 namespace OWD {
 
 
@@ -96,7 +94,6 @@ namespace OWD {
     if (forceValue > forcetorque_threshold) {
       forcetorque_limit_reached = true;
       runstate=ABORT;
-      ROS_INFO("Force limit reached (%f > %f)", forceValue, forcetorque_threshold);
     }
 
     // check torque threshold
@@ -104,7 +101,6 @@ namespace OWD {
     if (torqueValue > forcetorque_torque_threshold) {
       forcetorque_limit_reached = true;
       runstate=ABORT;
-      ROS_INFO("Torque limit reached (%f > %f)", torqueValue, forcetorque_torque_threshold);
     }
 
     ForceInputVerified = true;
