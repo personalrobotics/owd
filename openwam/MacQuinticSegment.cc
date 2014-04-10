@@ -837,9 +837,18 @@ bool MacQuinticSegment::search_for_decel_pulse(double distance,
 	+ decel2 * 3.0 * U;
     }
     double a_increment = dist_step / d_dist;
-    //    if (dist_step > 0) {
-    //    } else {
-    //    }
+    if (fabs(a_increment) > fabs(decel))
+    {
+      // don't change decel by more than 50%
+      if (a_increment > 0)
+      {
+        a_increment = 0.5 * fabs(decel);
+      }
+      else
+      {
+        a_increment = -0.5 * fabs(decel);
+      }
+    }
     decel -= a_increment;  // remember decel is negative
     if (decel >= 0.0) {
       // oops, we overshot.  reduce the jump factor and try again
