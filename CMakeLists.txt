@@ -1,5 +1,4 @@
-if(DEFINED CATKIN_TOPLEVEL)
-
+if(DEFINED CATKIN_TOPLEVEL OR (NOT $ENV{ROS_DISTRO} STREQUAL fuerte) )
 
 cmake_minimum_required(VERSION 2.8.3)
 project(owd_msgs)
