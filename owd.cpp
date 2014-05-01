@@ -31,6 +31,9 @@
 #include "tactile.hh"
 #include <sys/mman.h>
 #include <sched.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <syscall.h>
 
 int main(int argc, char** argv)
 {
@@ -94,6 +97,8 @@ int main(int argc, char** argv)
   int hand_pub_freq;
   int ft_pub_freq;
   int tactile_pub_freq;
+  std::string cpu_list;
+
   n.param("calibration_file",calibration_filename,std::string("wam_joint_calibrations"));
   n.param("canbus_number",canbus_number,0);
   n.param("hand_type",hand_type,std::string("none"));
@@ -112,6 +117,38 @@ int main(int argc, char** argv)
   n.param("hand_publish_frequency",hand_pub_freq,hand_freq_default);
   n.param("ft_publish_frequency",ft_pub_freq,10);
   n.param("tactile_publish_frequency",tactile_pub_freq,10);
+
+  n.param("cpus_to_run_on",cpu_list,std::string(""));
+  if (cpu_list.length() > 0) {
+    // bind our thread to the specified processors
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    char *cpustr = strdup(cpu_list.c_str());
+    char *cpustrtok(cpustr);
+    char *cpu;
+    char *strtokptr;
+    char cpulistout[200];
+    cpulistout[0] = 0;
+    while ((cpu = strtok_r(cpustrtok,", ",&strtokptr))) {
+      cpustrtok=NULL;
+      int cpunum = atoi(cpu);
+      CPU_SET(cpunum,&cpuset);
+      snprintf(cpulistout + strlen(cpulistout), 200 - strlen(cpulistout), "%d ", cpunum);
+    }
+    free(cpustr);
+    if (CPU_COUNT(&cpuset) > 0) {
+      ROS_INFO("Restricting process to run on core(s) %s",cpulistout);
+      pid_t tid = (pid_t) syscall (SYS_gettid);
+      int err=sched_setaffinity(tid,sizeof(cpu_set_t),&cpuset);
+      if (err) {
+	ROS_FATAL("Could not bind our process to the preferred CPU cores: %s",
+		  strerror(errno));
+      }
+    } else {
+      ROS_ERROR("Could not add specified processor cores to the affinity set");
+    }
+  }
+
 
   if (wam_pub_freq > 500) {
     ROS_WARN("value of wam_publish_frequency exceeds maximum sensor rate; capping to 500Hz");
