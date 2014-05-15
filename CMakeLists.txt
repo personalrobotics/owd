@@ -1,4 +1,5 @@
-if(DEFINED CATKIN_TOPLEVEL OR (NOT $ENV{ROS_DISTRO} STREQUAL fuerte) )
+if(DEFINED CATKIN_TOPLEVEL OR (NOT $ENV{ROS_DISTRO} STREQUAL fuerte))
+message(STATUS "catkin")
 
 cmake_minimum_required(VERSION 2.8.3)
 project(owd_msgs)
@@ -76,7 +77,8 @@ generate_messages(DEPENDENCIES std_msgs geometry_msgs)
 catkin_package(CATKIN_DEPENDS message_runtime std_msgs geometry_msgs)
 
 
-else(DEFINED CATKIN_TOPLEVEL OR (NOT $ENV{ROS_DISTRO} STREQUAL fuerte) )
+else()
+message(STATUS "rosbuild")
 
 
 cmake_minimum_required(VERSION 2.4.6)
@@ -91,4 +93,4 @@ rosbuild_genmsg()
 rosbuild_gensrv()
 
 
-endif(DEFINED CATKIN_TOPLEVEL OR (NOT $ENV{ROS_DISTRO} STREQUAL fuerte) )
+endif()
