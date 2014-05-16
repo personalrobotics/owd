@@ -21,6 +21,7 @@
  ***********************************************************************/
 
 #include <ros/ros.h>
+#include <bullet/LinearMath/btTransform.h>
 #include <CANbus.hh>
 #include <tf/transform_broadcaster.h>
 #include <owd_msgs/BHState.h>

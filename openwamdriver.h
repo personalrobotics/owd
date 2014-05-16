@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <ros/ros.h>
 #include <boost/thread/mutex.hpp>
+#include <bullet/LinearMath/btTransform.h>
 #include <owd_msgs/AddTrajectory.h>
 #include <owd_msgs/AddTimedTrajectory.h>
 #include <owd_msgs/DeleteTrajectory.h>

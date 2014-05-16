@@ -105,39 +105,37 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     add_dependencies(openwam ${catkin_EXPORTED_TARGETS})
 endif ()
 
-# Build OpenWAM utility programs.
+# OpenWAM utility programs.
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     add_library(wamcan ${OPENWAM_CAN_SOURCE})
     add_dependencies(wamcan ${catkin_EXPORTED_TARGETS})
-    set_target_properties(wamcan PROPERTIES
-        COMPILE_FLAGS "${CANBUS_DEFS}"
-        LINK_FLAGS "${CANBUS_LIBS}"
-    )
+    set_target_properties(wamcan PROPERTIES COMPILE_FLAGS "${CANBUS_DEFS}")
+    target_link_libraries(wamcan ${CANBUS_LIBS})
 
     add_library(bhdcan ${OPENWAM_CAN_SOURCE})
     add_dependencies(bhdcan ${catkin_EXPORTED_TARGETS})
-    set_target_properties(bhdcan PROPERTIES
-        COMPILE_FLAGS "${CANBUS_DEFS} -DBH280_ONLY"
-        LINK_FLAGS "${CANBUS_LIBS}"
-    )
+    set_target_properties(bhdcan PROPERTIES COMPILE_FLAGS "${CANBUS_DEFS} -DBH280_ONLY")
+    target_link_libraries(bhdcan "${CANBUS_LIBS}")
 
     if (RT_BUILD)
         add_library(wamcanrt ${OPENWAM_CAN_SOURCE})
         add_dependencies(wamcanrt ${catkin_EXPORTED_TARGETS})
-        set_target_properties(wamcanrt PROPERTIES
-            COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS}"
-            LINK_FLAGS "${CANBUS_LIBS} ${RT_LIBS}"
-        )
+        set_target_properties(wamcanrt PROPERTIES COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS}")
+        target_link_libraries(wamcanrt ${CANBUS_LIBS} ${RT_LIBS})
 
         add_library(bhdcanrt ${OPENWAM_CAN_SOURCE})
         add_dependencies(bhdcanrt ${catkin_EXPORTED_TARGETS})
         set_target_properties(bhdcanrt PROPERTIES
-            COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS} -DBH280_ONLY"
-            LINK_FLAGS "${CANBUS_LIBS} ${RT_LIBS}"
-        )
+            COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS} -DBH280_ONLY")
+        target_link_libraries(bhdcanrt ${CANBUS_LIBS} ${RT_LIBS})
     endif ()
 endif ()
 
+add_executable(MacTrajTest openwam/MacTrajTest.cc)
+add_dependencies(MacTrajTest ${catkin_EXPORTED_TARGETS})
+target_link_libraries(MacTrajTest openwamsim openmath)
+
+# owdsim
 add_library(openwamsim
     ${OPENWAM_SOURCE}
     openwam/CANbus_sim.cc
@@ -146,8 +144,106 @@ add_library(openwamsim
     openwam/Plugin.cc
 )
 add_dependencies(openwamsim ${catkin_EXPORTED_TARGETS})
+target_link_libraries(openwamsim openwam)
 set_target_properties(openwamsim PROPERTIES COMPILE_FLAGS "-DOWDSIM")
 
-add_executable(MacTrajTest openwam/MacTrajTest.cc)
-add_dependencies(MacTrajTest ${catkin_EXPORTED_TARGETS})
-target_link_libraries(MacTrajTest openwamsim)
+# Core executables.
+if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
+    add_executable(owd
+        owd.cpp
+        openwamdriver.cpp
+        bhd280.cc
+        ft.cc
+        tactile.cc
+    )
+    add_dependencies(owd ${catkin_EXPORTED_TARGETS})
+    target_link_libraries(owd wamcan openwam openmath lapack blas gfortran ${CANBUS_LIBS})
+    set_target_properties(owd PROPERTIES
+        COMPILE_FLAGS "${CANBUS_DEFS}"
+        LINK_FLAGS "${CANBUS_LDFLAGS}"
+    )
+
+    add_executable(canbhd
+        owd.cpp
+        openwamdriver.cpp
+        bhd280.cc
+        ft.cc
+        tactile.cc
+    )
+    add_dependencies(canbhd ${catkin_EXPORTED_TARGETS})
+    target_link_libraries(canbhd bhdcan openwam openmath lapack blas gfortran ${CANBUS_LIBS})
+    set_target_properties(canbhd PROPERTIES
+        COMPILE_FLAGS "-DBH280 -DBH280_ONLY ${CANBUS_DEFS}"
+        LINK_FLAGS "${CANBUS_LDFLAGS}"
+    )
+
+    if (RT_BUILD)
+        add_executable(owdrt owd.cpp openwamdriver.cpp bhd280.cc ft.cc tactile.cc)
+        target_link_libraries(owdrt wamcanrt openwam openmath lapack blas
+                              gfortran ${CANBUS_LIBS} ${RT_LIBS})
+        set_target_properties(owdrt PROPERTIES
+            COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS}"
+            LINK_FLAGS "${CANBUS_LDFLAGS}"
+        )
+
+        add_executable(canbhdrt owd.cpp openwamdriver.cpp bhd280.cc ft.cc tactile.cc)
+        target_link_libraries(canbhdrt bhdcanrt openwam openmath lapack blas
+                              gfortran ${CANBUS_LIBS} ${RT_LIBS})
+        set_target_properties(canbhdrt PROPERTIES
+            COMPILE_FLAGS "-DBH280 -DBH280_ONLY ${CANBUS_DEFS} ${RT_DEFS}"
+            LINK_FLAGS "${CANBUS_LDFLAGS}"
+        )
+    endif ()
+endif ()
+
+add_executable(owdsim owd.cpp openwamdriver.cpp)
+target_link_libraries(owdsim openwamsim openmath lapack blas gfortran)
+set_target_properties(owdsim PROPERTIES COMPILE_FLAGS "-DOWDSIM")
+
+# Utility executables.
+if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
+    add_executable(owd_test test.cpp)
+    add_executable(synctest synctest.cpp)
+
+    add_executable(puck_update puck_update.cpp)
+    target_link_libraries(puck_update wamcan openwam ${CANBUS_LIBS})
+    set_target_properties(puck_update PROPERTIES
+        COMPILE_FLAGS "${CANBUS_DEFS}"
+        LINK_FLAGS "${CANBUS_LDFLAGS}"
+    )
+
+    add_executable(puck_defaults puck_defaults.cpp)
+    target_link_libraries(puck_defaults wamcan openwam ${CANBUS_LIBS})
+    set_target_properties(puck_defaults PROPERTIES
+        COMPILE_FLAGS "${CANBUS_DEFS}"
+        LINK_FLAGS "${CANBUS_LDFLAGS}"
+    )
+
+    add_executable(puck_getprops puck_getprops.cpp)
+    target_link_libraries(puck_getprops wamcan openwam ${CANBUS_LIBS})
+    set_target_properties(puck_getprops PROPERTIES
+        COMPILE_FLAGS "${CANBUS_DEFS}"
+        LINK_FLAGS "${CANBUS_LDFLAGS}"
+    )
+
+    add_executable(puck_find_mofst puck_find_mofst.cpp)
+    target_link_libraries(puck_find_mofst wamcan openwam ${CANBUS_LIBS})
+    set_target_properties(puck_find_mofst PROPERTIES
+        COMPILE_FLAGS "${CANBUS_DEFS}"
+        LINK_FLAGS "${CANBUS_LDFLAGS}"
+    )
+
+    add_executable(puck_setprop puck_setprop.cpp)
+    target_link_libraries(puck_setprop wamcan openwam ${CANBUS_LIBS})
+    set_target_properties(puck_setprop PROPERTIES
+        COMPILE_FLAGS "${CANBUS_DEFS}"
+        LINK_FLAGS "${CANBUS_LDFLAGS}"
+    )
+endif ()
+
+add_executable(owd_traj_timer owd_traj_timer.cpp)
+if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
+  target_link_libraries(owd_traj_timer openwam)
+else ()
+  target_link_libraries(owd_traj_timer openwamsim)
+endif ()
