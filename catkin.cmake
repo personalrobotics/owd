@@ -22,8 +22,10 @@ catkin_package(
 include(${PROJECT_SOURCE_DIR}/find_xenomai.cmake)
 include(${PROJECT_SOURCE_DIR}/detect_cpu.cmake)
 
+include_directories(openwam openmath ${catkin_INCLUDE_DIRS})
+link_libraries(${catkin_LIBRARIES})
+
 # TODO: Why are we compiling with -O0?
-include_directories(openwam openmath)
 add_definitions("-O0 -ggdb3 -DWRIST -DBH8 -DRT_STATS")
 
 # Choose the CAN driver.
@@ -100,17 +102,20 @@ set(OPENWAM_CAN_SOURCE
 
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     add_library(openwam ${OPENWAM_SOURCE})
+    add_dependencies(openwam ${catkin_EXPORTED_TARGETS})
 endif ()
 
 # Build OpenWAM utility programs.
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     add_library(wamcan ${OPENWAM_CAN_SOURCE})
+    add_dependencies(wamcan ${catkin_EXPORTED_TARGETS})
     set_target_properties(wamcan PROPERTIES
         COMPILE_FLAGS "${CANBUS_DEFS}"
         LINK_FLAGS "${CANBUS_LIBS}"
     )
 
     add_library(bhdcan ${OPENWAM_CAN_SOURCE})
+    add_dependencies(bhdcan ${catkin_EXPORTED_TARGETS})
     set_target_properties(bhdcan PROPERTIES
         COMPILE_FLAGS "${CANBUS_DEFS} -DBH280_ONLY"
         LINK_FLAGS "${CANBUS_LIBS}"
@@ -118,12 +123,14 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
     if (RT_BUILD)
         add_library(wamcanrt ${OPENWAM_CAN_SOURCE})
+        add_dependencies(wamcanrt ${catkin_EXPORTED_TARGETS})
         set_target_properties(wamcanrt PROPERTIES
             COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS}"
             LINK_FLAGS "${CANBUS_LIBS} ${RT_LIBS}"
         )
 
         add_library(bhdcanrt ${OPENWAM_CAN_SOURCE})
+        add_dependencies(bhdcanrt ${catkin_EXPORTED_TARGETS})
         set_target_properties(bhdcanrt PROPERTIES
             COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS} -DBH280_ONLY"
             LINK_FLAGS "${CANBUS_LIBS} ${RT_LIBS}"
@@ -138,7 +145,9 @@ add_library(openwamsim
     openwam/WAM.cc
     openwam/Plugin.cc
 )
+add_dependencies(openwamsim ${catkin_EXPORTED_TARGETS})
 set_target_properties(openwamsim PROPERTIES COMPILE_FLAGS "-DOWDSIM")
 
 add_executable(MacTrajTest openwam/MacTrajTest.cc)
-target_link_libraries(MacTrajTest openwam/openwamsim)
+add_dependencies(MacTrajTest ${catkin_EXPORTED_TARGETS})
+target_link_libraries(MacTrajTest openwamsim)
