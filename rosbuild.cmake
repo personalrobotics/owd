@@ -2,7 +2,12 @@ cmake_minimum_required(VERSION 2.4.6)
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 include(find_xenomai.cmake)
 
-#set (CANBUS_TYPE "ESD")
+#set(CANBUS_TYPE "ESD")
+set(CANBUS_TYPE "PEAK")
+set(CMAKE_VERBOSE_MAKEFILE on)
+set(ROS_BUILD_STATIC_LIBS true)
+set(ROS_BUILD_SHARED_LIBS false)
+
 rosbuild_init()
 
 add_subdirectory(openwam)
