@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package>
+  <name>owd</name>
+  <version>0.0.1</version>
+  <description>
+     ROS driver for the Barrett WAM.
+  </description>
+  <url type="website">https://personalrobotics.ri.cmu.edu/pr-ros-pkg/owd/html/</url>
+  <url type="repository">https://svn.personalrobotics.ri.cmu.edu/pr-ros-drivers/trunk/owd/</url>
+  <maintainer email="vandeweg@cmu.edu">Mike Vande Weghe</maintainer>
+  <license>LGPLv2.1</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>owd_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>gfortran</build_depend>
+  <build_depend>tf</build_depend>
+  <build_depend>libblas-dev</build_depend>
+  <build_depend>liblapack-dev</build_depend>
+  <build_depend>libxenomai-dev"</build_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>owd_msgs</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>message_runtime</run_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>tf</run_depend>
+</package>

@@ -1,13 +1,14 @@
+if(DEFINED CATKIN_TOPLEVEL OR (NOT ("$ENV{ROS_DISTRO}" STREQUAL "fuerte")))
+
+message(FATAL_ERROR "Catkin builds are not supported.")
+
+else()
+
 cmake_minimum_required(VERSION 2.4.6)
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 include(find_xenomai.cmake)
 
 #set (CANBUS_TYPE "ESD")
-set (CANBUS_TYPE "PEAK")
-set (CMAKE_VERBOSE_MAKEFILE on)
-
-set(ROS_BUILD_STATIC_LIBS true)
-set(ROS_BUILD_SHARED_LIBS false)
 rosbuild_init()
 
 add_subdirectory(openwam)
@@ -118,3 +119,5 @@ elseif (VENDOR_ID STREQUAL "CentaurHauls")
     message(STATUS "Building for VIA - Original Barrett WAM PC")
     add_definitions("-march=c3-2")
 endif  (DEFINED ENV{OWD_MARCH_FLAGS})
+
+endif()
