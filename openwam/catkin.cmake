@@ -34,16 +34,18 @@ set(OPENWAM_TARGETS openwamsim)
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     list(APPEND OPENWAM_TARGETS openwam wamcan bhdcan)
 
-    add_library(openwam ${OPENWAM_SOURCE})
+    add_library(openwam STATIC ${OPENWAM_SOURCE})
 
-    add_library(wamcan ${OPENWAM_IMPL_SOURCE} CANbus.cc)
+    add_library(wamcan STATIC ${OPENWAM_IMPL_SOURCE} CANbus.cc)
+    add_dependencies(wamcan owd_msgs_generate_messages_cpp)
     target_link_libraries(wamcan ${CANBUS_LIBS})
     set_target_properties(wamcan PROPERTIES
         COMPILE_FLAGS "${CANBUS_DEFS}"
         LINK_FLAGS "${CANBUS_LDFLAGS}"
     )
 
-    add_library(bhdcan ${OPENWAM_IMPL_SOURCE} CANbus.cc)
+    add_library(bhdcan STATIC ${OPENWAM_IMPL_SOURCE} CANbus.cc)
+    add_dependencies(bhdcan owd_msgs_generate_messages_cpp)
     target_link_libraries(bhdcan ${CANBUS_LIBS})
     set_target_properties(bhdcan PROPERTIES
         COMPILE_FLAGS "${CANBUS_DEFS} -DBH280_ONLY"
@@ -53,14 +55,16 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     if (RT_BUILD)
         list(APPEND OPENWAM_TARGETS wamcanrt bhdcanrt)
 
-        add_library(wamcanrt ${OPENWAM_IMPL_SOURCE} CANbus.cc)
+        add_library(wamcanrt STATIC ${OPENWAM_IMPL_SOURCE} CANbus.cc)
+        add_dependencies(wamcanrt owd_msgs_generate_messages_cpp)
         target_link_libraries(wamcanrt ${CANBUS_LIBS} ${RT_LIBS})
         set_target_properties(wamcanrt PROPERTIES
             COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS}"
             LINK_FLAGS "${CANBUS_LDFLAGS}"
         )
 
-        add_library(bhdcanrt ${OPENWAM_IMPL_SOURCE} CANbus.cc)
+        add_library(bhdcanrt STATIC ${OPENWAM_IMPL_SOURCE} CANbus.cc)
+        add_dependencies(bhdcanrt owd_msgs_generate_messages_cpp)
         target_link_libraries(bhdcanrt ${CANBUS_LIBS} ${RT_LIBS})
         set_target_properties(bhdcanrt PROPERTIES
             COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS} -DBH280_ONLY"
@@ -69,7 +73,9 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     endif ()
 endif ()
 
-add_library(openwamsim ${OPENWAM_SOURCE} ${OPENWAM_IMPL_SOURCE} CANbus_sim.cc)
+add_library(openwamsim STATIC ${OPENWAM_SOURCE} ${OPENWAM_IMPL_SOURCE}
+                              CANbus_sim.cc)
+add_dependencies(openwamsim owd_msgs_generate_messages_cpp)
 target_link_libraries(openwamsim ${CANBUS_LIBS})
 set_target_properties(openwamsim PROPERTIES
     COMPILE_FLAGS "${CANBUS_DEFS} -DOWDSIM"
