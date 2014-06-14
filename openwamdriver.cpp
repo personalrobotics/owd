@@ -212,16 +212,16 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   // Construct the base transforms, based on the dimensions
   // from the WAM manual.
   static double PI=3.141592654;
-  btQuaternion HALFPI_ROLL, NEG_HALFPI_ROLL;
+  tf::Quaternion HALFPI_ROLL, NEG_HALFPI_ROLL;
   HALFPI_ROLL.setEulerZYX(0,0,PI/2.0);
   NEG_HALFPI_ROLL.setEulerZYX(0,0,-PI/2.0);
-  wam_tf_base[0] = btTransform::getIdentity();
-  wam_tf_base[1] = btTransform(NEG_HALFPI_ROLL);
-  wam_tf_base[2] = btTransform(HALFPI_ROLL);
-  wam_tf_base[3] = btTransform(NEG_HALFPI_ROLL,btVector3(0.045,0,0.55));
-  wam_tf_base[4] = btTransform(HALFPI_ROLL,btVector3(-0.045,0,0));
-  wam_tf_base[5] = btTransform(NEG_HALFPI_ROLL,btVector3(0,0,0.30));
-  wam_tf_base[6] = btTransform(HALFPI_ROLL);
+  wam_tf_base[0] = tf::Transform::getIdentity();
+  wam_tf_base[1] = tf::Transform(NEG_HALFPI_ROLL);
+  wam_tf_base[2] = tf::Transform(HALFPI_ROLL);
+  wam_tf_base[3] = tf::Transform(NEG_HALFPI_ROLL,tf::Vector3(0.045,0,0.55));
+  wam_tf_base[4] = tf::Transform(HALFPI_ROLL,tf::Vector3(-0.045,0,0));
+  wam_tf_base[5] = tf::Transform(NEG_HALFPI_ROLL,tf::Vector3(0,0,0.30));
+  wam_tf_base[6] = tf::Transform(HALFPI_ROLL);
 
 }
 
@@ -1864,9 +1864,9 @@ bool WamDriver::Publish() {
     snprintf(jname,50,"wam%d",i+1);
     std::string jrefstring(jref);
     std::string jnamestring(jname);
-    btQuaternion YAW;
+    tf::Quaternion YAW;
     YAW.setEulerZYX(jointpos[i+1],0,0);
-    btTransform wam_tf = wam_tf_base[i] *  btTransform(YAW);
+    tf::Transform wam_tf = wam_tf_base[i] *  tf::Transform(YAW);
     tf::StampedTransform st(wam_tf,ros::Time::now(),jrefstring,jnamestring);
     tf_broadcaster.sendTransform(st);
   }

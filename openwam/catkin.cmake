@@ -25,23 +25,25 @@ set(OPENWAM_SOURCE
     JSController.cc
 )
 set(OPENWAM_IMPL_SOURCE
-    CANbus_sim.cc
     Plugin.cc
     WAM.cc
     ControlLoop.cc
 )
+set(OPENWAM_TARGETS openwamsim)
 
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
+    list(APPEND OPENWAM_TARGETS openwam wamcan bhdcan)
+
     add_library(openwam ${OPENWAM_SOURCE})
 
-    add_library(wamcan ${OPENWAM_IMPL_SOURCE})
+    add_library(wamcan ${OPENWAM_IMPL_SOURCE} CANbus.cc)
     target_link_libraries(wamcan ${CANBUS_LIBS})
     set_target_properties(wamcan PROPERTIES
         COMPILE_FLAGS "${CANBUS_DEFS}"
         LINK_FLAGS "${CANBUS_LDFLAGS}"
     )
 
-    add_library(bhdcan ${OPENWAM_IMPL_SOURCE})
+    add_library(bhdcan ${OPENWAM_IMPL_SOURCE} CANbus.cc)
     target_link_libraries(bhdcan ${CANBUS_LIBS})
     set_target_properties(bhdcan PROPERTIES
         COMPILE_FLAGS "${CANBUS_DEFS} -DBH280_ONLY"
@@ -49,14 +51,16 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     )
 
     if (RT_BUILD)
-        add_library(wamcanrt ${OPENWAM_IMPL_SOURCE})
+        list(APPEND OPENWAM_TARGETS wamcanrt bhdcanrt)
+
+        add_library(wamcanrt ${OPENWAM_IMPL_SOURCE} CANbus.cc)
         target_link_libraries(wamcanrt ${CANBUS_LIBS} ${RT_LIBS})
         set_target_properties(wamcanrt PROPERTIES
             COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS}"
             LINK_FLAGS "${CANBUS_LDFLAGS}"
         )
 
-        add_library(bhdcanrt ${OPENWAM_IMPL_SOURCE})
+        add_library(bhdcanrt ${OPENWAM_IMPL_SOURCE} CANbus.cc)
         target_link_libraries(bhdcanrt ${CANBUS_LIBS} ${RT_LIBS})
         set_target_properties(bhdcanrt PROPERTIES
             COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS} -DBH280_ONLY"
@@ -65,7 +69,7 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     endif ()
 endif ()
 
-add_library(openwamsim ${OPENWAM_SOURCE} ${OPENWAM_IMPL_SOURCE})
+add_library(openwamsim ${OPENWAM_SOURCE} ${OPENWAM_IMPL_SOURCE} CANbus_sim.cc)
 target_link_libraries(openwamsim ${CANBUS_LIBS})
 set_target_properties(openwamsim PROPERTIES
     COMPILE_FLAGS "${CANBUS_DEFS} -DOWDSIM"
@@ -75,3 +79,10 @@ set_target_properties(openwamsim PROPERTIES
 # TODO: Something needs to link with openmath.
 #add_executable(MacTrajTest MacTrajTest.cc)
 #target_link_libraries(MacTrajTest openwamsim)
+
+install(TARGETS ${OPENWAM_TARGETS}
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+

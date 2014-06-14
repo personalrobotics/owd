@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
 
-# Depends on the pcan kernel driver, which depends on libpopt-dev
-
-# NOTE: These must be Catkin packages. This exports ${catkin_INCLUDE_DIRS}, etc.
 find_package(catkin REQUIRED COMPONENTS
     owd_msgs
     std_msgs
@@ -11,9 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
     tf
 )
 
-# NOTE: This is used by packages that depend on you. List of dependencies that
-# dependencies might need. For Catkin and non-Catkin packages. INCLUDE_DIRS and
-# LIBRARIES are exported from this package.
+# TODO: Populate this.
 catkin_package(
     #INCLUDE_DIRS include
     #LIBRARIES ${PROJECT_NAME}
@@ -49,6 +44,7 @@ include_directories(
     openmath
     ${catkin_INCLUDE_DIRS}
 )
+link_libraries(${catkin_LIBRARIES})
 
 add_subdirectory(openmath)
 add_subdirectory(openwam)
@@ -61,89 +57,41 @@ set(OWD_SOURCE
     tactile.cc
 )
 set(OWD_LIBS
-    wamcan
     openwam
     openmath
     lapack
     blas
     gfortran
-    ${CANBUS_LIBS}
 )
+set(OWD_TARGETS owdsim)
+
+add_executable(owdsim owd.cpp openwamdriver.cpp)
+target_link_libraries(owdsim openwamsim ${OWD_LIBS})
+set_target_properties(owdsim PROPERTIES COMPILE_FLAGS "-DOWDSIM")
 
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
+    list(APPEND OWD_TARGETS owd canbhd)
+
     add_executable(owd ${OWD_SOURCE})
-    target_link_libraries(owd ${OWD_LIBS})
+    target_link_libraries(owd wamcan ${OWD_LIBS} ${CANBUS_LIBS})
     set_target_properties(owd PROPERTIES
         COMPILE_FLAGS "${CANBUS_DEFS}"
         LINK_FLAGS "${CANBUS_LDFLAGS}"
     )
 
     add_executable(canbhd ${OWD_SOURCE})
-    target_link_libraries(canbhd ${OWD_LIBS})
+    target_link_libraries(canbhd wamcan ${OWD_LIBS} ${CANBUS_LIBS})
     set_target_properties(canbhd PROPERTIES
         COMPILE_FLAGS "${CANBUS_DEFS} -DBH280 -DBH280_ONLY"
         LINK_FLAGS "${CANBUS_LDFLAGS}"
     )
 endif ()
 
-#rosbuild_add_executable(owdsim owd.cpp openwamdriver.cpp)
-#target_link_libraries(owdsim openwamsim openmath lapack blas gfortran)
-#rosbuild_add_compile_flags(owdsim "-DOWDSIM")
-#
-#if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
-#rosbuild_add_executable(owd_test test.cpp)
-#rosbuild_add_executable(synctest synctest.cpp)
-#
-#rosbuild_add_executable(puck_update puck_update.cpp)
-#target_link_libraries(puck_update wamcan openwam ${CANBUS_LIBS})
-#rosbuild_add_compile_flags(puck_update "${CANBUS_DEFS}")
-#rosbuild_add_link_flags(puck_update "${CANBUS_LDFLAGS}")
-#
-#rosbuild_add_executable(puck_defaults puck_defaults.cpp)
-#target_link_libraries(puck_defaults wamcan openwam ${CANBUS_LIBS})
-#rosbuild_add_compile_flags(puck_defaults "${CANBUS_DEFS}")
-#rosbuild_add_link_flags(puck_defaults "${CANBUS_LDFLAGS}")
-#
-#rosbuild_add_executable(puck_getprops puck_getprops.cpp)
-#target_link_libraries(puck_getprops wamcan openwam ${CANBUS_LIBS})
-#rosbuild_add_compile_flags(puck_getprops "${CANBUS_DEFS}")
-#rosbuild_add_link_flags(puck_getprops "${CANBUS_LDFLAGS}")
-#
-#rosbuild_add_executable(puck_find_mofst puck_find_mofst.cpp)
-#target_link_libraries(puck_find_mofst wamcan openwam ${CANBUS_LIBS})
-#rosbuild_add_compile_flags(puck_find_mofst "${CANBUS_DEFS}")
-#rosbuild_add_link_flags(puck_find_mofst "${CANBUS_LDFLAGS}")
-#
-#rosbuild_add_executable(puck_setprop puck_setprop.cpp)
-#target_link_libraries(puck_setprop wamcan openwam ${CANBUS_LIBS})
-#rosbuild_add_compile_flags(puck_setprop "${CANBUS_DEFS}")
-#rosbuild_add_link_flags(puck_setprop "${CANBUS_LDFLAGS}")
-#endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
-#
-#rosbuild_add_executable(owd_traj_timer owd_traj_timer.cpp)
-#if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
-#  target_link_libraries(owd_traj_timer openwam)
-#else (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
-#  target_link_libraries(owd_traj_timer openwamsim)
-#endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
-#
-#if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
-#if (RT_BUILD)
-#  rosbuild_add_executable(owdrt owd.cpp openwamdriver.cpp bhd280.cc
-#                                ft.cc tactile.cc)
-#  target_link_libraries(owdrt wamcanrt openwam openmath lapack blas
-#                              gfortran ${CANBUS_LIBS} ${RT_LIBS})
-#  rosbuild_add_compile_flags(owdrt "${CANBUS_DEFS} ${RT_DEFS}")
-#  rosbuild_add_link_flags(owdrt "${CANBUS_LDFLAGS}")
-#
-#  rosbuild_add_executable(canbhdrt owd.cpp openwamdriver.cpp bhd280.cc
-#                                   ft.cc tactile.cc)
-#  target_link_libraries(canbhdrt bhdcanrt openwam openmath lapack blas
-#      	                         gfortran ${CANBUS_LIBS} ${RT_LIBS})
-#  rosbuild_add_compile_flags(canbhdrt "-DBH280 -DBH280_ONLY ${CANBUS_DEFS} ${RT_DEFS}")
-#  rosbuild_add_link_flags(canbhdrt "${CANBUS_LDFLAGS}")
-#endif (RT_BUILD)
-#endif (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
+# TODO: Also build the large collection of utilities.
 
-#include_directories(openwam openmath ${catkin_INCLUDE_DIRS})
-#link_libraries(${catkin_LIBRARIES})
+install(TARGETS ${OWD_TARGETS}
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+

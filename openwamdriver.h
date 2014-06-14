@@ -28,7 +28,6 @@
 #include <algorithm>
 #include <ros/ros.h>
 #include <boost/thread/mutex.hpp>
-#include <bullet/LinearMath/btTransform.h>
 #include <owd_msgs/AddTrajectory.h>
 #include <owd_msgs/AddTimedTrajectory.h>
 #include <owd_msgs/DeleteTrajectory.h>
@@ -299,7 +298,7 @@ private:
       ss_SetController;
 
     tf::TransformBroadcaster tf_broadcaster;
-    btTransform wam_tf_base[7];
+    tf::Transform wam_tf_base[7];
  
 #ifdef BUILD_FOR_SEA
     ros::Publisher

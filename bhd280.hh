@@ -21,7 +21,6 @@
  ***********************************************************************/
 
 #include <ros/ros.h>
-#include <bullet/LinearMath/btTransform.h>
 #include <CANbus.hh>
 #include <tf/transform_broadcaster.h>
 #include <owd_msgs/BHState.h>
@@ -56,8 +55,8 @@ public:
   ros::NodeHandle node;
   CANbus *bus;
   tf::TransformBroadcaster *tf_broadcaster;
-  btTransform finger_link1_base[3];
-  btTransform finger_link2_base, finger_link3_base;
+  tf::Transform finger_link1_base[3];
+  tf::Transform finger_link2_base, finger_link3_base;
 
   owd_msgs::BHState bhstate;
   double max_velocity;
