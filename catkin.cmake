@@ -11,8 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
     #INCLUDE_DIRS include
     #LIBRARIES ${PROJECT_NAME}
-    #CATKIN_DEPENDS std_msgs owd_msgs geometry_msgs roscpp tf
-    #DEPENDS libblas-dev liblapack-dev
+    CATKIN_DEPENDS std_msgs owd_msgs geometry_msgs roscpp tf
 )
 
 include(${PROJECT_SOURCE_DIR}/find_xenomai.cmake)
