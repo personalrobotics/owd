@@ -8,15 +8,16 @@
   <url type="website">https://personalrobotics.ri.cmu.edu/pr-ros-pkg/owd/html/</url>
   <url type="repository">https://svn.personalrobotics.ri.cmu.edu/pr-ros-drivers/trunk/owd/</url>
   <maintainer email="vandeweg@cmu.edu">Mike Vande Weghe</maintainer>
+  <author email="vandeweg@cmu.edu">Mike Vande Weghe</author>
   <license>LGPLv2.1</license>
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>owd_msgs</build_depend>
   <build_depend>geometry_msgs</build_depend>
   <build_depend>roscpp</build_depend>
-  <build_depend>bullet</build_depend>
   <build_depend>gfortran</build_depend>
   <build_depend>tf</build_depend>
+  <build_depend>libpcan</build_depend>
   <build_depend>libblas-dev</build_depend>
   <build_depend>liblapack-dev</build_depend>
   <build_depend>libxenomai-dev</build_depend>
@@ -24,7 +25,8 @@
   <run_depend>owd_msgs</run_depend>
   <run_depend>geometry_msgs</run_depend>
   <run_depend>message_runtime</run_depend>
-  <run_depend>bullet</run_depend>
   <run_depend>roscpp</run_depend>
+  <run_depend>gfortran</run_depend>
   <run_depend>tf</run_depend>
+  <run_depend>libpcan</run_depend>
 </package>
