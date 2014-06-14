@@ -10,6 +10,7 @@ add_message_files(
     BHState.msg
     BHTactile.msg
     ForceRead.msg
+    ForceState.msg
     IndexedJointValues.msg
     Jacobian.msg
     Joints.msg
@@ -17,6 +18,7 @@ add_message_files(
     MassProperties.msg
     PIDgains.msg
     Servo.msg
+    ServoOpt.msg
     TrajInfo.msg
     WAMInternals.msg
     WamSetupSeaCtrl.msg
@@ -49,6 +51,7 @@ add_service_files(
     Reset.srv
     SetController.srv
     SetExtraMass.srv
+    SetFingerCompliant.srv
     SetForceInputThreshold.srv
     SetGains.srv
     SetHandProperty.srv
