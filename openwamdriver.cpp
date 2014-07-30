@@ -271,6 +271,7 @@ bool WamDriver::Init(const char *joint_cal_file)
 	if (bus->set_property_rt(SAFETY_MODULE, 5, 0, false, 10000) == OW_FAILURE) {
 	  ROS_ERROR("Unable to reset the safety puck");
 	}
+	
 	sleep(1);
 	// set STAT back to 2
 	if (bus->set_property_rt(SAFETY_MODULE, 5, 2, false, 10000) == OW_FAILURE) {
@@ -401,6 +402,8 @@ bool WamDriver::Init(const char *joint_cal_file)
   n.param("synchronize_with_other_controllers",synchronize,false);
   if (synchronize) {
     int sync_id;
+    int sync_timeout;
+    n.param("synchronization_timeout", sync_timeout, -1);
     n.param("synchronization_id",sync_id,-1);
     if (sync_id == -1) {
       ROS_FATAL("Must specify unique synchronization_id values for each synchronized controller.");
@@ -427,17 +430,35 @@ bool WamDriver::Init(const char *joint_cal_file)
 	throw e.c_str();
       }
     } else {
-      ROS_INFO("Attempting to contact master synchronization controller");
-      try {
-	owam->ms = new MultiSync(sync_name, sync_id);
-      } catch (const char *errmsg) {
-	std::string e("Error while contacting master synchronization controller:");
-	e += errmsg;
-	ROS_ERROR("%s",e.c_str());
-	throw e.c_str();
-      }
+      
+      char *line     = NULL;
+      size_t linelen = 0;
+      bool force     = false;
+      while (synchronize) 
+	{
+	  try 
+	    {
+	      ROS_INFO("Attempting to contact master synchronization controller with timeout %i", sync_timeout);
+	      owam->ms = new MultiSync(sync_name, sync_id, force, sync_timeout);
+	      ROS_INFO("Contacted master synchronization controller.");
+	      break;
+	    } 
+	  catch (const char *errmsg) 
+	    {
+	      std::string e("Error while contacting master synchronization controller! ");
+	      e += errmsg;
+	      ROS_ERROR("%s",e.c_str());
+	      ROS_INFO("Press enter to try to contact synchronization master again, or type NOSYNC to disable synchronization and begin the control loop.");
+	      linelen = getline(&line,&linelen,stdin);
+	      if (strncmp(line, "NOSYNC", 6) == 0) 
+		{
+		  ROS_ERROR("\nContinuing with synchronization DISABLED!");
+		  synchronize = false;
+		}
+	    }
+	}
     }
-    ROS_INFO("Synchronization established");
+    if (synchronize) { ROS_INFO("Synchronization established"); } 
   }
 
   // Read our motor offsets from file (if found) and apply them
