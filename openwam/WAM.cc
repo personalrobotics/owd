@@ -853,7 +853,7 @@ void control_loop_rt(void* argv){
     RTIME last_loopstart_time = last_sendtorque_time;
 #endif // BH280_ONLY
 
-    ROS_DEBUG("Control loop started");
+    ROS_ERROR("Control loop started");
 
     int hand_cycles=12;  // we need 12 cycles to get everything we need
     // from the hand pucks (tactile takes 9 cycles)
@@ -986,6 +986,7 @@ void control_loop_rt(void* argv){
             uint32_t PROPERTY;
 
             if (wam->bus->read_rt(&msgid, msg, &msglen, time_to_wait) == OW_FAILURE){
+	      wam->unlock("control_loop");
                 goto NEXT;
             }
 
@@ -1048,6 +1049,7 @@ void control_loop_rt(void* argv){
             } else {
                 // unknown
                 wam->bus->stats.canread_badpackets++;
+		wam->unlock("control_loop");
                 goto NEXT;
             }
 
@@ -1095,6 +1097,8 @@ void control_loop_rt(void* argv){
                 controltime += (sendtorque_start_time-control_start_time) * 1e-6;
                 sendtime += (sendtorque_end_time-sendtorque_start_time) * 1e-6;
             }
+#else // BH280_ONLY
+	    wam->unlock("control_loop");
 #endif // ! BH280_ONLY
 
             // spend some time checking the F/T sensor and BH280 hand
@@ -1170,7 +1174,7 @@ CONTROL_DONE:
         }
 #endif // BH280_ONLY
     }
-    ROS_DEBUG("Control loop finished");
+    ROS_ERROR("Control loop finished");
 
 #ifdef __LATENCY__
     FILE* fp = fopen("latencies_dir/latencies", "w");
