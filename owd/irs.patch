@@ -1,0 +1,39 @@
+# to apply patch:
+# move the patch into the directory that contains owd
+# patch -p0 < irs.patch
+diff -rup -x .svn -x xenomai -N owd/openwam/WAM.hh /home/ubuntu/ros/ros-pkg-irs/owd/openwam/WAM.hh
+--- owd/openwam/WAM.hh	2009-07-08 08:39:34.000000000 -0700
++++ /home/ubuntu/ros/ros-pkg-irs/owd/openwam/WAM.hh	2009-06-09 15:32:04.000000000 -0700
+@@ -17,7 +17,7 @@
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+ //LLL
+-//#define BUILD_FOR_SEA
++#define BUILD_FOR_SEA
+ 
+ #include <semaphore.h>
+ #include <list>
+@@ -86,6 +86,7 @@ public:
+ 
+ class WAM{
+ public:
++  /*
+   static const double mN1 = 41.782;  //joint ratios
+   static const double mN2 = 27.836;
+   static const double mN3 = 27.836;
+@@ -93,6 +94,15 @@ public:
+   static const double mN5 =  9.68163;
+   static const double mN6 =  9.68163;
+   static const double mN7 = 14.962;
++  */
++
++  static const double mN1 = 41.891; 
++  static const double mN2 = 27.662;
++  static const double mN3 = 27.662;
++  static const double mN4 = 17.718;
++  static const double mN5 = 9.64756;
++  static const double mN6 = 9.64756;
++  static const double mN7 = 15.577;
+   static const double mn3 = 1.68;
+   static const double mn6 = 1.00;
+ 

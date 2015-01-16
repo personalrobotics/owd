@@ -1,0 +1,21 @@
+<package>
+  <description brief="OpenWAM driver">
+     ROS driver for the Barrett WAM
+  </description>
+  <author>Mike Vande Weghe (vandeweg@cmu.edu)</author>
+  <url>http://personalrobotics.ri.cmu.edu/intel-pkg/owd/html/index.html</url>
+  <license>LGPL</license>
+  <review status="released" notes="approved on 3/13"/>
+  <export>
+    <cpp cflags="-I${prefix}"/>
+  </export>
+  <depend package="roscpp"/>
+  <depend package="std_msgs"/>
+  <depend package="owd_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="tf"/>
+  <rosdep name="libblas-dev"/>
+  <rosdep name="liblapack-dev"/>
+  <rosdep name="gfortran"/>
+  <rosdep name="libxenomai-dev"/>
+</package>

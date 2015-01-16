@@ -1,0 +1,511 @@
+/**
+\mainpage
+\htmlinclude manifest.html
+
+<b>%OWD</b> is a ROS driver for controlling a Barrett %WAM Arm and/or model 280 Hand.
+
+\section downloading Downloading
+The %OWD ROS package, and its owd_msgs dependency, can be obtained via
+svn from
+\verbatim
+https://svn.personalrobotics.ri.cmu.edu/public/latest/owd
+https://svn.personalrobotics.ri.cmu.edu/public/latest/owd_msgs
+\endverbatim
+
+\section dependencies Dependencies
+%OWD requires either a Peak or an ESD CanBUS card.  The Peak
+IPEH-002066 (single channel) or IPEH-002067 (dual channel) card is
+recommended for desktop systems running Xenomai, while the Peak
+IPEH-002093 performs well on laptops if Xenomai is not required.
+
+The Peak Linux driver can be obtained from
+  \b http://www.peak-system.com/fileadmin/media/linux/files/peak-linux-driver-7.7.tar.gz
+More information about this driver, along with other versions, can be found at
+  \b http://www.peak-system.com/fileadmin/media/linux/index.htm
+
+Build it as follows:
+\verbatim
+  sudo apt-get install libpopt-dev
+  make NET=NO RT=NO_RT
+  sudo make install
+  sudo modprobe pcan
+\endverbatim
+(if you are trying to build the RT version of %OWD, substitute
+RT=XENOMAI in place of RT=NO_RT)
+
+The remaining system dependencies can be installed using rosdep once
+you have owd in your ROS_PACKAGE_PATH:
+\verbatim
+rosdep install owd
+\endverbatim
+
+\section building Building
+Make sure you have both the owd and owd_msgs directories in your
+ROS_PACKAGE_PATH, and then build owd using rosmake:
+\verbatim
+rosmake owd
+\endverbatim
+
+Seven executables will be created:
+ - \b owd Driver for arm only
+ - \b owdrt Driver for arm running under Xenomai RT
+ - \b owdbhd Driver for arm plus 280 Hand
+ - \b owdbhdrt Driver for arm plus 280 Hand (Xenomai)
+ - \b canbhd Driver for 280 Hand only
+ - \b canbhdrt Driver for 280 Hand only (Xenomai)
+ - \b owdsim Simulation driver for testing clients offline
+
+\section configuration Configuring
+\b owd.launch is a sample launch file for staring owd using \b
+roslaunch.  The following parameters are supported:
+
+ - \b ~/canbus_number Numeric id of the canbus device, appended to
+   "/dev/pcan" for Peak cards or "/dev/can" for ESD cards.
+
+ - \b ~/hand_type Type of hand installed.  Should be one of:
+   - \b 260 For a BH260 Hand (serial communication)
+   - \b 280 For a BH280 Hand (%CANbus communication)
+   - \b 280+TACT For a BH280 Hand with the fingertip tactile arrays installed
+   - \b none For no hand installed
+
+ - \b ~/forcetorque_sensor Whether the Barrett Force/Torque sensor is
+   installed (\e true/false)
+
+ - \b ~/calibration_file A string specifying a file to keep on disk of
+   the joint calibration values (see the \ref calibration section
+   below)
+
+ - \b ~/home_position A comma-separated list of joint values, in
+   radians, of the configuration of the arm when the encoder values
+   have been lost and the home position needs to be reset.
+
+ - \b ~/tactile_top10 If set to \e true will only report 4-bit values for
+   the 10 ten pressures in each tactile array.  Default is \e false (all
+   values are reported as 12-bit numbers).  Setting to \e true reduces
+   the communication demands on the CAN bus, but does not increase the
+   maximum frequency that the sensors can be read, since most of the
+   time is waiting for the hand pucks to gather the tactile data.
+
+ - \b ~/hold_starting_position If set to \e true will hold the current
+   position immediately at startup.  Defaults to \e false, in which case
+   it will start up with only gravity compensation leaving the arm free
+   to move.
+
+ - \b ~/slip_joints_on_high_torque If set to \e true will allow the
+   joints to slip when high motor torques are applied. When a joint torque
+   exceeds the threshold, the joint setpoint is moved to reduce the
+   torque. This option is only valid when in gravity compensation and not
+   during any trajectory executions.
+ 
+ - \b ~/modified_j1 If set to \e true %OWD expects that joint 1 has been
+   remounted at 180 degrees from the original, as is done for Herb's
+   configuration.  Defaults to \e false (factory configuration).
+
+ - \b ~/wam_publish_frequency Rate at which the wamstate and waminternals
+   messages are published, in hertz.  Also governs the rate at which
+   a plugin's Publish() function is called.  Default is 10, max is 500.
+
+ - \b ~/hand_publish_frequency Rate at which the handstate messages
+   are published, in hertz, if a model 280 hand is installed.
+   Default is 10, max is 40.
+
+ - \b ~/ft_publish_frequency Rate at which the forcetorque
+   messages are published, in hertz.  Default is 10, max is 500.
+
+ - \b ~/tactile_publish_frequency Rate at which the tactile
+   messages are published, in hertz.  Default is 10, max is 40.
+
+ - \b ~/owd_plugins A comma-separated list of shared library files to
+   be loaded.  See the \subpage plugins documentation for more info.
+
+ - \b ~/log_controller_data If set to \e true %OWD will create log files
+   of the position, torques, etc in /tmp anytime it is holding position
+   or executing a trajectory.  Default is \e false.
+
+ - \b ~/log_canbus_data If set to \e true %OWD will log all the messages
+   sent and received on the CANbus and dump them to the file candata%%.log
+   in the current directory at the end of the run, where %% is the
+   canbus_number.  Defaults to \e false.
+
+ - \b ~/gravity_vector The vector describing the direction that gravity
+   is acting on the arm, expressed as a string of three comma-separated
+   floating-point numbers in the wam0 frame.  Default is "-1,0,0", which
+   is the configuration used on Herb and the Darpa ARM-S arms, with the
+   base mounted vertically so the cables exit down.  For a WAM arm
+   mounted horizontally on a tabletop, use "0,0,-1".
+
+ - \b ~/ignore_breakaway_encoders If true, the values of the secondary
+   encoders on an optionally-installed BH280 hand will be ignored and
+   will not be used to detect breakaway (due to hardware issues, many
+   BH280 hands do not have reliable secondary encoder readings).  When
+   breakaway detection is disabled the \b inner_links, \b outer_links,
+   and \b breakaway arrays in the WAMState message will be zero
+   length.  Defaults to false.
+
+\section running Running
+
+At this time %OWD should be launched on the same machine it will run
+on, since it requires stdio for startup prompts.
+
+\verbatim
+roslaunch owd.launch
+\endverbatim
+
+No more than one %OWD should be started from a single roslaunch file
+so that the stdio from each remains independent.
+
+If the motor encoder values have not been preserved from a previous
+run, owd will ask you to first move the hand to a safe space for
+initialization, and then to move the arm to its home position.  You
+can choose the home position to be something convenient based on how
+your %WAM is mounted, but in general it's good to have as many joints
+as possible against one of their stops for repeatability.  As long as
+you match the joint angles specified in the <em>home_position</em> ROS
+parameter, owd be able to successfully set the correct joint angles.
+For more accurate joint angle calibration, see the \ref calibration
+section for details on preserving calibration values in a file.
+
+\section controlling Controlling
+
+The most common way of using %OWD is send it jointspace trajectories
+that define the path of the arm.  %OWD does not do any self-collision
+or environment collision checking, so that responsibility lies with
+the client sending the trajectory.  The following ROS Service Calls
+are supported for manipulating trajectories:
+
+ - \b AddTrajectory: Adds a new joint trajectory to the queue.  Options:
+   - opt_WaitForStart: Initializes the trajectory in the Paused state;
+     you can start the trajectory by calling PauseTrajectory with a
+     value of zero.
+   - opt_CancelOnStall: Aborts the trajectory if the arm stalls (normally
+     %OWD will try to resume a stalled trajectory automatically).
+   - opt_CancelOnForceInput: Aborts the trajectory if the force/torque
+     sensor reports a force or torque that exceeds the threshold set by
+     the owd/SetForceInputThreshold service.
+\note If the arm is idle (has 0 stiffness), and %OWD receives a
+      trajectory, then the stiffness will be set to 1 and the
+      trajectory will be run, as long as the starting point matches.
+      There is no "get stiffness" call.  However, the state field in
+      the wamstate message gives an indication of whether stiffness
+      is zero (state_free) or non-zero (state_fixed or one of the
+      trajectory states).
+
+ - \b PauseTrajectory: Pauses / unpauses the currently-running trajectory
+
+ - \b DeleteTrajectory: Deletes the specified trajectory from the
+   queue.  If the current trajectory is deleted then the arm will stop
+   where it is.  Any queued trajectories following the deleted one
+   will also be deleted if their start position does not match the
+   current position (if the current trajectory was deleted) or the end
+   position of the previous trajectory (if a queued trajectory was
+   deleted)
+
+ - \b CancelAllTrajectories: Always brings the arm to an immediate
+   stop by deleting the current trajectory and all queued
+   trajectories.
+
+ - \b ReplaceTrajectory: Replaces a queued trajectory with a new one.
+   If the end position changes, then any subsequent trajectories
+   already in the queue will be deleted.
+
+<!--  rough notes to be cleaned up and added:
+ The blend radius is in radians, and it describes the radius of
+curvature of a circular blend that connects the two adjacent straight
+segments.  Remember this is all happening in 7-DOF jointspace, but any
+two intersecting 7-dimensional straight segments will always be
+coplanar, and the blend lies in that plane.  The blend changes the path
+that the arm will take (in both jointspace and workspace), of course, so
+it's up to you to make sure that the blended path is still
+collision-free.  Also, by adding the blend you are effectively
+shortening the segments, so you have to make sure that the size of the
+blend at each end does not shrink the segment to zero (or negative)
+length.  If %OWD starts processing the trajectory and discovers that the
+blend radii are incompatible with the segment distances, it will throw
+out the blends and just run it as an unblended trajectory, which will
+require V=0 at each segment intersection.
+-->
+
+
+A few additional service calls are provided for manipulating %OWD:
+
+ - \b SetStiffness: Controls how firmly %OWD will try to hold the
+   current position, on a scale from 0 (no holding at all) to 1
+   (firmly holding).
+\attention Stiffness values between 0 and 1 are still kind of
+      experimental.  The stiffness basically just scales back the
+      amount of %PID torque being added in.  It is not recommended
+      trying to run trajectories with anything other than stiffness 1.
+      However, a stiffness of 0.2 or so may be useful when holding
+      position if you expect people to be interacting with the arm
+      (like taking an object from the closed hand).
+\note %OWD has a feature that lets you "override" the held position of
+      any of the joints by physically moving the arm.  Some of them
+      take more force than others, but basically it comes down to the
+      safety torque thresholds set in the
+      WAM::safety_torques_exceeded() function in openwam/WAM.cc.
+      During hold position mode if %OWD notices that any of the %PID
+      torques exceed their threshold it will "slide" the target
+      position towards the current position until the torques are back
+      under the threshold.  Basically, %OWD trys to keep from ever
+      exerting a lot of force in order to keep things safe for people
+      nearby, so held positions will yield to force, and trajectories
+      will slow down or stop instead of pushing harder.
+
+
+ - \b SetSpeed: Sets the max speed of each joint.  Note that there are
+   compiled-in joint velocity limits which prevent the speed from
+   being set to an unsafe value.
+
+ - \b SetExtraMass: Adds the specified mass properties (mass, COG, and
+   inertia) to the specified link, so that %OWD can better compensate
+   for a heavy object that is held by the hand or otherwise attached
+   to the arm.  When the object is released this call should be
+   repeated with mass and inertia of zero.
+
+ - \b SetStallSensitivity: Specifies how sensitive %OWD is to
+   detecting stalling of the arm while executing trajectories, on a
+   scale of 0 to 1.  The PID correction torques for each joint are
+   multiplied by the stall sensitivity before being compared against
+   the safety_torque threshold values.  Defaults to 1.0, the most
+   sensitive setting.
+
+ - \b SetForceInputThreshold: Sets the termination criteria for
+   trajectories having the CancelOnForceInput option set.  Takes three
+   arguments:
+   - \b direction is a unit vector in the force/torque coordinate frame
+    (which is in the same orientation as the hand frame)
+   - \b force is a scalar representing the threshold value, in Newtons
+   - \b torque is a vector of the three torques
+   The values you set will remain set until you change them again.  The
+   initial value is (0,0,-1) and 6 (six Newtons of force pressing in
+   towards the palm).
+
+ - \b SetTactileInputThreshold: Sets the termination criteria for
+   trajectories having the CancelOnTactileInput option set.  Takes four
+   arguments:
+   - \b pad_number is the tactile pad that should be watched (1-3 for
+   the three fingers or 4 for the palm)
+   - \b threshold is value that tactile cells will be compared to
+   - \b minimum_cells is the minimum number of cells in a pad that must
+        reach the threshold for a pad to be considered pressed
+   - \b minimum_readings is the number of successive times a pad must
+        register as pressed before the trajectory is stopped
+
+ - \b GetArmDOF: Returns the number of joints
+
+ - \b CalibrateJoints: Puts the arm into <b>Calibration Mode</b>, so
+   that the joints can be calibrated using the text interface on
+   stdin/stdout.
+
+ - \b SetJointOffsets: Adds the specified angles (in radians) to each
+   reported joint value.  This service is intended to adjust the arm
+   calibration online based on an external calibration node.  If a
+   trajectory is active, the command will fail and return ok set to
+   false.  If the SetStiffness value is nonzero, the held position
+   value will also be adjusted by the offset so that the arm does not
+   physically move.  The offset will affect everything in OWD,
+   including the gravity compensation torques, so a large sudden
+   offset will cause a jump in torques that will make the arm briefly
+   spasm until the controllers stabilize (to avoid this, apply a large
+   offset by making successive service calls with slowly increasing
+   offset values).  Set the joint offsets back to zero to restore the
+   initial calibration values.
+
+%OWD can also be controlled by sending velocities directly to one or
+more of the joints.  Once again, %OWD does not do any collision
+checking, so the responsiblity lies with the client to avoid sending
+velocity commands that will crash the arm into things.  If the
+requested velocity is not equal to the current velocity, %OWD will
+(de)accelerate at the maximum acceleration limit for that joint until
+the velocities match.  If a new velocity command is not received for
+more than 100ms, %OWD will bring the arm to a controlled stop (the
+assumption is that the client has died or given up).  Velocity
+commands should be published to the following topic:
+
+ - \b wamservo (type owd_msgs/Servo): A vector of one or more joint
+   indices followed by a vector of corresponding velocities in
+   radians/sec.  Note: joint indices are 1 based.
+
+%OWD provides feedback through the following ROS topics:
+
+ - \b wamstate: %Joint positions, velocities, estimated torques due to
+   external forces, and the state of the trajectory queue
+
+ - \b waminternals: %Joint positions, total joint torques, feedforward
+   torques from the dynamic simulators, and controller %PID gain
+   values
+
+ - \b filtered_forcetorque: A geometry_msgs/Wrench message containing
+   the values from the force/torque sensor after being filtered by
+   a second-order Butterworth lowpass filter with a cutoff frequency
+   of 10hz.  This topic is only present if the sensor is installed.
+
+ - \b forcetorque: The raw unfiltered values from the force/torque
+   sensor (only published if the sensor is installed).
+
+Additionally, %OWD publishes a TF frame for every link, defining \b
+wam1 in terms of \b wam0, \b wam2 in terms of \b wam1, etc, all the
+way up to \b wam7 in terms of \b wam6.
+
+Autogenerated documentation can be found here for the 
+<a href="http://personalrobotics.ri.cmu.edu/pr-ros-pkg/owd/html/index-msg.html">owd</a> and
+<a href="http://personalrobotics.ri.cmu.edu/pr-ros-pkg/owd_msgs/html/index-msg.html">owd_msgs</a>
+ROS message and service types.
+
+\section barretthand Barrett Hand
+
+%OWD has integrated support for controlling a model 280 Barrett Hand
+attached to the arm.  See the \subpage bhand page for more
+information.
+
+\section customizing Customizing
+
+%OWD allows users to add new features via run-time loadable plugins.
+ See the \subpage plugins page for details.
+
+\section shutdown Shutting down
+
+To shut down %OWD and still preserve the encoder values, first press
+shift-idle on the pendant, then kill %OWD with ctrl-c.  As long as the
+yellow Idle button stays lit, %OWD can be restarted without having to
+return the %WAM to the home position.
+
+If the safety board ever shuts down the %WAM due to a torque or
+velocity fault (red error light), the yellow idle button stays lit,
+meaning the encoder values are still valid.  You can resume operation
+by killing %OWD with ctrl-c, pressing shift-idle again to clear the
+error, and restarting %OWD.
+
+\section calibration Calibration
+
+To accurately calibrate each of the joints so that their positions can be recalled for future runs, do the following:
+
+- launch owd
+
+- make a call to the service \b /owd/CalibrateJoints to put the driver into calibration mode
+
+- %OWD will print keyboard instructions and then start a display of joint angles.
+
+- Use a bubble level on the %WAM links to align each joint
+  -# Start by aligning J1 to be a multiple of 90 degrees.
+    - If your %WAM is mounted with the baseplate horizontal, you'll
+      have to pick where you want the J1 zero orientation.  A good
+      location is where the alignment marks line up with one another.
+    - If your %WAM is mounted with the baseplate vertical, use a level
+      on the upper arm link, and rotate J1 until the link is either
+      out to one side and level, or straight up and plumb.
+  -# When it's in position, press "1" on the keyboard.  %OWD will
+     suggest the nearest 90-deg multiple to set it to, and ask you to
+     confirm with "y".
+  -# Repeat with the remaining joints, starting with 2 and continuing
+     up to 7.
+  -# To aid in aligning the latter joints, %OWD allows you to "hold" a
+     joint at a particular angle by pressing "h" and the joint number.
+     - For example, to align joint 4, first hold joint 2 so that it's
+       horizontal, then put the level on the lower arm and move J4
+       until it's horizontal, too.
+     - If the joint is with 2 degrees of a multiple of 90, the joint
+       will "snap" to the neared 90 degrees; otherwise, it will be
+       held exactly where it is.
+  -# Joints may be unheld by pressing "u" and the joint number.
+  -# Because of possible inaccuracies in the transmission ratios, it
+     is recommended that you set each joint near the center of its
+     range, so that any error near the two joint stops is
+     approximately equal.
+
+- When you are satisfied with your new calibration values, press "d"
+  (for "done")
+  -# %OWD will ask you to return the %WAM to its home position so that
+      the calibration offsets can be recorded.  Move it to home, hold
+      it steady, and press shift-idle.
+  -# %OWD will wait briefly for the position to stabilize, then
+      measure the calibration offsets and write them to the file
+      specified in the launch file.
+  -# Once it is done, you can press shift-activate to resume %OWD.
+
+- If you want to abort the calibration, press "q" (for "quit") and the
+  calibration routine will exit.
+
+<b>Calibration Details:</b>
+
+- The WAM has encoders only on the motors, and the transmissions
+  between the motors and the joints mean that the motor rotates
+  multiple times (between 10 and 42 times) for a single revolution of
+  a joint.  The pucks on each motor keep track of both the motor's
+  actual rotor position (14-bit property MECH) and the estimated joint
+  position (22-bit property AP ("absolute position")).
+
+- The MECH property value cannot be set; it is the absolute position
+  of the rotor, and only changes when the rotor turns.  The AP value
+  can be set to whatever we want, and thereafter it will increment or
+  decrement by the same amount that MECH changes.  As the MECH value
+  wraps around, AP keeps going without wrapping (at least when it has
+  been set to a reasonable initial value).
+
+- The correct mapping between MECH and AP is unique for each WAM, and
+  is a function of how the encoder and pinion were mounted on the
+  rotor as well as the cable length and tension.  But once the mapping
+  between MECH and AP is measured for a particular joint on a
+  particular WAM, it is relatively constant.
+
+- The "wam_joint_calibrations" file records the mapping between MECH
+  and AP for each joint, taken at a particular WAM position.  The
+  format of the file is:
+\verbatim
+<joint number> = <distance> <MECH>
+where distance = AP-MECH
+\endverbatim
+
+- As long as a WAM joint motor is within half a revolution of of the
+position that the mapping was recorded, the mapping can be restored by
+setting AP equal to the current MECH plus the distance in the
+calibration file.  This restores the joint value to the resolution of
+the precise encoder tick as what it was when last calibrated.  The
+MECH value is recorded in the file so that %OWD can be sure of using
+the right starting position even if we are near the roll-over point
+for the motor encoder.  For example, if the mapping was measured with
+MECH equal to 4020, and the current MECH is 63, it realizes that it's
+more likely we've rotated 139 ticks \e past the original spot (4096 -
+4020 + 63) than 3957 ticks \e before (4020 - 63).
+
+- If the calibration file exists, then %OWD will use it exclusively,
+  and will not use the home_position values at all.  %OWD just assumes
+  you have moved the joints to the right position when it asks you to,
+  and once it applies the offsets from the calibration file the right
+  joint values come about automatically.  The only time that the
+  home_position values are required is when there is no calibration
+  file at all.  In that case, after %OWD asks you to move to the home
+  position it will set the joints to be exactly those values.
+
+- The right way to start %OWD on a new WAM is to set the home_position
+  parameter to the startup configuration you are going to use, and set
+  the wam_joint_calibrations so that it has a valid pathname but
+  points to a file that does not yet exist.  The WAM will start up
+  with your home position values and should be reasonably good (it
+  certainly should not velocity-fault because of gravity compensation
+  errors).  Once you perform a calibration, the results will be saved
+  to the specified pathname, and thereafter %OWD will just use the
+  mapping in the file, ignoring the home_position value.
+
+
+
+\section develoment Development
+
+Development of %OWD is handled by the collaboration of its users.  See
+the \subpage development page for the current task list and schedule.
+
+\section owdnews New Features
+
+Announcements of new features and bug fixes are listed on the
+\subpage news page.
+
+\section owdusers Mailing List
+
+To stay up-to-date with new feature announcements and discussions,
+subscribe to the owd-users mailing list at
+https://lists.andrew.cmu.edu/mailman/listinfo/owd-users
+
+\verbatim
+Copyright 2010-2012 Carnegie Mellon University and Intel Corporation
+\endverbatim
+*/

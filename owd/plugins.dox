@@ -1,0 +1,105 @@
+/**
+\page plugins OWD Plugins
+
+With %OWD plugins you can extend the behavior of %OWD without having to
+modify the distributed code.  This allows you to easily stay on top of
+%OWD updates, as well as share your improvements with other %OWD users.
+Furthermore, the plugin architecture speeds the development cycle,
+since you do not have to recompile %OWD every time you make a change.
+
+\section plugin_what What they can do
+
+Plugins for %OWD have access to all of the sensor values and motion
+commands for the %WAM, Barrett Hand, and Force/Torque sensor.  They can
+directly interpolate sensor readings without the delays and bandwidth
+limitations of ROS messages, perform calculations using %OWD's own
+internal functions, and command hand and arm motions in ways that are
+not supported by %OWD's standard interfaces.  Additionally, plugins can
+create their own ROS interfaces for publishing data, receiving
+external sensor values, and accepting custom service calls.  In short,
+the plugin interface allows users to experiment with %WAM control
+without having to modify %OWD on their own.
+
+\section plugin_how How they work
+
+%OWD plugins are simply Linux shared libraries that define the following
+two functions:
+
+\verbatim
+bool register_owd_plugin()
+void unregister_owd_plugin()
+\endverbatim
+
+Upon loading the plugin, %OWD will call the register_owd_plugin
+function, which gives the plugin the opportunity to initialize itself
+and start running.  Plugins interface with %OWD through the OWD::Plugin
+class, which provides read-only copies of all the sensor values and
+functions for motion control of the arm and hand.  Plugins can either
+make use of %OWD's callback functionality for regular updates via the
+OWD::Plugin::Publish function, or they can create their own threads.
+Plugins can also create their own trajectory types and ask that %OWD
+execute them.  When %OWD shuts down it will call the
+unregister_owd_plugin function so that the plugin can terminate its
+own ROS services and clean up.
+
+Plugins are specified to %OWD via the \b ~/owd_plugins ROS parameter,
+which should contain a comma-separated list of shared libraries (full
+pathname recommended).  %OWD will send INFO level ROS log messages as each
+plugin is loaded and registered.
+
+\section plugin_writing Writing an OWD plugin
+
+A plugin should be created as its own ROS package, with a
+manifest-specified dependency on owd.  The CMakeLists.txt file should
+contain a rosbuild_add_library() directive to create the shared
+library.  As long as the library contains the functions
+register_owd_plugin and unregister_owd_plugin (described above), it
+will be compatible with %OWD.
+
+A typical plugin will include the following files:
+
+\verbatim
+#include <openwam/Plugin.hh>
+#include <openwam/Trajectory.hh>
+#include <ros/ros.h>
+\endverbatim
+
+This will give the plugin access to the OWD::Plugin class (for
+interfacing to %OWD) and the OWD::Trajectory class (for deriving custom
+%OWD trajectories).  For automatic periodic calls to the plugin, users
+can subclass the OWD::Plugin class and override the Publish()
+function.  Your Publish() function will be called at the rate defined
+by %OWD ROS parameter \b ~/publish_frequency.  In this way you can
+perform your own calculations on the %WAM state and publish the values
+to other ROS nodes or even to non-ROS clients.
+
+Custom trajectories are defined by subclassing the OWD::Trajectory
+class.  Typically, a plugin will create its own ROS service for
+handling trajectory requests, which will create trajectory instances
+and add them to the %OWD queue.  Once %OWD begins execution of the
+trajectory, it will call the evaluate function until the trajectory
+transitions from state RUN to state DONE.  Although a trajectory is
+usually thought of as a timed path from start_position to
+end_position, it can also be a long-running behavior that, for
+instance, servos the %WAM based on sensor data that you are receiving
+on a ROS topic.  Or a trajectory could be a data-gathering device for
+recording positions and forces while a user manually moves the arm.
+
+A good practice is to tie the ROS topic / service handlers to the
+classes that use them.  Thus, a user's own Trajectory class might
+define a static AddTrajectory() member that services new trajectory
+requests.  In this way all the code related to creating and running
+the trajectory is contained within a single class.
+
+\section plugin_examples Example plugin
+
+The <a href=http://personalrobotics.ri.cmu.edu/intel-pkg/owd_plugin_example/html/index.html>owd_plugin_example</a>
+node is a fully documented sample %OWD plugin which users are
+encouraged to modify as a starting point for their own plugins.
+
+\verbatim
+Copyright 2011-2012 Carnegie Mellon University and Intel Corporation
+\endverbatim
+
+*/
+

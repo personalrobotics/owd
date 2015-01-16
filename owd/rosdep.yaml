@@ -1,0 +1,8 @@
+libblas-dev:
+  ubuntu: libblas-dev
+liblapack-dev:
+  ubuntu: liblapack-dev
+gfortran:
+  ubuntu: gfortran
+libxenomai-dev:
+  ubuntu: libxenomai-dev
