@@ -1,0 +1,8 @@
+string traj
+string id
+string xml_id
+bool synchronize
+---
+bool ok
+string reason
+string id
