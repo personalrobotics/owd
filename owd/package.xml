@@ -15,10 +15,10 @@
   <build_depend>owd_msgs</build_depend>
   <build_depend>geometry_msgs</build_depend>
   <build_depend>roscpp</build_depend>
+  <build_depend>rosconsole</build_depend>
   <build_depend>gfortran</build_depend>
   <build_depend>ncurses</build_depend>
   <build_depend>tf</build_depend>
-  <build_depend>libpcan</build_depend>
   <build_depend>libblas-dev</build_depend>
   <build_depend>liblapack-dev</build_depend>
   <build_depend>libxenomai-dev</build_depend>
@@ -27,8 +27,8 @@
   <run_depend>geometry_msgs</run_depend>
   <run_depend>message_runtime</run_depend>
   <run_depend>roscpp</run_depend>
+  <run_depend>rosconsole</run_depend>
   <run_depend>gfortran</run_depend>
   <run_depend>ncurses</run_depend>
   <run_depend>tf</run_depend>
-  <run_depend>libpcan</run_depend>
 </package>

@@ -3,6 +3,7 @@ find_package(catkin REQUIRED COMPONENTS
     owd_msgs
     std_msgs
     geometry_msgs
+    rosconsole
     roscpp
     tf
 )
@@ -29,11 +30,8 @@ if (CANBUS_TYPE STREQUAL "ESD")
     set(CANBUS_LDFLAGS "-L../../esdcan-pci200/lib32")
 elseif (CANBUS_TYPE  STREQUAL "PEAK")
     message(STATUS "using PEAK CANbus driver")
-    find_package(libpcan)
-    link_directories(${libpcan_LIBRARY_DIRS})
-    include_directories(${libpcan_INCLUDE_DIRS})
-    set(CANBUS_DEFS "${libpcan_DEFINITIONS} -DPEAK_CAN")
-    set(CANBUS_LIBS "${libpcan_LIBRARIES}")
+    set(CANBUS_DEFS "-DPEAK_CAN")
+    set(CANBUS_LIBS "pcan")
 else ()
     message(STATUS "No CANbus type recognized; only building owdsim.")
     set(CANBUS_DEFS "")

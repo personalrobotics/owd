@@ -31,6 +31,8 @@ set(OPENWAM_IMPL_SOURCE
 )
 set(OPENWAM_TARGETS openwamsim)
 
+add_definitions("-O0 -ggdb3 -DWRIST -DRT_STATS")
+
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     list(APPEND OPENWAM_TARGETS openwam wamcan bhdcan)
 
