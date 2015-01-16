@@ -1,0 +1,6 @@
+int32 joint
+float64 torque
+---
+bool ok
+string reason
+uint32 id
