@@ -1,0 +1,8 @@
+int32 joint
+float64 max_torque
+float64 max_step
+float64 hold_time
+int32 num_samples
+---
+owd_plugins/CogSample[] data
+
