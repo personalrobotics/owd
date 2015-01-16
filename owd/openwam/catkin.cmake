@@ -35,6 +35,7 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     list(APPEND OPENWAM_TARGETS openwam wamcan bhdcan)
 
     add_library(openwam STATIC ${OPENWAM_SOURCE})
+    add_dependencies(openwam owd_msgs_generate_messages_cpp)
 
     add_library(wamcan STATIC ${OPENWAM_IMPL_SOURCE} CANbus.cc)
     add_dependencies(wamcan owd_msgs_generate_messages_cpp)

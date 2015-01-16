@@ -69,6 +69,7 @@ set(OWD_LIBS
 set(OWD_TARGETS owdsim)
 
 add_executable(owdsim owd.cpp openwamdriver.cpp)
+add_dependencies(owdsim owd_msgs_generate_messages_cpp)
 target_link_libraries(owdsim openwamsim ${OWD_LIBS})
 set_target_properties(owdsim PROPERTIES COMPILE_FLAGS "-DOWDSIM")
 
@@ -77,6 +78,7 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
     # ROS Nodes.
     add_executable(owd ${OWD_SOURCE})
+    add_dependencies(owd owd_msgs_generate_messages_cpp)
     target_link_libraries(owd wamcan ${OWD_LIBS} ${CANBUS_LIBS})
     set_target_properties(owd PROPERTIES
         COMPILE_FLAGS "${CANBUS_DEFS}"
@@ -84,6 +86,7 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
     )
 
     add_executable(canbhd ${OWD_SOURCE})
+    add_dependencies(canbhd owd_msgs_generate_messages_cpp)
     target_link_libraries(canbhd wamcan ${OWD_LIBS} ${CANBUS_LIBS})
     set_target_properties(canbhd PROPERTIES
         COMPILE_FLAGS "${CANBUS_DEFS} -DBH280 -DBH280_ONLY"
@@ -94,6 +97,7 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
         list(APPEND OWD_TARGETS owdrt canbhdrt)
 
         add_executable(owdrt ${OWD_SOURCE})
+        add_dependencies(owdrt owd_msgs_generate_messages_cpp)
         target_link_libraries(owdrt wamcanrt ${OWD_LIBS} ${CANBUS_LIBS} ${RT_LIBS})
         set_target_properties(owdrt PROPERTIES
             COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS}"
@@ -101,6 +105,7 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
         )
 
         add_executable(canbhdrt ${OWD_SOURCE})
+        add_dependencies(canbhdrt owd_msgs_generate_messages_cpp)
         target_link_libraries(canbhdrt wamcanrt ${OWD_LIBS} ${CANBUS_LIBS}
                                        ${RT_LIBS})
         set_target_properties(canbhdrt PROPERTIES
@@ -121,8 +126,13 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
     list(APPEND OWD_TARGETS owd_test synctest owd_traj_timer)
     add_executable(owd_test test.cpp)
+    add_dependencies(owd_test owd_msgs_generate_messages_cpp)
+
     add_executable(synctest synctest.cpp)
+    add_dependencies(synctest owd_msgs_generate_messages_cpp)
+
     add_executable(owd_traj_timer owd_traj_timer.cpp)
+    add_dependencies(owd_traj_timer owd_msgs_generate_messages_cpp)
     target_link_libraries(owd_traj_timer openwam)
 
     # Puck Utilities.
