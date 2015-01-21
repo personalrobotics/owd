@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<package>
+  <name>pantilt</name>
+  <version>0.0.1</version>
+  <description>
+    Modified version of OWD for controlling HERB's pan-tilt head.
+  </description>
+  <maintainer email="mdawsonh@cs.cmu.edu">Michael Dawson-Haggerty</maintainer>
+  <author email="vandeweg@cmu.edu">Mike Vande Weghe</author>
+  <license>LGPLv2.1</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>owd_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>rosconsole</build_depend>
+  <build_depend>gfortran</build_depend>
+  <build_depend>ncurses</build_depend>
+  <build_depend>tf</build_depend>
+  <build_depend>libblas-dev</build_depend>
+  <build_depend>liblapack-dev</build_depend>
+  <build_depend>libxenomai-dev</build_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>owd_msgs</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>message_runtime</run_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>rosconsole</run_depend>
+  <run_depend>gfortran</run_depend>
+  <run_depend>ncurses</run_depend>
+  <run_depend>tf</run_depend>
+</package>
