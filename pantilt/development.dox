@@ -1,0 +1,116 @@
+/**
+\page development
+
+\section schedule Development Schedule
+<em>Recently completed tasks are announced on the \subpage news page.</em>
+
+Currently scheduled tasks:
+  <table border="0" cellpadding="2" cellspacing="3">
+    <tr>
+      <th width="120" align="left">Date</th>
+      <th width="120" align="left">Assigned to</th>
+      <th align="left">Description and estimate</th>
+    </tr>
+    <tr>
+      <td>06-May-2011</td>
+      <td>vandeweg</td>
+
+      <td><b>breakaway positions</b> publish breakaway detection
+          settings for the three fingers.  Requires querying
+          additional finger puck parameters.</td>
+
+    </tr>
+  </table>
+
+Additional unscheduled tasks:
+  <table border="0" cellpadding="2" cellspacing="3">
+    <tr>
+      <th width="120" align="left">Date</th>
+      <th width="120" align="left">Assigned to</th>
+      <th align="left">Description and estimate</th>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+
+      <td><b>auto-calibration</b> Determine startup calibration for
+          J5/J6/J7 automatically by moving the joints to their limits
+          in a safe way.  Requires resurrecting code that Mike had
+          working on the previous Herb configuration.</td>
+
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+
+      <td><b>transmission ratio parameterization</b> Allow the
+          transmission ratios to be set via ROS parameters or from a file
+          so that they can be calibrated for each individual WAM.</td>
+
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+
+      <td><b>absolute joint encoders</b> [3 days] Switch over to using the
+          joint encoders to avoid calibration and achieve better
+          endpoint accuracy.  Requires getting additional puck values
+          and tuning the control gains based on new error scales.
+          Also need to see whether it's necessary to use the motor
+          encoders for interpolation in between joint encoder
+          ticks.</td>
+
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+
+      <td><b>calibration verification (possibly using F/T sensor)</b>
+          Verify the overall arm joint angles by moving joints to
+          their limits and/or watching the F/T sensor values as the
+          hand moves around.  This could be done as a subroutine in
+          openwamdriver.cpp.</td>
+
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+
+      <td><b>update dynamic model based on finger positions</b> The
+          link7 model assumes the CG of the hand is always on-axis,
+          without regard for the finger positions.  Most of the
+          groundwork is in place for the link7 model to update based
+          on the actual finger positions, but it still needs final
+          testing.</td>
+
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+
+      <td><b>calibrate dynamic model</b> write a system-ID routine to
+          improve the inertial parameters of each link.  This could be
+          done outside of %OWD, either online or offline.  Currently
+          we're just using data calculated from the CAD mass
+          models.</td>
+
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+
+      <td><b>recalibration of transmission ratios</b> Automatically
+          check for and adjust the transmission ratios for each joint.
+          Similar work to the joint offset auto-calibration.</td>
+
+    </tr>
+  </table>
+
+\note This page was automatically generated from the file owd/develoment.dox.
+
+\verbatim
+Copyright 2011 Carnegie Mellon University and Intel Corporation
+\endverbatim
+
+*/
+

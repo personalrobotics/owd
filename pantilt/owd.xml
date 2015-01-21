@@ -1,0 +1,73 @@
+<?xml version="1.0" ?>
+
+<launch>
+    <param name="owd/positionInterface/speedLimitJ1" value="3.0"/>
+    <param name="owd/positionInterface/speedLimitJ2" value="3.0"/>
+    <param name="owd/positionInterface/speedLimitJ3" value="3.0"/>
+    <param name="owd/positionInterface/speedLimitJ4" value="3.0"/>
+    <param name="owd/positionInterface/speedLimitJ5" value="5.0"/>
+    <param name="owd/positionInterface/speedLimitJ6" value="5.0"/>
+    <param name="owd/positionInterface/speedLimitJ7" value="20.0"/>
+
+    <param name="owd/JointCtrlSea/j1Kp_safe" value="1800.1"/>
+    <param name="owd/JointCtrlSea/j1Ki_safe" value="0.0"/>
+    <param name="owd/JointCtrlSea/j1Kd_safe" value="10.0"/>
+
+    <param name="owd/JointCtrlSea/j2Kp_safe" value="2000.1"/>
+    <param name="owd/JointCtrlSea/j2Ki_safe" value="0.0"/>
+    <param name="owd/JointCtrlSea/j2Kd_safe" value="20.0"/>
+
+    <param name="owd/JointCtrlSea/j3Kp_safe" value="1200.1"/>
+    <param name="owd/JointCtrlSea/j3Ki_safe" value="0.0"/>
+    <param name="owd/JointCtrlSea/j3Kd_safe" value="10.0"/>
+
+    <param name="owd/JointCtrlSea/j4Kp_safe" value="300.1"/>
+    <param name="owd/JointCtrlSea/j4Ki_safe" value="0.0"/>
+    <param name="owd/JointCtrlSea/j4Kd_safe" value="5.0"/>
+
+    <param name="owd/JointCtrlSea/j5Kp_safe" value="10.01"/>
+    <param name="owd/JointCtrlSea/j5Ki_safe" value="0.0"/>
+    <param name="owd/JointCtrlSea/j5Kd_safe" value="1.5"/>
+
+    <param name="owd/JointCtrlSea/j6Kp_safe" value="15.01"/>
+    <param name="owd/JointCtrlSea/j6Ki_safe" value="0.0"/>
+    <param name="owd/JointCtrlSea/j6Kd_safe" value="0.0"/>
+
+    <param name="owd/JointCtrlSea/j7Kp_safe" value="2.001"/>
+    <param name="owd/JointCtrlSea/j7Ki_safe" value="0.0"/>
+    <param name="owd/JointCtrlSea/j7Kd_safe" value="0.1"/>
+
+
+    <param name="owd/JointCtrlSea/j1Limit" value="15.0"/>
+    <param name="owd/JointCtrlSea/j2Limit" value="23.7"/>
+    <param name="owd/JointCtrlSea/j3Limit" value="10.0"/>
+    <param name="owd/JointCtrlSea/j4Limit" value="10.4"/>
+    <param name="owd/JointCtrlSea/j5Limit" value="3.0"/>
+    <param name="owd/JointCtrlSea/j6Limit" value="3.0"/>
+    <param name="owd/JointCtrlSea/j7Limit" value="1.7"/>
+
+    <param name="owd/JointCtrlSea/j1Kp" value="450.0"/>
+    <param name="owd/JointCtrlSea/j2Kp" value="500.0"/> 
+    <param name="owd/JointCtrlSea/j3Kp" value="300.0"/>
+    <param name="owd/JointCtrlSea/j4Kp" value="75.0"/>
+    <param name="owd/JointCtrlSea/j5Kp" value="10.0"/>
+    <param name="owd/JointCtrlSea/j6Kp" value="15.0"/>
+    <param name="owd/JointCtrlSea/j7Kp" value="2.0"/>
+
+    <param name="owd/JointCtrlSea/j1Kd" value="10.0"/>
+    <param name="owd/JointCtrlSea/j2Kd" value="20.0"/> 
+    <param name="owd/JointCtrlSea/j3Kd" value="4.9"/>
+    <param name="owd/JointCtrlSea/j4Kd" value="5.0"/>
+    <param name="owd/JointCtrlSea/j5Kd" value="0.39"/>
+    <param name="owd/JointCtrlSea/j6Kd" value="0.1"/>
+    <param name="owd/JointCtrlSea/j7Kd" value="0.1"/>
+
+    <param name="owd/JointCtrlSea/j1Ki" value="0.0"/> 
+    <param name="owd/JointCtrlSea/j2Ki" value="0.0"/> 
+    <param name="owd/JointCtrlSea/j3Ki" value="0.0"/>
+    <param name="owd/JointCtrlSea/j4Ki" value="0.0"/>
+    <param name="owd/JointCtrlSea/j5Ki" value="0.0"/>
+    <param name="owd/JointCtrlSea/j6Ki" value="0.0"/>
+
+</launch>
+
