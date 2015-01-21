@@ -150,3 +150,155 @@ for the clients which communicate with them.
        Useful for debugging protocol problems.
 
 */
+/**
+\page bhand Barrett Hand
+
+For historical reasons we have a separate node, "bhd", for controlling
+the 262 hand.  When the 280 hand came out it required integrating the
+hand CANbus commands into OWD, so when OWD is configured for a 280
+hand it also mimics a BHD node (which is why the hand services are all
+prefixed with "bhd/" instead of "owd/").
+
+\note We run a mixed environment on Herb with no problems at all: OWD
+plus BHD for the left arm (which has a 262 hand), and OWD alone for
+the right arm (with a 280 hand).  There is no discernible difference
+for the clients which communicate with them.
+
+\section parameters Parameters
+
+ - \b ~/hand_type Type of hand installed.  Should be one of:
+   - \b 260 For a BH260 Hand (serial communication)
+   - \b 280 For a BH280 Hand (%CANbus communication)
+   - \b 280+TACT For a BH280 Hand with the fingertip tactile arrays installed
+   - \b none For no hand installed
+
+ - \b ~/hand_publish_frequency Rate at which the handstate messages
+   are published, in hertz, if a model 280 hand is installed.
+   Default is 10, max is 40.
+
+ - \b ~/tactile_publish_frequency Rate at which the tactile
+   messages are published, in hertz.  Default is 10, max is 40.
+
+ - \b ~/tactile_top10 If set to \e true will only report 4-bit values for
+   the 10 ten pressures in each tactile array.  Default is \e false (all
+   values are reported as 12-bit numbers).  Setting to \e true reduces
+   the communication demands on the CAN bus, but does not increase the
+   maximum frequency that the sensors can be read, since most of the
+   time is waiting for the hand pucks to gather the tactile data.
+
+\section services Services
+
+ - \b /bhd/GetHandDOF: type: \e owd_msgs/GetDOF.  Get the number of
+   degrees of freedom of the hand.
+
+ - \b /bhd/MoveHand: type: \e owd_msgs/MoveHand.  Move the hand in
+   either position or velocity mode.
+
+ - \b /bhd/RelaxHand: type: \e owd_msgs/RelaxHand.  Idle the hand
+   pucks.
+
+ - \b /bhd/ResetHand: type: \e owd_msgs/ResetHand.  Send the HI (Hand
+   Initialize) command to each hand puck, in the sequence 1, 2, 3, 1,
+   2, 3, 1, 2, 3, 4 (allows the hand to fully unfold if fingers are
+   blocking one-another in the worst-case configuration).  The HI command 
+   is the only guaranteed way to clear the breakaway condition.
+
+ - \b /bhd/ResetHandQuick: type: \e owd_msgs/ResetHand.  Send the HI (Hand
+   Initialize) command to each hand puck and the spread puck simultaneously.
+   This command will work for most, but not every hand configuration. The 
+   HI command is the only guaranteed way to clear the breakaway condition.
+
+ - \b /bhd/ResetFinger: type: \e owd_msgs/ResetFinger.  Send the HI
+   command to a single specified finger (1 through 4).
+
+ - \b /bhd/GetProperty: type: \e owd_msgs/GetHandProperty.  Get a bhand
+   property.  See CANbus::initPropertyDefs for a list of property
+   values.
+
+ - \b /bhd/SetProperty: type: \e owd_msgs/SetHandProperty.  Set a bhand
+   property.  See CANbus::initPropertyDefs for a list of property
+   values.
+
+ - The model 280 hand uses pucks to control the motors, the same as
+   for the arm joints.  Barrett has some documentation on the CANbus
+   communication here:
+   http://web.barrett.com/support/Puck_Documentation/CAN_Message_Format.pdf.
+   And the full list of puck property names and values is in the
+   CANbus::initPropertyDefs function in openwam/CANbus.cc.  Many of
+   these are only applicable for arm pucks, and some only for the
+   safety puck, but many (like P/AP and MT) are shared between both
+   arm and hand pucks.  The hand pucks have a rudimentary imitation of
+   the original 262 protocol, in that you can send a few different
+   command values (like HI or M) to the pucks CMD property.  But for
+   the most part you treat them like arm pucks.
+
+ - \b /bhd/SetSpeed: type: \e owd_msgs/SetSpeed.  Set the speed that
+   the hand will use for a /bhd/MoveHand position command.  The
+   velocities vector should have four values in units of radians per
+   second (three for the fingers, one for the spread).  The default
+   values for the 280 hand are 2.5 for the fingers and 4.3 for the
+   spread.  The min_accel_time field in the service message is
+   ignored.
+
+ - \b /bhd/SetHandTorque: type: \e owd_msgs/SetHandTorque.  Set the
+   torques that the hand will use for the position moves.  The \b initial
+   value will be used for the start of each move, and if the finger
+   gets stalled before it reaches its destination the torque will drop
+   to the \b sustained level.  Default is 2200 / 1100; do not exceed these
+   defaults or you will risk overheating the hand.  If you want to keep
+   the torques below the breakaway torques, try setting them to 1200/1100.
+
+\section topics Topics
+
+ - \b /bhd/handstate: type: \e owd_msgs/BHState.  Publishes the state
+   of the hand at the frequency set by the \b ~/hand_publish_frequency
+   parameter.  Includes the following fields:
+  - float64[] \b positions: The angle of each inner link, in radians,
+       if the finger is \e not in breakaway.  This is the same angle
+       that the motor tries to seek to when commanding positions.
+       Once the finger goes into the breakaway state, the inner link
+       stops moving, and this field no longer directly reflects any
+       physical position.  With the advent of the inner link encoders
+       on the 280 hand, the inner_links and outer_links fields have
+       superceded this field, but it has been kept for backwards
+       compatibility.  Eventually this should be changed to reflect
+       the outer link angle relative to the palm plane, which is
+       always valid even without the inner link encoders, and which
+       could be matched by the position command values.
+  - float64[] \b inner_links: The true angle of each inner link, in
+       radians, relative to the palm plane (range of 0 to 2.44).  This
+       value is accurate at all times (including the breakaway state).
+       The value is reported for the three fingers only if the hand is
+       equipped with inner-link encoders; otherwise this array will be
+       empty.
+  - float64[] \b outer_links: The angle of each outer link, in
+       radians, relative to the inner link (range of 0.73 to 1.57).
+       This value is accurate at all times (including the breakaway
+       state).  The value is reported for the three fingers only if
+       the hand is equipped with inner-link encoders; otherwise this
+       array will be empty.
+  - bool[] \b breakaway: True if the finger is in the breakaway state,
+       detected by watching the ratio of the motor encoder value to
+       the inner link encoder value.  Once the breakaway flag has been
+       set, it remains set until the finger is reset with the
+       ResetHand or ResetFinger service calls.  While this flag is
+       set, OWD will not repeat movement commands that stop short of
+       their goal, since it may be due to the reduced motion limits
+       during breakaway.  If the hand is not equipped with inner link
+       encoders this array will be empty.
+  - float64[] \b strain: The strain gauge readings for each of the
+       three fingers.
+  - float32 \b temperature: Not used.  The BHD node, which controls a
+       model 262 hand, populates this field with the temperature of
+       the controller board.  This needs to be updated for the 280
+       hand to report the temps of each of the pucks and their motors.
+  - uint8 \b state: The motion state of the hand, calculated by
+       aggregating together the states of each of the four motors.
+       Values are in the BHState.msg file.
+  - uint8[] \b internal_state: The individual state of each of the
+       motors.  Eventually this will become the only state field, and
+       the existing state field will be removed.
+  - uint8[] \b puck_mode: The MODE value for each of the pucks.
+       Useful for debugging protocol problems.
+
+*/

@@ -18,3 +18,23 @@
   <rosdep name="gfortran"/>
   <rosdep name="xenomai"/>
 </package>
+<package>
+  <description brief="OpenWAM driver">
+     ROS driver for the Barrett WAM
+  </description>
+  <author>Mike Vande Weghe (vandeweg@cmu.edu)</author>
+  <url>http://personalrobotics.ri.cmu.edu/intel-pkg/owd/html/index.html</url>
+  <license>LGPL</license>
+  <export>
+    <cpp cflags="-I${prefix}"/>
+  </export>
+  <depend package="roscpp"/>
+  <depend package="std_msgs"/>
+  <depend package="owd_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="tf"/>
+  <rosdep name="blas"/>
+  <rosdep name="lapack"/>
+  <rosdep name="gfortran"/>
+  <rosdep name="xenomai"/>
+</package>

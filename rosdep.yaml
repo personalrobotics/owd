@@ -6,3 +6,11 @@ gfortran:
   ubuntu: gfortran
 xenomai:
   ubuntu: libxenomai-dev
+blas:
+  ubuntu: libblas-dev
+lapack:
+  ubuntu: liblapack-dev
+gfortran:
+  ubuntu: gfortran
+xenomai:
+  ubuntu: libxenomai-dev

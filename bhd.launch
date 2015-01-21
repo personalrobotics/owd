@@ -16,3 +16,21 @@
 
 </launch>
 
+<launch>
+
+  <param name="bhd/canbus_number" type="int" value="32" />
+  
+  <!-- Type of hand installed. Should be one of:
+         * "280" For a BH280 Hand (CANbus communication)
+         * "280+TACT" For a BH280 Hand with the fingertip tactile array
+       -->
+  <param name="bhd/hand_type" type="string" value="280" />
+  
+  <param name="bhd/log_canbus_data" type="bool" value="false" />
+
+  <node pkg="owd" type="canbhd" output="screen" respawn="false"
+        cwd="node" name="bhd">
+  </node>
+
+</launch>
+

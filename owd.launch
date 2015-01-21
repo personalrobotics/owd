@@ -83,3 +83,88 @@
 
 </launch>
 
+<launch>
+
+  <!-- A string specifying a file to keep on disk of the joint calibration 
+       values.  This file is read during startup if the encoder values have
+       been lost and need to be reset, and it is written to once a
+       calibration is successfully performed.  If this file is not present
+       then the values from the "home_position" parameter, below, are used.
+       -->
+  <param name="owd/calibration_file" type="string"
+         value="wam_joint_calibrations" />
+  
+  <!-- A comma-separated list of joint values, in radians, of the 
+       configuration of the arm when the encoder values have been lost 
+       and calibration file does not yet exist.  These are ignored when
+       the calibration file is present. -->
+  <param name="owd/home_position" type="string"
+         value="0, -1.629, 0, 0.164, 0, 0, 0" />
+
+  <!-- The max velocity that the elbow or hand can attain (in m/s) before
+       the safety puck shuts down the arm. -->
+  <param name="owd/max_cartesian_velocity" type="string"
+         value="0.7" />
+
+  <!-- Numeric id of the canbus device, appended to "/dev/pcan" for Peak cards
+       or "/dev/can" for ESD cards. -->
+  <param name="owd/canbus_number" type="int" value="0" />
+  
+  <!-- Type of hand installed. Should be one of:
+         * "260" For a BH260 Hand (serial communication)
+         * "280" For a BH280 Hand (CANbus communication)
+         * "280+TACT" For a BH280 Hand with the fingertip tactile arrays
+         * "darpa_arms_calibration_target" For the DARPA-supplied
+                    calibration target from the ARM-S program installed
+                    in place of the hand
+         * "none" For no hand installed -->
+  <param name="owd/hand_type" type="string" value="280+TACT" />
+  
+  <!-- If true, the values of the optional secondary encoders on the -->
+  <!-- BH280 hand will be ignored and will not be used to detect breakaway. -->
+  <!-- When breakaway detection is disabled the inner_links, outer_links-->
+  <!-- and breakaway arrays in the WAMState message will be -->
+  <!-- zero length.  Defaults to false. -->
+  <param name="owd/ignore_breakaway_encoders" type="bool" value="false" />
+  
+  <!-- Whether the Barrett Force/Torque sensor is installed (true/false) -->
+  <param name="owd/forcetorque_sensor" type="bool" value="true" />
+  
+  <!-- A comma-separated list of shared library files to be loaded.
+       See the OWD Plugins documentation for more info. -->
+  <param name="owd/owd_plugins" type="string" value=""/>
+  
+  <!-- Start with stiffness = 1 -->
+  <param name="owd/hold_starting_position" type="bool" value="false" />
+  
+  <!-- Whether or not joint 1 has been remounted at 180 degrees -->
+  <param name="owd/modified_j1" type="bool" value="false" />
+  
+  <!-- How fast to publish owd wam info (in hertz) -->
+  <param name="owd/wam_publish_frequency" type="int" value="100" />
+
+  <!-- How fast to publish hand info (in hertz) -->
+  <param name="owd/hand_publish_frequency" type="int" value="40" />
+
+  <!-- How fast to publish force torque data (in hertz) -->
+  <param name="owd/ft_publish_frequency" type="int" value="80" />
+
+  <!-- How fast to publish tactile data (in hertz) -->
+  <param name="owd/tactile_publish_frequency" type="int" value="40" />
+
+  <!-- If set to True will only report 4-bit values for the 10 ten pressures
+       in each tactile array. Default is false (all values are reported as 
+       12-bit numbers). Setting to true reduces the communication demands on
+       the CAN bus, but does not increase the upper frequency limit. -->
+  <param name="tactile_top10" type="bool" value="false" />
+  
+  <!-- The direction of gravity in the wam0 frame.  "-1,0,0" is the default -->
+  <!-- for a vertically mounted WAM.  Use "0,0,-1" for a table mounted WAM. -->
+  <param name="owd/gravity_vector" type="string" value="-1,0,0" />
+  
+  <node pkg="owd" type="owd" output="screen" respawn="false"
+        cwd="node" name="owd">
+  </node>
+
+</launch>
+
