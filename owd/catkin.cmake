@@ -63,6 +63,10 @@ set(OWD_LIBS
     lapack
     blas
     gfortran
+    # NOTE: Linking fails with the error message "undefined reference to
+    # dlclose@@GLIBC_2.2.5" if this is omitted. This seems to only happen when
+    # building with a recent version of clang on Ubuntu 14.04.
+    dl
 )
 set(OWD_TARGETS owdsim)
 
