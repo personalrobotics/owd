@@ -58,8 +58,8 @@ set(OWD_SOURCE
     tactile.cc
 )
 set(OWD_LIBS
-    openwam
-    openmath
+    ${PROJECT_NAME}_openwam
+    ${PROJECT_NAME}_openmath
     lapack
     blas
     # NOTE: I have no idea why this depends on gfortran. Maybe we can remove
@@ -71,31 +71,36 @@ set(OWD_LIBS
     #   http://askubuntu.com/q/334884
     dl
 )
-set(OWD_TARGETS owdsim)
+set(OWD_TARGETS ${PROJECT_NAME}_owdsim)
 
-add_executable(owdsim owd.cpp openwamdriver.cpp)
-add_dependencies(owdsim owd_msgs_generate_messages_cpp)
-target_link_libraries(owdsim openwamsim ${OWD_LIBS})
-set_target_properties(owdsim PROPERTIES COMPILE_FLAGS "-DOWDSIM")
+add_executable(${PROJECT_NAME}_owdsim owd.cpp openwamdriver.cpp)
+add_dependencies(${PROJECT_NAME}_owdsim owd_msgs_generate_messages_cpp)
+target_link_libraries(${PROJECT_NAME}_owdsim ${PROJECT_NAME}_openwamsim ${OWD_LIBS})
+set_target_properties(${PROJECT_NAME}_owdsim PROPERTIES
+    OUTPUT_NAME owdsim
+    COMPILE_FLAGS "-DOWDSIM"
+)
 
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
-    list(APPEND OWD_TARGETS owd)
+    list(APPEND OWD_TARGETS ${PROJECT_NAME}_owd)
 
-    add_executable(owd ${OWD_SOURCE})
-    add_dependencies(owd owd_msgs_generate_messages_cpp)
-    target_link_libraries(owd wamcan ${OWD_LIBS} ${CANBUS_LIBS})
-    set_target_properties(owd PROPERTIES
+    add_executable(${PROJECT_NAME}_owd ${OWD_SOURCE})
+    add_dependencies(${PROJECT_NAME}_owd owd_msgs_generate_messages_cpp)
+    target_link_libraries(${PROJECT_NAME}_owd ${PROJECT_NAME}_wamcan ${OWD_LIBS} ${CANBUS_LIBS})
+    set_target_properties(${PROJECT_NAME}_owd PROPERTIES
+        OUTPUT_NAME owd
         COMPILE_FLAGS "${CANBUS_DEFS}"
         LINK_FLAGS "${CANBUS_LDFLAGS}"
     )
 
     if (RT_BUILD)
-        list(APPEND OWD_TARGETS owdrt)
+        list(APPEND OWD_TARGETS ${PROJECT_NAME}_owdrt)
 
-        add_executable(owdrt ${OWD_SOURCE})
-        add_dependencies(owdrt owd_msgs_generate_messages_cpp)
-        target_link_libraries(owdrt wamcanrt ${OWD_LIBS} ${CANBUS_LIBS} ${RT_LIBS})
-        set_target_properties(owdrt PROPERTIES
+        add_executable(${PROJECT_NAME}_owdrt ${OWD_SOURCE})
+        add_dependencies(${PROJECT_NAME}_owdrt owd_msgs_generate_messages_cpp)
+        target_link_libraries(${PROJECT_NAME}_owdrt ${PROJECT_NAME}_wamcanrt ${OWD_LIBS} ${CANBUS_LIBS} ${RT_LIBS})
+        set_target_properties(${PROJECT_NAME}_owdrt PROPERTIES
+            OUTPUT_NAME owdrt
             COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS}"
             LINK_FLAGS "${CANBUS_LDFLAGS}"
         )
