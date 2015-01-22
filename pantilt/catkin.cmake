@@ -79,9 +79,8 @@ target_link_libraries(owdsim openwamsim ${OWD_LIBS})
 set_target_properties(owdsim PROPERTIES COMPILE_FLAGS "-DOWDSIM")
 
 if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
-    list(APPEND OWD_TARGETS owd canbhd)
+    list(APPEND OWD_TARGETS owd)
 
-    # ROS Nodes.
     add_executable(owd ${OWD_SOURCE})
     add_dependencies(owd owd_msgs_generate_messages_cpp)
     target_link_libraries(owd wamcan ${OWD_LIBS} ${CANBUS_LIBS})
@@ -90,16 +89,8 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
         LINK_FLAGS "${CANBUS_LDFLAGS}"
     )
 
-    add_executable(canbhd ${OWD_SOURCE})
-    add_dependencies(canbhd owd_msgs_generate_messages_cpp)
-    target_link_libraries(canbhd wamcan ${OWD_LIBS} ${CANBUS_LIBS})
-    set_target_properties(canbhd PROPERTIES
-        COMPILE_FLAGS "${CANBUS_DEFS} -DBH280 -DBH280_ONLY"
-        LINK_FLAGS "${CANBUS_LDFLAGS}"
-    )
-
     if (RT_BUILD)
-        list(APPEND OWD_TARGETS owdrt canbhdrt)
+        list(APPEND OWD_TARGETS owdrt)
 
         add_executable(owdrt ${OWD_SOURCE})
         add_dependencies(owdrt owd_msgs_generate_messages_cpp)
@@ -108,51 +99,7 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
             COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS}"
             LINK_FLAGS "${CANBUS_LDFLAGS}"
         )
-
-        add_executable(canbhdrt ${OWD_SOURCE})
-        add_dependencies(canbhdrt owd_msgs_generate_messages_cpp)
-        target_link_libraries(canbhdrt wamcanrt ${OWD_LIBS} ${CANBUS_LIBS}
-                                       ${RT_LIBS})
-        set_target_properties(canbhdrt PROPERTIES
-            COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS} -DBH280 -DBH280_ONLY"
-            LINK_FLAGS "${CANBUS_LDFLAGS}"
-        )
     endif ()
-
-    # Stand-alone Utilities.
-    macro(puck_utility target_name source_files)
-        add_executable(${target_name} ${source_files})
-        target_link_libraries(${target_name} wamcan openwam ${CANBUS_LIBS})
-        set_target_properties(${target_name} PROPERTIES
-            COMPILE_FLAGS "${CANBUS_DEFS}"
-            LINK_FLAGS "${CANBUS_LDFLAGS}"
-        )
-    endmacro()
-
-    list(APPEND OWD_TARGETS owd_test synctest owd_traj_timer)
-    add_executable(owd_test test.cpp)
-    add_dependencies(owd_test owd_msgs_generate_messages_cpp)
-
-    add_executable(synctest synctest.cpp)
-    add_dependencies(synctest owd_msgs_generate_messages_cpp)
-
-    add_executable(owd_traj_timer owd_traj_timer.cpp)
-    add_dependencies(owd_traj_timer owd_msgs_generate_messages_cpp)
-    target_link_libraries(owd_traj_timer openwam)
-
-    # Puck Utilities.
-    list(APPEND OWD_TARGETS puck_update puck_defaults puck_getprops
-                            puck_find_mofst puck_setprop)
-    puck_utility(puck_update puck_update.cpp)
-    puck_utility(puck_defaults puck_defaults.cpp)
-    puck_utility(puck_getprops puck_getprops.cpp)
-    puck_utility(puck_find_mofst puck_find_mofst.cpp)
-    puck_utility(puck_setprop puck_setprop.cpp)
-
-else ()
-    list(APPEND OWD_TARGETS owd_traj_timer)
-    add_executable(owd_traj_timer owd_traj_timer.cpp)
-    target_link_libraries(owd_traj_timer openwamsim)
 endif()
 
 # TODO: Also build the large collection of utilities.
