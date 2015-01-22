@@ -62,7 +62,14 @@ set(OWD_LIBS
     openmath
     lapack
     blas
+    # NOTE: I have no idea why this depends on gfortran. Maybe we can remove
+    # this dependency?
     gfortran
+    # NOTE: Linking fails with the error message "undefined reference to
+    # dlclose@@GLIBC_2.2.5" if this is omitted. I have no idea why this is
+    # necessary, but I found the solution here:
+    #   http://askubuntu.com/q/334884
+    dl
 )
 set(OWD_TARGETS owdsim)
 
