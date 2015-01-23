@@ -308,6 +308,10 @@ bool WamDriver::Init(const char *joint_cal_file)
 
   ros::NodeHandle n("~");
 
+  //std::string tf_prefix;
+  n.param("tf_prefix",tf_prefix,std::string("controller"));
+  ROS_INFO("tf_prefix: %s", tf_prefix.c_str());
+  
   std::string wamhome_list, plugin_list, gravity_vector;
   // default value is the one used for Herb
 #ifdef WRIST
@@ -431,8 +435,6 @@ bool WamDriver::Init(const char *joint_cal_file)
       return false;
     }
     std::string sync_name("owd_");
-    std::string tf_prefix;
-    n.param("tf_prefix",tf_prefix,std::string("controller"));
     sync_name += tf_prefix;
     if (sync_id == 0) {
       ROS_INFO("Creating master synchronization controller");
@@ -1981,8 +1983,8 @@ bool WamDriver::Publish() {
     waminternals.joint_offsets[i] = owam->joints[i+1].offset;
     // publish as transforms, too
     char jref[50], jname[50];
-    snprintf(jref,50,"wam%d",i);
-    snprintf(jname,50,"wam%d",i+1);
+    snprintf(jref,50,"%s/wam%d",tf_prefix.c_str(),i);
+    snprintf(jname,50,"%s/wam%d",tf_prefix.c_str(),i+1);
     std::string jrefstring(jref);
     std::string jnamestring(jname);
     tf::Quaternion YAW;

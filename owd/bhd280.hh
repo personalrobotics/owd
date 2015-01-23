@@ -60,6 +60,7 @@ public:
 
   owd_msgs::BHState bhstate;
   double max_velocity;
+  std::string tf_prefix;
 
   BHD_280(CANbus *cb);
   ~BHD_280();
