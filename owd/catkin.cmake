@@ -89,7 +89,7 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
     add_executable(canbhd ${OWD_SOURCE})
     add_dependencies(canbhd owd_msgs_generate_messages_cpp)
-    target_link_libraries(canbhd wamcan ${OWD_LIBS} ${CANBUS_LIBS})
+    target_link_libraries(canbhd bhdcan ${OWD_LIBS} ${CANBUS_LIBS})
     set_target_properties(canbhd PROPERTIES
         COMPILE_FLAGS "${CANBUS_DEFS} -DBH280 -DBH280_ONLY"
         LINK_FLAGS "${CANBUS_LDFLAGS}"
@@ -108,7 +108,7 @@ if (CANBUS_TYPE STREQUAL "ESD" OR CANBUS_TYPE STREQUAL "PEAK")
 
         add_executable(canbhdrt ${OWD_SOURCE})
         add_dependencies(canbhdrt owd_msgs_generate_messages_cpp)
-        target_link_libraries(canbhdrt wamcanrt ${OWD_LIBS} ${CANBUS_LIBS}
+        target_link_libraries(canbhdrt bhdcanrt ${OWD_LIBS} ${CANBUS_LIBS}
                                        ${RT_LIBS})
         set_target_properties(canbhdrt PROPERTIES
             COMPILE_FLAGS "${CANBUS_DEFS} ${RT_DEFS} -DBH280 -DBH280_ONLY"
