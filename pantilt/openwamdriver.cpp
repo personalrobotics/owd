@@ -341,19 +341,34 @@ bool WamDriver::Init(const char *joint_cal_file)
   int32_t WamWasZeroed = 0;
 
 #ifdef HEAD
-  int32_t mpos1, mpos2, jpos1, jpos2;
-  if (bus->get_property_rt(1, AP, &mpos1, 2000, 1, &jpos1) != OW_SUCCESS) {
-    ROS_FATAL("Unable to retrieve JP from puck 1");
-    return false;
+  // Set the AP property to an invalid value (above 1 << 20) to force a re-home.
+  if(bus->set_property_rt(1, AP, 0, true, 2000) == OW_FAILURE) {
+    ROS_FATAL("Unable to clear AP on puck 1");
+    throw -1;
   }
-  if (bus->get_property_rt(2, AP, &mpos2, 2000, 1, &jpos2) != OW_SUCCESS) {
-    ROS_FATAL("Unable to retrieve JP from puck 2");
-    return false;
+  usleep(1e6);
+  ROS_INFO("Cleared AP (property %d) on puck 1", AP);
+
+  if(bus->set_property_rt(2, AP, 0, true, 2000) == OW_FAILURE) {
+    ROS_FATAL("Unable to clear AP on puck 2");
+    throw -1;
   }
-  if (((jpos1 > (1<<20)) || (jpos1 < -(1<<20))) // good J1
-      && ((jpos2 > (1<<20)) || (jpos2 < -(1<<20)))) { // good J2 
-    WamWasZeroed=1;
+  usleep(1e6);
+  ROS_INFO("Cleared AP (property %d) on puck 2", AP);
+
+  {
+    int32_t mpos, jpos;
+
+    bus->get_property_rt(1, AP, &mpos, 2000, 1, &jpos);
+    usleep(1e6);
+    ROS_INFO("Puck 1: mpos = %d jpos = %d\n", mpos, jpos);
+
+    bus->get_property_rt(2, AP, &mpos, 2000, 1, &jpos);
+    usleep(1e6);
+    ROS_INFO("Puck 2: mpos = %d jpos = %d\n", mpos, jpos);
   }
+
+  WamWasZeroed=0;
 #elif !defined BH280_ONLY
   if (bus->get_property_rt(SAFETY_MODULE, ZERO, &WamWasZeroed,10000) == OW_FAILURE) {
     ROS_FATAL("Unable to query safety puck");
@@ -1610,16 +1625,6 @@ void WamDriver::set_home_position() {
         }
     }
 #else // HEAD
-
-    // Set the AP property to an invalid value (above 1 << 20) to force a re-home.
-    if(bus->set_property_rt(1, AP, 1 << 21, false, 2000) == OW_FAILURE) {
-	  ROS_FATAL("Unable to clear AP on puck 1");
-	  throw -1;
-    }
-    if(bus->set_property_rt(2, AP, 1 << 21, false, 2000) == OW_FAILURE) {
-	  ROS_FATAL("Unable to clear AP on puck 2");
-	  throw -1;
-    }
 
     owam->use_joint_encoders=false;
     ROS_WARN("Please twist the head to the extreme left to calibrate the PAN axis");
