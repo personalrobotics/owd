@@ -1610,6 +1610,17 @@ void WamDriver::set_home_position() {
         }
     }
 #else // HEAD
+
+    // Set the AP property to an invalid value (above 1 << 20) to force a re-home.
+    if(bus->set_property_rt(1, AP, 1 << 21, false, 2000) == OW_FAILURE) {
+	  ROS_FATAL("Unable to clear AP on puck 1");
+	  throw -1;
+    }
+    if(bus->set_property_rt(2, AP, 1 << 21, false, 2000) == OW_FAILURE) {
+	  ROS_FATAL("Unable to clear AP on puck 2");
+	  throw -1;
+    }
+
     owam->use_joint_encoders=false;
     ROS_WARN("Please twist the head to the extreme left to calibrate the PAN axis");
     int32_t mpos, jpos;
