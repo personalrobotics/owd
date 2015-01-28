@@ -250,7 +250,7 @@ public:
   bool& jsdynamics(){return jsdyn;} // use to set the dynamics
   
   bool& record(){return rec;}       // use to set the recording
-  SE3 FK(){  SE3 e0n; lock();   e0n=E0n;   unlock();   return e0n;  }
+  SE3 FK(){  SE3 e0n; lock("wam_hh_L253");   e0n=E0n;   unlock("wam_hh_UL253");   return e0n;  }
 
   friend ostream& operator << (ostream& s, WAM& wam);
 

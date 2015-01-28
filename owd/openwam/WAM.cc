@@ -722,7 +722,7 @@ int WAM::set_joint_offsets(double offsets[]) {
     if (jointstraj != NULL) {
         // cannot change joint offsets while a trajectory is running
         // because it would require recomputing the trajectory vals
-        this->unlock();
+        this->unlock("wam_L725");
         return OW_FAILURE;
     }
 
@@ -742,7 +742,7 @@ int WAM::set_joint_offsets(double offsets[]) {
         joints[j].offset = offsets[ joints[j].id() ];
     }
 
-    this->unlock();
+    this->unlock("wam_L745");
     return OW_SUCCESS;
 }
 
@@ -777,16 +777,16 @@ void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *sim
             trajtrq[joints[j].id()] = traj_torq[j-1];
         }
     }
-    this->unlock();
+    this->unlock("wam_L780");
 }
 
 void WAM::get_abs_positions(double* jpos) {
     if (jpos){
-        this->lock();
+        this->lock("wam_L785");
         for(int j=1; j<=4; ++j) {
             jpos[ j ] = bus->jpos[j];
         }
-        this->unlock();
+        this->unlock("wam_L789");
     }
 }
 
@@ -1065,7 +1065,7 @@ void control_loop_rt(void* argv){
                 // now that we've gotten all the joint values and computed
                 // the control torques, unlock so that other threads can read
                 // our values
-                wam->unlock("control_loop");
+             
                 last_loopstart_time = loopstart_time;
                 sendtorque_start_time = ControlLoop::get_time_ns_rt();
                 if(wam->bus->send_torques_rt() == OW_FAILURE){
@@ -1074,6 +1074,8 @@ void control_loop_rt(void* argv){
                     break;
                 }
                 torques_sent=true;
+		wam->unlock("control_loop");
+
                 sendtorque_end_time = ControlLoop::get_time_ns_rt();
 
                 // make sure we're not falling behind
@@ -1117,7 +1119,7 @@ void control_loop_rt(void* argv){
         if (! torques_sent) {
             // we must have not received all the joint values before the
             // time expired
-            wam->unlock();
+            wam->unlock("wam_L1120");
             ++total_missed_data_cycles;
             if (++missing_data_cycles == 50) {
                 // we went 50 cycles in a row while missing values from at
@@ -1722,7 +1724,7 @@ void WAM::newcontrol_rt(double dt){
     if (bus->simulation) {
         // If we're running in simulation mode, then set the joint positions
         // as if they instantly moved to where we wanted.
-        this->unlock();
+        this->unlock("wam_L1725");
         set_jpos((&tc.q[0])-1);
         this->lock("control_loop");
     }
@@ -1912,7 +1914,7 @@ void WAM::move_sigmoid(const SE3& E02){
 void WAM::set_stiffness(float s) {
     this->lock("set_stiffness");
     stiffness = s;
-    this->unlock();
+    this->unlock("wam_L1915");
 }
 
 int WAM::hold_position(double jval[],bool grab_lock) 
@@ -2013,6 +2015,14 @@ void WAM::lock(const char *name) {
 #endif // ! OWD_RT
     strncpy(last_locked_by,name,100);
     last_locked_by[99]=0; // just in case it was more than 99 chars long
+    /**    if (name) {
+      static char msg[200];
+      sprintf(msg,"OPENWAM locked by %s",name);
+      syslog(LOG_ERR,msg);
+    } else {
+      syslog(LOG_ERR,"OPENWAM locked by (unknown)");
+      }*/
+ 
 }
 
 bool WAM::lock_rt(const char *name) {
@@ -2038,18 +2048,21 @@ bool WAM::lock_rt(const char *name) {
 }
 
 void WAM::unlock(const char *name) {
-    //  if (name) {
-    //    static char msg[200];
-    //    sprintf(msg,"OPENWAM unlocked by %s",name);
-    //    syslog(LOG_ERR,msg);
-    //  } else {
-    //    syslog(LOG_ERR,"OPENWAM unlocked by (unknown)");
-    //  }
+    static char last_unlocked_by[100];
+    /**if (name) {
+      static char msg[200];
+      sprintf(msg,"OPENWAM unlocked by %s",name);
+      syslog(LOG_ERR,msg);
+    } else {
+      syslog(LOG_ERR,"OPENWAM unlocked by (unknown)");
+      }*/
 #ifdef OWD_RT
     rt_mutex_release(&rt_mutex);
 #else // ! OWD_RT
     pthread_mutex_unlock(&mutex);
 #endif // ! OWD_RT
+    strncpy(last_unlocked_by,name, 100);
+    last_unlocked_by[99] = 0; // just in case it was more than 99 chars long
 }
 
 void WAMstats::rosprint(int recorder_count) const {
