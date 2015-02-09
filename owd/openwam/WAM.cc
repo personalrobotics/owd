@@ -978,6 +978,7 @@ void control_loop_rt(void* argv){
         int32_t time_to_wait = ControlLoop::PERIOD * 1e6  // sec to usecs
             - (read_start_time - loopstart_time) * 1e-3;  // nsecs to usecs
         wam->lock("control loop");
+	bool locked(true);
         while (time_to_wait>0) {
             uint8_t  msg[8];
             int32_t msgid, msglen;
@@ -987,7 +988,8 @@ void control_loop_rt(void* argv){
 
             if (wam->bus->read_rt(&msgid, msg, &msglen, time_to_wait) == OW_FAILURE){
 	      wam->unlock("control_loop");
-                goto NEXT;
+	      locked=false;
+	      break;
             }
 
             // process the response
@@ -1049,7 +1051,6 @@ void control_loop_rt(void* argv){
             } else {
                 // unknown
                 wam->bus->stats.canread_badpackets++;
-		wam->unlock("control_loop");
                 goto NEXT;
             }
 
@@ -1066,6 +1067,7 @@ void control_loop_rt(void* argv){
                 // the control torques, unlock so that other threads can read
                 // our values
                 wam->unlock("control_loop");
+		locked=false;
                 last_loopstart_time = loopstart_time;
                 sendtorque_start_time = ControlLoop::get_time_ns_rt();
                 if(wam->bus->send_torques_rt() == OW_FAILURE){
@@ -1099,6 +1101,7 @@ void control_loop_rt(void* argv){
             }
 #else // BH280_ONLY
 	    wam->unlock("control_loop");
+	    locked=false;
 #endif // ! BH280_ONLY
 
             // spend some time checking the F/T sensor and BH280 hand
@@ -1111,13 +1114,15 @@ void control_loop_rt(void* argv){
             time_to_wait = ControlLoop::PERIOD * 1e6  // sec to usecs
                 - (ControlLoop::get_time_ns_rt() - loopstart_time) * 1e-3;  // nsecs to usecs
         } // END OF READ LOOP
+	if (locked) {
+	  wam->unlock();
+	}
 
         static int total_missed_data_cycles=0;
 #ifndef BH280_ONLY
         if (! torques_sent) {
             // we must have not received all the joint values before the
             // time expired
-            wam->unlock();
             ++total_missed_data_cycles;
             if (++missing_data_cycles == 50) {
                 // we went 50 cycles in a row while missing values from at
