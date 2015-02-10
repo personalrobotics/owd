@@ -78,7 +78,8 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool flipped_hand, bool tac
     elbow_vel(0,0,0),
     endpoint_vel(0,0,0),
     barrett_endpoint_vel(0),
-    vel_damping_gain(60)
+    vel_damping_gain(60),
+    mutex_locked(false)
 {
 #ifdef OWD_RT
     rt_mutex_create(&rt_mutex,"WAM_CC");
@@ -705,11 +706,11 @@ int WAM::set_jpos(double pos[]){
 
     // send the position array on the CAN bus
     if(bus->send_positions(mpos) == OW_FAILURE){
-        this->unlock("set_jpos");
+        this->unlock("set_jpos_L708");
         ROS_ERROR("WAM::set_jpos: bus.send_position failed." );
         return OW_FAILURE;
     }
-    this->unlock("set_jpos");
+    this->unlock("set_jpos_L712");
     return OW_SUCCESS;
 }
 
@@ -978,6 +979,7 @@ void control_loop_rt(void* argv){
         int32_t time_to_wait = ControlLoop::PERIOD * 1e6  // sec to usecs
             - (read_start_time - loopstart_time) * 1e-3;  // nsecs to usecs
         wam->lock("control loop");
+        bool locked(true);
         while (time_to_wait>0) {
             uint8_t  msg[8];
             int32_t msgid, msglen;
@@ -986,8 +988,7 @@ void control_loop_rt(void* argv){
             uint32_t PROPERTY;
 
             if (wam->bus->read_rt(&msgid, msg, &msglen, time_to_wait) == OW_FAILURE){
-	      wam->unlock("control_loop");
-                goto NEXT;
+                break;
             }
 
             // process the response
@@ -1049,7 +1050,7 @@ void control_loop_rt(void* argv){
             } else {
                 // unknown
                 wam->bus->stats.canread_badpackets++;
-		wam->unlock("control_loop");
+                ROS_WARN("control_loop: Bad backets read.");
                 goto NEXT;
             }
 
@@ -1066,6 +1067,8 @@ void control_loop_rt(void* argv){
                 // the control torques, unlock so that other threads can read
                 // our values
              
+		wam->unlock("control_loop_1071");
+                locked = false;
                 last_loopstart_time = loopstart_time;
                 sendtorque_start_time = ControlLoop::get_time_ns_rt();
                 if(wam->bus->send_torques_rt() == OW_FAILURE){
@@ -1074,7 +1077,6 @@ void control_loop_rt(void* argv){
                     break;
                 }
                 torques_sent=true;
-		wam->unlock("control_loop");
 
                 sendtorque_end_time = ControlLoop::get_time_ns_rt();
 
@@ -1100,7 +1102,10 @@ void control_loop_rt(void* argv){
                 sendtime += (sendtorque_end_time-sendtorque_start_time) * 1e-6;
             }
 #else // BH280_ONLY
-	    wam->unlock("control_loop");
+	    if(locked){
+	      wam->unlock("control_loop_L1106");
+	      locked = false;
+	    }
 #endif // ! BH280_ONLY
 
             // spend some time checking the F/T sensor and BH280 hand
@@ -1113,13 +1118,15 @@ void control_loop_rt(void* argv){
             time_to_wait = ControlLoop::PERIOD * 1e6  // sec to usecs
                 - (ControlLoop::get_time_ns_rt() - loopstart_time) * 1e-3;  // nsecs to usecs
         } // END OF READ LOOP
-
+        if(locked){
+            wam->unlock("control_loop_L1121");
+	    locked = false;
+        }
         static int total_missed_data_cycles=0;
 #ifndef BH280_ONLY
         if (! torques_sent) {
             // we must have not received all the joint values before the
             // time expired
-            wam->unlock("wam_L1120");
             ++total_missed_data_cycles;
             if (++missing_data_cycles == 50) {
                 // we went 50 cycles in a row while missing values from at
@@ -2008,6 +2015,7 @@ void WAM::printmtrq(){
 
 void WAM::lock(const char *name) {
     static char last_locked_by[100];
+
 #ifdef OWD_RT
     rt_mutex_acquire(&rt_mutex,TM_INFINITE);
 #else // ! OWD_RT
@@ -2015,6 +2023,7 @@ void WAM::lock(const char *name) {
 #endif // ! OWD_RT
     strncpy(last_locked_by,name,100);
     last_locked_by[99]=0; // just in case it was more than 99 chars long
+    mutex_locked = true;
     /**    if (name) {
       static char msg[200];
       sprintf(msg,"OPENWAM locked by %s",name);
@@ -2048,7 +2057,11 @@ bool WAM::lock_rt(const char *name) {
 }
 
 void WAM::unlock(const char *name) {
-    static char last_unlocked_by[100];
+  if(!mutex_locked){
+    ROS_ERROR("[WAM] %s tried to unlock mutex. Already unlocked by %s",
+		    name, last_unlocked_by);
+    return;
+  }
     /**if (name) {
       static char msg[200];
       sprintf(msg,"OPENWAM unlocked by %s",name);
@@ -2063,6 +2076,7 @@ void WAM::unlock(const char *name) {
 #endif // ! OWD_RT
     strncpy(last_unlocked_by,name, 100);
     last_unlocked_by[99] = 0; // just in case it was more than 99 chars long
+    mutex_locked = false;
 }
 
 void WAMstats::rosprint(int recorder_count) const {

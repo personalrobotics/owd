@@ -178,6 +178,8 @@ public:
   bool log_controller_data; // will log joint positions, torques, etc while
                             // holding a position or running a trajectory
 
+  char last_unlocked_by[100];
+  bool mutex_locked;
   WAMstats stats;
   inline void rosprint_stats() { stats.rosprint(recorder.count); bus->rosprint_stats();}
 
