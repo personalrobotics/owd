@@ -1779,7 +1779,7 @@ int CANbus::send_rt(int32_t msgid, uint8_t* msgdata, int32_t msglen, int32_t use
     }
 #else // ! OWD_RT
     if ((err == CAN_ERR_BUSHEAVY) || (err==CAN_ERR_XMTFULL)
-	|| (err==CAN_ERR_BUSOFF) || (err=CAN_ERR_QXMTFULL)) {
+	|| (err==CAN_ERR_BUSOFF) || (err==CAN_ERR_QXMTFULL)) {
       snprintf(last_error,200,"CAN_Write failed (0x%x): write buffer full?",err);
       return OW_FAILURE;
     }
