@@ -179,7 +179,9 @@ public:
                             // holding a position or running a trajectory
 
   char last_unlocked_by[100];
+  char last_locked_by[100];
   bool mutex_locked;
+  pthread_t last_locked_thread_id;
   WAMstats stats;
   inline void rosprint_stats() { stats.rosprint(recorder.count); bus->rosprint_stats();}
 

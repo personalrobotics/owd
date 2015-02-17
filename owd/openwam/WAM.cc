@@ -79,7 +79,8 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool flipped_hand, bool tac
     endpoint_vel(0,0,0),
     barrett_endpoint_vel(0),
     vel_damping_gain(60),
-    mutex_locked(false)
+    mutex_locked(false),
+    last_locked_thread_id(0)
 {
 #ifdef OWD_RT
     rt_mutex_create(&rt_mutex,"WAM_CC");
@@ -1067,8 +1068,12 @@ void control_loop_rt(void* argv){
                 // the control torques, unlock so that other threads can read
                 // our values
              
+		if(!locked){
+		  ROS_ERROR("[WAM] Trying to unlock an already unlocked mutex."); 
+		}
 		wam->unlock("control_loop_1071");
-                locked = false;
+		locked = false;
+
                 last_loopstart_time = loopstart_time;
                 sendtorque_start_time = ControlLoop::get_time_ns_rt();
                 if(wam->bus->send_torques_rt() == OW_FAILURE){
@@ -2014,8 +2019,7 @@ void WAM::printmtrq(){
 }
 
 void WAM::lock(const char *name) {
-    static char last_locked_by[100];
-
+  //    static char last_locked_by[100];
 #ifdef OWD_RT
     rt_mutex_acquire(&rt_mutex,TM_INFINITE);
 #else // ! OWD_RT
@@ -2024,6 +2028,8 @@ void WAM::lock(const char *name) {
     strncpy(last_locked_by,name,100);
     last_locked_by[99]=0; // just in case it was more than 99 chars long
     mutex_locked = true;
+    last_locked_thread_id = pthread_self();
+    //ROS_INFO("[WAM] Locked by %s", name);
     /**    if (name) {
       static char msg[200];
       sprintf(msg,"OPENWAM locked by %s",name);
@@ -2062,6 +2068,15 @@ void WAM::unlock(const char *name) {
 		    name, last_unlocked_by);
     return;
   }
+  pthread_t this_thread_id = pthread_self();
+  if(!pthread_equal(this_thread_id, last_locked_thread_id)){
+    ROS_ERROR("[WAM] %s tried to unlock from a different thread. Last locked by %s",
+	      name, last_locked_by);
+    return;
+  }
+    strncpy(last_unlocked_by,name, 100);
+    last_unlocked_by[99] = 0; // just in case it was more than 99 chars long
+    mutex_locked = false;
     /**if (name) {
       static char msg[200];
       sprintf(msg,"OPENWAM unlocked by %s",name);
@@ -2074,9 +2089,7 @@ void WAM::unlock(const char *name) {
 #else // ! OWD_RT
     pthread_mutex_unlock(&mutex);
 #endif // ! OWD_RT
-    strncpy(last_unlocked_by,name, 100);
-    last_unlocked_by[99] = 0; // just in case it was more than 99 chars long
-    mutex_locked = false;
+    //ROS_INFO("[WAM] Unlocked by %s", name);
 }
 
 void WAMstats::rosprint(int recorder_count) const {
