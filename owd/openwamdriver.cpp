@@ -93,6 +93,7 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   bool log_canbus_data;
   n.param("log_canbus_data",log_canbus_data,false);
   n.param("auto_start",auto_start,false);
+  n.param("publish_transforms",publish_transforms,true);
 
 #ifndef BH280_ONLY
   bus=new CANbus(canbus_number, Joint::Jn, bh_model==280, forcetorque, tactile, log_canbus_data);
@@ -1890,7 +1891,9 @@ bool WamDriver::Publish() {
     YAW.setEulerZYX(jointpos[i+1],0,0);
     tf::Transform wam_tf = wam_tf_base[i] *  tf::Transform(YAW);
     tf::StampedTransform st(wam_tf,ros::Time::now(),jrefstring,jnamestring);
-    tf_broadcaster.sendTransform(st);
+    if (publish_transforms) {
+      tf_broadcaster.sendTransform(st);
+    }
   }
 
   owam->lock("owd_L1896");
