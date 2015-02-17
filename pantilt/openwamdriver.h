@@ -258,6 +258,7 @@ private:
     boost::mutex wamstate_mutex;
     boost::mutex plugin_mutex;
     bool modified_j1;
+    bool publish_transforms;
 
     ros::Publisher
       pub_wamstate,
