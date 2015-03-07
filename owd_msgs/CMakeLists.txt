@@ -29,6 +29,7 @@ add_service_files(
   FILES
     AddTimedTrajectory.srv
     AddTrajectory.srv
+    AddOrTrajectory.srv
     AddWSTraj.srv
     ApplyEEForceTorque.srv
     ApplyForce.srv
