@@ -10,8 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 # TODO: Populate this.
 catkin_package(
-    #INCLUDE_DIRS include
-    #LIBRARIES ${PROJECT_NAME}
+    INCLUDE_DIRS .
     CATKIN_DEPENDS std_msgs owd_msgs geometry_msgs roscpp tf
 )
 
