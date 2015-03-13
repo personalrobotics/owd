@@ -1,8 +1,16 @@
+# Options bitmask.
+uint32 opt_WaitForStart=1
+uint32 opt_CancelOnStall=2
+uint32 opt_CancelOnForceInput=4
+uint32 opt_CancelOnTactileInput=8
+uint32 opt_Synchronize=16
+#
 string traj
 string id
 string xml_id
-bool synchronize
+int32 options
 ---
 bool ok
 string reason
 string id
+time time_added
