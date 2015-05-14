@@ -1112,7 +1112,7 @@ void control_loop_rt(void* argv){
 	  // now that we've gotten all the joint values and computed
 	  // the control torques, unlock so that other threads can read
 	  // our values
-      if(locked){
+      if(!locked){
           ROS_ERROR("[WAM] Trying to unlock an already unlocked mutex.");
       }
 	  wam->unlock("control_loop");
