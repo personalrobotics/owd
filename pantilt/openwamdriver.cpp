@@ -95,6 +95,7 @@ WamDriver::WamDriver(int canbus_number, int bh_model, bool forcetorque, bool tac
   ros::NodeHandle n("~");
   bool log_canbus_data;
   n.param("log_canbus_data",log_canbus_data,false);
+  n.param("publish_transforms",publish_transforms,true);
 
 #ifndef BH280_ONLY
   bus=new CANbus(canbus_number, Joint::Jn, bh_model==280, forcetorque, tactile, log_canbus_data);
@@ -308,6 +309,10 @@ bool WamDriver::Init(const char *joint_cal_file)
 
   ros::NodeHandle n("~");
 
+  //std::string tf_prefix;
+  n.param("tf_prefix",tf_prefix,std::string("controller"));
+  ROS_INFO("tf_prefix: %s", tf_prefix.c_str());
+  
   std::string wamhome_list, plugin_list, gravity_vector;
   // default value is the one used for Herb
 #ifdef WRIST
@@ -431,8 +436,6 @@ bool WamDriver::Init(const char *joint_cal_file)
       return false;
     }
     std::string sync_name("owd_");
-    std::string tf_prefix;
-    n.param("tf_prefix",tf_prefix,std::string("controller"));
     sync_name += tf_prefix;
     if (sync_id == 0) {
       ROS_INFO("Creating master synchronization controller");
@@ -1762,21 +1765,21 @@ bool WamDriver::move_until_stop(int joint, double stop, double limit, double vel
     }
 
     // loop until the trajectory finishes or gets stuck
-    owam->lock(); // lock before checking jointstraj
+    owam->lock("owd_L1768"); // lock before checking jointstraj
     while (owam->jointstraj) {
       if (owam->jointstraj->state() == OWD::Trajectory::STOP) {
-            owam->unlock();
+            owam->unlock("owd_L1771");
             // joint is stuck, so stop the trajectory
             ROS_DEBUG_NAMED("calibration","Joint hit torque limit.");
             owam->cancel_trajectory();
-            owam->lock(); // just so that we can unlock again outside the loop
+            owam->lock("owd_L1775"); // just so that we can unlock again outside the loop
             break;
         }
-        owam->unlock();
+        owam->unlock("owd_L1778");
         usleep(50000); // 50ms delay
-        owam->lock(); // lock before rechecking jointstraj
+        owam->lock("owd_L1780"); // lock before rechecking jointstraj
     }
-    owam->unlock();
+    owam->unlock("owd_L1782");
     // check our resting position
     owam->get_current_data(jointpos,NULL,NULL);
     ROS_DEBUG_NAMED("calibration",
@@ -1822,19 +1825,19 @@ bool WamDriver::move_joint(int joint, double newpos, double velocity) {
     }
 
     // loop until the trajectory finishes or gets stuck
-    owam->lock(); // lock before checking jointstraj
+    owam->lock("owd_L1828"); // lock before checking jointstraj
     while (owam->jointstraj) {
       if (owam->jointstraj->state()==OWD::Trajectory::STOP) {
-            owam->unlock();
+            owam->unlock("owd_L1831");
             // joint got stuck
             owam->cancel_trajectory();
             return false;
         }
-        owam->unlock();
+        owam->unlock("owd_L1836");
         usleep(50000); // 50ms delay
-        owam->lock(); // lock before rechecking jointstraj
+        owam->lock("owd_L1838"); // lock before rechecking jointstraj
     }
-    owam->unlock();
+    owam->unlock("owd_L1840");
     // we finished the trajectory ok
     return true;
 }
@@ -1981,15 +1984,17 @@ bool WamDriver::Publish() {
     waminternals.joint_offsets[i] = owam->joints[i+1].offset;
     // publish as transforms, too
     char jref[50], jname[50];
-    snprintf(jref,50,"wam%d",i);
-    snprintf(jname,50,"wam%d",i+1);
+    snprintf(jref,50,"%s/wam%d",tf_prefix.c_str(),i);
+    snprintf(jname,50,"%s/wam%d",tf_prefix.c_str(),i+1);
     std::string jrefstring(jref);
     std::string jnamestring(jname);
     tf::Quaternion YAW;
     YAW.setEulerZYX(jointpos[i+1],0,0);
     tf::Transform wam_tf = wam_tf_base[i] *  tf::Transform(YAW);
     tf::StampedTransform st(wam_tf,ros::Time::now(),jrefstring,jnamestring);
-    tf_broadcaster.sendTransform(st);
+    if (publish_transforms) {
+      tf_broadcaster.sendTransform(st);
+    }
   }
   // joint-encoder positions
   bool valid_jpos=true;
@@ -2016,7 +2021,7 @@ bool WamDriver::Publish() {
   }
   */
 
-  owam->lock();
+  owam->lock("owd_L2024");
   // Get the data we might need and then unlock as quickly as we can.
   // Whatever you do, DO NOT call any ROS functions in this block, or
   // you run the risk of slowing down the control loop enough to cause a
@@ -2042,7 +2047,7 @@ bool WamDriver::Publish() {
     wamstate.controller += std::string(" + ");
     wamstate.controller += owam->new_jscontroller->name;
   }
-  owam->unlock();
+  owam->unlock("owd_L2050");
 
   // Now that we've unlocked the controller again, we can figure out what's going
   // on the with trajectory and log any messages as necessary.
@@ -2235,15 +2240,15 @@ bool WamDriver::AddTrajectory(owd_msgs::AddTrajectory::Request &req,
       curpoint.resize(nJoints);  // strip off the fake joints
 #endif
     } else {
-      owam->lock();
+      owam->lock("owd_L2243");
       if (! owam->jointstraj) {
         // the trajectory finished while we were monkeying around.
         // go back and try again.
-        owam->unlock();
+        owam->unlock("owd_L2247");
         return AddTrajectory(req,res);
       }
       curpoint = owam->jointstraj->end_position;
-      owam->unlock();
+      owam->unlock("owd_L2251");
     }
     // make sure first point matches current pos or last queued pos.
     if (firstpoint !=  curpoint) {
@@ -2407,15 +2412,15 @@ bool WamDriver::AddTrajectory(OWD::Trajectory *traj, std::string &failure_reason
       curpoint.resize(nJoints);  // strip off the fake joints
 #endif
     } else {
-      owam->lock();
+      owam->lock("owd_L2415");
       if (! owam->jointstraj) {
         // the trajectory finished while we were monkeying around.
         // go back and try again.
-        owam->unlock();
+        owam->unlock("owd_L2419");
         return AddTrajectory(traj,failure_reason);
       }
       curpoint = owam->jointstraj->end_position;
-      owam->unlock();
+      owam->unlock("owd_L2423");
     }
     // make sure first point matches current pos or last queued pos.
     if (traj->start_position !=  curpoint) {
@@ -2484,9 +2489,9 @@ bool WamDriver::DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
   boost::mutex::scoped_lock lock(wamstate_mutex);
   for (unsigned int x=0; x<req.ids.size(); ++x) {
     std::string delete_id = req.ids[x];
-    owam->lock();
+    owam->lock("owd_L2492");
     if (owam->jointstraj && (owam->jointstraj->id == delete_id)) {
-      owam->unlock();
+      owam->unlock("owd_L2494");
       owam->cancel_trajectory();
       if (wamstate.trajectory_queue.size() > 0) {
 	wamstate.prev_trajectory = wamstate.trajectory_queue.front();
@@ -2494,7 +2499,7 @@ bool WamDriver::DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
 	wamstate.trajectory_queue.erase(wamstate.trajectory_queue.begin());
       }
     } else {
-      owam->unlock();
+      owam->unlock("owd_L2502");
       for (tl_it = trajectory_list.begin(),
              ws_it=wamstate.trajectory_queue.begin();
            tl_it != trajectory_list.end(); ++tl_it,++ws_it) {
@@ -2510,7 +2515,7 @@ bool WamDriver::DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
     }
   }
   // now look for discontinuities in position
-  owam->lock();
+  owam->lock("owd_L2518");
   JointPos p;
   tl_it=trajectory_list.begin();
   ws_it=wamstate.trajectory_queue.begin();
@@ -2521,11 +2526,11 @@ bool WamDriver::DeleteTrajectory(owd_msgs::DeleteTrajectory::Request &req,
     ++tl_it; ++ws_it;
   } else {
     // no more trajectories
-    owam->unlock();
+    owam->unlock("owd_L2529");
     ROS_INFO("DeleteTrajectory done; no more trajectories");
     return true;
   }
-  owam->unlock();
+  owam->unlock("owd_L2533");
   while (tl_it != trajectory_list.end()) {
     while (p != (*tl_it)->end_position) {
       // mismatch, so delete
@@ -2813,7 +2818,7 @@ bool WamDriver::SetExtraMass(owd_msgs::SetExtraMass::Request &req,
   owam->lock("SetExtraMass");
   if ((req.m.link < Link::L1) ||
       (req.m.link > Link::Ln)) {
-    owam->unlock();
+    owam->unlock("owd_L2821");
     res.ok=false;
     res.reason="Specified link is out of range";
     return true; // always return true if we received the request
@@ -3076,7 +3081,7 @@ void WamDriver::update_xmission_ratio(const char *param_name, double &current_va
     }
 
     // let the control loop resume
-    owam->unlock();
+    owam->unlock("owd_L3084");
     ROS_INFO("Using new value for %s = %2.3f",param_name, new_value);
   }
 }
@@ -3097,7 +3102,7 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const owd_msgs::Servo>
     ROS_DEBUG_NAMED("servo","  Servo joint %d velocity %2.2f",
               servo->joint[j], servo->velocity[j]);
   }
-  owam->lock();
+  owam->lock("owd_L3105");
   if (owam->jointstraj) {
     ServoTraj *straj = dynamic_cast<ServoTraj *>(owam->jointstraj);
     if (straj) {
@@ -3105,16 +3110,16 @@ void WamDriver::wamservo_callback(const boost::shared_ptr<const owd_msgs::Servo>
         straj->SetVelocity(servo->joint[i],servo->velocity[i]);
       }
       std::string trajid = straj->id;
-      owam->unlock();
+      owam->unlock("owd_L3113");
       ROS_DEBUG_NAMED("servo","Updated servo trajectory %s",trajid.c_str());
       return;
     } else {
-      owam->unlock();
+      owam->unlock("owd_L3117");
       ROS_WARN("A Joint Trajectory is still running; velocity command ignored");
       return;
     }
   } else {
-    owam->unlock();
+    owam->unlock("owd_L3122");
 #ifdef BUILD_FOR_SEA
     owam->posSmoother.getSmoothedPVA(owam->heldPositions);
 #endif // BUILD_FOR_SEA
@@ -3343,11 +3348,11 @@ bool WamDriver::SetController(owd_msgs::SetController::Request &req,
 	return true;
       }
     }
-    owam->lock();
+    owam->lock("owd_L3351");
     if (owam->new_jscontroller) {
       res.reason=std::string("Still not finished switching to controller ");
       res.reason += owam->new_jscontroller->name;
-      owam->unlock();
+      owam->unlock("owd_L3355");
       res.ok=false;
       return true;
     }
@@ -3359,7 +3364,7 @@ bool WamDriver::SetController(owd_msgs::SetController::Request &req,
       // controller is inactive, so swith immediately
       owam->jscontroller = controller;
     }
-    owam->unlock();
+    owam->unlock("owd_L3367");
     res.reason=std::string("");
     res.ok=true;
     ROS_INFO("Switching to controller %s",controller->name.c_str());

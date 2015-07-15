@@ -178,6 +178,10 @@ public:
   bool log_controller_data; // will log joint positions, torques, etc while
                             // holding a position or running a trajectory
 
+  char last_unlocked_by[100];
+  char last_locked_by[100];
+  bool mutex_locked;
+  pthread_t last_locked_thread_id;
   WAMstats stats;
   inline void rosprint_stats() { stats.rosprint(recorder.count); bus->rosprint_stats();}
 
@@ -250,7 +254,7 @@ public:
   bool& jsdynamics(){return jsdyn;} // use to set the dynamics
   
   bool& record(){return rec;}       // use to set the recording
-  SE3 FK(){  SE3 e0n; lock();   e0n=E0n;   unlock();   return e0n;  }
+  SE3 FK(){  SE3 e0n; lock("wam_hh_L253");   e0n=E0n;   unlock("wam_hh_UL253");   return e0n;  }
 
   friend ostream& operator << (ostream& s, WAM& wam);
 
