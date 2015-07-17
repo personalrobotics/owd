@@ -102,6 +102,9 @@ void BHD_280::GetParameters(ros::NodeHandle &n) {
   n.param("max_velocity",max_velocity,6.0);
   n.param("hsg_value",bus->hsg_value,0);
   n.param("apply_squeeze_after_stalling",bus->squeeze_after_stalling,true);
+  n.param("tf_prefix",tf_prefix, std::string("controller"));
+  n.param("publish_transforms",publish_transforms,true);
+  ROS_INFO("tf prefix: %s", tf_prefix.c_str());
 }
   
 void BHD_280::SetPuckValues() {
@@ -229,8 +232,8 @@ bool BHD_280::Publish() {
       tf::Quaternion YAW;
       
       // LINK 1
-      snprintf(jref,50,"wam7");
-      snprintf(jname,50,"finger%d_0",f);
+      snprintf(jref,50,"%s/wam7", tf_prefix.c_str());
+      snprintf(jname,50,"%s/finger%d_0",tf_prefix.c_str(),f);
       if (f==0) {
 	YAW.setEulerZYX(-bhstate.positions[3],0,0);
       } else if (f==1) {
@@ -239,23 +242,25 @@ bool BHD_280::Publish() {
 	// finger 3 has link1 fixed
 	YAW.setEulerZYX(0,0,0);
       }
-      tf::Transform finger_tf = finger_link1_base[f] * tf::Transform(YAW);
-      tf_broadcaster->sendTransform(tf::StampedTransform(finger_tf,ros::Time::now(),jref,jname));
 
-      // LINK 2
-      snprintf(jref,50,"finger%d_0",f);
-      snprintf(jname,50,"finger%d_1",f);
-      YAW.setEulerZYX(bhstate.positions[f],0,0);
-      finger_tf = finger_link2_base * tf::Transform(YAW);
-      tf_broadcaster->sendTransform(tf::StampedTransform(finger_tf,ros::Time::now(),jref,jname));
+      if (publish_transforms) {
+        tf::Transform finger_tf = finger_link1_base[f] * tf::Transform(YAW);
+        tf_broadcaster->sendTransform(tf::StampedTransform(finger_tf,ros::Time::now(),jref,jname));
 
-      // LINK 3
-      snprintf(jref,50,"finger%d_1",f);
-      snprintf(jname,50,"finger%d_2",f);
-      YAW.setEulerZYX(bhstate.positions[f]/3.0,0,0); // distal link moves at 1/3
-      finger_tf = finger_link3_base * tf::Transform(YAW);
-      tf_broadcaster->sendTransform(tf::StampedTransform(finger_tf,ros::Time::now(),jref,jname));
+        // LINK 2
+        snprintf(jref,50,"%s/finger%d_0",tf_prefix.c_str(),f);
+        snprintf(jname,50,"%s/finger%d_1",tf_prefix.c_str(),f);
+        YAW.setEulerZYX(bhstate.positions[f],0,0);
+        finger_tf = finger_link2_base * tf::Transform(YAW);
+        tf_broadcaster->sendTransform(tf::StampedTransform(finger_tf,ros::Time::now(),jref,jname));
 
+        // LINK 3
+        snprintf(jref,50,"%s/finger%d_1",tf_prefix.c_str(),f);
+        snprintf(jname,50,"%s/finger%d_2",tf_prefix.c_str(),f);
+        YAW.setEulerZYX(bhstate.positions[f]/3.0,0,0); // distal link moves at 1/3
+        finger_tf = finger_link3_base * tf::Transform(YAW);
+        tf_broadcaster->sendTransform(tf::StampedTransform(finger_tf,ros::Time::now(),jref,jname));
+      }
   }
 
   return true;

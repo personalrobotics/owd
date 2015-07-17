@@ -78,7 +78,9 @@ WAM::WAM(CANbus* cb, int bh_model, bool forcetorque, bool tactile,
   BH_model(bh_model), ForceTorque(forcetorque), Tactile(tactile),
   last_control_position(Joint::Jn),
   slip_joints_on_high_torque(false),
-  use_joint_encoders(false)
+  use_joint_encoders(false),
+  mutex_locked(false),
+  last_locked_thread_id(0)
 {
 #ifdef OWD_RT
   rt_mutex_create(&rt_mutex,"WAM_CC");
@@ -764,7 +766,7 @@ int WAM::set_joint_offsets(double offsets[]) {
   if (jointstraj != NULL) {
     // cannot change joint offsets while a trajectory is running
     // because it would require recomputing the trajectory vals
-    this->unlock();
+    this->unlock("WAM_L769");
     return OW_FAILURE;
   }
 
@@ -784,7 +786,7 @@ int WAM::set_joint_offsets(double offsets[]) {
     joints[j].offset = offsets[ joints[j].id() ];
   }
 
-  this->unlock();
+  this->unlock("WAM_L789");
   return OW_SUCCESS;
 }
    
@@ -819,12 +821,12 @@ void WAM::get_current_data(double* pos, double *trq, double *nettrq, double *sim
 	trajtrq[joints[j].id()] = traj_torq[j-1];
       }
     }
-    this->unlock();
+    this->unlock("WAM_L824");
 }
 
 void WAM::get_joint_encoder_positions(double* jpos) {
   if (jpos){
-    this->lock();
+    this->lock("WAM_L829");
 #ifndef HEAD
     for(int j=1; j<=4; ++j) {
 #else // HEAD
@@ -832,17 +834,17 @@ void WAM::get_joint_encoder_positions(double* jpos) {
 #endif // HEAD
       jpos[ joints[j].id() ] = joints[j].encoder_position;
     }
-    this->unlock();
+    this->unlock("WAM_L837");
   }
 }
 
 void WAM::get_motor_positions(double* mpos) {
   if (mpos){
-    this->lock();
+    this->lock("WAM_L843");
     for(int j=Joint::J1; j<=Joint::Jn; j++)
       mpos[ joints[j].id() ] = joints[j].motor_position;
   }
-  this->unlock();
+  this->unlock("WAM_L847");
 }
 
 /*
@@ -1021,6 +1023,7 @@ void control_loop_rt(void* argv){
       int32_t time_to_wait = ControlLoop::PERIOD * 1e6  // sec to usecs
 	- (read_start_time - loopstart_time) * 1e-3;  // nsecs to usecs
       wam->lock("control loop");
+      bool locked(true);
       while (time_to_wait>0) {
 	uint8_t  msg[8];
 	int32_t msgid, msglen;
@@ -1109,7 +1112,12 @@ void control_loop_rt(void* argv){
 	  // now that we've gotten all the joint values and computed
 	  // the control torques, unlock so that other threads can read
 	  // our values
+      if(!locked){
+          ROS_ERROR("[WAM] Trying to unlock an already unlocked mutex.");
+      }
 	  wam->unlock("control_loop");
+      locked = false;
+
 	  last_loopstart_time = loopstart_time;
 	  sendtorque_start_time = ControlLoop::get_time_ns_rt();
 	  if(wam->bus->send_torques_rt() == OW_FAILURE){
@@ -1159,7 +1167,10 @@ void control_loop_rt(void* argv){
       if (! torques_sent) {
 	// we must have not received all the joint values before the
 	// time expired
-	wam->unlock();
+          if(locked){
+              wam->unlock("WAM_L1171");
+              locked = false;
+          }
 	++total_missed_data_cycles;
 	if (++missing_data_cycles == 100) {
 	  // we went 100 cycles in a row while missing values from at
@@ -1731,7 +1742,7 @@ void WAM::newcontrol_rt(double dt){
   if (bus->simulation) {
     // If we're running in simulation mode, then set the joint positions
     // as if they instantly moved to where we wanted.
-    this->unlock();
+    this->unlock("WAM_L1745");
     set_jpos((&tc.q[0])-1);
     this->lock("control_loop");
   }
@@ -1923,7 +1934,7 @@ void WAM::move_sigmoid(const SE3& E02){
 void WAM::set_stiffness(float s) {
   this->lock("set_stiffness");
   stiffness = s;
-  this->unlock();
+  this->unlock("set_stiffness");
 }
 
 int WAM::hold_position(double jval[],bool grab_lock) 
@@ -2016,7 +2027,7 @@ void WAM::printmtrq(){
 }
 
 void WAM::lock(const char *name) {
-  static char last_locked_by[100];
+    //static char last_locked_by[100];
 #ifdef OWD_RT
   rt_mutex_acquire(&rt_mutex,TM_INFINITE);
 #else // ! OWD_RT
@@ -2024,6 +2035,8 @@ void WAM::lock(const char *name) {
 #endif // ! OWD_RT
   strncpy(last_locked_by,name,100);
   last_locked_by[99]=0; // just in case it was more than 99 chars long
+  mutex_locked = true;
+  last_locked_thread_id = pthread_self();
 }
 
 bool WAM::lock_rt(const char *name) {
@@ -2056,6 +2069,23 @@ void WAM::unlock(const char *name) {
   //  } else {
   //    syslog(LOG_ERR,"OPENWAM unlocked by (unknown)");
   //  }
+    if(!mutex_locked){
+        ROS_ERROR("[WAM] %s tried to unlock mutex. Already unlocked by %s",
+                  name, last_unlocked_by);
+        return;
+    }
+
+    pthread_t this_thread_id = pthread_self();
+    if(!pthread_equal(this_thread_id, last_locked_thread_id)){
+        ROS_ERROR("[WAM] %s tried to unlock from a different thread. Last locked by %s.",
+                  name, last_locked_by);
+        return;
+    }
+
+    strncpy(last_unlocked_by, name, 100);
+    last_unlocked_by[99] = 0;
+    mutex_locked = false;
+
 #ifdef OWD_RT
   rt_mutex_release(&rt_mutex);
 #else // ! OWD_RT

@@ -219,6 +219,7 @@ private:
     bool log_controller_data;
     typedef pair<void *,bool (*)()> PluginPointers;
     std::vector<PluginPointers> loaded_plugins;
+    std::string tf_prefix;
 
     // update internal structures
     void resetDesiredJointPositions(void);
@@ -257,6 +258,7 @@ private:
     boost::mutex wamstate_mutex;
     boost::mutex plugin_mutex;
     bool modified_j1;
+    bool publish_transforms;
 
     ros::Publisher
       pub_wamstate,
