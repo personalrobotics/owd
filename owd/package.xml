@@ -29,6 +29,6 @@
   <run_depend>roscpp</run_depend>
   <run_depend>rosconsole</run_depend>
   <run_depend>gfortran</run_depend>
-  <run_depend>lib-ncurses-dev</run_depend>
+  <run_depend>libncurses-dev</run_depend>
   <run_depend>tf</run_depend>
 </package>
